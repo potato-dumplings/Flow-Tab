@@ -21,7 +21,7 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
     @Binding var hotkeyQuitKeyRaw: String
     @Binding var inAppWindowHotkeyPrimaryModifierRaw: String
     @Binding var inAppWindowHotkeyMainKeyRaw: String
-    let commandTabTakeoverActive: Bool
+    let commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
     let accessibilityTrusted: Bool
     let screenCaptureTrusted: Bool
     let onWindowLayerAutoEnterDelayTextChanged: (String) -> Void
@@ -128,7 +128,7 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
                 hotkeyQuitKeyRaw: hotkeyQuitKeyRaw.wrappedValue,
                 inAppWindowHotkeyPrimaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw.wrappedValue,
                 inAppWindowHotkeyMainKeyRaw: inAppWindowHotkeyMainKeyRaw.wrappedValue,
-                commandTabTakeoverActive: commandTabTakeoverActive,
+                commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
                 accessibilityTrusted: accessibilityTrusted,
                 screenCaptureTrusted: screenCaptureTrusted,
                 targetNSAppearanceName: presentationContext.targetNSAppearanceName

@@ -584,7 +584,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testAppDelegateDirectHotkeyReloadRegistersImmediatelyWithoutNotificationEcho() async {
+    func testAppDelegateDirectHotkeyReloadPublishesExactRegistrationEvidence() {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
 
         let previousHooks = AppDelegate.testHooks
@@ -630,6 +630,7 @@ extension FlowTabPriorityCoverageTests {
         appDelegate.applicationDidFinishLaunching(
             Notification(name: NSApplication.didFinishLaunchingNotification)
         )
+        let initialEvidence = appDelegate.latestHotkeyRegistrationEvidence
         let baselineRecordCount = hotkeyFactory.records.count
         XCTAssertGreaterThanOrEqual(baselineRecordCount, 2)
         let previousMainMonitor = hotkeyFactory.records[baselineRecordCount - 2].monitor
@@ -647,16 +648,10 @@ extension FlowTabPriorityCoverageTests {
                 quitKey: .q
             )
         )
-        appDelegate.requestHotkeyReload(using: request, source: "test_direct")
-
-        let didRegisterNewHotkeys = await waitUntil(
-            "direct hotkey reload registers replacement monitors",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            hotkeyFactory.records.count >= baselineRecordCount + 2
-        }
-        XCTAssertTrue(didRegisterNewHotkeys)
+        let evidence = appDelegate.requestHotkeyReload(
+            using: request,
+            source: "test_direct"
+        )
 
         let newRecords = Array(hotkeyFactory.records.dropFirst(baselineRecordCount))
         XCTAssertEqual(newRecords.count, 2)
@@ -679,6 +674,15 @@ extension FlowTabPriorityCoverageTests {
             }
         )
         XCTAssertEqual(takeoverController.reconcileCalls.last, true)
+        XCTAssertEqual(evidence.generation, (initialEvidence?.generation ?? 0) + 1)
+        XCTAssertEqual(evidence.requestID, request.requestID)
+        XCTAssertEqual(evidence.mainConfiguration, request.mainConfiguration)
+        XCTAssertEqual(
+            evidence.inAppWindowConfiguration,
+            request.inAppWindowConfiguration
+        )
+        XCTAssertTrue(evidence.commandTabTakeoverActive)
+        XCTAssertEqual(appDelegate.latestHotkeyRegistrationEvidence, evidence)
     }
 
     @MainActor

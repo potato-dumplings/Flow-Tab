@@ -28,8 +28,6 @@ struct AppSettingsView: View {
     private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyQuitKey)
     private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
-    @AppStorage(CommandTabTakeoverController.takeoverMarkerKey)
-    private var commandTabTakeoverActive = false
     @AppStorage(AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier)
     private var inAppWindowHotkeyPrimaryModifierRaw =
         InAppWindowHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
@@ -42,6 +40,8 @@ struct AppSettingsView: View {
     @State private var hasAttemptedScreenCapturePermissionRequest = false
     @StateObject private var permissionObservationCoordinator =
         RuntimePermissionObservationCoordinator()
+    @StateObject private var hotkeyRegistrationObservationOwner =
+        HotkeyRegistrationObservationOwner()
     @State private var windowLayerAutoEnterDelayText = ""
     @State private var didInitialize = false
     @State private var isWindowLayerAutoEnterDelayEditing = false
@@ -79,6 +79,19 @@ struct AppSettingsView: View {
             primaryModifier: resolved.primaryModifier,
             mainKey: resolved.mainKey,
             quitKey: .q
+        )
+    }
+
+    private var currentHotkeyRegistrationRequest: HotkeyRegistrationRequest {
+        HotkeyRegistrationRequest(
+            mainConfiguration: hotkeyConfiguration,
+            inAppWindowConfiguration: inAppWindowHotkeyConfiguration
+        )
+    }
+
+    private var commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState {
+        hotkeyRegistrationObservationOwner.takeoverState(
+            matching: currentHotkeyRegistrationRequest
         )
     }
 
@@ -151,7 +164,7 @@ struct AppSettingsView: View {
                 hotkeyQuitKeyRaw: $hotkeyQuitKeyRaw,
                 inAppWindowHotkeyPrimaryModifierRaw: $inAppWindowHotkeyPrimaryModifierRaw,
                 inAppWindowHotkeyMainKeyRaw: $inAppWindowHotkeyMainKeyRaw,
-                commandTabTakeoverActive: commandTabTakeoverActive,
+                commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
                 accessibilityTrusted: accessibilityTrusted,
                 screenCaptureTrusted: screenCaptureTrusted,
                 onWindowLayerAutoEnterDelayTextChanged: applyWindowLayerAutoEnterDelayText,
@@ -255,6 +268,7 @@ struct AppSettingsView: View {
         }
         .onDisappear {
             cancelPermissionObservation()
+            hotkeyRegistrationObservationOwner.stop()
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("flowtab.tab.settings.content")
@@ -264,8 +278,10 @@ struct AppSettingsView: View {
     private func handleVisibilityChanged(_ active: Bool) {
         guard active else {
             cancelPermissionObservation()
+            hotkeyRegistrationObservationOwner.stop()
             return
         }
+        hotkeyRegistrationObservationOwner.start()
         if !didInitialize {
             enforceHotkeyConsistency()
             enforceInAppWindowHotkeyConsistency()
@@ -608,6 +624,7 @@ struct AppSettingsView: View {
     @MainActor
     private func notifyHotkeyConfigChanged(using request: HotkeyRegistrationRequest) {
         lastNotifiedHotkeySignature = hotkeyRequestSignature(request)
+        hotkeyRegistrationObservationOwner.prepare(for: request)
         persistHotkeyRegistrationRequest(request)
         RuntimeLog.info(
             .hotKey,
@@ -626,6 +643,7 @@ struct AppSettingsView: View {
                 userInfo: request.notificationUserInfo
             )
         }
+        hotkeyRegistrationObservationOwner.readback()
     }
 
     private func hotkeyRequestSignature(_ request: HotkeyRegistrationRequest) -> String {

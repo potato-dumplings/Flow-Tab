@@ -10,7 +10,7 @@ struct AppKitHotkeySettingsCardContent: AppKitSettingsCardRepresentable {
     @Binding var hotkeyQuitKeyRaw: String
     @Binding var inAppWindowHotkeyPrimaryModifierRaw: String
     @Binding var inAppWindowHotkeyMainKeyRaw: String
-    let commandTabTakeoverActive: Bool
+    let commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
     let accessibilityTrusted: Bool
 
     final class Coordinator {
@@ -108,7 +108,7 @@ struct AppKitHotkeySettingsCardContent: AppKitSettingsCardRepresentable {
             hotkeyQuitKeyRaw: hotkeyQuitKeyRaw,
             inAppWindowHotkeyPrimaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw,
             inAppWindowHotkeyMainKeyRaw: inAppWindowHotkeyMainKeyRaw,
-            commandTabTakeoverActive: commandTabTakeoverActive,
+            commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
             accessibilityTrusted: accessibilityTrusted,
             appLanguageRaw: AppLanguagePreferencesStore.load().rawValue
         )
@@ -121,7 +121,7 @@ struct HotkeySettingsCardState: Equatable {
     let hotkeyQuitKeyRaw: String
     let inAppWindowHotkeyPrimaryModifierRaw: String
     let inAppWindowHotkeyMainKeyRaw: String
-    let commandTabTakeoverActive: Bool
+    let commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
     let accessibilityTrusted: Bool
     let appLanguageRaw: String
 
@@ -158,12 +158,6 @@ struct HotkeySettingsCardState: Equatable {
             && inAppWindowHotkeyConfiguration.mainKey == .tab
     }
 
-    var commandTabTakeoverStatusText: String {
-        commandTabTakeoverActive
-            ? AppStrings.text(.hotkeyCommandTabTakeoverActive, language: language)
-            : AppStrings.text(.hotkeyCommandTabTakeoverInactive, language: language)
-    }
-
     var mainSummaryText: String {
         AppStrings.text(
             .hotkeyMainSummary,
@@ -193,10 +187,6 @@ struct HotkeySettingsCardState: Equatable {
 }
 
 final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
-    private final class DelayedTakeoverStatusToken {
-        var generation: UInt64 = 0
-    }
-
     var onHotkeyPrimaryModifierChanged: ((String) -> Void)?
     var onHotkeyMainKeyChanged: ((String) -> Void)?
     var onHotkeyQuitKeyChanged: ((String) -> Void)?
@@ -235,36 +225,17 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         title: "",
         control: inAppMainKeySelect
     )
-    private static let defaultTakeoverInactiveDisplayDelay: TimeInterval = 0.25
-    private let takeoverInactiveDisplayDelay: TimeInterval
     private var isApplyingState = false
-    private var mainInactiveStatusWorkItem: DispatchWorkItem?
-    private var inAppInactiveStatusWorkItem: DispatchWorkItem?
-    private let mainInactiveStatusToken = DelayedTakeoverStatusToken()
-    private let inAppInactiveStatusToken = DelayedTakeoverStatusToken()
     private var currentState: HotkeySettingsCardState?
 
     override init(frame frameRect: NSRect) {
-        self.takeoverInactiveDisplayDelay = Self.defaultTakeoverInactiveDisplayDelay
         super.init(frame: frameRect)
         buildViewHierarchy()
     }
 
-    init(takeoverInactiveDisplayDelay: TimeInterval) {
-        self.takeoverInactiveDisplayDelay = takeoverInactiveDisplayDelay
-        super.init(frame: .zero)
-        buildViewHierarchy()
-    }
-
     required init?(coder: NSCoder) {
-        self.takeoverInactiveDisplayDelay = Self.defaultTakeoverInactiveDisplayDelay
         super.init(coder: coder)
         buildViewHierarchy()
-    }
-
-    deinit {
-        mainInactiveStatusWorkItem?.cancel()
-        inAppInactiveStatusWorkItem?.cancel()
     }
 
     override var intrinsicContentSize: NSSize {
@@ -462,10 +433,8 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         updateTakeoverStatus(
             label: mainTakeoverStatusLabel,
             usesCommandTab: state.mainUsesCommandTab,
-            takeoverActive: state.commandTabTakeoverActive,
-            language: state.language,
-            workItem: &mainInactiveStatusWorkItem,
-            token: mainInactiveStatusToken
+            registrationState: state.commandTabTakeoverRegistrationState,
+            language: state.language
         )
     }
 
@@ -473,59 +442,37 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         updateTakeoverStatus(
             label: inAppTakeoverStatusLabel,
             usesCommandTab: state.inAppUsesCommandTab,
-            takeoverActive: state.commandTabTakeoverActive,
-            language: state.language,
-            workItem: &inAppInactiveStatusWorkItem,
-            token: inAppInactiveStatusToken
+            registrationState: state.commandTabTakeoverRegistrationState,
+            language: state.language
         )
     }
 
     private func updateTakeoverStatus(
         label: NSTextField,
         usesCommandTab: Bool,
-        takeoverActive: Bool,
-        language: AppLanguage,
-        workItem: inout DispatchWorkItem?,
-        token: DelayedTakeoverStatusToken
+        registrationState: CommandTabTakeoverRegistrationState,
+        language: AppLanguage
     ) {
-        workItem?.cancel()
-        workItem = nil
-        token.generation &+= 1
-
         guard usesCommandTab else {
             label.isHidden = true
             return
         }
 
-        if takeoverActive {
+        switch registrationState {
+        case .pending:
+            label.isHidden = true
+        case .active:
             label.stringValue = AppStrings.text(.hotkeyCommandTabTakeoverActive, language: language)
             label.textColor = .systemGreen
             label.isHidden = false
-            return
-        }
-
-        // Treat fresh Command+Tab updates as pending; only show inactive text after confirmation delay.
-        label.isHidden = true
-        let scheduledGeneration = token.generation
-        let pendingWorkItem = DispatchWorkItem { [weak self, weak label] in
-            guard let self, let label else { return }
-            guard token.generation == scheduledGeneration else { return }
-            guard let latestState = self.currentState else { return }
-
-            let latestUsesCommandTab = label === self.mainTakeoverStatusLabel
-                ? latestState.mainUsesCommandTab
-                : latestState.inAppUsesCommandTab
-
-            guard latestUsesCommandTab, !latestState.commandTabTakeoverActive else { return }
+        case .inactive:
             label.stringValue = AppStrings.text(
                 .hotkeyCommandTabTakeoverInactive,
-                language: latestState.language
+                language: language
             )
             label.textColor = .systemRed
             label.isHidden = false
         }
-        workItem = pendingWorkItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + takeoverInactiveDisplayDelay, execute: pendingWorkItem)
     }
 
     private func updateLocalizedRows(language: AppLanguage) {

@@ -93,7 +93,7 @@ extension Notification.Name {
     )
 }
 
-struct HotkeyRegistrationRequest: Sendable {
+struct HotkeyRegistrationRequest: Equatable, Sendable {
     private enum NotificationUserInfoKey {
         static let requestID = "requestID"
         static let mainPrimaryModifier = "mainPrimaryModifier"

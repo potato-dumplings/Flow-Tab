@@ -559,7 +559,7 @@ extension FlowTabTests {
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
             inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
             inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
-            commandTabTakeoverActive: false,
+            commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: accessibilityTrusted,
             screenCaptureTrusted: screenCaptureTrusted,
             targetNSAppearanceName: themeMode

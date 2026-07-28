@@ -154,7 +154,7 @@ enum SwitcherHotkeyKey: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-struct SwitcherHotkeyConfiguration: Sendable {
+struct SwitcherHotkeyConfiguration: Equatable, Sendable {
     let primaryModifier: SwitcherPrimaryModifier
     let mainKey: SwitcherHotkeyKey
     let quitKey: SwitcherHotkeyKey

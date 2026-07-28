@@ -97,7 +97,7 @@ and Process/Tooling.
 | SYNC-041 | `HomeLandingView.requestSelectedAppRefresh`, `requestAppDetailProjection`, `HomeAppDetailProjectionObservationOwner`; selected/scoped Home detail | Fixed 120ms and 220ms post-selection or AX-signal delays assumed the requested current-app projection had committed. Evidence migration. | Install the exact runtime-service observer before the initial readback and selected/app-window/AX-destroy signal. Filter by exact appID and projection identity; apply an exact complete baseline immediately while retaining the trigger observation, then accept a newly available projection, monotonic source generation, or same-generation completeness transition. Independent request-return readback closes synchronous completion races. Home visibility and per-app request generations own subscriptions, cancellation, and stale-event rejection. | H; Unit, Behavior, selected-app Home UI, runtime-topology Pressure. | blocked: implementation, focused Unit/Behavior, full FlowTabTests, tab-switch Pressure, and Process passed; UI automation and full Priority order-isolation evidence are recorded below |
 | SYNC-014 | `FlowTab/App/AppFoundation.swift`; `AppWindowCoordinator.scheduleAccessoryPolicyRestoration` | Up to 250 polls at 20ms infer that a status-item-opened regular window is active and visible. Conditional observation plus watchdog. | Register app/window observers before presentation, perform immediate visibility/activation readback, and complete on the matching window transition. A named cancellable condition observer is the fallback; watchdog diagnostics include app-active, visible, miniaturized, and activation-policy state. `AppWindowCoordinator` owns the task/observers. | H; Unit, Behavior, status-item UI. | completed; the expanded full Priority run's assigned SYNC-032/SYNC-033 order-isolation failure is recorded below |
 | SYNC-015 | `SwitcherSearchCoordinator.scheduleRebuild`, `LiveSwitcherModel.scheduleSearchComputation` | 10–45ms delays debounce query work; result publication already requires revision and query/scope equality. Domain duration. | Retain as one named search scheduling policy with injectable scheduler/clock, cancellation, and revision Oracle. Remove duplicate scheduling ownership if both paths serve the same contract. | H hot path; Unit, Behavior, Search UI, realistic/stress Search Pressure. | completed; the expanded full Priority run's assigned SYNC-032/SYNC-033 order-isolation failure is recorded below |
-| SYNC-016 | `FlowTab/Features/Settings/HotkeySettingsCard.swift`; `updateTakeoverStatus` | A 250ms delay is treated as confirmation that Command+Tab takeover stayed inactive. Evidence migration. | Publish registration result/marker generation from the hotkey owner and render status from that readback. The card observes before requesting registration and owns subscription cleanup. | M; Unit, Behavior, Settings UI. | planned |
+| SYNC-016 | `AppDelegate.setupHotkeyMonitors`, `HotkeyRegistrationObservationOwner`, `HotkeySettingsCardAppKitView.updateTakeoverStatus`; Command+Tab registration status | A 250ms delay was treated as confirmation that Command+Tab takeover stayed inactive. Evidence migration. | Publish a monotonic registration generation with exact request ID, configurations, and takeover result after reconciliation and monitor setup. Settings observes before persistence/registration, closes synchronous delivery with readback, and renders only matching evidence. Settings active visibility owns observer cleanup and stale-generation rejection. | M; Unit, Behavior, Settings UI. | completed; the expanded full Priority run's assigned SYNC-032/SYNC-033 order-isolation failure is recorded below |
 | SYNC-017 | `SwitcherPanelController+InputHandling.swift`; modifier-release confirmation and replay suppression | Hardware release is inferred from repeated samples after fixed intervals. Conditional observation. | Consume flags/key transition events first, immediately read hardware state, and retain named cancellable sampling only for missed global events. Stable released-state samples remain the condition Oracle; session and confirmation generations own cancellation. | H; Unit, Behavior, switcher UI, interaction Pressure. | planned |
 | SYNC-018 | `SwitcherPanelController+Hotkeys.swift`, `+SelectionLifecycle.swift`; tab throttle and post-finish ignore | 16ms and 20ms windows discard input assumed to be duplicate/replayed, so scheduling can change the selected result. Evidence migration. | Deduplicate by concrete event identity and session/input generation, and suppress replay until observed modifier/main-key release. The active presentation session owns the state. | H; Unit, Behavior, switcher UI, interaction Pressure. | planned |
 | SYNC-019 | `SwitcherPanelController+InitialVisibilityRecovery.swift`; initial visibility grace/deadline | A grace duration decides whether occlusion is stale and later triggers failure. Evidence migration plus watchdog. | Establish the panel occlusion/key/order observer before presentation, use initial readback and later presentation generation to prove visibility, and retain one named terminal watchdog that reports the last visibility snapshot. The presentation session owns it. | H; Unit, Behavior, switcher UI, runtime-topology Pressure. | planned |
@@ -1099,5 +1099,78 @@ polling cadence, deadline, or timeout in the scoped paths.
   search, and source-size checks passed. New production and test files remain
   within the 400-line guardrail, while the touched oversized
   `LiveSwitcherModel.swift` shrank by four lines.
-- Commit: `refactor(sync): migrate SYNC-015 search scheduling`; its exact SHA
-  is appended by the next ledger update after the commit exists.
+- Commit: `76827b2`
+  (`refactor(sync): migrate SYNC-015 search scheduling`).
+
+### SYNC-016 Closure Record
+
+- Design and Oracle: `AppDelegate` now publishes
+  `HotkeyRegistrationEvidence` only after Command+Tab reconciliation and both
+  hotkey monitors have been configured. Each evidence value carries a
+  monotonic generation, exact request ID, both requested configurations, and
+  the resulting takeover-active readback. `AppSettingsView` prepares its
+  observer before persisting or requesting registration and performs an
+  independent request-return readback to close synchronous delivery races.
+  `HotkeySettingsCardAppKitView` renders pending, active, or inactive solely
+  from matching registration evidence.
+- Lifecycle: Settings active visibility owns one
+  `HotkeyRegistrationObservationOwner`. Starting installs the notification
+  token before the initial readback; inactivity and disappearance remove the
+  token, clear pending evidence, and advance an observation generation that
+  rejects already-queued delivery. The owner accepts only strictly increasing
+  evidence generations. Exact request identity or exact configuration
+  equality resolves a pending request, while duplicate, regressed,
+  out-of-order, and unrelated evidence cannot change the rendered result.
+- Retained time policy: the 250ms inactive-status delay, delayed work items,
+  and generation tokens were removed. Registration completion is synchronous
+  at the AppDelegate owner boundary and therefore needs no watchdog. The
+  persisted Command+Tab restoration marker remains the compatibility and crash-
+  restoration state owned by `CommandTabTakeoverController`; Settings no
+  longer uses it as registration-success evidence.
+- Unit and Behavior: the final focused set passed 11/11 under
+  `.build-local/evidence-driven-sync/SYNC-016/flowtabtests-targeted-attempt-003`
+  (seven Unit paths and four Priority behavior paths). Coverage includes
+  observer-before-readback delivery, an already-satisfied exact initial
+  request, exact request/configuration matching, duplicate and out-of-order
+  rejection, explicit stop/cancellation, scheduler-yield latency equivalence,
+  exact AppDelegate publication, and 2,000 monotonic evidence generations.
+  After tightening cancellation coverage to reject an already-queued
+  notification delivery, the final five owner tests passed 5/5 under
+  `.build-local/evidence-driven-sync/SYNC-016/flowtabtests-owner-final-attempt-001`.
+  The complete `FlowTabTests` class passed 288/288 under
+  `.build-local/evidence-driven-sync/SYNC-016/flowtabtests-unit-full-attempt-001`.
+  The complete `FlowTabPriorityCoverageTests` class executed 570 tests under
+  `.build-local/evidence-driven-sync/SYNC-016/flowtabtests-priority-full-attempt-001`;
+  all four SYNC-016 behavior paths passed, while
+  `testAppDelegateLaunchWithUITestBootstrapArgumentsSeedsLogsAndOpensSearch`
+  observed the previously recorded duplicate external hotkey reload in suite
+  order. Its exact isolated rerun passed 1/1 under
+  `.build-local/evidence-driven-sync/SYNC-016/flowtabtests-known-order-isolated-attempt-001`.
+  The order-isolation work remains assigned to SYNC-032/SYNC-033.
+- FlowTabCore: not relevant because registration, Settings visibility,
+  AppKit rendering, and notification publication are app-target boundaries.
+- UI: the canonical install script rebuilt and installed the fixed-path signed
+  app. The first canonical run ended before the test body when macOS timed out
+  enabling automation mode. The elevated second run exposed that the new UI
+  assertion read one accessibility property immediately after element
+  existence; the Oracle was corrected to wait for the identified status
+  element whose label or value contains the active registration evidence.
+  `testSettingsCommandTabTakeoverTriggersSwitcherAndRestoresSystemShortcut`
+  then passed 1/1 in 40.599 seconds under
+  `.build-local/evidence-driven-sync/SYNC-016/ui-settings-command-tab-attempt-003`.
+  It verified exact active-registration logging, marker compatibility, visible
+  active status, Command+Tab delivery, and system-shortcut restoration after
+  exit.
+- Pressure: the deterministic 2,000-generation owner test passed in the
+  focused run. It preserved the latest matching registration result while
+  rejecting every earlier generation. The latency-equivalence test inserted
+  additional scheduler yields and produced the same terminal state, so
+  scheduling pressure changed delivery time without changing the result.
+- Process/Tooling: the app, app-test, and UI-test targets built through the
+  canonical scripts. Project-file `plutil -lint`, `git diff --check`, scoped
+  stale-delay/symbol search, and source-size checks passed. New production and
+  test files remain below the 400-line guardrail; the touched
+  `HotkeySettingsCard.swift` shrank from 572 to 519 lines. The startup
+  `prompts.zip` remains unchanged and outside the slice.
+- Commit: `refactor(sync): migrate SYNC-016 hotkey registration status`; its
+  exact SHA is appended by the next ledger update after the commit exists.

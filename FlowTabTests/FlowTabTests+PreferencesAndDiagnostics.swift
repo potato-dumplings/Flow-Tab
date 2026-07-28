@@ -498,35 +498,44 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testHotkeyTakeoverInactiveStatusShowsAfterConfirmationDelay() {
-        let view = HotkeySettingsCardAppKitView(takeoverInactiveDisplayDelay: 0.01)
+    func testHotkeyTakeoverInactiveStatusUsesRegistrationEvidence() {
+        let view = HotkeySettingsCardAppKitView()
         let statusLabel: NSTextField? = descendant(
             in: view,
             identifier: "flowtab.settings.hotkey.main-takeover-status"
         )
 
-        view.update(with: makeHotkeySettingsState(commandTabTakeoverActive: false))
+        view.update(
+            with: makeHotkeySettingsState(
+                commandTabTakeoverRegistrationState: .inactive
+            )
+        )
 
-        XCTAssertTrue(waitForRunLoopCondition(timeout: 0.5) {
-            statusLabel?.isHidden == false
-        })
+        XCTAssertFalse(statusLabel?.isHidden ?? true)
         XCTAssertEqual(statusLabel?.stringValue, AppStrings.text(.hotkeyCommandTabTakeoverInactive))
     }
 
     @MainActor
-    func testHotkeyTakeoverInactiveDelayDoesNotShowStaleStatusAfterRecovery() {
-        let view = HotkeySettingsCardAppKitView(takeoverInactiveDisplayDelay: 0.01)
+    func testHotkeyTakeoverPendingStateHidesUntilRegistrationEvidenceArrives() {
+        let view = HotkeySettingsCardAppKitView()
         let statusLabel: NSTextField? = descendant(
             in: view,
             identifier: "flowtab.settings.hotkey.main-takeover-status"
         )
 
-        view.update(with: makeHotkeySettingsState(commandTabTakeoverActive: false))
-        view.update(with: makeHotkeySettingsState(commandTabTakeoverActive: true))
+        view.update(
+            with: makeHotkeySettingsState(
+                commandTabTakeoverRegistrationState: .pending
+            )
+        )
+        XCTAssertTrue(statusLabel?.isHidden ?? false)
 
-        XCTAssertTrue(waitForRunLoopCondition(timeout: 0.5) {
-            statusLabel?.stringValue == AppStrings.text(.hotkeyCommandTabTakeoverActive)
-        })
+        view.update(
+            with: makeHotkeySettingsState(
+                commandTabTakeoverRegistrationState: .active
+            )
+        )
+
         XCTAssertEqual(statusLabel?.stringValue, AppStrings.text(.hotkeyCommandTabTakeoverActive))
         XCTAssertFalse(statusLabel?.isHidden ?? true)
     }
@@ -1492,14 +1501,16 @@ extension FlowTabTests {
         XCTAssertEqual(scopedLines.count, 1)
     }
 
-    private func makeHotkeySettingsState(commandTabTakeoverActive: Bool) -> HotkeySettingsCardState {
+    private func makeHotkeySettingsState(
+        commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
+    ) -> HotkeySettingsCardState {
         HotkeySettingsCardState(
             hotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.command.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
             inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
             inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
-            commandTabTakeoverActive: commandTabTakeoverActive,
+            commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
             accessibilityTrusted: true,
             appLanguageRaw: AppLanguage.simplifiedChinese.rawValue
         )
@@ -1526,7 +1537,7 @@ extension FlowTabTests {
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
             inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
             inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
-            commandTabTakeoverActive: false,
+            commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: false,
             screenCaptureTrusted: false,
             targetNSAppearanceName: .aqua

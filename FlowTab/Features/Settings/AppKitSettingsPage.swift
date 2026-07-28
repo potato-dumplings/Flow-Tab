@@ -20,7 +20,7 @@ struct AppKitSettingsPageState: Equatable {
     let hotkeyQuitKeyRaw: String
     let inAppWindowHotkeyPrimaryModifierRaw: String
     let inAppWindowHotkeyMainKeyRaw: String
-    let commandTabTakeoverActive: Bool
+    let commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
     let accessibilityTrusted: Bool
     let screenCaptureTrusted: Bool
     let targetNSAppearanceName: NSAppearance.Name
@@ -420,7 +420,7 @@ final class AppKitSettingsPageView: NSView {
                 hotkeyQuitKeyRaw: state.hotkeyQuitKeyRaw,
                 inAppWindowHotkeyPrimaryModifierRaw: state.inAppWindowHotkeyPrimaryModifierRaw,
                 inAppWindowHotkeyMainKeyRaw: state.inAppWindowHotkeyMainKeyRaw,
-                commandTabTakeoverActive: state.commandTabTakeoverActive,
+                commandTabTakeoverRegistrationState: state.commandTabTakeoverRegistrationState,
                 accessibilityTrusted: state.accessibilityTrusted,
                 appLanguageRaw: state.appLanguageRaw
             )

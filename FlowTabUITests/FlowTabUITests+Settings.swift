@@ -461,15 +461,27 @@ extension FlowTabUITests {
             containing: [
                 "updated main=Command + Tab",
                 "system Command+Tab shortcuts disabled for FlowTab takeover",
+                "commandTabTakeoverActive=true",
                 "hotkeyReloadNotification sender=AppDelegate main=Command + Tab"
             ],
             since: takeoverLogSnapshot,
             timeout: 10
         )
         XCTAssertTrue(waitForCommandTabTakeoverMarker(true, timeout: 5))
+        let activeTakeoverText = "已接管系统 Command + Tab"
+        let activeTakeoverStatus = app.descendants(matching: .any)
+            .matching(
+                NSPredicate(
+                    format: "identifier == %@ AND (label CONTAINS %@ OR value CONTAINS %@)",
+                    Identifier.settingsHotkeyMainTakeoverStatus,
+                    activeTakeoverText,
+                    activeTakeoverText
+                )
+            )
+            .firstMatch
         XCTAssertTrue(
-            element(in: app, identifier: Identifier.settingsHotkeyMainTakeoverStatus)
-                .waitForExistence(timeout: 5)
+            activeTakeoverStatus.waitForExistence(timeout: 5),
+            "Expected the settings status to expose active Command+Tab registration evidence."
         )
 
         let triggerLogSnapshot = makeRuntimeLogFileSnapshot()

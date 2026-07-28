@@ -11,6 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var panelController: SwitcherPanelController?
     private(set) var hotkeyMonitor: (any HotkeyMonitoring)?
     private(set) var inAppWindowHotkeyMonitor: (any HotkeyMonitoring)?
+    private(set) var latestHotkeyRegistrationEvidence: HotkeyRegistrationEvidence?
+    private var hotkeyRegistrationGeneration: UInt64 = 0
     private lazy var commandTabTakeoverController: any CommandTabTakeoverControlling = {
 #if FLOWTAB_TESTING
         Self.testHooks.commandTabTakeoverController ?? CommandTabTakeoverController()
@@ -130,33 +132,62 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func requestHotkeyReload(using request: HotkeyRegistrationRequest, source: String) {
+    @discardableResult
+    func requestHotkeyReload(
+        using request: HotkeyRegistrationRequest,
+        source: String
+    ) -> HotkeyRegistrationEvidence {
         RuntimeLog.info(
             .hotKey,
             "re-register requested source=\(source) requestID=\(request.requestID.uuidString) main=\(request.mainConfiguration.mainShortcutText) inApp=\(request.inAppWindowConfiguration.mainShortcutText)"
         )
-        applyHotkeyReload(request, source: source)
+        let evidence = applyHotkeyReload(request, source: source)
         NotificationCenter.default.post(
             name: .flowTabReRegisterHotkeys,
             object: self,
             userInfo: request.notificationUserInfo
         )
+        return evidence
     }
 
-    private func setupHotkeyMonitors(using request: HotkeyRegistrationRequest) {
-        setupHotkeyMonitor(using: request)
+    @discardableResult
+    private func setupHotkeyMonitors(
+        using request: HotkeyRegistrationRequest
+    ) -> HotkeyRegistrationEvidence {
+        let commandTabTakeoverActive = setupHotkeyMonitor(using: request)
         setupInAppWindowHotkeyMonitor(using: request)
+        hotkeyRegistrationGeneration &+= 1
+        let evidence = HotkeyRegistrationEvidence(
+            generation: hotkeyRegistrationGeneration,
+            request: request,
+            commandTabTakeoverActive: commandTabTakeoverActive
+        )
+        latestHotkeyRegistrationEvidence = evidence
+        RuntimeLog.info(
+            .hotKey,
+            "registration evidence generation=\(evidence.generation) requestID=\(evidence.requestID.uuidString) commandTabTakeoverActive=\(evidence.commandTabTakeoverActive)"
+        )
+        NotificationCenter.default.post(
+            name: .flowTabHotkeyRegistrationEvidenceDidChange,
+            object: self,
+            userInfo: evidence.notificationUserInfo
+        )
+        return evidence
     }
 
-    private func applyHotkeyReload(_ request: HotkeyRegistrationRequest, source: String) {
+    @discardableResult
+    private func applyHotkeyReload(
+        _ request: HotkeyRegistrationRequest,
+        source: String
+    ) -> HotkeyRegistrationEvidence {
         RuntimeLog.info(
             .hotKey,
             "re-register applying source=\(source) requestID=\(request.requestID.uuidString)"
         )
-        setupHotkeyMonitors(using: request)
+        return setupHotkeyMonitors(using: request)
     }
 
-    private func setupHotkeyMonitor(using request: HotkeyRegistrationRequest) {
+    private func setupHotkeyMonitor(using request: HotkeyRegistrationRequest) -> Bool {
         hotkeyMonitor?.stop()
 
         var hotkeyConfiguration = request.mainConfiguration
@@ -202,6 +233,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             "register main=\(hotkeyConfiguration.mainShortcutText) backward=\(hotkeyConfiguration.backwardShortcutText) quit=\(hotkeyConfiguration.quitShortcutText)"
         )
         hotkeyMonitor = monitor
+        return (mainUsesCommandTab || inAppUsesCommandTab) && takeoverReady
     }
 
     private func setupInAppWindowHotkeyMonitor(using request: HotkeyRegistrationRequest) {
