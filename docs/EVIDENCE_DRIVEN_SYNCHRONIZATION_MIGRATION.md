@@ -81,7 +81,7 @@ and Process/Tooling.
 | --- | --- | --- | --- | --- | --- |
 | SYNC-000 | `docs/EVIDENCE_DRIVEN_SYNCHRONIZATION_MIGRATION.md`; migration ledger baseline | The repository previously had no stable, reviewable closure ledger for time-based synchronization contracts. Process contract. | Preserve the startup Git baseline, semantic classification, dependency order, per-slice validation, and local commit trace in this document. The migration task owns updates through final closure. | L; Process/Tooling (`git diff --check`, ID/path/source-scope review). | completed by the baseline commit |
 | SYNC-001 | `FlowTab/Infrastructure/Runtime/RuntimeAXRemoteWindowResolver.swift`; `windowScanResult(forPID:policy:)` | An 80–250ms wall-clock budget accepts a machine-dependent partial element-ID scan as usable output. Evidence migration. | Scan a deterministic policy-owned ID range and publish complete/unavailable evidence. Any watchdog must fail the scan with last scanned ID and observed windows rather than promote a partial result. The resolver call owns cancellation/termination. | H; Unit, Behavior, affected topology UI, runtime-topology Pressure. | blocked: implementation and Unit/Behavior/Process passed; UI/Pressure environment evidence is recorded below |
-| SYNC-002 | `FlowTab/Infrastructure/Runtime/RuntimeProjectionMaintenancePolicy.swift`, `RuntimeProjectionService.signalAppLaunched`; app-launch convergence scheduler | A fixed 800ms delay is assumed to be enough for a launched app's windows to exist. Evidence migration. | Establish observation before launch handling, capture the read-model generation, perform initial readback, and reconcile on AX/window/app lifecycle evidence after that baseline. Use named cancellable condition observation only when the launched process exposes no usable event. `RuntimeProjectionService` owns cleanup per PID and app termination cancels it. | H; Unit, Behavior, launch/topology UI, runtime-topology Pressure. | planned |
+| SYNC-002 | `AppDelegate.installWorkspaceLifecycleObserver`, `RuntimeAppLaunchWindowEvidenceCoordinator`, `RuntimeProjectionService.signalAppLaunched`; app-launch convergence | A fixed 800ms delay was assumed to be enough for a launched app's windows to exist. Evidence migration. | Establish the exact app/PID AX observer before launch handling, use the launch repair as initial readback, and reconcile later AX transitions or a successful delayed observer installation. The AppDelegate-owned coordinator manages per-PID generation, exact appID/PID cancellation, monitor cleanup, and the named observer-install condition cadence. | H; Unit, Behavior, launch/topology UI, runtime-topology Pressure. | blocked: implementation and Unit/Behavior/Process passed; UI/Pressure environment evidence is recorded below |
 | SYNC-003 | `RuntimeReconciliationCoordinator`, `RuntimeProjectionReconciliationDrainer`, `RuntimeProjectionService`; transient-empty retry | Delayed `notBefore` values `[0.1, 0.3, 0.8]` wait for AX data to become non-empty, while a later unrelated maintenance request currently advances the retry. Conditional observation. | Check the repair readback immediately; retry from an observed incomplete payload or a later AX/generation signal. A service-owned cancellable retry driver supplies named cadence and a watchdog reports request ID, attempt, state, and last payload evidence. | H; Unit, Behavior, topology UI, runtime-topology Pressure. | planned |
 | SYNC-004 | `FlowTab/Infrastructure/Runtime/RuntimeAXWindowChangeMonitor.swift`; observer install and `handleAXNotification` | Events during a 750ms warm-up are discarded and events inside a 160ms throttle window can lose the final state. Evidence migration. | Install observers, take an initial AX/window readback, and publish monotonically coalesced generations with a guaranteed trailing readback. The monitor owns observer removal and pending coalescing cancellation. | H; Unit, Behavior, Home/topology UI, runtime-topology Pressure. | planned |
 | SYNC-005 | `FlowTab/Infrastructure/Runtime/RuntimeChromeWindowFocusBridge.swift`; `focusWindowScript` | Two fixed 50ms AppleScript delays are assumed to propagate Chrome window ordering before front-window readback. Conditional observation. | Read the exact Chrome window ID immediately after the focus request and poll only that readback when needed. Use a named script cadence and terminal watchdog; return the last front-window ID/error. The script invocation owns the wait. | H; Unit, Behavior, exact-window UI, runtime-topology Pressure. | planned |
@@ -213,5 +213,49 @@ polling cadence, deadline, or timeout in the scoped paths.
   `pressure-attempt-002`.
 - Process/Tooling: `git diff --check` passed. The owner-scope source search
   found no elapsed clock cutoff or partial-scan completion path.
-- Commit: `refactor(sync): migrate SYNC-001 remote AX scan`; its exact SHA is
-  appended by the next ledger update after the commit exists.
+- Commit: `695f740` (`refactor(sync): migrate SYNC-001 remote AX scan`).
+
+### SYNC-002 Closure Record
+
+- Design and Oracle: `AppDelegate` installs the PID-scoped AX observation before
+  forwarding the workspace launch event. The launch repair supplies the initial
+  readback. Each later supported AX window transition supplies evidence for an
+  `.axNotification` repair, while a delayed observer installation triggers an
+  explicit post-install readback. Early consecutive AX transitions use the
+  `everyObservedTransition` delivery policy. Observer callbacks are accepted
+  only from the current context for the exact appID/PID.
+- Lifecycle: `RuntimeAppLaunchWindowEvidenceCoordinator` owns observer-install
+  generation and retry cancellation. Exact appID/PID termination removes one
+  observer; stale termination for a reused PID is ignored. App termination
+  cancels the PID retry, and AppDelegate termination cancels every retry and
+  stops the monitor.
+- Retained time policy: the platform exposes no readiness callback for a failed
+  AX observer installation, so
+  `runtimeAppLaunchObserverInstallRetryIntervalNanoseconds` retains a 250ms
+  cancellable condition-observation cadence. Every attempt checks installation
+  evidence directly; elapsed time never establishes success. Cancellation logs
+  the last AX installation error.
+- Unit and Behavior: ten immediate-install, delayed-install/readback,
+  consecutive-event, cancellation, shutdown, superseded-generation, PID-reuse,
+  AppDelegate-ordering, and projection-repair tests passed in
+  `.build-local/evidence-driven-sync/SYNC-002/flowtabtests-targeted-attempt-005`.
+  Six existing AX identity and runtime-drainer tests passed in
+  `.build-local/evidence-driven-sync/SYNC-002/flowtabtests-expanded-attempt-006`.
+- FlowTabCore: not relevant because the contract is owned by AppKit,
+  ApplicationServices, AppDelegate, and the app runtime projection boundary.
+- UI and Pressure: the real-fixture launch/termination scenario was attempted
+  twice through `runtime-topology-pressure.sh`. Both attempts completed fixture
+  preparation, fixed-App identity validation, runner signing, and result-bundle
+  creation. macOS LocalAuthentication then returned code `-4`
+  (`System authentication is running`) before the test body, so no target
+  FlowTab process could be bound and no pressure samples could be attributed.
+  Evidence is preserved under
+  `.build-local/evidence-driven-sync/SYNC-002/pressure-attempt-001` and
+  `pressure-attempt-002`; the latter was built from the final slice source
+  state with private identity-manifest SHA-256
+  `cf855c34361ee17c2309bedb385a0f1aca535e2dc68b02e7916bf07231a2f322`.
+- Process/Tooling: `git diff --check` passed. The owner-scope source search
+  found no app-launch convergence scheduler, 800ms delay, or delayed
+  `.appLaunched` success path.
+- Commit: `refactor(sync): migrate SYNC-002 app launch readiness`; its exact SHA
+  is appended by the next ledger update after the commit exists.

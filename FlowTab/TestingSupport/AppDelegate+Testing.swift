@@ -17,6 +17,8 @@ struct AppDelegateTestHooks {
     var activationPolicyApplication: (any AppActivationPolicyApplying)? = nil
     var runtimeProjectionService: (any RuntimeProjectionServing)? = nil
     var workspaceNotificationCenter: NotificationCenter? = nil
+    var appLaunchWindowEvidenceCoordinator:
+        (any RuntimeAppLaunchWindowEvidenceCoordinating)? = nil
 }
 
 @MainActor
@@ -53,6 +55,13 @@ extension AppDelegate {
 
     var resolvedWorkspaceNotificationCenter: NotificationCenter {
         Self.testHooks.workspaceNotificationCenter ?? NSWorkspace.shared.notificationCenter
+    }
+
+    func makeAppLaunchWindowEvidenceCoordinator()
+        -> any RuntimeAppLaunchWindowEvidenceCoordinating
+    {
+        Self.testHooks.appLaunchWindowEvidenceCoordinator
+            ?? makeDefaultAppLaunchWindowEvidenceCoordinator()
     }
 
     func makePanelController() -> SwitcherPanelController {

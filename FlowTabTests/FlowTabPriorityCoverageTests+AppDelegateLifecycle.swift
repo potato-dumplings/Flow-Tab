@@ -111,9 +111,16 @@ extension FlowTabPriorityCoverageTests {
         let previousActivationOverride = AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride
         let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
         let runtimeProjectionService = RecordingRuntimeProjectionService()
+        let appLaunchWindowEvidenceCoordinator =
+            SpyAppLaunchWindowEvidenceCoordinator()
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let stressRunner = SpyStressRunner()
         let workspaceNotificationCenter = NotificationCenter()
+        var observationPrecededLaunchSignal = false
+        appLaunchWindowEvidenceCoordinator.onPrepareObservation = { _, _ in
+            observationPrecededLaunchSignal =
+                runtimeProjectionService.appLaunchSignalsRecorded().isEmpty
+        }
         var delegate: AppDelegate?
         defer {
             delegate?.applicationWillTerminate(
@@ -140,7 +147,8 @@ extension FlowTabPriorityCoverageTests {
             },
             stressRunner: stressRunner,
             runtimeProjectionService: runtimeProjectionService,
-            workspaceNotificationCenter: workspaceNotificationCenter
+            workspaceNotificationCenter: workspaceNotificationCenter,
+            appLaunchWindowEvidenceCoordinator: appLaunchWindowEvidenceCoordinator
         )
 
         delegate = AppDelegate()
@@ -187,6 +195,23 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(didSignalLaunch)
         XCTAssertTrue(didSignalTermination)
+        XCTAssertTrue(observationPrecededLaunchSignal)
+        XCTAssertEqual(
+            appLaunchWindowEvidenceCoordinator.preparedObservations.map(\.appID),
+            [RuntimeAppIdentity.appID(for: workspaceApp)]
+        )
+        XCTAssertEqual(
+            appLaunchWindowEvidenceCoordinator.preparedObservations.map(\.pid),
+            [workspaceApp.processIdentifier]
+        )
+        XCTAssertEqual(
+            appLaunchWindowEvidenceCoordinator.cancelledObservations.map(\.appID),
+            [RuntimeAppIdentity.appID(for: workspaceApp)]
+        )
+        XCTAssertEqual(
+            appLaunchWindowEvidenceCoordinator.cancelledObservations.map(\.pid),
+            [workspaceApp.processIdentifier]
+        )
     }
 
     @MainActor

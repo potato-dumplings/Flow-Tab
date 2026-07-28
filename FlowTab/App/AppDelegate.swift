@@ -26,6 +26,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var appVisibilityObserver: NSObjectProtocol?
     private(set) var languageObserver: NSObjectProtocol?
     private(set) var workspaceLifecycleObservers: [NSObjectProtocol] = []
+    private var appLaunchWindowEvidenceCoordinator:
+        (any RuntimeAppLaunchWindowEvidenceCoordinating)?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
@@ -45,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installHotkeyObserver()
         installAppVisibilityObserver()
         installLanguageObserver()
+        appLaunchWindowEvidenceCoordinator = makeAppLaunchWindowEvidenceCoordinator()
         installWorkspaceLifecycleObserver()
 
         installStatusItem()
@@ -96,6 +99,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             workspaceLifecycleObservers.removeAll()
         }
+        appLaunchWindowEvidenceCoordinator?.stop()
+        appLaunchWindowEvidenceCoordinator = nil
         hotkeyMonitor?.stop()
         inAppWindowHotkeyMonitor?.stop()
         commandTabTakeoverController.restoreSystemShortcutsIfNeeded()
@@ -341,6 +346,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             let appID = RuntimeAppIdentity.appID(for: app)
+            self.appLaunchWindowEvidenceCoordinator?.prepareObservation(
+                appID: appID,
+                pid: app.processIdentifier
+            )
             self.resolvedRuntimeProjectionService.signalAppLaunched(
                 appID: appID,
                 pid: app.processIdentifier,
@@ -357,12 +366,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             let appID = RuntimeAppIdentity.appID(for: app)
+            self.appLaunchWindowEvidenceCoordinator?.cancelObservation(
+                appID: appID,
+                pid: app.processIdentifier
+            )
             self.resolvedRuntimeProjectionService.signalAppTerminated(
                 appID: appID,
                 pid: app.processIdentifier
             )
         }
         workspaceLifecycleObservers = [didLaunchObserver, didTerminateObserver]
+    }
+
+    func makeDefaultAppLaunchWindowEvidenceCoordinator()
+        -> any RuntimeAppLaunchWindowEvidenceCoordinating
+    {
+        RuntimeAppLaunchWindowEvidenceCoordinator(
+            onAppWindowChanged: { [weak self] appID, pid in
+                self?.resolvedRuntimeProjectionService.signalAppWindowsChanged(
+                    appID: appID,
+                    pid: pid
+                )
+            },
+            onAXWindowDestroyed: { [weak self] appID, pid, axWindowID in
+                self?.resolvedRuntimeProjectionService.signalAXWindowDestroyed(
+                    appID: appID,
+                    pid: pid,
+                    axWindowID: axWindowID
+                )
+            }
+        )
     }
 
     func applyActivationPolicyFromPreferences() {
@@ -513,6 +546,12 @@ extension AppDelegate {
 
     var resolvedWorkspaceNotificationCenter: NotificationCenter {
         NSWorkspace.shared.notificationCenter
+    }
+
+    func makeAppLaunchWindowEvidenceCoordinator()
+        -> any RuntimeAppLaunchWindowEvidenceCoordinating
+    {
+        makeDefaultAppLaunchWindowEvidenceCoordinator()
     }
 
     func makePanelController() -> SwitcherPanelController {
