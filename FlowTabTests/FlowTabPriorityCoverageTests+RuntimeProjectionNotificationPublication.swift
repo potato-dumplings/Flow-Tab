@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import Foundation
 import FlowTabCore
 import XCTest
@@ -46,29 +45,6 @@ private func makeProjectionPublicationWindowRecord(
 }
 
 extension FlowTabTests {
-    @MainActor
-    func testHomeRuntimeProjectionUpdatePublisherDeliversBackgroundPostsOnMainThread() async {
-        let notificationCenter = NotificationCenter()
-        let delivered = expectation(description: "Home receives the runtime projection update")
-        let cancellable = HomeRuntimeProjectionUpdatePublisher.publisher(
-            notificationCenter: notificationCenter
-        )
-        .sink { _ in
-            XCTAssertTrue(Thread.isMainThread)
-            delivered.fulfill()
-        }
-
-        DispatchQueue.global(qos: .userInitiated).async {
-            notificationCenter.post(
-                name: .runtimeAppSwitcherProjectionDidUpdate,
-                object: nil
-            )
-        }
-
-        await fulfillment(of: [delivered], timeout: 1)
-        withExtendedLifetime(cancellable) {}
-    }
-
     func testFlowTabTestLaunchOptionsParsesFrontmostBundleIdentifierOverride() {
         withLaunchArgumentsForTesting(
             ["FlowTab", "--flowtab-ui-frontmost-bundle-id", "com.example.fixture.chrome"]

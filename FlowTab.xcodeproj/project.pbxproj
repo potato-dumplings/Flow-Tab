@@ -87,6 +87,9 @@
 		EAD100043D18000100B0D737 /* FlowTabTests+HomePermissionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAD100033D18000100B0D737 /* FlowTabTests+HomePermissionObservation.swift */; };
 		EBD100023D19000100B0D737 /* HomeInitialProjectionObservationOwner.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBD100013D19000100B0D737 /* HomeInitialProjectionObservationOwner.swift */; };
 		EBD100043D19000100B0D737 /* FlowTabTests+HomeInitialProjectionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBD100033D19000100B0D737 /* FlowTabTests+HomeInitialProjectionObservation.swift */; };
+		ECD100023D1A000100B0D737 /* HomeAppSummaryProjectionObservationOwner.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECD100013D1A000100B0D737 /* HomeAppSummaryProjectionObservationOwner.swift */; };
+		ECD100043D1A000100B0D737 /* FlowTabPriorityCoverageTests+HomeAppSummaryObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECD100033D1A000100B0D737 /* FlowTabPriorityCoverageTests+HomeAppSummaryObservation.swift */; };
+		ECD100063D1A000100B0D737 /* FlowTabUITests+HomeAppSummaryObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECD100053D1A000100B0D737 /* FlowTabUITests+HomeAppSummaryObservation.swift */; };
 		D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000022FF500100B0D737 /* RuntimeProjectionService.swift */; };
 		D10000032FF500200B0D737 /* RuntimeProjectionServing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000042FF500200B0D737 /* RuntimeProjectionServing.swift */; };
 		B26010012FE000100B0D737 /* RuntimePerformanceClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */; };
@@ -367,6 +370,9 @@
 		EAD100033D18000100B0D737 /* FlowTabTests+HomePermissionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HomePermissionObservation.swift"; sourceTree = "<group>"; };
 		EBD100013D19000100B0D737 /* HomeInitialProjectionObservationOwner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeInitialProjectionObservationOwner.swift; sourceTree = "<group>"; };
 		EBD100033D19000100B0D737 /* FlowTabTests+HomeInitialProjectionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HomeInitialProjectionObservation.swift"; sourceTree = "<group>"; };
+		ECD100013D1A000100B0D737 /* HomeAppSummaryProjectionObservationOwner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeAppSummaryProjectionObservationOwner.swift; sourceTree = "<group>"; };
+		ECD100033D1A000100B0D737 /* FlowTabPriorityCoverageTests+HomeAppSummaryObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+HomeAppSummaryObservation.swift"; sourceTree = "<group>"; };
+		ECD100053D1A000100B0D737 /* FlowTabUITests+HomeAppSummaryObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeAppSummaryObservation.swift"; sourceTree = "<group>"; };
 		F6E7E20135C4000100B0D737 /* RuntimeSearchIndexReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSearchIndexReadModel.swift; sourceTree = "<group>"; };
 		F6E7E30135C4000200B0D737 /* RuntimeProjectionReadModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionReadModels.swift; sourceTree = "<group>"; };
 		D10000022FF500100B0D737 /* RuntimeProjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionService.swift; sourceTree = "<group>"; };
@@ -683,6 +689,7 @@
 				D10001012FF600100B0D737 /* FlowTabPriorityCoverageTests+RuntimeMainTableProjection.swift */,
 				C1A0A0013A10000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication.swift */,
 				D2C0A0013A23000100B0D737 /* FlowTabPriorityCoverageTests+HomeColdStart.swift */,
+				ECD100033D1A000100B0D737 /* FlowTabPriorityCoverageTests+HomeAppSummaryObservation.swift */,
 				C8A200013A24000100B0D737 /* FlowTabPriorityCoverageTests+AppDirectoryPermissionBoundary.swift */,
 				B10001142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift */,
 				B29001012FF200100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewPaging.swift */,
@@ -733,6 +740,7 @@
 				F50000122F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift */,
 				F50000152FA1000100B0D737 /* FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift */,
 				B20002012FBD000100B0D737 /* FlowTabUITests+SpaceFixtureHomeActivation.swift */,
+				ECD100053D1A000100B0D737 /* FlowTabUITests+HomeAppSummaryObservation.swift */,
 				F50000162FA1000100B0D737 /* FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift */,
 				B22002012FC1000100B0D737 /* FlowTabUITests+SpaceFixtureInAppWindowSwitcher.swift */,
 				B23002012FC2000100B0D737 /* FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift */,
@@ -935,6 +943,7 @@
 				C10000132F75000100B0D737 /* HomeLandingView.swift */,
 				EAD100013D18000100B0D737 /* HomePermissionObservationOwner.swift */,
 				EBD100013D19000100B0D737 /* HomeInitialProjectionObservationOwner.swift */,
+				ECD100013D1A000100B0D737 /* HomeAppSummaryProjectionObservationOwner.swift */,
 				C30000122FBD100100B0D737 /* HomeAppVisibilityPresentation.swift */,
 				C30000132FBD100100B0D737 /* HomeLayerRowView.swift */,
 				D43000112FFD000100B0D737 /* HomeOverviewComponents.swift */,
@@ -1246,6 +1255,7 @@
 				C10000032F75000100B0D737 /* HomeLandingView.swift in Sources */,
 				EAD100023D18000100B0D737 /* HomePermissionObservationOwner.swift in Sources */,
 				EBD100023D19000100B0D737 /* HomeInitialProjectionObservationOwner.swift in Sources */,
+				ECD100023D1A000100B0D737 /* HomeAppSummaryProjectionObservationOwner.swift in Sources */,
 				C30000022FBD100100B0D737 /* HomeAppVisibilityPresentation.swift in Sources */,
 				C30000032FBD100100B0D737 /* HomeLayerRowView.swift in Sources */,
 				D43000012FFD000100B0D737 /* HomeOverviewComponents.swift in Sources */,
@@ -1418,6 +1428,7 @@
 				D10001022FF600100B0D737 /* FlowTabPriorityCoverageTests+RuntimeMainTableProjection.swift in Sources */,
 				C1A0A0023A10000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication.swift in Sources */,
 				D2C0A0023A23000100B0D737 /* FlowTabPriorityCoverageTests+HomeColdStart.swift in Sources */,
+				ECD100043D1A000100B0D737 /* FlowTabPriorityCoverageTests+HomeAppSummaryObservation.swift in Sources */,
 				C8A200023A24000100B0D737 /* FlowTabPriorityCoverageTests+AppDirectoryPermissionBoundary.swift in Sources */,
 				B10011142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift in Sources */,
 				B29011012FF200100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewPaging.swift in Sources */,
@@ -1475,6 +1486,7 @@
 				F50001102F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift in Sources */,
 				F50001142FA1000100B0D737 /* FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift in Sources */,
 				B20012012FBD000100B0D737 /* FlowTabUITests+SpaceFixtureHomeActivation.swift in Sources */,
+				ECD100063D1A000100B0D737 /* FlowTabUITests+HomeAppSummaryObservation.swift in Sources */,
 				F50001152FA1000100B0D737 /* FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift in Sources */,
 				B22012012FC1000100B0D737 /* FlowTabUITests+SpaceFixtureInAppWindowSwitcher.swift in Sources */,
 				B23012012FC2000100B0D737 /* FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift in Sources */,

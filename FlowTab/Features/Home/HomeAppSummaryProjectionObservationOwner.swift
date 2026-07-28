@@ -1,36 +1,31 @@
 import Combine
 import Foundation
 
-enum HomeInitialProjectionObservationSource: String, Equatable {
+enum HomeAppSummaryProjectionObservationSource: String, Equatable {
     case initialReadback
     case maintenanceRequestReadback
     case appSwitcherProjectionNotification
 }
 
-struct HomeInitialProjectionObservationEvidence: Equatable {
+struct HomeAppSummaryProjectionObservationEvidence: Equatable {
     let observationGeneration: UInt64
     let readbackCount: Int
-    let source: HomeInitialProjectionObservationSource
+    let source: HomeAppSummaryProjectionObservationSource
     let transition: HomeAppSummaryProjectionTransition
     let projectionRead: HomeAppSummaryProjectionRead
 
     var shouldApply: Bool {
         transition.shouldApply
     }
-
-    var isReady: Bool {
-        projectionRead.isProjectionBacked
-            && projectionRead.freshness?.isCompleteForScope == true
-    }
 }
 
 @MainActor
-final class HomeInitialProjectionObservationOwner: ObservableObject {
+final class HomeAppSummaryProjectionObservationOwner: ObservableObject {
     private struct Observation {
         let generation: UInt64
         let reason: String
         let onEvidence:
-            @MainActor (HomeInitialProjectionObservationEvidence) -> Void
+            @MainActor (HomeAppSummaryProjectionObservationEvidence) -> Void
         var readbackCount: Int
         var lastAcceptedState: HomeAppSummaryProjectionState?
     }
@@ -59,8 +54,8 @@ final class HomeInitialProjectionObservationOwner: ObservableObject {
     func start(
         reason: String,
         onEvidence:
-            @escaping @MainActor (HomeInitialProjectionObservationEvidence) -> Void
-    ) -> HomeInitialProjectionObservationEvidence {
+            @escaping @MainActor (HomeAppSummaryProjectionObservationEvidence) -> Void
+    ) -> HomeAppSummaryProjectionObservationEvidence {
         stop(reason: "superseded")
 
         let generation = nextGeneration
@@ -78,20 +73,19 @@ final class HomeInitialProjectionObservationOwner: ObservableObject {
             source: .initialReadback,
             generation: generation
         )!
-        guard observation?.generation == generation else {
-            return initialEvidence
-        }
-
-        runtimeProjectionService.requestAppSwitcherProjectionMaintenance(
-            reason: .homeProjectionMissing
-        )
-        if observation?.generation == generation {
-            _ = readback(
-                source: .maintenanceRequestReadback,
+        if observation?.generation == generation,
+           !initialEvidence.projectionRead.isProjectionBacked {
+            requestMaintenance(
+                reason: "initialProjectionMissing",
                 generation: generation
             )
         }
         return initialEvidence
+    }
+
+    func requestMaintenance(reason: String) {
+        guard let generation = observation?.generation else { return }
+        requestMaintenance(reason: reason, generation: generation)
     }
 
     func stop(reason: String) {
@@ -99,7 +93,7 @@ final class HomeInitialProjectionObservationOwner: ObservableObject {
         RuntimeLog.debug(
             .projection,
             [
-                "homeInitialProjectionObservation",
+                "homeAppSummaryProjectionObservation",
                 "state=cancelled",
                 "generation=\(active.generation)",
                 "reason=\(reason)",
@@ -130,11 +124,36 @@ final class HomeInitialProjectionObservationOwner: ObservableObject {
         }
     }
 
+    private func requestMaintenance(
+        reason: String,
+        generation: UInt64
+    ) {
+        guard observation?.generation == generation else { return }
+        RuntimeLog.debug(
+            .projection,
+            [
+                "homeAppSummaryProjectionObservation",
+                "state=maintenanceRequested",
+                "generation=\(generation)",
+                "reason=\(reason)"
+            ].joined(separator: " ")
+        )
+        runtimeProjectionService.requestAppSwitcherProjectionMaintenance(
+            reason: .homeProjectionMissing
+        )
+        if observation?.generation == generation {
+            _ = readback(
+                source: .maintenanceRequestReadback,
+                generation: generation
+            )
+        }
+    }
+
     @discardableResult
     private func readback(
-        source: HomeInitialProjectionObservationSource,
+        source: HomeAppSummaryProjectionObservationSource,
         generation: UInt64
-    ) -> HomeInitialProjectionObservationEvidence? {
+    ) -> HomeAppSummaryProjectionObservationEvidence? {
         guard var active = observation,
               active.generation == generation
         else {
@@ -154,7 +173,7 @@ final class HomeInitialProjectionObservationOwner: ObservableObject {
         }
         observation = active
 
-        let evidence = HomeInitialProjectionObservationEvidence(
+        let evidence = HomeAppSummaryProjectionObservationEvidence(
             observationGeneration: generation,
             readbackCount: active.readbackCount,
             source: source,
@@ -162,44 +181,7 @@ final class HomeInitialProjectionObservationOwner: ObservableObject {
             projectionRead: projectionRead
         )
         active.onEvidence(evidence)
-
-        guard observation?.generation == generation,
-              evidence.shouldApply,
-              evidence.isReady
-        else {
-            return evidence
-        }
-        finish(
-            generation: generation,
-            source: source,
-            reason: "completeProjectionObserved"
-        )
         return evidence
-    }
-
-    private func finish(
-        generation: UInt64,
-        source: HomeInitialProjectionObservationSource,
-        reason: String
-    ) {
-        guard let active = observation,
-              active.generation == generation
-        else {
-            return
-        }
-        _ = takeObservation()
-        RuntimeLog.info(
-            .projection,
-            [
-                "homeInitialProjectionObservation",
-                "state=completed",
-                "generation=\(generation)",
-                "source=\(source.rawValue)",
-                "reason=\(reason)",
-                "requestReason=\(active.reason)",
-                "readbacks=\(active.readbackCount)"
-            ].joined(separator: " ")
-        )
     }
 
     private func takeObservation() -> Observation? {

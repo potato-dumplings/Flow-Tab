@@ -21,6 +21,7 @@ struct HomeLandingView: View {
         runtimeProjectionService: any RuntimeProjectionServing = homeRuntimeProjectionService,
         permissionObservationOwner: HomePermissionObservationOwner? = nil,
         initialProjectionObservationOwner: HomeInitialProjectionObservationOwner? = nil,
+        appSummaryProjectionObservationOwner: HomeAppSummaryProjectionObservationOwner? = nil,
         openSettings: @escaping () -> Void
     ) {
         self.isActive = isActive
@@ -39,6 +40,12 @@ struct HomeLandingView: View {
                     runtimeProjectionService: runtimeProjectionService
                 )
         )
+        _appSummaryProjectionObservationOwner = StateObject(
+            wrappedValue: appSummaryProjectionObservationOwner
+                ?? HomeAppSummaryProjectionObservationOwner(
+                    runtimeProjectionService: runtimeProjectionService
+                )
+        )
         self.openSettings = openSettings
     }
 
@@ -53,6 +60,7 @@ struct HomeLandingView: View {
     @StateObject private var permissionObservationOwner:
         HomePermissionObservationOwner
     @StateObject private var initialProjectionObservationOwner: HomeInitialProjectionObservationOwner
+    @StateObject private var appSummaryProjectionObservationOwner: HomeAppSummaryProjectionObservationOwner
     @State private var appSummaries: [RuntimeHomeAppSummary] = []
     @State private var hiddenAppIDs = AppVisibilityPreferencesStore.loadHiddenAppIDs()
     @State private var windowsByAppID: [String: [WindowCandidate]] = [:]
@@ -60,12 +68,11 @@ struct HomeLandingView: View {
     @State private var homeSummaryProjectionFreshness: RuntimeProjectionFreshness?
     @State private var loadingWindowCountAppIDs: Set<String> = []
     @State private var selectedAppID: String?
-    @State private var appSummariesRefreshTask: Task<Void, Never>?
     @State private var selectedAppRefreshTask: Task<Void, Never>?
     @State private var appRefreshTasksByID: [String: Task<Void, Never>] = [:]
     @State private var windowChangeMonitor = RuntimeAXWindowChangeMonitor()
 
-    private let appRefreshDebounceDelayNs: UInt64 = 220_000_000
+    private let singleAppRefreshDebounceDelayNs: UInt64 = 220_000_000
     private let selectedAppRefreshDebounceDelayNs: UInt64 = 120_000_000
 
     private var accessibilityTrusted: Bool {
@@ -148,28 +155,11 @@ struct HomeLandingView: View {
         .onChange(of: isActive) { active in
             handleVisibilityChanged(active)
         }
-        .onReceive(NSWorkspace.shared.notificationCenter.publisher(
-            for: NSWorkspace.didLaunchApplicationNotification
-        )) { _ in
-            guard isActive else { return }
-            scheduleAppSummaryEvidenceRefresh(reason: "workspace_launch")
-        }
-        .onReceive(NSWorkspace.shared.notificationCenter.publisher(
-            for: NSWorkspace.didTerminateApplicationNotification
-        )) { _ in
-            guard isActive else { return }
-            scheduleAppSummaryEvidenceRefresh(reason: "workspace_terminate")
-        }
-        .onReceive(HomeRuntimeProjectionUpdatePublisher.publisher()) { _ in
-            guard isActive else { return }
-            guard !initialProjectionObservationOwner.isObserving else { return }
-            scheduleAppSummariesRefresh(reason: "runtime_projection_updated")
-        }
         .onReceive(NotificationCenter.default.publisher(
             for: NSApplication.didBecomeActiveNotification
         )) { _ in
             guard isActive else { return }
-            scheduleRuntimeProjectionRefresh(reason: "app_active")
+            requestAppSummaryProjectionMaintenance(reason: "app_active")
         }
         .onReceive(NotificationCenter.default.publisher(
             for: .flowTabAppVisibilityPreferenceChanged
@@ -448,21 +438,22 @@ struct HomeLandingView: View {
     private func handleVisibilityChanged(_ active: Bool) {
         guard active else {
             initialProjectionObservationOwner.stop(reason: "homeInactive")
+            appSummaryProjectionObservationOwner.stop(reason: "homeInactive")
             permissionObservationOwner.stop()
             return
         }
 
         refreshHomeAppVisibility()
         restoreCachedStateIfNeeded()
-        startPermissionObservationIfNeeded()
-        setupWindowMonitorIfNeeded()
 
         if appSummaries.isEmpty || homeSummaryProjectionFreshness?.isCompleteForScope != true {
             scheduleInitialAppSummariesRefresh(reason: "initial_load")
-            return
+        } else {
+            startAppSummaryProjectionObservation(reason: "appear")
         }
 
-        scheduleRuntimeProjectionRefresh(reason: "appear")
+        startPermissionObservationIfNeeded()
+        setupWindowMonitorIfNeeded()
         if let selectedAppID = currentSelectedAppID {
             scheduleSelectedAppRefresh(
                 appID: selectedAppID,
@@ -519,7 +510,7 @@ struct HomeLandingView: View {
 
     private func startPermissionObservationIfNeeded() {
         permissionObservationOwner.start { evidence in
-            scheduleAppSummaryEvidenceRefresh(
+            requestAppSummaryProjectionMaintenance(
                 reason: "permission_changed_\(evidence.source.rawValue)"
             )
             if evidence.target == .accessibility,
@@ -543,20 +534,6 @@ struct HomeLandingView: View {
             Self.cachedWindowsByAppID = windowsByAppID
             Self.cachedSelectedAppID = selectedAppID
         }
-    }
-
-    private func scheduleRuntimeProjectionRefresh(reason: String) {
-        guard HomeRuntimeProjectionRefreshPolicy.shouldRequestAppSummaryRefresh(
-            appSummaryCount: appSummaries.count,
-            loadingWindowCountAppCount: loadingWindowCountAppIDs.count
-        ) else {
-            RuntimeLog.debug(
-                .projection,
-                "homeSkipRuntimeProjectionRefresh reason=\(reason) phase=initializing apps=\(appSummaries.count) loadingCounts=\(loadingWindowCountAppIDs.count)"
-            )
-            return
-        }
-        scheduleAppSummariesRefresh(reason: "runtime_projection_refresh_\(reason)")
     }
 
     private func selectApp(_ appID: String) {
@@ -589,28 +566,37 @@ struct HomeLandingView: View {
     }
 
     private func scheduleInitialAppSummariesRefresh(reason: String) {
-        appSummariesRefreshTask?.cancel()
-        appSummariesRefreshTask = nil
+        appSummaryProjectionObservationOwner.stop(reason: "initialProjectionRequired")
         RuntimeLog.debug(.projection, "homeInitialProjectionObservation state=starting reason=\(reason)")
         initialProjectionObservationOwner.start(reason: reason) { evidence in
             applyInitialProjectionEvidence(evidence, reason: reason)
         }
     }
 
-    private func scheduleAppSummaryEvidenceRefresh(reason: String) {
+    private func requestAppSummaryProjectionMaintenance(reason: String) {
         if initialProjectionObservationOwner.isObserving {
             scheduleInitialAppSummariesRefresh(reason: reason)
             return
         }
-        scheduleAppSummariesRefresh(reason: reason)
+        guard appSummaryProjectionObservationOwner.isObserving else {
+            let initialEvidence = startAppSummaryProjectionObservation(reason: reason)
+            if initialEvidence.projectionRead.isProjectionBacked {
+                appSummaryProjectionObservationOwner.requestMaintenance(reason: reason)
+            }
+            return
+        }
+        appSummaryProjectionObservationOwner.requestMaintenance(reason: reason)
     }
 
-    private func scheduleAppSummariesRefresh(reason: String) {
-        appSummariesRefreshTask?.cancel()
-        appSummariesRefreshTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: appRefreshDebounceDelayNs)
-            await refreshAppSummaries(reason: reason)
-            appSummariesRefreshTask = nil
+    @discardableResult
+    private func startAppSummaryProjectionObservation(reason: String)
+        -> HomeAppSummaryProjectionObservationEvidence {
+        RuntimeLog.debug(
+            .projection,
+            "homeAppSummaryProjectionObservation state=starting reason=\(reason)"
+        )
+        return appSummaryProjectionObservationOwner.start(reason: reason) { evidence in
+            applyAppSummaryProjectionEvidence(evidence, reason: reason)
         }
     }
 
@@ -650,7 +636,11 @@ struct HomeLandingView: View {
         setupWindowMonitorIfCountsReady()
         persistCache()
 
-        if accessibilityTrusted, let selectedAppID = currentSelectedAppID {
+        if evidence.isReady {
+            startAppSummaryProjectionObservation(
+                reason: "initial_projection_\(evidence.source.rawValue)"
+            )
+        } else if accessibilityTrusted, let selectedAppID = currentSelectedAppID {
             scheduleSelectedAppRefresh(
                 appID: selectedAppID,
                 force: true,
@@ -663,13 +653,28 @@ struct HomeLandingView: View {
         )
     }
 
-    private func refreshAppSummaries(reason: String) async {
+    private func applyAppSummaryProjectionEvidence(
+        _ evidence: HomeAppSummaryProjectionObservationEvidence,
+        reason: String
+    ) {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-        RuntimeLog.debug(.projection, "homeRefreshAppSummaryProjection begin reason=\(reason)")
-        let projectionRead = await readHomeAppSummaryProjection()
-        let summaries = projectionRead.summaries
-        guard !Task.isCancelled else { return }
+        let projectionRead = evidence.projectionRead
+        guard evidence.shouldApply else {
+            RuntimeLog.debug(
+                .projection,
+                "homeAppSummaryProjectionRead result=\(evidence.transition.rawValue) source=\(evidence.source.rawValue) reason=\(reason) readbacks=\(evidence.readbackCount)"
+            )
+            return
+        }
+        guard projectionRead.isProjectionBacked else {
+            RuntimeLog.debug(
+                .projection,
+                "homeAppSummaryProjectionRead result=projectionMissing source=\(evidence.source.rawValue) reason=\(reason)"
+            )
+            return
+        }
 
+        let summaries = projectionRead.summaries
         homeSummaryProjectionFreshness = projectionRead.freshness
         appSummaries = summaries
         loadingWindowCountAppIDs.removeAll()
@@ -691,7 +696,7 @@ struct HomeLandingView: View {
         }
         RuntimeLog.debug(
             .projection,
-            "homeRefreshAppSummaryProjection result=ready reason=\(reason) source=\(projectionRead.isProjectionBacked ? "runtimeProjection" : "currentFallback") freshnessComplete=\(projectionRead.freshness?.isCompleteForScope == true ? 1 : 0) apps=\(summaries.count) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
+            "homeAppSummaryProjectionRead result=applied reason=\(reason) source=\(evidence.source.rawValue) transition=\(evidence.transition.rawValue) freshnessComplete=\(projectionRead.freshness?.isCompleteForScope == true ? 1 : 0) apps=\(summaries.count) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
         )
     }
 
@@ -712,7 +717,7 @@ struct HomeLandingView: View {
     private func scheduleSingleAppRefresh(appID: String, reason: String) {
         appRefreshTasksByID[appID]?.cancel()
         appRefreshTasksByID[appID] = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: appRefreshDebounceDelayNs)
+            try? await Task.sleep(nanoseconds: singleAppRefreshDebounceDelayNs)
             let shouldUpdateWindows = appID == currentSelectedAppID || windowsByAppID[appID] != nil
             await refreshSingleAppCache(
                 appID: appID,
@@ -798,13 +803,6 @@ struct HomeLandingView: View {
         )
     }
 
-    private func readHomeAppSummaryProjection() async -> HomeAppSummaryProjectionRead {
-        HomeRuntimeRefreshReader.appSummaryProjection(
-            from: runtimeProjectionService,
-            current: appSummaries
-        )
-    }
-
     private func setupWindowMonitorIfCountsReady() {
         guard loadingWindowCountAppIDs.isEmpty else { return }
         setupWindowMonitorIfNeeded()
@@ -844,8 +842,7 @@ struct HomeLandingView: View {
 
     private func teardownActiveState() {
         initialProjectionObservationOwner.stop(reason: "homeDisappeared")
-        appSummariesRefreshTask?.cancel()
-        appSummariesRefreshTask = nil
+        appSummaryProjectionObservationOwner.stop(reason: "homeDisappeared")
         selectedAppRefreshTask?.cancel()
         selectedAppRefreshTask = nil
         for task in appRefreshTasksByID.values {

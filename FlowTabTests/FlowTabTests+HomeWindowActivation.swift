@@ -336,16 +336,8 @@ extension FlowTabTests {
         XCTAssertEqual(summaryRead?.freshness, freshness)
         XCTAssertEqual(summaryRead?.isProjectionBacked, true)
         XCTAssertEqual(summaryRead?.freshness?.isCompleteForScope, false)
-        let initialRead = HomeRuntimeProjectionReader.initialAppSummaryProjection(from: runtimeProjectionService)
-        XCTAssertEqual(initialRead?.summaries.map(\.appID), [appID])
-        XCTAssertEqual(initialRead?.freshness, freshness)
-        XCTAssertEqual(initialRead?.isProjectionBacked, true)
         XCTAssertEqual(
             HomeRuntimeProjectionReader.appSummaries(from: runtimeProjectionService)?.map(\.appID),
-            [appID]
-        )
-        XCTAssertEqual(
-            HomeRuntimeProjectionReader.initialAppSummaries(from: runtimeProjectionService)?.map(\.appID),
             [appID]
         )
         XCTAssertEqual(
@@ -359,7 +351,7 @@ extension FlowTabTests {
             )?.candidate.windows.map(\.id),
             ["home-projected-1"]
         )
-        XCTAssertEqual(runtimeProjectionService.homeSummaryProjectionReadCount(), 5)
+        XCTAssertEqual(runtimeProjectionService.homeSummaryProjectionReadCount(), 3)
         XCTAssertEqual(runtimeProjectionService.homeDetailProjectionReadCount(appID: appID), 1)
         XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 0)
         XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 0)
@@ -446,7 +438,7 @@ extension FlowTabTests {
         XCTAssertEqual(appSwitcherOnlyService.appSwitcherProjectionReadCount(), 0)
     }
 
-    func testHomeInitialAppSummaryReaderDoesNotUseLightweightSnapshotFallback() {
+    func testHomeAppSummaryProjectionReadbackDoesNotUseLightweightSnapshotFallback() {
         let appID = "com.example.home-initial-projection"
         let summary = makeHomeAppSummary(
             appID: appID,
@@ -470,28 +462,24 @@ extension FlowTabTests {
             )
         )
 
-        let initialProjectionRead = HomeInitialAppSummaryReader.appSummaryProjection(from: projectionService)
+        let initialProjectionRead = HomeAppSummaryProjectionReadback.read(
+            from: projectionService
+        )
         XCTAssertEqual(initialProjectionRead.summaries.map(\.appID), [appID])
         XCTAssertEqual(initialProjectionRead.freshness, freshness)
         XCTAssertEqual(initialProjectionRead.isProjectionBacked, true)
-        XCTAssertEqual(
-            HomeInitialAppSummaryReader.appSummaries(from: projectionService).map(\.appID),
-            [appID]
-        )
-        XCTAssertEqual(projectionService.homeSummaryProjectionReadCount(), 2)
+        XCTAssertEqual(projectionService.homeSummaryProjectionReadCount(), 1)
         XCTAssertEqual(projectionService.appSwitcherProjectionReadCount(), 0)
 
         let missingProjectionService = RecordingRuntimeProjectionService()
 
-        let missingRead = HomeInitialAppSummaryReader.appSummaryProjection(from: missingProjectionService)
+        let missingRead = HomeAppSummaryProjectionReadback.read(
+            from: missingProjectionService
+        )
         XCTAssertEqual(missingRead.summaries, [])
         XCTAssertNil(missingRead.freshness)
         XCTAssertEqual(missingRead.isProjectionBacked, false)
-        XCTAssertEqual(
-            HomeInitialAppSummaryReader.appSummaries(from: missingProjectionService),
-            []
-        )
-        XCTAssertEqual(missingProjectionService.homeSummaryProjectionReadCount(), 2)
+        XCTAssertEqual(missingProjectionService.homeSummaryProjectionReadCount(), 1)
         XCTAssertEqual(missingProjectionService.appSwitcherProjectionReadCount(), 0)
         XCTAssertEqual(missingProjectionService.appSwitcherMaintenanceRequestsRecorded(), [])
     }
@@ -547,7 +535,7 @@ extension FlowTabTests {
         XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 0)
     }
 
-    func testHomeRuntimeRefreshReaderSignalsRuntimeRepairWhenProjectionIsMissingWithoutHomeFallback() {
+    func testHomeRuntimeRefreshReaderSignalsScopedRepairWhenProjectionIsMissing() {
         let appID = "com.example.home-refresh-missing"
         let cachedDetailProjection = makeHomeActivationDetailProjection(
             appID: appID,
@@ -562,20 +550,6 @@ extension FlowTabTests {
         )
         let runtimeProjectionService = RecordingRuntimeProjectionService()
 
-        let summaryRead = HomeRuntimeRefreshReader.appSummaryProjection(
-            from: runtimeProjectionService,
-            current: [cachedDetailProjection.summary]
-        )
-        XCTAssertEqual(summaryRead.summaries.map(\.appID), [appID])
-        XCTAssertNil(summaryRead.freshness)
-        XCTAssertEqual(summaryRead.isProjectionBacked, false)
-        XCTAssertEqual(
-            HomeRuntimeRefreshReader.appSummaries(
-                from: runtimeProjectionService,
-                current: [cachedDetailProjection.summary]
-            ).map(\.appID),
-            [appID]
-        )
         XCTAssertEqual(
             HomeRuntimeRefreshReader.appSummary(
                 for: appID,
@@ -595,17 +569,12 @@ extension FlowTabTests {
         )
         XCTAssertEqual(
             runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
-            [.homeProjectionMissing, .homeProjectionMissing]
+            []
         )
         XCTAssertEqual(runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.appID), [appID, appID])
     }
 
-    func testHomeRuntimeRefreshReaderAdoptsLatestRuntimeProjectionOrder() {
-        let currentSummaries = [
-            makeHomeAppSummary(appID: "com.example.mail", displayName: "Mail", rank: 0),
-            makeHomeAppSummary(appID: "com.example.browser", displayName: "Browser", rank: 1),
-            makeHomeAppSummary(appID: "com.example.notes", displayName: "Notes", rank: 2),
-        ]
+    func testHomeRuntimeProjectionReaderPreservesLatestProjectionOrder() {
         let refreshedSummaries = [
             makeHomeAppSummary(
                 appID: "com.example.notes",
@@ -647,13 +616,12 @@ extension FlowTabTests {
             )
         )
 
-        let read = HomeRuntimeRefreshReader.appSummaryProjection(
-            from: runtimeProjectionService,
-            current: currentSummaries
+        let read = HomeRuntimeProjectionReader.appSummaryProjection(
+            from: runtimeProjectionService
         )
 
         XCTAssertEqual(
-            read.summaries.map(\.appID),
+            read?.summaries.map(\.appID),
             [
                 "com.example.notes",
                 "com.example.calendar",
@@ -661,13 +629,13 @@ extension FlowTabTests {
                 "com.example.browser",
             ]
         )
-        XCTAssertEqual(read.summaries.map(\.displayName), [
+        XCTAssertEqual(read?.summaries.map(\.displayName), [
             "Notes Updated",
             "Calendar",
             "Mail Updated",
             "Browser Updated",
         ])
-        XCTAssertEqual(read.summaries.map(\.windowCount), [3, 2, 4, 5])
+        XCTAssertEqual(read?.summaries.map(\.windowCount), [3, 2, 4, 5])
     }
 
     func testHomeRuntimeRefreshReaderRetriesIncompleteEmptyDetailProjection() {
@@ -737,27 +705,6 @@ extension FlowTabTests {
                 appID: "com.flowtab.mock.browser",
                 selectedAppID: "com.flowtab.mock.mail",
                 loadingWindowCountAppIDs: []
-            )
-        )
-    }
-
-    func testHomeRuntimeProjectionRefreshPolicyRequestsOnlyAfterProjectionStateIsLoaded() {
-        XCTAssertFalse(
-            HomeRuntimeProjectionRefreshPolicy.shouldRequestAppSummaryRefresh(
-                appSummaryCount: 0,
-                loadingWindowCountAppCount: 0
-            )
-        )
-        XCTAssertFalse(
-            HomeRuntimeProjectionRefreshPolicy.shouldRequestAppSummaryRefresh(
-                appSummaryCount: 2,
-                loadingWindowCountAppCount: 1
-            )
-        )
-        XCTAssertTrue(
-            HomeRuntimeProjectionRefreshPolicy.shouldRequestAppSummaryRefresh(
-                appSummaryCount: 2,
-                loadingWindowCountAppCount: 0
             )
         )
     }
