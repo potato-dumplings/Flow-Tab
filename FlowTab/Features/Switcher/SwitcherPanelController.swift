@@ -165,6 +165,9 @@ final class SwitcherPanelController {
         TerminateInterruptionProtectionObservationOwner
     let delayedWindowLayerEntryObservationOwner:
         DelayedWindowLayerEntryObservationOwner
+    let terminatePressFeedbackCompletionOwner:
+        TerminatePressFeedbackCompletionOwner
+    let terminatePressFeedbackPolicy: TerminatePressFeedbackPolicy
     let terminateTargetProcessStateReader:
         any TerminateTargetProcessStateReading
     var modifierReleaseState: ModifierReleaseState = .idle
@@ -271,7 +274,6 @@ final class SwitcherPanelController {
     let minAppTileSize: CGFloat = 1
     var activeHotkeySessionKind: HotkeySessionKind?
     var activePresentationScreen: NSScreen?
-    var terminateSelectedAppTask: Task<Void, Never>?
     var suppressModifierReleaseConfirmationForTesting = false
 
     var panelVisibilityOverride: Bool?
@@ -336,6 +338,10 @@ final class SwitcherPanelController {
             (any TerminateInterruptionProtectionScheduling)? = nil,
         delayedWindowLayerEntryScheduler:
             (any DelayedWindowLayerEntryScheduling)? = nil,
+        terminatePressFeedbackScheduler:
+            (any TerminatePressFeedbackScheduling)? = nil,
+        terminatePressFeedbackPolicy:
+            TerminatePressFeedbackPolicy = .default,
         terminateTargetProcessStateReader:
             (any TerminateTargetProcessStateReading)? = nil
     ) {
@@ -369,6 +375,12 @@ final class SwitcherPanelController {
             DelayedWindowLayerEntryObservationOwner(
                 scheduler: delayedWindowLayerEntryScheduler
             )
+        terminatePressFeedbackCompletionOwner =
+            TerminatePressFeedbackCompletionOwner(
+                scheduler: terminatePressFeedbackScheduler
+            )
+        self.terminatePressFeedbackPolicy =
+            terminatePressFeedbackPolicy
         panel = SwitcherOverlayPanel(
             contentRect: NSRect(x: 0, y: 0, width: 880, height: 290),
             styleMask: SwitcherPanelWindowConfiguration.styleMask,
@@ -706,8 +718,6 @@ final class SwitcherPanelController {
     deinit {
         initialWindowOnlyPreviewRevealTask?.cancel()
         initialWindowOnlyPreviewRevealTask = nil
-        terminateSelectedAppTask?.cancel()
-        terminateSelectedAppTask = nil
         if let appDidResignActiveObserver {
             NotificationCenter.default.removeObserver(appDidResignActiveObserver)
         }

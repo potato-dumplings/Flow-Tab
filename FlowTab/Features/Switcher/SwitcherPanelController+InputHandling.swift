@@ -49,8 +49,7 @@ extension SwitcherPanelController {
     }
 
     func removeEventMonitors() {
-        terminateSelectedAppTask?.cancel()
-        terminateSelectedAppTask = nil
+        terminatePressFeedbackCompletionOwner.cancel()
         model.clearTerminateSelectedAppAnimation()
         cancelPendingModifierReleaseConfirmation()
         if let keyDownMonitor {

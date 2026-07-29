@@ -245,65 +245,76 @@ extension SwitcherPanelController {
     }
 
     func terminateSelectedApp() {
-        guard terminateSelectedAppTask == nil else { return }
+        guard !terminatePressFeedbackCompletionOwner.isPending else {
+            return
+        }
         let shouldAnimatePress = model.prepareTerminateSelectedAppAnimation()
 
-        terminateSelectedAppTask = Task { @MainActor [weak self] in
+        guard shouldAnimatePress else {
+            completeTerminateSelectedApp()
+            return
+        }
+
+        terminatePressFeedbackCompletionOwner.start(
+            after: terminatePressFeedbackPolicy.completionInterval
+        ) { [weak self] completion in
             guard let self else { return }
-            defer {
-                self.terminateSelectedAppTask = nil
-            }
+            RuntimeLog.debug(
+                .session,
+                "terminate press feedback completed generation=\(completion.generation) intervalMs=\(completion.interval * 1_000)"
+            )
+            self.completeTerminateSelectedApp()
+        }
+    }
 
-            if shouldAnimatePress {
-                try? await Task.sleep(nanoseconds: 80_000_000)
-                guard !Task.isCancelled else { return }
-            }
-
-            let protectionGeneration = self.model.selectedApp.map {
-                self.prepareTerminateInterruptionProtection(
-                    trigger: "terminate_selected_app",
-                    appID: $0.id
+    private func completeTerminateSelectedApp() {
+        let protectionGeneration = model.selectedApp.map {
+            prepareTerminateInterruptionProtection(
+                trigger: "terminate_selected_app",
+                appID: $0.id
+            )
+        }
+        switch model.terminateSelectedApp() {
+        case .notHandled:
+            if let protectionGeneration {
+                cancelPreparedTerminateInterruptionProtection(
+                    observationGeneration: protectionGeneration
                 )
             }
-            switch self.model.terminateSelectedApp() {
-            case .notHandled:
-                if let protectionGeneration {
-                    self.cancelPreparedTerminateInterruptionProtection(
-                        observationGeneration: protectionGeneration
-                    )
-                }
-                self.model.clearTerminateSelectedAppAnimation()
-                RuntimeLog.info(.session, "terminate selected app ignored")
-                NSSound.beep()
-            case .updatedSession:
-                guard
-                    let protectionGeneration,
-                    let request = self.model.pendingTerminateRequest
-                else {
-                    self.cancelTerminateInterruptionProtection()
-                    RuntimeLog.error(
-                        .session,
-                        "terminate selected app missing observation identity"
-                    )
-                    return
-                }
-                self.commitTerminateInterruptionProtection(
-                    observationGeneration: protectionGeneration,
-                    request: request
+            model.clearTerminateSelectedAppAnimation()
+            RuntimeLog.info(.session, "terminate selected app ignored")
+            NSSound.beep()
+        case .updatedSession:
+            guard
+                let protectionGeneration,
+                let request = model.pendingTerminateRequest
+            else {
+                cancelTerminateInterruptionProtection()
+                RuntimeLog.error(
+                    .session,
+                    "terminate selected app missing observation identity"
                 )
-                RuntimeLog.info(.session, "terminate selected app \(self.model.debugSelectionSummary())")
-                self.updatePanelSize()
-                self.scheduleDelayedWindowLayerEntryIfNeeded()
-            case .sessionEnded:
-                if let protectionGeneration {
-                    self.cancelPreparedTerminateInterruptionProtection(
-                        observationGeneration: protectionGeneration
-                    )
-                }
-                self.model.clearTerminateSelectedAppAnimation()
-                RuntimeLog.info(.session, "terminate selected app ended session")
-                self.endPresentationSession()
+                return
             }
+            commitTerminateInterruptionProtection(
+                observationGeneration: protectionGeneration,
+                request: request
+            )
+            RuntimeLog.info(
+                .session,
+                "terminate selected app \(model.debugSelectionSummary())"
+            )
+            updatePanelSize()
+            scheduleDelayedWindowLayerEntryIfNeeded()
+        case .sessionEnded:
+            if let protectionGeneration {
+                cancelPreparedTerminateInterruptionProtection(
+                    observationGeneration: protectionGeneration
+                )
+            }
+            model.clearTerminateSelectedAppAnimation()
+            RuntimeLog.info(.session, "terminate selected app ended session")
+            endPresentationSession()
         }
     }
 

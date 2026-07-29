@@ -389,6 +389,13 @@ struct AppTileView: View {
         .scaleEffect(isTerminating ? 0.96 : 1.0)
         .opacity(isTerminating ? 0.9 : 1.0)
         .saturation(isTerminating ? 0.88 : 1.0)
-        .animation(.easeOut(duration: 0.12), value: isTerminating)
+        .animation(
+            .easeOut(
+                duration:
+                    TerminatePressFeedbackPolicy.default
+                    .completionInterval
+            ),
+            value: isTerminating
+        )
     }
 }
