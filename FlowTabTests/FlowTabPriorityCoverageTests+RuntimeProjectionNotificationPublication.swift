@@ -666,27 +666,69 @@ extension FlowTabPriorityCoverageTests {
             .runtimeCommittedSearchIndexDidUpdate
         ]
         let publishers = DispatchGroup()
+        let publisherCompletion = expectation(
+            description: "All runtime projection notification publishers returned"
+        )
+        let publicationEvidence = RuntimeProjectionNotificationPublicationEvidence()
+
+        for _ in notificationNames {
+            publishers.enter()
+        }
+        publishers.notify(queue: .main) {
+            publisherCompletion.fulfill()
+        }
 
         for name in notificationNames {
-            publishers.enter()
             DispatchQueue.global(qos: .userInitiated).async {
                 NotificationCenter.default.post(name: name, object: nil)
+                publicationEvidence.recordCompletion(of: name)
                 publishers.leave()
             }
         }
 
-        let publicationResult = publishers.wait(timeout: .now() + 0.5)
+        let publicationResult = publishers.wait(
+            timeout: .now()
+                + RuntimeProjectionNotificationPublicationTestPolicy
+                    .mainActorNonblockingWatchdog
+        )
         XCTAssertEqual(
             publicationResult,
             .success,
-            "Runtime projection publishers must not synchronously wait for MainActor delivery."
+            """
+            Runtime projection publishers must return without synchronously waiting for \
+            MainActor delivery. completed=\(publicationEvidence.completedNames) \
+            expected=\(notificationNames.map(\.rawValue).sorted())
+            """
         )
 
-        let cleanupDeadline = Date().addingTimeInterval(1)
-        while publishers.wait(timeout: .now()) == .timedOut, Date() < cleanupDeadline {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.01))
-        }
+        wait(
+            for: [publisherCompletion],
+            timeout: RuntimeProjectionNotificationPublicationTestPolicy
+                .publisherCompletionWatchdog
+        )
         XCTAssertEqual(publishers.wait(timeout: .now()), .success)
         withExtendedLifetime(controller) {}
+    }
+}
+
+private enum RuntimeProjectionNotificationPublicationTestPolicy {
+    static let mainActorNonblockingWatchdog: DispatchTimeInterval = .milliseconds(500)
+    static let publisherCompletionWatchdog: TimeInterval = 1
+}
+
+private final class RuntimeProjectionNotificationPublicationEvidence: @unchecked Sendable {
+    private let lock = NSLock()
+    private var names: [Notification.Name] = []
+
+    var completedNames: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return names.map(\.rawValue).sorted()
+    }
+
+    func recordCompletion(of name: Notification.Name) {
+        lock.lock()
+        names.append(name)
+        lock.unlock()
     }
 }
