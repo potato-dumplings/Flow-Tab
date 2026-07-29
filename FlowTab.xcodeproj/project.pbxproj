@@ -80,6 +80,7 @@
 		FFFB01063D3A000100B0D737 /* TabSwitchStressTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFFB00063D3A000100B0D737 /* TabSwitchStressTestSupport.swift */; };
 		FFFB01073D3A000100B0D737 /* TabSwitchStressEvidenceTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFFB00073D3A000100B0D737 /* TabSwitchStressEvidenceTransport.swift */; };
 		FFFB01083D3A000100B0D737 /* FlowTabUITests+TabSwitchStressEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFFB00083D3A000100B0D737 /* FlowTabUITests+TabSwitchStressEvidence.swift */; };
+		FFFC01013D3B000100B0D737 /* FlowTabTests+AppVisibilityReload.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFFC00013D3B000100B0D737 /* FlowTabTests+AppVisibilityReload.swift */; };
 		4A6DAE9D2F727C0900B0D737 /* FlowTabCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4A6DAE9C2F727C0900B0D737 /* FlowTabCore */; };
 		7A1B2C3D4E5F600100B0D737 /* FlowTabPriorityCoverageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1B2C3D4E5F600200B0D737 /* FlowTabPriorityCoverageTests.swift */; };
 		A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */; };
@@ -787,6 +788,7 @@
 		FFFB00063D3A000100B0D737 /* TabSwitchStressTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSwitchStressTestSupport.swift; sourceTree = "<group>"; };
 		FFFB00073D3A000100B0D737 /* TabSwitchStressEvidenceTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSwitchStressEvidenceTransport.swift; sourceTree = "<group>"; };
 		FFFB00083D3A000100B0D737 /* FlowTabUITests+TabSwitchStressEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+TabSwitchStressEvidence.swift"; sourceTree = "<group>"; };
+		FFFC00013D3B000100B0D737 /* FlowTabTests+AppVisibilityReload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+AppVisibilityReload.swift"; sourceTree = "<group>"; };
 		F500000B2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureApp.swift"; sourceTree = "<group>"; };
 		F50000122F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureWorkflow.swift"; sourceTree = "<group>"; };
 		F50000132F90000100B0D737 /* SpaceFixtureWorkflowConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWorkflowConfiguration.swift; sourceTree = "<group>"; };
@@ -1014,6 +1016,7 @@
 				FFFB00043D3A000100B0D737 /* FlowTabTests+TabSwitchStressRunner.swift */,
 				FFFB00053D3A000100B0D737 /* FlowTabTests+TabSwitchStressRunnerPressure.swift */,
 				FFFB00063D3A000100B0D737 /* TabSwitchStressTestSupport.swift */,
+				FFFC00013D3B000100B0D737 /* FlowTabTests+AppVisibilityReload.swift */,
 			);
 			path = FlowTabTests;
 			sourceTree = "<group>";
@@ -1932,6 +1935,7 @@
 				FFFB01043D3A000100B0D737 /* FlowTabTests+TabSwitchStressRunner.swift in Sources */,
 				FFFB01053D3A000100B0D737 /* FlowTabTests+TabSwitchStressRunnerPressure.swift in Sources */,
 				FFFB01063D3A000100B0D737 /* TabSwitchStressTestSupport.swift in Sources */,
+				FFFC01013D3B000100B0D737 /* FlowTabTests+AppVisibilityReload.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

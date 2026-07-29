@@ -31,23 +31,6 @@ extension FlowTabTests {
         }
     }
 
-    @MainActor
-    func waitUntil(
-        _ description: String,
-        timeout: TimeInterval = 1.0,
-        pollIntervalNanoseconds: UInt64 = 5_000_000,
-        predicate: @MainActor @escaping () -> Bool
-    ) async -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if predicate() {
-                return true
-            }
-            try? await Task.sleep(nanoseconds: pollIntervalNanoseconds)
-        }
-        return predicate()
-    }
-
     func searchSampleApps() -> [AppSwitchCandidate] {
         [
             AppSwitchCandidate(

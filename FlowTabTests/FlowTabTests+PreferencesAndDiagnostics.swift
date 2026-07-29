@@ -1109,60 +1109,6 @@ extension FlowTabTests {
         XCTAssertEqual(hiddenModel.hiddenCount, 1)
     }
 
-    @MainActor
-    func testAppVisibilityManagerShowsStoredHiddenAppIDsMissingFromInventory() async {
-        guard let userDefaults = makeIsolatedUserDefaults() else { return }
-        defer { clearIsolatedUserDefaults(userDefaults) }
-
-        let missingAppID = "com.flowtab.hidden.missing"
-        userDefaults.set(true, forKey: AppPreferenceKeys.showInCommandTab)
-        AppVisibilityPreferencesStore.saveHiddenAppIDs([missingAppID], userDefaults: userDefaults)
-
-        await withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
-            let model = AppVisibilityManagerModel(userDefaults: userDefaults)
-            model.filter = .hidden
-            model.reload()
-
-            let didFinishLoading = await waitUntil(
-                "app visibility manager finishes loading hidden missing app ids",
-                timeout: 5.0,
-                pollIntervalNanoseconds: 20_000_000
-            ) {
-                !model.isLoading
-            }
-            XCTAssertTrue(didFinishLoading)
-
-            XCTAssertFalse(model.isLoading)
-            XCTAssertEqual(model.hiddenCount, 1)
-            XCTAssertEqual(model.visibleApps.map(\.id), [missingAppID])
-            XCTAssertEqual(model.selectedApp?.id, missingAppID)
-        }
-    }
-
-    @MainActor
-    func testAppVisibilityManagerSearchUsesSharedPinyinMatching() async {
-        guard let userDefaults = makeIsolatedUserDefaults() else { return }
-        defer { clearIsolatedUserDefaults(userDefaults) }
-
-        await withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
-            let model = AppVisibilityManagerModel(userDefaults: userDefaults)
-            model.query = "ceshi"
-            model.reload()
-
-            let didFinishLoading = await waitUntil(
-                "app visibility manager finishes loading searchable mock apps",
-                timeout: 5.0,
-                pollIntervalNanoseconds: 20_000_000
-            ) {
-                !model.isLoading
-            }
-            XCTAssertTrue(didFinishLoading)
-
-            XCTAssertEqual(model.visibleApps.map(\.id), ["com.xxx.test"])
-            XCTAssertEqual(model.selectedApp?.id, "com.xxx.test")
-        }
-    }
-
     func testAppVisibilityIconStateRefreshesWhenAppSourceChanges() {
         let firstApp = InstalledAppRecord(
             id: "com.example.first",
