@@ -304,75 +304,6 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testSettingsPermissionRequestAppliesIndependentPostRequestReadback() throws {
-        let previousAXTrusted =
-            AccessibilityPermissionChecker.isTrustedOverrideForTesting
-        let previousAXRequest =
-            AccessibilityPermissionChecker.requestPermissionOverrideForTesting
-        let previousScreenTrusted =
-            ScreenCapturePermissionChecker.hasPermissionOverrideForTesting
-        let previousLanguageRaw = UserDefaults.standard.string(
-            forKey: AppPreferenceKeys.appLanguage
-        )
-        defer {
-            AccessibilityPermissionChecker.isTrustedOverrideForTesting =
-                previousAXTrusted
-            AccessibilityPermissionChecker.requestPermissionOverrideForTesting =
-                previousAXRequest
-            ScreenCapturePermissionChecker.hasPermissionOverrideForTesting =
-                previousScreenTrusted
-            restoreUserDefaultsValue(
-                previousLanguageRaw,
-                forKey: AppPreferenceKeys.appLanguage
-            )
-        }
-
-        var isGranted = false
-        var requestCount = 0
-        AccessibilityPermissionChecker.isTrustedOverrideForTesting = {
-            isGranted
-        }
-        AccessibilityPermissionChecker.requestPermissionOverrideForTesting = {
-            requestCount += 1
-            isGranted = true
-            return false
-        }
-        ScreenCapturePermissionChecker.hasPermissionOverrideForTesting = {
-            true
-        }
-        UserDefaults.standard.set(
-            AppLanguage.simplifiedChinese.rawValue,
-            forKey: AppPreferenceKeys.appLanguage
-        )
-
-        let hostedView = NSHostingView(
-            rootView: AppSettingsView(isActive: true)
-                .frame(width: 1_200, height: 760)
-        )
-        hostedView.frame = NSRect(x: 0, y: 0, width: 1_200, height: 760)
-        hostedView.layoutSubtreeIfNeeded()
-        let actionButton: NSButton = try XCTUnwrap(
-            descendant(
-                in: hostedView,
-                identifier: "flowtab.settings.permission.accessibility-action"
-            )
-        )
-
-        actionButton.performClick(nil)
-
-        XCTAssertEqual(requestCount, 1)
-        XCTAssertTrue(
-            waitForRunLoopCondition(timeout: 1) {
-                hostedView.layoutSubtreeIfNeeded()
-                return actionButton.title == AppStrings.text(
-                    .permissionAccessibilityManage,
-                    language: .simplifiedChinese
-                )
-            }
-        )
-    }
-
-    @MainActor
     func testHotkeyTakeoverInactiveStatusUsesRegistrationEvidence() {
         let view = HotkeySettingsCardAppKitView()
         let statusLabel: NSTextField? = descendant(
@@ -1402,20 +1333,6 @@ extension FlowTabTests {
         XCTAssertEqual(actualColor.greenComponent, expectedColor.greenComponent, accuracy: 0.001, file: file, line: line)
         XCTAssertEqual(actualColor.blueComponent, expectedColor.blueComponent, accuracy: 0.001, file: file, line: line)
         XCTAssertEqual(actualColor.alphaComponent, expectedColor.alphaComponent, accuracy: 0.001, file: file, line: line)
-    }
-
-    private func waitForRunLoopCondition(
-        timeout: TimeInterval,
-        predicate: () -> Bool
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if predicate() {
-                return true
-            }
-            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.005))
-        }
-        return predicate()
     }
 
     private func restoreUserDefaultsValue(_ value: String?, forKey key: String) {
