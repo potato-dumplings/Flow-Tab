@@ -15,6 +15,12 @@ extension FlowTabUITests {
             }
     ) -> [XCUIApplication] {
         var launchedApps: [XCUIApplication] = []
+        let readinessOwner =
+            makeSpaceFixtureWorkflowReadinessAggregateOwner(
+                for: workflow
+            )
+        readinessOwner.start()
+        defer { readinessOwner.cancel() }
 
         for workflowApp in workflow.apps {
             let app =
@@ -56,6 +62,10 @@ extension FlowTabUITests {
             }
             app.launchArguments +=
                 workflowAppLaunchArguments(workflowApp)
+            app.launchArguments +=
+                readinessOwner.fixtureLaunchArguments(
+                    for: workflowApp.appID
+                )
             if workflowApp.fullscreenWindowIndex != nil {
                 logWorkflowSpaceObservation(
                     "workflow.beforeLaunch."
@@ -92,25 +102,24 @@ extension FlowTabUITests {
             launchedApps.append(app)
         }
 
-        let settleDeadline =
-            Date().addingTimeInterval(workflow.settleTimeout)
-        var settleTick = 0
-        while Date() < settleDeadline {
-            let nextTick = Date().addingTimeInterval(
-                min(
-                    1,
-                    settleDeadline.timeIntervalSinceNow
+        guard let readinessSnapshot =
+                readinessOwner.waitForReady(
+                    timeout: workflow.readinessWatchdog
                 )
+        else {
+            XCTFail(
+                "Fixture workflow readiness watchdog expired: "
+                    + readinessOwner.diagnosticSummary
             )
-            RunLoop.current.run(until: nextTick)
-            settleTick += 1
-            logFullscreenWorkflowSpaceObservations(
-                "workflow.settle.\(settleTick)s",
-                workflow: workflow
-            )
+            return launchedApps
         }
+        assertSpaceFixtureWorkflowReadinessAggregate(
+            readinessSnapshot,
+            workflow: workflow,
+            launchedApps: launchedApps
+        )
         logFullscreenWorkflowSpaceObservations(
-            "workflow.afterSettle",
+            "workflow.afterReadiness",
             workflow: workflow
         )
         if preservesDesktopAfterFullscreen,

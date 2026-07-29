@@ -330,6 +330,12 @@ extension FlowTabUITests {
         _ workflow: SpaceFixtureResolvedWorkflow
     ) -> [XCUIApplication] {
         var launchedApps: [XCUIApplication] = []
+        let readinessOwner =
+            makeSpaceFixtureWorkflowReadinessAggregateOwner(
+                for: workflow
+            )
+        readinessOwner.start()
+        defer { readinessOwner.cancel() }
 
         for workflowApp in workflow.apps {
             let app = makeEdgeWorkflowApplication(for: workflowApp.identity)
@@ -337,6 +343,10 @@ extension FlowTabUITests {
                 "--workflow-config", workflow.workflowURL.path,
                 "--workflow-app-id", workflowApp.appID
             ]
+            app.launchArguments +=
+                readinessOwner.fixtureLaunchArguments(
+                    for: workflowApp.appID
+                )
             launchSpaceFixtureApplicationAndWaitForForeground(app)
             waitForSpaceFixtureWorkflowMetadata(
                 in: app,
@@ -346,7 +356,22 @@ extension FlowTabUITests {
             launchedApps.append(app)
         }
 
-        RunLoop.current.run(until: Date().addingTimeInterval(workflow.settleTimeout))
+        guard let readinessSnapshot =
+                readinessOwner.waitForReady(
+                    timeout: workflow.readinessWatchdog
+                )
+        else {
+            XCTFail(
+                "Edge fixture workflow readiness watchdog expired: "
+                    + readinessOwner.diagnosticSummary
+            )
+            return launchedApps
+        }
+        assertSpaceFixtureWorkflowReadinessAggregate(
+            readinessSnapshot,
+            workflow: workflow,
+            launchedApps: launchedApps
+        )
         if let desktopAnchorApp = launchedApps.first {
             desktopAnchorApp.activate()
             _ = desktopAnchorApp.wait(for: .runningForeground, timeout: 5)

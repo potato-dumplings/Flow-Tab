@@ -186,7 +186,7 @@ struct SpaceFixtureResolvedWorkflow: Equatable {
 
     let workflowName: String
     let workflowURL: URL
-    let settleTimeout: TimeInterval
+    let readinessWatchdog: TimeInterval
     let apps: [App]
 
     static func configured(
@@ -263,15 +263,29 @@ struct SpaceFixtureResolvedWorkflow: Equatable {
                 return $0.identity.bundleIdentifier < $1.identity.bundleIdentifier
             }
 
-            let configuredSettleTimeout = TimeInterval(document.settleTimeoutMilliseconds ?? 0) / 1_000
-            let fullscreenSettleTimeout = resolvedApps.contains(where: { $0.fullscreenWindowIndex != nil })
-                ? Double(SpaceFixtureMultiAppWorkflowDefaults.enterFullscreenDelayMilliseconds) / 1_000 + 3.5
+            let configuredReadinessWatchdog =
+                TimeInterval(
+                    document.settleTimeoutMilliseconds ?? 0
+                ) / 1_000
+            let fullscreenDelayMilliseconds =
+                resolvedApps.contains(where: {
+                    $0.fullscreenWindowIndex != nil
+                })
+                ? SpaceFixtureMultiAppWorkflowDefaults
+                    .enterFullscreenDelayMilliseconds
                 : 0
 
             return SpaceFixtureResolvedWorkflow(
                 workflowName: document.workflowName,
                 workflowURL: normalizedURL,
-                settleTimeout: max(configuredSettleTimeout, fullscreenSettleTimeout, 1),
+                readinessWatchdog: max(
+                    configuredReadinessWatchdog,
+                    SpaceFixtureWorkflowReadinessUITestPolicy
+                        .watchdog(
+                            enterFullscreenDelayMilliseconds:
+                                fullscreenDelayMilliseconds
+                        )
+                ),
                 apps: resolvedApps
             )
         } catch let error as SpaceFixtureMultiAppWorkflowError {
@@ -468,7 +482,7 @@ extension FlowTabUITests {
         XCTAssertEqual(workflow.apps[1].expectedWindowTitles, ["Docs", "Review"])
         XCTAssertEqual(workflow.apps[1].expectedHomeWindowTitles, ["Docs"])
         XCTAssertEqual(workflow.apps[1].fullscreenWindowIndex, 2)
-        XCTAssertEqual(workflow.settleTimeout, 8.5)
+        XCTAssertEqual(workflow.readinessWatchdog, 20)
     }
 
     func testSpaceFixtureResolvedWorkflowResolvesScenarioUsingInstalledWorkflowAppVariants() throws {
@@ -491,7 +505,7 @@ extension FlowTabUITests {
         let installedWorkflow = SpaceFixtureResolvedWorkflow(
             workflowName: "installed-variants",
             workflowURL: tempRootURL.appendingPathComponent("resolved-workflow.json"),
-            settleTimeout: 8,
+            readinessWatchdog: 20,
             apps: [
                 .init(
                     appID: "finder",
@@ -577,7 +591,7 @@ extension FlowTabUITests {
         let workflow = SpaceFixtureResolvedWorkflow(
             workflowName: "multi-app-home-isolation",
             workflowURL: URL(fileURLWithPath: "/tmp/resolved-workflow.json"),
-            settleTimeout: 8,
+            readinessWatchdog: 20,
             apps: [
                 .init(
                     appID: "finder",
