@@ -252,6 +252,268 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelControllerDelayedAutoEnterWindowLayerTriggersAfterConfiguredDelay() {
+        let scheduler =
+            ManualDelayedWindowLayerEntryScheduler()
+        let controller =
+            makeConfiguredDelayedWindowLayerController(
+                scheduler: scheduler
+            )
+        controller.windowLayerPresentationDelayOverride = 0.01
+
+        XCTAssertTrue(
+            controller.beginGlobalHotkeySessionForTesting()
+        )
+        let targetAppID =
+            controller.modelForTesting.selectedApp?.id
+        XCTAssertNotNil(targetAppID)
+        XCTAssertEqual(
+            controller.modelForTesting.session?.mode,
+            .appCycle
+        )
+
+        controller.scheduleDelayedWindowLayerEntryForTesting()
+
+        XCTAssertEqual(scheduler.scheduledIntervals, [0.01])
+        XCTAssertEqual(scheduler.pendingCount, 1)
+        XCTAssertTrue(
+            controller.hasPendingDelayedWindowLayerEntryForTesting
+        )
+        XCTAssertEqual(
+            controller.modelForTesting.session?.mode,
+            .appCycle
+        )
+
+        XCTAssertTrue(scheduler.fireNextDeadline())
+
+        XCTAssertEqual(
+            controller.modelForTesting.session?.mode,
+            .windowCycle(appID: targetAppID ?? "")
+        )
+        XCTAssertFalse(
+            controller.hasPendingDelayedWindowLayerEntryForTesting
+        )
+        XCTAssertEqual(scheduler.pendingCount, 0)
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerDelayedAutoEnterWindowLayerUsesPreferenceDelay() async {
+        await withTemporaryWindowLayerAutoEnterDelay(0.01) {
+            let scheduler =
+                ManualDelayedWindowLayerEntryScheduler()
+            let controller =
+                makeConfiguredDelayedWindowLayerController(
+                    scheduler: scheduler
+                )
+
+            XCTAssertTrue(
+                controller.beginGlobalHotkeySessionForTesting()
+            )
+            let targetAppID =
+                controller.modelForTesting.selectedApp?.id
+            XCTAssertNotNil(targetAppID)
+            XCTAssertEqual(
+                controller.modelForTesting.session?.mode,
+                .appCycle
+            )
+
+            controller.scheduleDelayedWindowLayerEntryForTesting()
+
+            XCTAssertEqual(
+                scheduler.scheduledIntervals,
+                [0.01]
+            )
+            XCTAssertEqual(scheduler.pendingCount, 1)
+            XCTAssertEqual(
+                controller.modelForTesting.session?.mode,
+                .appCycle
+            )
+
+            XCTAssertTrue(scheduler.fireNextDeadline())
+
+            XCTAssertEqual(
+                controller.modelForTesting.session?.mode,
+                .windowCycle(appID: targetAppID ?? "")
+            )
+            XCTAssertEqual(scheduler.pendingCount, 0)
+            controller.cancelSelectionForTesting()
+        }
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerDelayedAutoEnterUsesCommittedSelectedAppProjection() {
+        let currentApp = NSRunningApplication.current
+        let appID = "com.example.deferred-window-snapshot"
+        let scheduler =
+            ManualDelayedWindowLayerEntryScheduler()
+        let windows = [
+            WindowCandidate(
+                id: "deferred-1",
+                title: "Deferred One",
+                isMinimized: false,
+                lastActiveAt: 30
+            ),
+            WindowCandidate(
+                id: "deferred-2",
+                title: "Deferred Two",
+                isMinimized: false,
+                lastActiveAt: 20
+            ),
+        ]
+        let appOnlyCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Deferred Snapshot",
+            groupID: "deferred",
+            lastActiveAt: 100,
+            windows: []
+        )
+        let windowCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Deferred Snapshot",
+            groupID: "deferred",
+            lastActiveAt: 100,
+            windows: windows
+        )
+        let context = makeRuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windows: windows
+        )
+        let selectedCurrentAppWindowPayload =
+            RuntimeCurrentAppWindowPayload(
+                summary: RuntimeHomeAppSummary(
+                    appID: appID,
+                    displayName: "Deferred Snapshot",
+                    groupID: "deferred",
+                    lastActiveAt: 100,
+                    windowCount: windows.count,
+                    pid: currentApp.processIdentifier
+                ),
+                candidate: windowCandidate,
+                context: context,
+                appDirectoryEntries: [
+                    RuntimeAppDirectoryEntry(app: currentApp)
+                ]
+            )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 12,
+            sourceGeneration:
+                RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let runtimeProjectionService =
+            RecordingRuntimeProjectionService(
+                appSwitcherProjection:
+                    RuntimeAppSwitcherProjection(
+                        apps: [appOnlyCandidate],
+                        contextsByID: [:],
+                        freshness: freshness
+                    ),
+                currentAppWindowProjectionsByAppID: [
+                    appID:
+                        RuntimeCurrentAppWindowProjection(
+                            appID: appID,
+                            currentAppWindowPayload:
+                                selectedCurrentAppWindowPayload,
+                            freshness: freshness
+                        )
+                ]
+            )
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                runtimeProjectionService:
+                    runtimeProjectionService
+            ),
+            delayedWindowLayerEntryScheduler: scheduler
+        )
+        controller.windowLayerPresentationDelayOverride = 0.01
+
+        XCTAssertTrue(
+            controller.beginGlobalHotkeySessionForTesting()
+        )
+        XCTAssertEqual(
+            controller.modelForTesting.session?
+                .selectedApp.windows.count,
+            0
+        )
+        XCTAssertEqual(
+            runtimeProjectionService
+                .appSwitcherProjectionReadCount(),
+            1
+        )
+        XCTAssertEqual(
+            runtimeProjectionService
+                .appSwitcherMaintenanceRequestsRecorded(),
+            [.switcherSessionStarted]
+        )
+        XCTAssertEqual(
+            runtimeProjectionService
+                .currentAppWindowProjectionReadCount(
+                    appID: appID
+                ),
+            0
+        )
+
+        controller.scheduleDelayedWindowLayerEntryForTesting()
+
+        XCTAssertEqual(
+            runtimeProjectionService
+                .currentAppWindowProjectionReadCount(
+                    appID: appID
+                ),
+            1
+        )
+        XCTAssertTrue(
+            runtimeProjectionService
+                .selectedCurrentAppWindowChangeSignalsRecorded()
+                .isEmpty
+        )
+        XCTAssertEqual(
+            controller.modelForTesting.session?.mode,
+            .appCycle
+        )
+        XCTAssertEqual(
+            controller.modelForTesting.session?
+                .selectedApp.windows.map(\.id),
+            ["deferred-1", "deferred-2"]
+        )
+        XCTAssertEqual(scheduler.scheduledIntervals, [0.01])
+
+        XCTAssertTrue(scheduler.fireNextDeadline())
+
+        XCTAssertEqual(
+            controller.modelForTesting.session?.mode,
+            .windowCycle(appID: appID)
+        )
+        XCTAssertEqual(
+            controller.modelForTesting.session?
+                .selectedApp.windows.map(\.id),
+            ["deferred-1", "deferred-2"]
+        )
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    private func makeConfiguredDelayedWindowLayerController(
+        scheduler: ManualDelayedWindowLayerEntryScheduler
+    ) -> SwitcherPanelController {
+        SwitcherPanelController(
+            model: LiveSwitcherModel(
+                runtimeProjectionService:
+                    RecordingRuntimeProjectionService(
+                        appSwitcherApps: searchScenarioApps()
+                    )
+            ),
+            delayedWindowLayerEntryScheduler: scheduler
+        )
+    }
+
+    @MainActor
     private func makeDelayedWindowLayerFixture(
         scheduler: ManualDelayedWindowLayerEntryScheduler
     ) -> (
