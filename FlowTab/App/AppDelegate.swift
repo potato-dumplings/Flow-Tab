@@ -299,52 +299,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            let postedRequest = notification.userInfo.flatMap(HotkeyRegistrationRequest.init)
-            let sendingDelegateID = (notification.object as AnyObject?).map(ObjectIdentifier.init)
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                if Self.shared !== self {
-                    if let postedRequest {
-                        RuntimeLog.debug(
-                            .hotKey,
-                            "re-register ignored source=notification_stale_delegate requestID=\(postedRequest.requestID.uuidString)"
-                        )
-                    } else {
-                        RuntimeLog.warning(
-                            .hotKey,
-                            "re-register ignored source=notification_stale_delegate requestID=missing_payload"
-                        )
-                    }
-                    return
-                }
-                if sendingDelegateID == ObjectIdentifier(self) {
-                    if let postedRequest {
-                        RuntimeLog.debug(
-                            .hotKey,
-                            "re-register ignored source=notification_self requestID=\(postedRequest.requestID.uuidString)"
-                        )
-                    } else {
-                        RuntimeLog.warning(
-                            .hotKey,
-                            "re-register ignored source=notification_self requestID=missing_payload"
-                        )
-                    }
-                    return
-                }
-                guard let postedRequest else {
-                    RuntimeLog.warning(
-                        .hotKey,
-                        "re-register ignored source=notification_missing_payload"
-                    )
-                    return
-                }
-                RuntimeLog.info(
-                    .hotKey,
-                    "re-register requested source=notification_payload requestID=\(postedRequest.requestID.uuidString) main=\(postedRequest.mainConfiguration.mainShortcutText) inApp=\(postedRequest.inAppWindowConfiguration.mainShortcutText)"
-                )
-                self.applyHotkeyReload(postedRequest, source: "notification_payload")
+            MainActor.assumeIsolated {
+                self?.handleHotkeyReloadNotification(notification)
             }
         }
+    }
+
+    private func handleHotkeyReloadNotification(_ notification: Notification) {
+        let postedRequest =
+            notification.userInfo.flatMap(HotkeyRegistrationRequest.init)
+        let sendingDelegateID =
+            (notification.object as AnyObject?).map(ObjectIdentifier.init)
+        if Self.shared !== self {
+            if let postedRequest {
+                RuntimeLog.debug(
+                    .hotKey,
+                    "re-register ignored source=notification_stale_delegate requestID=\(postedRequest.requestID.uuidString)"
+                )
+            } else {
+                RuntimeLog.warning(
+                    .hotKey,
+                    "re-register ignored source=notification_stale_delegate requestID=missing_payload"
+                )
+            }
+            return
+        }
+        if sendingDelegateID == ObjectIdentifier(self) {
+            if let postedRequest {
+                RuntimeLog.debug(
+                    .hotKey,
+                    "re-register ignored source=notification_self requestID=\(postedRequest.requestID.uuidString)"
+                )
+            } else {
+                RuntimeLog.warning(
+                    .hotKey,
+                    "re-register ignored source=notification_self requestID=missing_payload"
+                )
+            }
+            return
+        }
+        guard let postedRequest else {
+            RuntimeLog.warning(
+                .hotKey,
+                "re-register ignored source=notification_missing_payload"
+            )
+            return
+        }
+        RuntimeLog.info(
+            .hotKey,
+            "re-register requested source=notification_payload requestID=\(postedRequest.requestID.uuidString) main=\(postedRequest.mainConfiguration.mainShortcutText) inApp=\(postedRequest.inAppWindowConfiguration.mainShortcutText)"
+        )
+        applyHotkeyReload(postedRequest, source: "notification_payload")
     }
 
     private func installAppVisibilityObserver() {
