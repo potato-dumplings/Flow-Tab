@@ -152,7 +152,7 @@ and Process/Tooling.
 | SYNC-033A | `FlowTabTests+CompactActionButton`, `FlowTabTests+RuntimeLogsHostedControls`; initial hosted Logs control materialization | Two generic RunLoop condition loops wait for exact AppKit controls to appear below a SwiftUI host. Semantic review shows both representables materialize during the explicit host layout pass. | Perform the layout trigger once, then require immediate exact identifier/type hierarchy readback. Keep action-binding, style, and absence-of-native-popup assertions as independent Oracles. No observer or timer is needed when the synchronous readback is complete. | L test synchronization; affected Behavior, Process/Tooling. | completed |
 | SYNC-033B | `FlowTabTests+EnglishLayout`, `FlowTabTests+PreferencesAndDiagnostics`; Settings presentation, permission, and system-appearance publication routing boundary | Generic RunLoop condition loops combine three independently owned state contracts. Migration routing. | Close system-theme readback, hosted presentation bridge publication, and permission evidence through SYNC-033B1–SYNC-033B3. | M aggregate; child rows define required validation. | in progress |
 | SYNC-033B1 | `FlowTabTests+SystemThemeReadback`; app-scoped appearance-default contamination | A generic RunLoop loop waits for a distributed system-theme notification to return after the test has already established the expected effective appearance. Semantic review shows `SystemThemeState.refreshColorScheme()` performs the complete synchronous system-appearance readback. | Apply the app-scoped default, invoke the explicit refresh, and immediately require both `NSApp.effectiveAppearance` resolution and `SystemThemeState.colorScheme` to equal the baseline system scheme. Refresh again during test-owned restoration. | L test synchronization; affected Behavior, Process/Tooling. | completed |
-| SYNC-033B2 | `FlowTabTests+SettingsPresentationBridge`, `FlowTabTests+SettingsPresentationLayout`; hosted language and theme publication | RunLoop loops infer that SwiftUI published presentation state has rebuilt and updated the hosted AppKit Settings bridge. SwiftUI exposes no render-completion callback for this representable boundary. | Install a named, cancellable hosted-view condition observation before each presentation trigger, capture an immediate baseline readback, and accept only the exact target context plus localized-text or appearance topology. Use a named cadence and diagnostic watchdog; the test owns cancellation. Cold-host materialization uses direct layout readback when complete. | M Settings presentation behavior; affected Unit/Behavior, deterministic Pressure, Process/Tooling. | planned |
+| SYNC-033B2 | `SettingsPresentationObservationTestSupport`, `FlowTabTests+SettingsPresentationBridge`, `FlowTabTests+SettingsPresentationLayout`; hosted language and theme publication | RunLoop loops infer that SwiftUI published presentation state has rebuilt and updated the hosted AppKit Settings bridge. SwiftUI exposes no production render-completion callback for this representable boundary. | Wrap the unchanged Settings content with a test-owned SwiftUI transaction probe. Capture its initial context generation, install a cancellable callback before each trigger, and accept only a newer exact target context before checking localized-text or appearance topology. Keep the named XCTest watchdog as a failure bound with last-evidence diagnostics. Cold-host materialization uses direct layout readback when complete. | M Settings presentation behavior; affected Unit/Behavior, deterministic Pressure, Process/Tooling. | completed |
 | SYNC-033B3 | `FlowTabTests+SettingsPermissionReadback`; permission request title publication | A RunLoop loop infers that the permission coordinator's exact post-request readback reached the hosted action button. | Establish the named hosted-view condition observation before click, preserve the coordinator's pre-request observation and post-request readback, and require the exact request count plus localized granted-state button title. The test owns cancellation and diagnostic watchdog. | M permission presentation behavior; affected Behavior, deterministic Pressure, Process/Tooling. | planned |
 | SYNC-033C | `FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication`; background notification publication while MainActor is unavailable | A 500ms blocking wait proves publishers return, then a raw 10ms RunLoop loop assumes cleanup eventually completes. Evidence migration plus watchdog. | Enter all publishers and register DispatchGroup completion before dispatch. Keep a named blocking watchdog solely as the nonblocking failure bound, then wait for exact publisher-return completion through XCTest to release MainActor and clean up. Test scope owns the group expectation and controller lifetime; failure reports completed notification names. | M runtime-notification delivery; affected Behavior, Process/Tooling. | completed |
 | SYNC-033D | `FlowTabPriorityCoverageTests+RuntimeAXBackgroundResolution`; background remote AX resolution | A 250ms main-thread sleep is treated as proof that remote AX resolution can proceed without MainActor availability. Evidence migration plus watchdog. | Establish worker-start, resolver-invoked, and fetch-completed evidence before dispatch. Block MainActor only on a named resolver-invocation watchdog, then require exact off-main-thread readback and terminal worker completion. Test scope owns semaphores and override cleanup. | M AX runtime behavior; affected Behavior, runtime-topology Pressure, Process/Tooling. | completed |
@@ -3806,5 +3806,52 @@ polling cadence, deadline, or timeout in the scoped paths.
   commit. Startup `prompts.zip` remains unchanged and outside the slice.
 - Unit, UI, and FlowTabCore: not relevant because this slice changes only one
   app behavior test around an existing synchronous state readback.
-- Commit: pending
+- Commit: `3d09a602ed242809944ba4439e2e726af0c82a4c`
   (`test(sync): migrate SYNC-033B1 system theme readback`).
+
+### SYNC-033B2 Closure Record
+
+- Design and Oracle: the unchanged Settings content is wrapped only in the
+  app-test target with a zero-size SwiftUI transaction probe. The recorder
+  assigns monotonic context generations. Each hot language, explicit-theme,
+  or follow-system test captures an initial generation and exact initial
+  context/view readback, installs a cancellable callback, then performs the
+  trigger. A callback is accepted only for a newer matching context; final
+  success independently requires one exact AppKit Settings container plus
+  localized text, target appearance, dark card topology, container rebuild
+  identity, or layout frames as appropriate. Cold-dark materialization uses
+  the probe's initial context and immediate hierarchy readback. The probe,
+  recorder, callback, and cancellation token are test-owned and leave
+  production modules unchanged.
+- Timeout policy: `SettingsPresentationObservationPolicy.watchdogTimeout`
+  is the named one-second XCTest failure bound. Expiry reports the baseline
+  generation and last observed context evidence. Observer cancellation runs
+  through `defer`; matching completion, duplicate callbacks, and test
+  cancellation cannot leave a registered handler. The migrated paths retain
+  no sleep, timer, RunLoop advancement, retry, or polling cadence.
+- Unit and Behavior targeted: the recorder generation/cancellation test plus
+  five hosted presentation paths passed 6/6 in 3.465/3.467 seconds through
+  the canonical FlowTabTests runner at
+  `.build-local/evidence-driven-sync/SYNC-033B2/targeted-attempt-003`.
+  Attempt 001 stopped at compilation because the extracted files lacked
+  explicit `FlowTabCore` imports; the imports were added before attempts 002
+  and 003 passed.
+- Pressure: 20 repeated iterations of all six paths, 120/120 total, passed
+  in 66.177/66.200 seconds at
+  `.build-local/evidence-driven-sync/SYNC-033B2/pressure-attempt-001`.
+- Behavior full: 1024/1024 passed in 43.035/43.192 seconds at
+  `.build-local/evidence-driven-sync/SYNC-033B2/full-attempt-001`.
+- Process/Tooling: changed Swift files parse, the Xcode project plist is
+  valid, the scoped time-literal search is clean, and compiler diagnostics
+  contain no warnings for the new or extracted Settings presentation files.
+  New files are 182, 294, 205, and 294 lines; the extraction reduces
+  `FlowTabTests+EnglishLayout` from 913 to 726 lines and the pre-existing
+  oversized `FlowTabTests+PreferencesAndDiagnostics` from 1597 to 1462
+  lines. Final `git diff --check` and exact staged-content review are
+  recorded before commit. Startup `prompts.zip` remains unchanged and outside
+  the slice.
+- UI and FlowTabCore: not relevant because this slice changes app-test
+  synchronization and test-file organization around existing Settings
+  presentation behavior.
+- Commit: pending
+  (`test(sync): migrate SYNC-033B2 Settings presentation evidence`).
