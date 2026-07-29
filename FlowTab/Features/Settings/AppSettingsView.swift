@@ -633,6 +633,12 @@ struct AppSettingsView: View {
         let signature = hotkeyRequestSignature(request)
         guard signature != lastNotifiedHotkeySignature else { return }
         lastNotifiedHotkeySignature = signature
+        guard
+            !hotkeyRegistrationObservationOwner
+                .hasMatchingRegistration(for: request)
+        else {
+            return
+        }
         notifyHotkeyConfigChanged(using: request)
     }
 

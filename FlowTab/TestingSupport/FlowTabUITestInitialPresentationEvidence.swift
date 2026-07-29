@@ -3,6 +3,13 @@ import CoreGraphics
 import Darwin
 import Foundation
 
+extension Notification.Name {
+    static let flowTabUITestInitialPresentationDidResolve =
+        Notification.Name(
+            "FlowTab.UITestInitialPresentationDidResolve"
+        )
+}
+
 enum FlowTabUITestInitialPresentationMode:
     String,
     Equatable
@@ -219,6 +226,31 @@ struct FlowTabUITestInitialPresentationEvidence:
             )
         }
         return fields.joined(separator: " ")
+    }
+}
+
+extension FlowTabUITestInitialPresentationEvidence {
+    private enum NotificationUserInfoKey {
+        static let evidence = "evidence"
+    }
+
+    init?(notification: Notification) {
+        guard
+            let evidence =
+                notification.userInfo?[
+                    NotificationUserInfoKey.evidence
+                ] as? FlowTabUITestInitialPresentationEvidence
+        else {
+            return nil
+        }
+        self = evidence
+    }
+
+    var notificationUserInfo: [AnyHashable: Any] {
+        [
+            NotificationUserInfoKey.evidence:
+                self
+        ]
     }
 }
 

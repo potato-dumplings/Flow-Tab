@@ -45,7 +45,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         FlowTabUITestBootstrapper.configurePanelControllerIfNeeded(panelController: panelController)
 #endif
 
-        setupHotkeyMonitors(using: HotkeyRegistrationRequest.load(userDefaults: resolvedUserDefaults))
+        setupHotkeyMonitors(
+            using: HotkeyRegistrationRequest.load(
+                userDefaults: resolvedUserDefaults
+            ),
+            source:
+                HotkeyRegistrationEvidence
+                    .applicationLaunchSource
+        )
         installHotkeyObserver()
         installAppVisibilityObserver()
         installLanguageObserver()
@@ -162,7 +169,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @discardableResult
     private func setupHotkeyMonitors(
-        using request: HotkeyRegistrationRequest
+        using request: HotkeyRegistrationRequest,
+        source: String
     ) -> HotkeyRegistrationEvidence {
         let commandTabTakeoverActive = setupHotkeyMonitor(using: request)
         setupInAppWindowHotkeyMonitor(using: request)
@@ -170,7 +178,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let evidence = HotkeyRegistrationEvidence(
             generation: hotkeyRegistrationGeneration,
             request: request,
-            commandTabTakeoverActive: commandTabTakeoverActive
+            commandTabTakeoverActive: commandTabTakeoverActive,
+            source: source
         )
         latestHotkeyRegistrationEvidence = evidence
         RuntimeLog.info(
@@ -194,7 +203,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .hotKey,
             "re-register applying source=\(source) requestID=\(request.requestID.uuidString)"
         )
-        return setupHotkeyMonitors(using: request)
+        return setupHotkeyMonitors(
+            using: request,
+            source: source
+        )
     }
 
     private func setupHotkeyMonitor(using request: HotkeyRegistrationRequest) -> Bool {

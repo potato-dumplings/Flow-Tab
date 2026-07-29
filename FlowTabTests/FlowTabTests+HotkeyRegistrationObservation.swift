@@ -128,7 +128,51 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testHotkeyRegistrationObservationStopCancelsDeliveryAndClearsState() async {
+    func testHotkeyRegistrationObservationMatchingReadbackAvoidsRedundantRequest() {
+        let registeredRequest = makeHotkeyRegistrationRequest(
+            mainModifier: .command,
+            mainKey: .tab
+        )
+        let evidence = HotkeyRegistrationEvidence(
+            generation: 7,
+            request: registeredRequest,
+            commandTabTakeoverActive: true,
+            source:
+                HotkeyRegistrationEvidence
+                    .applicationLaunchSource
+        )
+        var readbackCount = 0
+        let owner = HotkeyRegistrationObservationOwner(
+            notificationCenter: NotificationCenter()
+        ) {
+            readbackCount += 1
+            return evidence
+        }
+        let matchingRequest = makeHotkeyRegistrationRequest(
+            mainModifier: .command,
+            mainKey: .tab
+        )
+        let changedRequest = makeHotkeyRegistrationRequest(
+            mainModifier: .option,
+            mainKey: .space
+        )
+
+        XCTAssertTrue(
+            owner.hasMatchingRegistration(
+                for: matchingRequest
+            )
+        )
+        XCTAssertEqual(owner.latestEvidence, evidence)
+        XCTAssertGreaterThanOrEqual(readbackCount, 1)
+        XCTAssertFalse(
+            owner.hasMatchingRegistration(
+                for: changedRequest
+            )
+        )
+    }
+
+    @MainActor
+    func testHotkeyRegistrationObservationStopCancelsDeliveryAndClearsState() {
         let notificationCenter = NotificationCenter()
         let request = makeHotkeyRegistrationRequest(
             mainModifier: .command,
@@ -151,7 +195,6 @@ extension FlowTabTests {
             userInfo: evidence.notificationUserInfo
         )
         owner.stop()
-        await Task.yield()
 
         XCTAssertNil(owner.pendingRequest)
         XCTAssertNil(owner.latestEvidence)

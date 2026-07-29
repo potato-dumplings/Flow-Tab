@@ -49,14 +49,15 @@ final class HotkeyRegistrationObservationOwner: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            guard let evidence = HotkeyRegistrationEvidence(notification: notification) else {
-                return
-            }
-            Task { @MainActor [weak self] in
+            MainActor.assumeIsolated {
                 guard
                     let self,
                     generation == self.observationGeneration,
-                    self.observer != nil
+                    self.observer != nil,
+                    let evidence =
+                        HotkeyRegistrationEvidence(
+                            notification: notification
+                        )
                 else {
                     return
                 }
@@ -86,6 +87,14 @@ final class HotkeyRegistrationObservationOwner: ObservableObject {
     func readback() {
         guard let evidence = evidenceProvider() else { return }
         accept(evidence)
+    }
+
+    func hasMatchingRegistration(
+        for request: HotkeyRegistrationRequest
+    ) -> Bool {
+        start()
+        return latestEvidence?
+            .matchesConfiguration(of: request) == true
     }
 
     func takeoverState(

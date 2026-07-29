@@ -11,22 +11,27 @@ struct HotkeyRegistrationEvidence: Equatable, Sendable {
         static let evidence = "evidence"
     }
 
+    static let applicationLaunchSource = "application_launch"
+
     let generation: UInt64
     let requestID: UUID
     let mainConfiguration: SwitcherHotkeyConfiguration
     let inAppWindowConfiguration: SwitcherHotkeyConfiguration
     let commandTabTakeoverActive: Bool
+    let source: String
 
     init(
         generation: UInt64,
         request: HotkeyRegistrationRequest,
-        commandTabTakeoverActive: Bool
+        commandTabTakeoverActive: Bool,
+        source: String = "unspecified"
     ) {
         self.generation = generation
         self.requestID = request.requestID
         self.mainConfiguration = request.mainConfiguration
         self.inAppWindowConfiguration = request.inAppWindowConfiguration
         self.commandTabTakeoverActive = commandTabTakeoverActive
+        self.source = source
     }
 
     init?(notification: Notification) {

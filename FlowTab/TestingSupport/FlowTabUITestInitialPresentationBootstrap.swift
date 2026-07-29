@@ -106,14 +106,21 @@ extension FlowTabUITestBootstrapper {
             panelController?
                 .cancelSelectionForTesting()
         } onResolved: {
-            [weak observationOwner] evidence in
+            [weak observationOwner, weak panelController] evidence in
             guard let observationOwner,
+                  let panelController,
                   initialPresentationObservationOwner
                     === observationOwner
             else {
                 return
             }
             initialPresentationObservationOwner = nil
+            NotificationCenter.default.post(
+                name:
+                    .flowTabUITestInitialPresentationDidResolve,
+                object: panelController,
+                userInfo: evidence.notificationUserInfo
+            )
             RuntimeLog.info(
                 "UITest",
                 "initial presentation resolved "
