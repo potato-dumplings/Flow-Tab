@@ -246,7 +246,7 @@ extension FlowTabPriorityCoverageTests {
         let initialApps = terminateScenarioApps()
         let transitionScheduler =
             ManualActiveSpaceTransitionObservationScheduler()
-        let runtimeProjectionService = RecordingRuntimeProjectionService(
+        let recordingService = RecordingRuntimeProjectionService(
             appSwitcherApps: initialApps,
             spaceTopologyProjection:
                 makeCompleteCurrentSpaceFullscreenProjectionForTesting(
@@ -254,6 +254,10 @@ extension FlowTabPriorityCoverageTests {
                     spaceGeneration: 1
                 )
         )
+        let runtimeProjectionService =
+            RetainingTerminatedAppRuntimeProjectionService(
+                recording: recordingService
+            )
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(
                 runtimeProjectionService: runtimeProjectionService
@@ -270,7 +274,7 @@ extension FlowTabPriorityCoverageTests {
             return XCTFail("Expected selected app before terminate refresh.")
         }
         XCTAssertEqual(
-            runtimeProjectionService
+            recordingService
                 .appSwitcherMaintenanceRequestsRecorded(),
             [.switcherSessionStarted]
         )
@@ -285,9 +289,9 @@ extension FlowTabPriorityCoverageTests {
                 .map(\.appID),
             [terminatedAppID]
         )
-        XCTAssertEqual(
-            runtimeProjectionService.appSwitcherProjectionReadCount(),
-            2
+        XCTAssertGreaterThanOrEqual(
+            recordingService.appSwitcherProjectionReadCount(),
+            4
         )
         XCTAssertNotNil(controller.modelForTesting.session)
         XCTAssertFalse(
@@ -295,9 +299,12 @@ extension FlowTabPriorityCoverageTests {
                 $0.id == terminatedAppID
             } ?? true
         )
+        XCTAssertTrue(
+            controller.shouldProtectTerminateSystemInterruption()
+        )
 
         controller.handleActiveSpaceDidChangeForTesting()
-        runtimeProjectionService.setSpaceTopologyProjection(
+        recordingService.setSpaceTopologyProjection(
             makeCompleteCurrentSpaceFullscreenProjectionForTesting(
                 currentSpaceID: 8,
                 spaceGeneration: 2

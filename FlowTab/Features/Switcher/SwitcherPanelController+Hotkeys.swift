@@ -437,17 +437,47 @@ extension SwitcherPanelController {
                 guard !Task.isCancelled else { return }
             }
 
+            let protectionGeneration = self.model.selectedApp.map {
+                self.prepareTerminateInterruptionProtection(
+                    trigger: "terminate_selected_app",
+                    appID: $0.id
+                )
+            }
             switch self.model.terminateSelectedApp() {
             case .notHandled:
+                if let protectionGeneration {
+                    self.cancelPreparedTerminateInterruptionProtection(
+                        observationGeneration: protectionGeneration
+                    )
+                }
                 self.model.clearTerminateSelectedAppAnimation()
                 RuntimeLog.info(.session, "terminate selected app ignored")
                 NSSound.beep()
             case .updatedSession:
-                self.beginTerminateInterruptionProtection(trigger: "terminate_selected_app")
+                guard
+                    let protectionGeneration,
+                    let request = self.model.pendingTerminateRequest
+                else {
+                    self.cancelTerminateInterruptionProtection()
+                    RuntimeLog.error(
+                        .session,
+                        "terminate selected app missing observation identity"
+                    )
+                    return
+                }
+                self.commitTerminateInterruptionProtection(
+                    observationGeneration: protectionGeneration,
+                    request: request
+                )
                 RuntimeLog.info(.session, "terminate selected app \(self.model.debugSelectionSummary())")
                 self.updatePanelSize()
                 self.scheduleDelayedWindowLayerEntryIfNeeded()
             case .sessionEnded:
+                if let protectionGeneration {
+                    self.cancelPreparedTerminateInterruptionProtection(
+                        observationGeneration: protectionGeneration
+                    )
+                }
                 self.model.clearTerminateSelectedAppAnimation()
                 RuntimeLog.info(.session, "terminate selected app ended session")
                 self.endPresentationSession()

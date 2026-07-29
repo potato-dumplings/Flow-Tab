@@ -161,6 +161,10 @@ final class SwitcherPanelController {
         PanelVisibilityRecoveryObservationOwner
     let activeSpaceTransitionObservationOwner:
         ActiveSpaceTransitionObservationOwner
+    let terminateInterruptionProtectionObservationOwner:
+        TerminateInterruptionProtectionObservationOwner
+    let terminateTargetProcessStateReader:
+        any TerminateTargetProcessStateReading
     var modifierReleaseState: ModifierReleaseState = .idle
     var presentationSessionGeneration = 0
     var initialWindowOnlyPreviewRevealTask: Task<Void, Never>?
@@ -189,10 +193,10 @@ final class SwitcherPanelController {
     var hasPendingModifierReleaseConfirmation: Bool {
         modifierReleaseObservationOwner.isObserving(.selectionConfirmation)
     }
-    let terminateInterruptionProtectionWindow: TimeInterval = 5.0
-    let postTerminateRefreshInterruptionProtectionWindow: TimeInterval = 0.5
     let panelVisibilityRecoveryPolicy: PanelVisibilityRecoveryPolicy = .default
     let activeSpaceTransitionPolicy: ActiveSpaceTransitionPolicy = .default
+    let terminateInterruptionProtectionPolicy:
+        TerminateInterruptionProtectionPolicy = .default
     let initialWindowOnlyPreviewRevealTimeoutNs: UInt64 = 250_000_000
     var initialPresentationVisibilityWatchdogInterval: TimeInterval {
         panelVisibilityRecoveryPolicy.initialPresentationWatchdogInterval
@@ -222,6 +226,17 @@ final class SwitcherPanelController {
         ActiveSpaceTransitionWatchdogFailure?
     {
         activeSpaceTransitionObservationOwner.lastFailure
+    }
+    var terminateInterruptionProtectionWatchdogInterval: TimeInterval {
+        terminateInterruptionProtectionPolicy.completionWatchdogInterval
+    }
+    var hasPendingTerminateInterruptionProtection: Bool {
+        terminateInterruptionProtectionObservationOwner.isObserving
+    }
+    var lastTerminateInterruptionProtectionWatchdogFailure:
+        TerminateInterruptionProtectionWatchdogFailure?
+    {
+        terminateInterruptionProtectionObservationOwner.lastFailure
     }
     var interruptionPresentationRecoveryMaximumAttemptCount: Int {
         panelVisibilityRecoveryPolicy.interruptionMaximumAttemptCount
@@ -260,7 +275,6 @@ final class SwitcherPanelController {
     var activeHotkeySessionKind: HotkeySessionKind?
     var activePresentationScreen: NSScreen?
     var terminateSelectedAppTask: Task<Void, Never>?
-    var terminateInterruptionProtectionUntil: TimeInterval = 0
     var suppressModifierReleaseConfirmationForTesting = false
 
     var panelVisibilityOverride: Bool?
@@ -320,11 +334,18 @@ final class SwitcherPanelController {
         panelVisibilityRecoveryObservationScheduler:
             (any PanelVisibilityRecoveryObservationScheduling)? = nil,
         activeSpaceTransitionObservationScheduler:
-            (any ActiveSpaceTransitionObservationScheduling)? = nil
+            (any ActiveSpaceTransitionObservationScheduling)? = nil,
+        terminateInterruptionProtectionScheduler:
+            (any TerminateInterruptionProtectionScheduling)? = nil,
+        terminateTargetProcessStateReader:
+            (any TerminateTargetProcessStateReading)? = nil
     ) {
         self.model = model
         runtimeProjectionNotificationObject =
             model.runtimeProjectionService as AnyObject
+        self.terminateTargetProcessStateReader =
+            terminateTargetProcessStateReader
+            ?? SystemTerminateTargetProcessStateReader()
         modifierReleaseObservationOwner = ModifierReleaseObservationOwner(
             scheduler: modifierReleaseObservationScheduler,
             eventSource: modifierReleaseEventSource
@@ -340,6 +361,10 @@ final class SwitcherPanelController {
         activeSpaceTransitionObservationOwner =
             ActiveSpaceTransitionObservationOwner(
                 scheduler: activeSpaceTransitionObservationScheduler
+            )
+        terminateInterruptionProtectionObservationOwner =
+            TerminateInterruptionProtectionObservationOwner(
+                scheduler: terminateInterruptionProtectionScheduler
             )
         panel = SwitcherOverlayPanel(
             contentRect: NSRect(x: 0, y: 0, width: 880, height: 290),

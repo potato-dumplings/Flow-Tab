@@ -27,8 +27,6 @@ extension SwitcherPanelController {
     }
 
     func searchTraceStateSummary() -> String {
-        let now = ProcessInfo.processInfo.systemUptime
-        let terminateProtectionMs = max(0, (terminateInterruptionProtectionUntil - now) * 1_000)
         let searchIndexTraceFields = model.lastSearchIndexReadDiagnostic?.searchTraceFields
             ?? [
                 "searchIndexReadiness=none",
@@ -37,27 +35,7 @@ extension SwitcherPanelController {
                 "searchIndexCoversCurrentGeneration=0",
                 "searchFreshnessBarrierRequested=0"
             ].joined(separator: " ")
-        return "panelVisible=\(isPanelPresented ? 1 : 0) panelKey=\(panel.isKeyWindow ? 1 : 0) appActive=\(isAppCurrentlyActive ? 1 : 0) searchActive=\(model.isSearchActive ? 1 : 0) inputFocused=\(model.isSearchInputFocused ? 1 : 0) marked=\(model.hasMarkedSearchText ? 1 : 0) firstResponder=\(panelFirstResponderDebugName()) activeSpaceTransitionPending=\(hasPendingActiveSpaceTransitionObservation ? 1 : 0) applicationActivationSuppressed=\(isApplicationActivationSuppressedForActiveSpaceTransition ? 1 : 0) terminateProtectionMs=\(formatMilliseconds(terminateProtectionMs)) \(searchIndexTraceFields)"
-    }
-
-    func beginTerminateInterruptionProtection(
-        trigger: String,
-        duration: TimeInterval? = nil,
-        extendExisting: Bool = true
-    ) {
-        let protectionWindow = duration ?? terminateInterruptionProtectionWindow
-        let protectionUntil = ProcessInfo.processInfo.systemUptime + protectionWindow
-        terminateInterruptionProtectionUntil = extendExisting
-            ? max(terminateInterruptionProtectionUntil, protectionUntil)
-            : protectionUntil
-        logSearchTrace(
-            "terminateInterruptionProtection trigger=\(trigger) durationMs=\(formatMilliseconds(protectionWindow * 1_000)) \(searchTraceStateSummary())"
-        )
-    }
-
-    func shouldProtectTerminateSystemInterruption() -> Bool {
-        ProcessInfo.processInfo.systemUptime < terminateInterruptionProtectionUntil
-            && model.session != nil
+        return "panelVisible=\(isPanelPresented ? 1 : 0) panelKey=\(panel.isKeyWindow ? 1 : 0) appActive=\(isAppCurrentlyActive ? 1 : 0) searchActive=\(model.isSearchActive ? 1 : 0) inputFocused=\(model.isSearchInputFocused ? 1 : 0) marked=\(model.hasMarkedSearchText ? 1 : 0) firstResponder=\(panelFirstResponderDebugName()) activeSpaceTransitionPending=\(hasPendingActiveSpaceTransitionObservation ? 1 : 0) applicationActivationSuppressed=\(isApplicationActivationSuppressedForActiveSpaceTransition ? 1 : 0) terminateProtectionPending=\(hasPendingTerminateInterruptionProtection ? 1 : 0) \(searchIndexTraceFields)"
     }
 
     func show(direction: CycleDirection) {
@@ -292,6 +270,7 @@ extension SwitcherPanelController {
         guard isPanelPresented || hasActivePresentationSession else { return }
         invalidatePresentationSessionGeneration(trigger: "endPresentationSession")
         cancelActiveSpaceTransitionObservation()
+        cancelTerminateInterruptionProtection()
         cancelPanelPresentationRecovery()
         clearInitialPresentationVisibilityTracking(invalidate: true)
         removeEventMonitors()
@@ -303,7 +282,6 @@ extension SwitcherPanelController {
         activeHotkeySessionKind = nil
         activePresentationScreen = nil
         lastSearchLayoutSizingLogSummary = nil
-        terminateInterruptionProtectionUntil = 0
         panelVisibilityRecoveryState = .idle
         if panelVisibilityOverride != nil {
             panelVisibilityOverride = false

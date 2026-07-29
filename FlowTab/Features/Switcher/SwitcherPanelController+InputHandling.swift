@@ -367,6 +367,9 @@ extension SwitcherPanelController {
         observePanelVisibilityRecovery(
             source: .panelOcclusionChanged
         )
+        observeTerminateInterruptionProtectionPresentationUpdate(
+            source: .panelVisibilityReadback
+        )
         if resolvedPanelOcclusionState.contains(.visible) {
             return
         }
@@ -391,6 +394,9 @@ extension SwitcherPanelController {
         observePanelVisibilityRecovery(
             source: .panelBecameKey
         )
+        observeTerminateInterruptionProtectionPresentationUpdate(
+            source: .panelVisibilityReadback
+        )
     }
 
     func handlePanelDidExpose() {
@@ -400,6 +406,9 @@ extension SwitcherPanelController {
         )
         observePanelVisibilityRecovery(
             source: .panelExposed
+        )
+        observeTerminateInterruptionProtectionPresentationUpdate(
+            source: .panelVisibilityReadback
         )
     }
 
@@ -414,20 +423,27 @@ extension SwitcherPanelController {
     }
 
     func handleWorkspaceApplicationTerminated(appID: String, pid: pid_t) {
+        let protectionBaseline =
+            captureTerminateInterruptionProtectionBaseline(appID: appID)
         let refreshed = model.handleApplicationTerminated(appID: appID, pid: pid)
-        guard refreshed else { return }
-        beginTerminateInterruptionProtection(
-            trigger: "terminate_refresh",
-            duration: postTerminateRefreshInterruptionProtectionWindow,
-            extendExisting: true
+        observeWorkspaceTerminationForInterruptionProtection(
+            appID: appID,
+            pid: pid,
+            baseline: protectionBaseline,
+            refreshedSession: refreshed
         )
     }
 
     @discardableResult
     func handleAppSwitcherProjectionDidUpdate() -> Bool {
         observeActiveSpaceTransitionProjectionUpdate()
-        guard isPanelPresented else { return false }
-        guard model.handleAppSwitcherProjectionDidUpdate() else { return false }
+        guard isPanelPresented else {
+            observeTerminateInterruptionProtectionProjectionUpdate()
+            return false
+        }
+        let updated = model.handleAppSwitcherProjectionDidUpdate()
+        observeTerminateInterruptionProtectionProjectionUpdate()
+        guard updated else { return false }
         resetPointerSelectionGate()
         updatePanelSize()
         scheduleDelayedWindowLayerEntryIfNeeded(preservingDeadline: true)
@@ -475,11 +491,15 @@ extension SwitcherPanelController {
         logSearchTrace(
             "systemInterruption trigger=\(trigger) action=recover reason=terminateInFlight \(searchTraceStateSummary())"
         )
+        if trigger != "activeSpaceDidChange" {
+            activateApplicationForPanelPresentationIfNeeded()
+        }
         schedulePanelVisibilityRecovery(
             trigger: "\(trigger)_terminate",
             cancelSessionOnFailure: false,
             activateApplicationIfNeeded: trigger != "activeSpaceDidChange"
         )
+        observeProtectedTerminateSystemInterruption()
         return true
     }
 

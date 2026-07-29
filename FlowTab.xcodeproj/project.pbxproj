@@ -117,6 +117,14 @@
 		F5D100043D23000100B0D737 /* SwitcherPanelController+ActiveSpaceTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D100033D23000100B0D737 /* SwitcherPanelController+ActiveSpaceTransition.swift */; };
 		F5D100063D23000100B0D737 /* FlowTabTests+ActiveSpaceTransitionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D100053D23000100B0D737 /* FlowTabTests+ActiveSpaceTransitionObservation.swift */; };
 		F5D100083D23000100B0D737 /* FlowTabPriorityCoverageTests+ActiveSpaceTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D100073D23000100B0D737 /* FlowTabPriorityCoverageTests+ActiveSpaceTransition.swift */; };
+		F7D100023D24000100B0D737 /* TerminateInterruptionProtectionObservation+Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D100013D24000100B0D737 /* TerminateInterruptionProtectionObservation+Types.swift */; };
+		F7D100043D24000100B0D737 /* TerminateInterruptionProtectionObservation+Scheduling.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D100033D24000100B0D737 /* TerminateInterruptionProtectionObservation+Scheduling.swift */; };
+		F7D100063D24000100B0D737 /* TerminateInterruptionProtectionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D100053D24000100B0D737 /* TerminateInterruptionProtectionObservation.swift */; };
+		F7D100083D24000100B0D737 /* SwitcherPanelController+TerminateInterruptionProtection.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D100073D24000100B0D737 /* SwitcherPanelController+TerminateInterruptionProtection.swift */; };
+		F7D1000A3D24000100B0D737 /* FlowTabTests+TerminateInterruptionProtectionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D100093D24000100B0D737 /* FlowTabTests+TerminateInterruptionProtectionObservation.swift */; };
+		F7D1000C3D24000100B0D737 /* TerminateInterruptionProtectionTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D1000B3D24000100B0D737 /* TerminateInterruptionProtectionTestSupport.swift */; };
+		F7D1000E3D24000100B0D737 /* TerminateInterruptionProtectionObservation+Evidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D1000D3D24000100B0D737 /* TerminateInterruptionProtectionObservation+Evidence.swift */; };
+		F7D100103D24000100B0D737 /* FlowTabTests+TerminateInterruptionProtectionLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D1000F3D24000100B0D737 /* FlowTabTests+TerminateInterruptionProtectionLifecycle.swift */; };
 		D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000022FF500100B0D737 /* RuntimeProjectionService.swift */; };
 		D10000032FF500200B0D737 /* RuntimeProjectionServing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000042FF500200B0D737 /* RuntimeProjectionServing.swift */; };
 		B26010012FE000100B0D737 /* RuntimePerformanceClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */; };
@@ -427,6 +435,14 @@
 		F5D100033D23000100B0D737 /* SwitcherPanelController+ActiveSpaceTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+ActiveSpaceTransition.swift"; sourceTree = "<group>"; };
 		F5D100053D23000100B0D737 /* FlowTabTests+ActiveSpaceTransitionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+ActiveSpaceTransitionObservation.swift"; sourceTree = "<group>"; };
 		F5D100073D23000100B0D737 /* FlowTabPriorityCoverageTests+ActiveSpaceTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+ActiveSpaceTransition.swift"; sourceTree = "<group>"; };
+		F7D100013D24000100B0D737 /* TerminateInterruptionProtectionObservation+Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminateInterruptionProtectionObservation+Types.swift"; sourceTree = "<group>"; };
+		F7D100033D24000100B0D737 /* TerminateInterruptionProtectionObservation+Scheduling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminateInterruptionProtectionObservation+Scheduling.swift"; sourceTree = "<group>"; };
+		F7D100053D24000100B0D737 /* TerminateInterruptionProtectionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminateInterruptionProtectionObservation.swift; sourceTree = "<group>"; };
+		F7D100073D24000100B0D737 /* SwitcherPanelController+TerminateInterruptionProtection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+TerminateInterruptionProtection.swift"; sourceTree = "<group>"; };
+		F7D100093D24000100B0D737 /* FlowTabTests+TerminateInterruptionProtectionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+TerminateInterruptionProtectionObservation.swift"; sourceTree = "<group>"; };
+		F7D1000B3D24000100B0D737 /* TerminateInterruptionProtectionTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminateInterruptionProtectionTestSupport.swift; sourceTree = "<group>"; };
+		F7D1000D3D24000100B0D737 /* TerminateInterruptionProtectionObservation+Evidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminateInterruptionProtectionObservation+Evidence.swift"; sourceTree = "<group>"; };
+		F7D1000F3D24000100B0D737 /* FlowTabTests+TerminateInterruptionProtectionLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+TerminateInterruptionProtectionLifecycle.swift"; sourceTree = "<group>"; };
 		F6E7E20135C4000100B0D737 /* RuntimeSearchIndexReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSearchIndexReadModel.swift; sourceTree = "<group>"; };
 		F6E7E30135C4000200B0D737 /* RuntimeProjectionReadModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionReadModels.swift; sourceTree = "<group>"; };
 		D10000022FF500100B0D737 /* RuntimeProjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionService.swift; sourceTree = "<group>"; };
@@ -717,6 +733,9 @@
 				F4D100093D22000100B0D737 /* PanelVisibilityRecoveryObservationTestSupport.swift */,
 				F5D100053D23000100B0D737 /* FlowTabTests+ActiveSpaceTransitionObservation.swift */,
 				F5D100073D23000100B0D737 /* FlowTabPriorityCoverageTests+ActiveSpaceTransition.swift */,
+				F7D100093D24000100B0D737 /* FlowTabTests+TerminateInterruptionProtectionObservation.swift */,
+				F7D1000F3D24000100B0D737 /* FlowTabTests+TerminateInterruptionProtectionLifecycle.swift */,
+				F7D1000B3D24000100B0D737 /* TerminateInterruptionProtectionTestSupport.swift */,
 				A12000013C00000100B0D737 /* FlowTabTests+RuntimeLogDeletion.swift */,
 				B7A7E00135C0000100B0D737 /* FlowTabTests+SettingsAppearanceSelectControls.swift */,
 				C1D900013700000100B0D737 /* FlowTabTests+FlowDropdownPlacement.swift */,
@@ -865,6 +884,7 @@
 				B32000012FF6000100B0D737 /* SwitcherPanelController+InitialVisibilityRecovery.swift */,
 				F4D100053D22000100B0D737 /* SwitcherPanelController+VisibilityRecovery.swift */,
 				F5D100033D23000100B0D737 /* SwitcherPanelController+ActiveSpaceTransition.swift */,
+				F7D100073D24000100B0D737 /* SwitcherPanelController+TerminateInterruptionProtection.swift */,
 				B26000032FE000100B0D737 /* SwitcherPanelController+PresentationDiagnostics.swift */,
 				A1B2C4032F73000100B0D737 /* SwitcherPanelController+InputHandling.swift */,
 				F1D100033D1F000100B0D737 /* SwitcherPanelController+ModifierReleaseObservation.swift */,
@@ -881,6 +901,10 @@
 				F4D100013D22000100B0D737 /* PanelVisibilityRecoveryObservation+Scheduling.swift */,
 				F4D100033D22000100B0D737 /* PanelVisibilityRecoveryObservation.swift */,
 				F5D100013D23000100B0D737 /* ActiveSpaceTransitionObservation.swift */,
+				F7D100013D24000100B0D737 /* TerminateInterruptionProtectionObservation+Types.swift */,
+				F7D100033D24000100B0D737 /* TerminateInterruptionProtectionObservation+Scheduling.swift */,
+				F7D100053D24000100B0D737 /* TerminateInterruptionProtectionObservation.swift */,
+				F7D1000D3D24000100B0D737 /* TerminateInterruptionProtectionObservation+Evidence.swift */,
 				A1B2C4072F73000100B0D737 /* LiveSwitcherModel+Types.swift */,
 				B25000012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift */,
 				B27000012FF000100B0D737 /* LiveSwitcherModel+Projections.swift */,
@@ -1456,6 +1480,11 @@
 				F4D100063D22000100B0D737 /* SwitcherPanelController+VisibilityRecovery.swift in Sources */,
 				F5D100023D23000100B0D737 /* ActiveSpaceTransitionObservation.swift in Sources */,
 				F5D100043D23000100B0D737 /* SwitcherPanelController+ActiveSpaceTransition.swift in Sources */,
+				F7D100023D24000100B0D737 /* TerminateInterruptionProtectionObservation+Types.swift in Sources */,
+				F7D100043D24000100B0D737 /* TerminateInterruptionProtectionObservation+Scheduling.swift in Sources */,
+				F7D100063D24000100B0D737 /* TerminateInterruptionProtectionObservation.swift in Sources */,
+				F7D1000E3D24000100B0D737 /* TerminateInterruptionProtectionObservation+Evidence.swift in Sources */,
+				F7D100083D24000100B0D737 /* SwitcherPanelController+TerminateInterruptionProtection.swift in Sources */,
 				A1B2C4172F73000100B0D737 /* LiveSwitcherModel+Types.swift in Sources */,
 				B25010012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift in Sources */,
 				B27010012FF000100B0D737 /* LiveSwitcherModel+Projections.swift in Sources */,
@@ -1497,6 +1526,9 @@
 				F4D1000A3D22000100B0D737 /* PanelVisibilityRecoveryObservationTestSupport.swift in Sources */,
 				F5D100063D23000100B0D737 /* FlowTabTests+ActiveSpaceTransitionObservation.swift in Sources */,
 				F5D100083D23000100B0D737 /* FlowTabPriorityCoverageTests+ActiveSpaceTransition.swift in Sources */,
+				F7D1000A3D24000100B0D737 /* FlowTabTests+TerminateInterruptionProtectionObservation.swift in Sources */,
+				F7D100103D24000100B0D737 /* FlowTabTests+TerminateInterruptionProtectionLifecycle.swift in Sources */,
+				F7D1000C3D24000100B0D737 /* TerminateInterruptionProtectionTestSupport.swift in Sources */,
 				A12000113C00000100B0D737 /* FlowTabTests+RuntimeLogDeletion.swift in Sources */,
 				B7A7E00235C0000100B0D737 /* FlowTabTests+SettingsAppearanceSelectControls.swift in Sources */,
 				C1D900023700000100B0D737 /* FlowTabTests+FlowDropdownPlacement.swift in Sources */,

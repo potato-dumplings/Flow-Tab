@@ -119,7 +119,11 @@ extension FlowTabUITests {
             since: logSnapshot,
             timeout: 10
         )
-        XCTAssertTrue(waitForNonExistence(fixtureAppTile, timeout: 8))
+        let refreshedFixtureAppTile = element(
+            in: app,
+            identifier: identity.switcherAppAccessibilityIdentifier
+        )
+        XCTAssertTrue(waitForNonExistence(refreshedFixtureAppTile, timeout: 8))
         XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "apps=", timeout: 5))
     }
 

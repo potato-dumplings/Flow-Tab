@@ -325,11 +325,14 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     func installAppSwitcherProjection(
         apps: [AppSwitchCandidate],
         contextsByID: [String: RuntimeAppContext] = [:],
-        generatedAt: TimeInterval = 10
+        generatedAt: TimeInterval = 10,
+        projectionGeneration: UInt64 = 1
     ) {
         let freshness = RuntimeProjectionFreshness(
             generatedAt: generatedAt,
-            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            sourceGeneration: RuntimeReadModelGeneration(
+                projection: projectionGeneration
+            ),
             dirtyAppIDs: [],
             dirtyPIDs: [],
             dirtyCGWindowIDs: [],

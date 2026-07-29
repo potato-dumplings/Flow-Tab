@@ -188,6 +188,9 @@ extension SwitcherPanelController {
         logSearchTrace(
             "presentationRecovery trigger=\(trigger) action=complete reason=\(evidence.source.rawValue) generation=\(evidence.recoveryGeneration) presentationGeneration=\(evidence.presentationGeneration) attempt=\(evidence.attempt) snapshot{\(evidence.snapshot.logFields)} \(searchTraceStateSummary())"
         )
+        observeTerminateInterruptionProtectionPresentationUpdate(
+            source: .panelVisibilityReadback
+        )
         scheduleModifierReleaseConfirmationAfterRecoveredPresentationIfNeeded(
             trigger: trigger
         )

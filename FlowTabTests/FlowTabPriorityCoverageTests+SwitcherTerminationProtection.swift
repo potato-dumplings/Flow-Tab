@@ -3,119 +3,6 @@ import FlowTabCore
 import XCTest
 @testable import FlowTab
 
-private final class RetainingTerminatedAppRuntimeProjectionService:
-    RuntimeProjectionServing,
-    @unchecked Sendable
-{
-    private let recording: RecordingRuntimeProjectionService
-    private let lock = NSLock()
-    private var terminationSignals: [(appID: String, pid: pid_t)] = []
-
-    init(recording: RecordingRuntimeProjectionService) {
-        self.recording = recording
-    }
-
-    func appTerminationSignalsRecorded() -> [(appID: String, pid: pid_t)] {
-        lock.lock()
-        defer { lock.unlock() }
-        return terminationSignals
-    }
-
-    func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection? {
-        recording.readAppSwitcherProjection()
-    }
-
-    func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection? {
-        recording.readHomeSummaryProjection()
-    }
-
-    func readHomeAppDetailProjection(appID: String) -> RuntimeHomeAppDetailProjection? {
-        recording.readHomeAppDetailProjection(appID: appID)
-    }
-
-    func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection? {
-        recording.readCurrentAppWindowProjection(appID: appID)
-    }
-
-    func readFocusedCurrentAppWindowProjection() -> RuntimeFocusedCurrentAppWindowProjectionRead? {
-        recording.readFocusedCurrentAppWindowProjection()
-    }
-
-    func readActivationTargetProjection() -> RuntimeActivationTargetProjection? {
-        recording.readActivationTargetProjection()
-    }
-
-    func readSpaceTopologyProjection() -> RuntimeSpaceTopologyProjection? {
-        recording.readSpaceTopologyProjection()
-    }
-
-    func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead {
-        recording.readCommittedSearchIndexForSearch()
-    }
-
-    func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics {
-        recording.runtimeReadModelDiagnostics()
-    }
-
-    func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason) {
-        recording.requestAppSwitcherProjectionMaintenance(reason: reason)
-    }
-
-    func requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason) {
-        recording.requestSearchIndexFreshnessBarrier(reason: reason)
-    }
-
-    func signalSpaceTopologyChanged() {
-        recording.signalSpaceTopologyChanged()
-    }
-
-    func signalAppLaunched(
-        appID: String,
-        pid: pid_t,
-        appDirectoryEntry: RuntimeAppDirectoryEntry?
-    ) {
-        recording.signalAppLaunched(
-            appID: appID,
-            pid: pid,
-            appDirectoryEntry: appDirectoryEntry
-        )
-    }
-
-    func signalAppWindowsChanged(appID: String, pid: pid_t) {
-        recording.signalAppWindowsChanged(appID: appID, pid: pid)
-    }
-
-    func signalSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t) {
-        recording.signalSelectedCurrentAppWindowsChanged(appID: appID, pid: pid)
-    }
-
-    func signalFocusedCurrentAppWindowsChanged() {
-        recording.signalFocusedCurrentAppWindowsChanged()
-    }
-
-    func signalAXWindowDestroyed(appID: String, pid: pid_t, axWindowID: String) {
-        recording.signalAXWindowDestroyed(appID: appID, pid: pid, axWindowID: axWindowID)
-    }
-
-    func signalAppTerminated(appID: String, pid: pid_t) {
-        lock.lock()
-        terminationSignals.append((appID, pid))
-        lock.unlock()
-    }
-
-    func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification) {
-        recording.signalWindowFocusVerified(verification)
-    }
-
-    func signalWindowFocusVerified(appID: String, pid: pid_t) {
-        recording.signalWindowFocusVerified(appID: appID, pid: pid)
-    }
-
-    func signalWindowFocusReadbackMismatch(_ diagnostic: WindowBindingReadbackDiagnostic) {
-        recording.signalWindowFocusReadbackMismatch(diagnostic)
-    }
-}
-
 extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelPreservesActiveWindowCycleAcrossDegradedAppProjectionRefresh() {
@@ -285,38 +172,224 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerTerminationRefreshPreservesRequestInterruptionProtection() {
-        let runtimeProjectionService = RecordingRuntimeProjectionService(
-            appSwitcherApps: terminateScenarioApps()
+    func testSwitcherPanelControllerTerminationRefreshProtectionEndsOnProjectionEvidence() {
+        let targetPID =
+            NSRunningApplication.current.processIdentifier
+        let apps = terminateScenarioApps()
+        let contextsByID = Dictionary(
+            uniqueKeysWithValues: apps.map { app in
+                (
+                    app.id,
+                    RuntimeAppContext(
+                        appID: app.id,
+                        runningApp: NSRunningApplication.current,
+                        ownerPID: targetPID,
+                        windowsByID: [:]
+                    )
+                )
+            }
         )
+        let recordingService = RecordingRuntimeProjectionService(
+            appSwitcherApps: apps,
+            contextsByID: contextsByID
+        )
+        let runtimeProjectionService =
+            RetainingTerminatedAppRuntimeProjectionService(
+                recording: recordingService
+            )
+        let scheduler =
+            ManualTerminateInterruptionProtectionScheduler()
         let controller = SwitcherPanelController(
-            model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
+            model: LiveSwitcherModel(
+                runtimeProjectionService: runtimeProjectionService
+            ),
+            terminateInterruptionProtectionScheduler: scheduler,
+            terminateTargetProcessStateReader:
+                MutableTerminateTargetProcessStateReader()
         )
+        controller.appIsActiveOverride = true
 
-        XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
-        let terminatedAppID = controller.modelForTesting.selectedApp?.id
-        controller.beginTerminateInterruptionProtection(trigger: "terminate_request_test")
-        XCTAssertTrue(controller.shouldProtectTerminateSystemInterruption())
-        let requestProtectionDeadline = controller.terminateInterruptionProtectionUntil
-
-        guard let terminatedAppID else {
-            XCTFail("Expected selected app before workspace terminate refresh")
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        guard let terminatedAppID =
+            controller.modelForTesting.selectedApp?.id
+        else {
+            XCTFail("Expected selected app before termination refresh.")
             return
         }
         controller.handleWorkspaceApplicationTerminatedForTesting(
             appID: terminatedAppID,
-            pid: 42_302
+            pid: targetPID
         )
 
-        XCTAssertGreaterThanOrEqual(
-            controller.terminateInterruptionProtectionUntil,
-            requestProtectionDeadline,
-            "Workspace termination refresh must preserve the request protection deadline so late system interruptions cannot close the active switcher session."
-        )
+        XCTAssertTrue(controller.shouldProtectTerminateSystemInterruption())
+        XCTAssertEqual(scheduler.pendingCount, 1)
         XCTAssertNotNil(controller.modelForTesting.session)
         XCTAssertFalse(
             controller.modelForTesting.session?.apps.contains { $0.id == terminatedAppID } ?? true
         )
+
+        let remainingApps = apps.filter { $0.id != terminatedAppID }
+        recordingService.installAppSwitcherProjection(
+            apps: remainingApps,
+            contextsByID: contextsByID.filter {
+                $0.key != terminatedAppID
+            },
+            generatedAt: 11,
+            projectionGeneration: 2
+        )
+        _ = controller.handleAppSwitcherProjectionDidUpdateForTesting()
+
+        XCTAssertTrue(controller.shouldProtectTerminateSystemInterruption())
+        XCTAssertEqual(scheduler.pendingCount, 0)
+        controller.handlePanelDidBecomeKeyForTesting()
+        XCTAssertFalse(controller.shouldProtectTerminateSystemInterruption())
+        XCTAssertNil(
+            controller
+                .lastTerminateInterruptionProtectionWatchdogFailure
+        )
         controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerConsumesPostTerminationPanelInterruptionBeforeEndingProtection() {
+        let targetPID =
+            NSRunningApplication.current.processIdentifier
+        let apps = terminateScenarioApps()
+        let contextsByID = Dictionary(
+            uniqueKeysWithValues: apps.map { app in
+                (
+                    app.id,
+                    RuntimeAppContext(
+                        appID: app.id,
+                        runningApp: NSRunningApplication.current,
+                        ownerPID: targetPID,
+                        windowsByID: [:]
+                    )
+                )
+            }
+        )
+        let recordingService = RecordingRuntimeProjectionService(
+            appSwitcherApps: apps,
+            contextsByID: contextsByID
+        )
+        let scheduler =
+            ManualTerminateInterruptionProtectionScheduler()
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                runtimeProjectionService:
+                    RetainingTerminatedAppRuntimeProjectionService(
+                        recording: recordingService
+                    )
+            ),
+            terminateInterruptionProtectionScheduler: scheduler,
+            terminateTargetProcessStateReader:
+                MutableTerminateTargetProcessStateReader()
+        )
+        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalMainKeyPressedOverride = false
+        controller.appIsActiveOverride = false
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        guard let terminatedAppID =
+            controller.modelForTesting.selectedApp?.id
+        else {
+            return XCTFail("Expected selected app before termination.")
+        }
+        controller.handleWorkspaceApplicationTerminatedForTesting(
+            appID: terminatedAppID,
+            pid: targetPID
+        )
+
+        recordingService.installAppSwitcherProjection(
+            apps: apps.filter { $0.id != terminatedAppID },
+            contextsByID: contextsByID.filter {
+                $0.key != terminatedAppID
+            },
+            generatedAt: 11,
+            projectionGeneration: 2
+        )
+        controller.panel.orderOut(nil)
+        controller.panelVisibilityOverride = true
+        _ = controller.handleAppSwitcherProjectionDidUpdateForTesting()
+
+        XCTAssertTrue(controller.shouldProtectTerminateSystemInterruption())
+        controller.handlePanelDidResignKeyForTesting()
+
+        XCTAssertTrue(controller.shouldProtectTerminateSystemInterruption())
+        XCTAssertNotNil(controller.modelForTesting.session)
+        controller.appIsActiveOverride = true
+        controller.handlePanelDidBecomeKeyForTesting()
+
+        XCTAssertFalse(controller.shouldProtectTerminateSystemInterruption())
+        XCTAssertNotNil(controller.modelForTesting.session)
+        XCTAssertEqual(scheduler.pendingCount, 0)
+        XCTAssertNil(
+            controller
+                .lastTerminateInterruptionProtectionWatchdogFailure
+        )
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerTerminationProtectionWatchdogReportsUnmetProjectionEvidence() {
+        let apps = terminateScenarioApps()
+        let recordingService = RecordingRuntimeProjectionService(
+            appSwitcherApps: apps
+        )
+        let runtimeProjectionService =
+            RetainingTerminatedAppRuntimeProjectionService(
+                recording: recordingService
+            )
+        let scheduler =
+            ManualTerminateInterruptionProtectionScheduler()
+        let processStateReader =
+            MutableTerminateTargetProcessStateReader()
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                runtimeProjectionService: runtimeProjectionService
+            ),
+            terminateInterruptionProtectionScheduler: scheduler,
+            terminateTargetProcessStateReader: processStateReader
+        )
+        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalMainKeyPressedOverride = false
+        controller.appIsActiveOverride = false
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        guard let terminatedAppID =
+            controller.modelForTesting.selectedApp?.id
+        else {
+            return XCTFail(
+                "Expected selected app before termination watchdog."
+            )
+        }
+        controller.handleWorkspaceApplicationTerminatedForTesting(
+            appID: terminatedAppID,
+            pid: 42_303
+        )
+        XCTAssertTrue(controller.shouldProtectTerminateSystemInterruption())
+
+        processStateReader.resolvedState = .terminated
+        scheduler.fireNextAvailable()
+
+        XCTAssertFalse(controller.shouldProtectTerminateSystemInterruption())
+        let failure =
+            controller
+                .lastTerminateInterruptionProtectionWatchdogFailure
+        XCTAssertEqual(
+            failure?.lastEvidence.source,
+            .workspaceTerminationReadback
+        )
+        XCTAssertEqual(
+            failure?.finalEvidence.snapshot.processState,
+            .terminated
+        )
+        XCTAssertEqual(
+            failure?.finalEvidence.snapshot.projectionState,
+            .identityUnavailable
+        )
+
+        controller.handlePanelDidResignKeyForTesting()
+        XCTAssertNil(controller.modelForTesting.session)
     }
 }

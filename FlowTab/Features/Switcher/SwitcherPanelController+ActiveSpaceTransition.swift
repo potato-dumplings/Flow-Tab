@@ -85,6 +85,9 @@ extension SwitcherPanelController {
         logSearchTrace(
             "activeSpaceTransition action=activationSuppressionEnded reason=\(reason) generation=\(suppression.observationGeneration) presentationGeneration=\(presentationGeneration) \(searchTraceStateSummary())"
         )
+        observeTerminateInterruptionProtectionPresentationUpdate(
+            source: .activeSpaceTransitionReadback
+        )
     }
 
     private func activeSpaceTransitionSnapshot()

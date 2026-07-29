@@ -1480,8 +1480,17 @@ extension FlowTabPriorityCoverageTests {
                 runtimeProjectionService: runtimeProjectionService
             )
         )
+        let terminateRequestSent = expectation(
+            description: "terminate request sent after protection preparation"
+        )
         controller.modelForTesting.terminateRequestOverride = { _ in
-            (sent: true, pid: 42_301)
+            XCTAssertTrue(
+                controller
+                    .terminateInterruptionProtectionObservationOwner
+                    .isPrepared
+            )
+            terminateRequestSent.fulfill()
+            return (sent: true, pid: 42_301)
         }
         controller.globalPrimaryModifierPressedOverride = false
         controller.globalMainKeyPressedOverride = false
@@ -1495,17 +1504,10 @@ extension FlowTabPriorityCoverageTests {
         let selectedAppID = controller.modelForTesting.selectedApp?.id
 
         controller.terminateSelectedApp()
-        let didEnterTerminateProtection = await waitUntil(
-            "terminate request enters interruption protection before panel resign",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            controller.modelForTesting.terminatingAppID == selectedAppID
-                && controller.shouldProtectTerminateSystemInterruption()
-        }
-        XCTAssertTrue(didEnterTerminateProtection)
+        await fulfillment(of: [terminateRequestSent], timeout: 1.0)
 
         XCTAssertEqual(controller.modelForTesting.terminatingAppID, selectedAppID)
+        XCTAssertTrue(controller.shouldProtectTerminateSystemInterruption())
         XCTAssertEqual(
             runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
             [.switcherSessionStarted, .appLifecycleRefresh]
