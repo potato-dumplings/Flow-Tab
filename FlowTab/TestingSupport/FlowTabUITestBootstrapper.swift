@@ -8,6 +8,8 @@ enum FlowTabUITestBootstrapper {
     private static var switcherTriggerObservers: [SwitcherTriggerNotificationObserver] = []
     private static var switcherCommandObservers: [SwitcherCommandNotificationObserver] = []
     private static var initialPanelOcclusionStaleGeneration = 0
+    static var initialPresentationObservationOwner:
+        FlowTabUITestInitialPresentationObservationOwner?
 
     private enum SwitcherTriggerNotification {
         static let global = Notification.Name("io.github.potato-dumplings.flowtab.ui-test.open-global-switcher")
@@ -46,6 +48,7 @@ enum FlowTabUITestBootstrapper {
     }
 
     static func prepareIfNeeded(userDefaults: UserDefaults = .standard) {
+        stopInitialUIPresentationObservation()
         if FlowTabTestLaunchOptions.isRunningUITests {
             RuntimeWindowRecencyTracker.shared.removeAll()
         }
@@ -293,7 +296,7 @@ enum FlowTabUITestBootstrapper {
         return normalized.isEmpty ? "Window" : normalized
     }
 
-    fileprivate static func installInitialPanelOcclusionStaleOverrideIfNeeded(
+    static func installInitialPanelOcclusionStaleOverrideIfNeeded(
         panelController: SwitcherPanelController
     ) {
         guard let rawMilliseconds = FlowTabTestLaunchOptions.initialPanelOcclusionStaleMilliseconds else {
@@ -433,67 +436,6 @@ enum FlowTabUITestBootstrapper {
         }
     }
 
-    static func presentInitialUIIfNeeded(panelController: SwitcherPanelController) {
-        guard FlowTabTestLaunchOptions.opensSwitcherOnLaunch else { return }
-        panelController.setModifierReleaseConfirmationSuppressedForTesting(true)
-
-        Task { @MainActor in
-            let retrySleepNanoseconds: UInt64 = 150_000_000
-            let maxAttempts = 20
-            let requiredStableSnapshotCount = 2
-            var lastObservedSnapshotSignature: [String] = []
-            var stableSnapshotCount = 0
-
-            for attempt in 0..<maxAttempts {
-                if presentLaunchSwitcher(panelController: panelController) {
-                    let snapshotSignature = launchSwitcherSnapshotSignature(
-                        panelController: panelController
-                    )
-                    if snapshotSignature == lastObservedSnapshotSignature {
-                        stableSnapshotCount += 1
-                    } else {
-                        lastObservedSnapshotSignature = snapshotSignature
-                        stableSnapshotCount = 1
-                    }
-
-                    if stableSnapshotCount >= requiredStableSnapshotCount {
-                        if FlowTabTestLaunchOptions.entersSearchOnLaunch {
-                            _ = panelController.enterSearchModeIfPossible()
-                        }
-                        return
-                    }
-
-                    panelController.cancelSelectionForTesting()
-                } else {
-                    lastObservedSnapshotSignature = []
-                    stableSnapshotCount = 0
-                }
-
-                guard attempt < maxAttempts - 1 else { return }
-                try? await Task.sleep(nanoseconds: retrySleepNanoseconds)
-            }
-        }
-    }
-
-    private static func presentLaunchSwitcher(panelController: SwitcherPanelController) -> Bool {
-        installInitialPanelOcclusionStaleOverrideIfNeeded(panelController: panelController)
-        if FlowTabTestLaunchOptions.opensInAppWindowSwitcherOnLaunch {
-            return panelController.presentInAppWindowHotkeySessionForTesting()
-        }
-        return panelController.presentGlobalHotkeySessionForTesting()
-    }
-
-    private static func launchSwitcherSnapshotSignature(
-        panelController: SwitcherPanelController
-    ) -> [String] {
-        guard let session = panelController.modelForTesting.session else { return [] }
-        if FlowTabTestLaunchOptions.opensInAppWindowSwitcherOnLaunch {
-            return session.apps.flatMap { app in
-                [app.id] + app.windows.map(\.id)
-            }
-        }
-        return session.apps.map(\.id)
-    }
 }
 
 private final class SwitcherTriggerNotificationObserver: NSObject {

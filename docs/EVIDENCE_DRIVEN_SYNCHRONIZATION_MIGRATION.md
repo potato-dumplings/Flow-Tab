@@ -126,7 +126,7 @@ and Process/Tooling.
 | SYNC-028B | Composite multi-application workflow-readiness routing boundary | Semantic owner review separated readiness evidence emitted independently by every fixture process from the final desktop-anchor activation and Space readback. Migration routing. | Aggregate every configured fixture process through SYNC-028B1, then establish the final anchor through SYNC-028B2. | H aggregate; child rows define required validation. | completed |
 | SYNC-028B1 | `SpaceFixtureWorkflowReadinessAggregateOwner`, `launchResolvedSpaceFixtureWorkflow`, `launchResolvedEdgeInputsWorkflow`; all-process readiness aggregation | A workflow-wide `settleTimeout` and fixed RunLoop advancement inferred when independently launched fixture processes and their Space topology were ready. Evidence migration plus watchdog. | Install a unique distributed observer for every workflow app before launching any process. Capture each exact configured baseline and accept its later ready evidence only for the configured workflow app ID, bundle ID, PID, observation generation, window plan, fullscreen plan, and titles. Complete after every app has terminal evidence. The workflow invocation owns all observers and aggregate-generation cancellation; one named watchdog reports every unmet app and last observation. | H multi-process fixture topology; Unit, Behavior, standard and edge multi-application UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-028B2 | `SpaceFixtureWorkflowDesktopAnchorObservationOwner`, `launchResolvedSpaceFixtureWorkflow`, `launchResolvedEdgeInputsWorkflow`; final desktop-anchor activation | After aggregate readiness, the launchers call `activate()` and use generic foreground state as the final desktop-anchor result. Evidence migration with exact readback. | Establish workspace observers and initial readback before activation. Resolve only when the exact readiness PID is active and frontmost, XCUI reports it foreground, the exact plan-identified XCUI window frame matches the PID-scoped topmost on-screen CG window, and that CG frame satisfies the desktop-Space non-fullscreen-size readback. The workflow invocation owns generation cancellation, observers, polling, and a diagnostic terminal watchdog. | H desktop/Space topology; Unit, Behavior, affected standard and edge UI, runtime-topology Pressure, Process/Tooling. | completed |
-| SYNC-029 | `FlowTab/TestingSupport/FlowTabUITestBootstrapper.swift`; `presentInitialUIIfNeeded` | Twenty 150ms retries and two equal snapshots infer runtime projection stability before opening Search/switcher. Evidence migration. | Observe runtime projection commit notifications before bootstrap, capture baseline generation, perform initial readback, and open from a matching complete later generation. A shared UI-test watchdog reports the last session/projection signature. Bootstrapper owns observer/task cleanup. | H test orchestration; Behavior, UI, runtime-topology/Search Pressure. | planned |
+| SYNC-029 | `FlowTabUITestInitialPresentationObservationOwner`, `FlowTabUITestBootstrapper.presentInitialUIIfNeeded`; initial UI-test Search/switcher presentation | Twenty 150ms retries and two equal snapshots infer runtime projection stability before opening Search/switcher. Evidence migration. | Install exact projection observers before the baseline readback and readiness request. Resolve from an initially complete projection, a monotonic later generation, or a same-generation completeness transition; require the exact filtered projection/session item signature and a compatible post-presentation readback. A complete empty projection is authoritative no-content. The bootstrapper owns replacement, prepare, termination, resolution, observer, generation, task, and watchdog cleanup. | H test orchestration; Behavior, UI, runtime-topology/Search Pressure. | completed |
 | SYNC-030 | `FlowTabUITestBootstrapper.installMockWindowPreviewsIfNeeded`, initial stale occlusion hook | Thread sleep and millisecond launch options intentionally inject preview latency or stale visibility. Domain fixture duration. | Retain as named fault-injection policies, preferably backed by controllable gates/acknowledgements; ensure cancellation and completion markers are owned by TestingSupport and UI tests wait on the resulting Oracle. | M; Behavior, affected UI, Pressure when used. | verification-needed |
 | SYNC-031 | `FlowTab/TestingSupport/FlowTabLaunchTesting.swift`; `TabSwitchStressRunner` | Switch cadence and total duration define the pressure workload. Domain duration. | Retain named protocol inputs, use a monotonic injectable clock/scheduler, propagate cancellation, and terminate only after the required workload/duration evidence. Runner task owns cancellation and cleanup. | M hot path; Unit/Behavior for runner, tab-switch Pressure, Process/Tooling. | verification-needed |
 | SYNC-032 | `FlowTabTests/FlowTabTests+Support.swift`, `FlowTabPriorityCoverageTests+AsyncSupport.swift`; shared async waits | Generic polling is used even where production callbacks, notifications, generations, or task completion are available; cancellation is swallowed. Evidence migration/conditional observation. | Add expectation/notification/task-completion helpers that observe before triggering. Keep one named immediate-check condition observer only for predicates without an event source, with cancellation and last-observation diagnostics. | M; app Unit/Behavior, Process/Tooling. | planned |
@@ -2742,5 +2742,90 @@ polling cadence, deadline, or timeout in the scoped paths.
   before commit. The new focused test remains below 400 lines; touched shared
   UI sources remain below 800 lines. Startup `prompts.zip` remains unchanged
   and outside the slice.
-- Commit: pending
+- Commit: `8092758e0e0fca7eb0d9a6345f504b9c50b900db`
   (`refactor(sync): migrate SYNC-034A exact window oracle`).
+
+### SYNC-029 Closure Record
+
+- Design and initial Oracle:
+  `FlowTabUITestInitialPresentationObservationOwner` installs the exact
+  runtime-service projection routes before its baseline readback and readiness
+  request. Global presentation derives its item signature from the complete
+  app-switcher projection after window-recency and app-visibility filtering.
+  In-app presentation derives the focused app PID, app ID, and recency-ordered
+  window IDs from the complete current-app projection. An initially complete
+  nonempty projection can present immediately; an initially complete empty
+  projection resolves as authoritative no-content. Later evidence must be a
+  newly available projection, a component-wise monotonic generation, or a
+  same-generation incomplete-to-complete transition. Regressed generations,
+  duplicate candidates, and stale owner generations cannot present.
+  `RuntimeReadModelGeneration` owns the shared component-wise monotonic
+  comparison in Runtime infrastructure, so Home and TestingSupport consume one
+  dependency-safe generation contract.
+- Presentation readback: success requires the controller to report a presented
+  session whose exact ordered item signature equals the accepted projection
+  candidate. The post-action projection must preserve mode, PID, and item
+  identity at the same or a component-wise monotonic later generation.
+  Session-start maintenance may temporarily mark that later projection
+  incomplete while preserving the accepted identity, so scheduling latency
+  changes freshness convergence time without changing the presentation
+  result. A changed PID or item signature cancels the presentation and waits
+  for fresh evidence.
+- Observation and lifecycle: the global route observes app-switcher projection
+  commits; the in-app route observes both current-app and app-switcher
+  projection commits. Each notification performs a full readback. One static
+  bootstrap owner replaces and cancels the prior generation during app
+  preparation, and AppDelegate termination cancels it before runtime service
+  teardown. Resolution, no-content, watchdog failure, explicit cancellation,
+  replacement, and deinitialization remove notification tokens; the owner
+  cancels its watchdog and rejects every late generation.
+- Retained time policy: the former presentation retry cadence and stable-
+  snapshot count were removed. The named three-second `watchdog` remains only
+  as a terminal failure bound. It performs one final readback that can still
+  resolve success, then reports the unmet projection conditions and distinct
+  last/final generation, completeness, PID, item, dirty-scope, presentation,
+  Search, and post-readback evidence.
+- Diagnostic correction: UI attempt 001 passed the real fixture path and
+  exposed a mock Search failure where successful `startSession` maintenance
+  advanced the projection before the immediate post-readback. The log recorded
+  the exact unchanged six-app signature at a later temporarily incomplete
+  generation. The final compatibility Oracle above removes that
+  scheduler-dependent result while retaining exact identity checks.
+- Unit and Behavior: the final focused canonical wrapper passed 8/8 with zero
+  failures in 0.389 seconds (0.390 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-029/targeted-attempt-006`.
+  Coverage includes initial complete and complete-empty states, observer-before-
+  trigger ordering, same-generation completeness, later monotonic generation,
+  regressed and stale generations, exact session mismatch, post-readback
+  identity mismatch, duplicate candidate rejection, fresh retry, explicit
+  cancellation, replacement, final-watchdog success, and last/final watchdog
+  failure diagnostics. AppDelegate behavior verifies one later complete
+  projection notification presents the exact two-app session and that
+  complete-empty evidence performs no maintenance request.
+- Full FlowTabTests: the canonical wrapper passed 1002/1002 with zero failures
+  in 47.781 seconds (47.926 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-029/full-attempt-002`.
+- FlowTabCore: not relevant because this owner exists only in the app
+  `FLOWTAB_TESTING` boundary and adds no core-domain API or dependency.
+- UI: the canonical install wrapper rebuilt and verified the fixed-path Apple
+  Development-signed app for the final source state. The real fixture standard
+  switcher path passed in 21.953 seconds and the mock window-Search launch path
+  passed in 6.739 seconds, 2/2 with zero failures in 28.692 seconds (28.693
+  seconds total), under
+  `.build-local/evidence-driven-sync/SYNC-029/ui-attempt-003`. Their independent
+  Oracles were the exact fixture app tile and exact mock Inbox window result.
+- Pressure: the deterministic owner workload replaced 500 generations,
+  force-delivered every cancelled watchdog and stale generation, then resolved
+  the final generation exactly once. Its explicit-cancellation phase delivered
+  a cancelled watchdog after a later ready snapshot and produced no callback.
+  The post-presentation regression also advances to a later incomplete
+  generation with the same identity and preserves the exact result.
+- Process/Tooling: canonical wrappers compiled the four TestingSupport sources
+  and three test sources in their intended targets. Project-file lint, Swift
+  parse checks, scoped obsolete-wait review, source-size checks,
+  `git diff --check`, and exact staged-content review are recorded before
+  commit. Every new production source remains within the 400-line guardrail;
+  the touched oversized AppDelegate lifecycle test source shrank. Startup
+  `prompts.zip` remains unchanged and outside the slice.
+- Commit: pending
+  (`refactor(sync): migrate SYNC-029 initial UI readiness`).

@@ -1123,7 +1123,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testAppDelegateLaunchOpenSwitcherWaitsForStableProjectionBeforeKeepingPanelOpen() async {
+    func testAppDelegateLaunchOpenSwitcherPresentsFromCompleteProjectionEvidence() {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
 
         let previousHooks = AppDelegate.testHooks
@@ -1135,7 +1135,14 @@ extension FlowTabPriorityCoverageTests {
         let previousLaunchEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let multiAppSnapshot = Array(searchScenarioApps().prefix(2))
-        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: [multiAppSnapshot[0]])
+        let initialProjection =
+            incompleteInitialPresentationProjection(
+                app: multiAppSnapshot[0]
+            )
+        let runtimeProjectionService =
+            RecordingRuntimeProjectionService(
+                appSwitcherProjection: initialProjection
+            )
         let panelController = SwitcherPanelController(
             model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         )
@@ -1185,28 +1192,24 @@ extension FlowTabPriorityCoverageTests {
         appDelegate.applicationDidFinishLaunching(
             Notification(name: NSApplication.didFinishLaunchingNotification)
         )
-        let didReadInitialProjection = await waitUntil(
-            "launch open switcher reads initial app-switcher projection",
-            timeoutNanoseconds: 2_000_000_000,
-            pollIntervalNanoseconds: 25_000_000
-        ) {
-            runtimeProjectionService.appSwitcherProjectionReadCount() >= 1
-        }
-        XCTAssertTrue(didReadInitialProjection)
+        XCTAssertTrue(FlowTabUITestBootstrapper.isObservingInitialPresentationForTesting)
+        XCTAssertNil(panelController.modelForTesting.session)
 
-        runtimeProjectionService.installAppSwitcherProjection(apps: multiAppSnapshot)
-        let didOpenSeededSwitcher = await waitUntil(
-            "launch open switcher loads seeded multi-app projection",
-            timeoutNanoseconds: 2_000_000_000,
-            pollIntervalNanoseconds: 25_000_000
-        ) {
-            runtimeProjectionService.appSwitcherProjectionReadCount() >= 3
-                && panelController.modelForTesting.appCount == multiAppSnapshot.count
-                && panelController.modelForTesting.session?.apps.map(\.id) == multiAppSnapshot.map(\.id)
-        }
-        XCTAssertTrue(didOpenSeededSwitcher)
+        runtimeProjectionService.installAppSwitcherProjection(
+            apps: multiAppSnapshot,
+            projectionGeneration: 2
+        )
+        NotificationCenter.default.post(
+            name: .runtimeAppSwitcherProjectionDidUpdate,
+            object: runtimeProjectionService
+        )
 
-        XCTAssertGreaterThanOrEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 3)
+        XCTAssertFalse(FlowTabUITestBootstrapper.isObservingInitialPresentationForTesting)
+        XCTAssertGreaterThanOrEqual(
+            runtimeProjectionService
+                .appSwitcherProjectionReadCount(),
+            5
+        )
         XCTAssertFalse(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded().isEmpty)
         XCTAssertTrue(
             runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded()
@@ -1293,23 +1296,18 @@ extension FlowTabPriorityCoverageTests {
         appDelegate.applicationDidFinishLaunching(
             Notification(name: NSApplication.didFinishLaunchingNotification)
         )
-        let didFinishLaunchBootstrap = await waitUntil(
-            "launch open switcher without results finishes bootstrap",
-            timeoutNanoseconds: 2_000_000_000,
-            pollIntervalNanoseconds: 25_000_000
-        ) {
-            hotkeyFactory.records.count == 2
-                && runtimeProjectionService.appSwitcherProjectionReadCount() >= 1
-        }
-        XCTAssertTrue(didFinishLaunchBootstrap)
-
+        XCTAssertFalse(FlowTabUITestBootstrapper.isObservingInitialPresentationForTesting)
         XCTAssertNil(panelController.modelForTesting.session)
         XCTAssertFalse(panelController.modelForTesting.isSearchActive)
-        XCTAssertGreaterThanOrEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 1)
-        XCTAssertFalse(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded().isEmpty)
+        XCTAssertEqual(
+            runtimeProjectionService
+                .appSwitcherProjectionReadCount(),
+            1
+        )
         XCTAssertTrue(
-            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded()
-                .allSatisfy { $0 == .switcherSessionStarted }
+            runtimeProjectionService
+                .appSwitcherMaintenanceRequestsRecorded()
+                .isEmpty
         )
         XCTAssertEqual(runtimeProjectionService.committedSearchIndexReadCount(), 0)
         XCTAssertEqual(hotkeyFactory.records.count, 2)

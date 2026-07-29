@@ -106,6 +106,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyMonitor?.stop()
         inAppWindowHotkeyMonitor?.stop()
 #if FLOWTAB_TESTING
+        FlowTabUITestBootstrapper
+            .stopInitialUIPresentationObservation()
         FlowTabUITestProjectionAcknowledgementBootstrap.stop()
 #endif
         commandTabTakeoverController.restoreSystemShortcutsIfNeeded()

@@ -157,19 +157,6 @@ enum HomeRuntimeProjectionReader {
     }
 }
 
-extension RuntimeReadModelGeneration {
-    func isStrictlyLater(
-        than other: RuntimeReadModelGeneration
-    ) -> Bool {
-        appLifecycle >= other.appLifecycle
-            && cg >= other.cg
-            && space >= other.space
-            && axDirty >= other.axDirty
-            && projection >= other.projection
-            && self != other
-    }
-}
-
 enum HomeAppSummaryProjectionReadback {
     static func read(
         from service: any RuntimeProjectionServing
