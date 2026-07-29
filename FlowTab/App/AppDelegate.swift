@@ -107,6 +107,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         inAppWindowHotkeyMonitor?.stop()
 #if FLOWTAB_TESTING
         FlowTabUITestBootstrapper
+            .stopInitialPanelOcclusionStalenessInjection()
+        FlowTabUITestBootstrapper
             .stopMockWindowPreviewLatencyInjection()
         FlowTabUITestBootstrapper
             .stopInitialUIPresentationObservation()

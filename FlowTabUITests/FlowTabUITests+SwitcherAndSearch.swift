@@ -506,6 +506,8 @@ extension FlowTabUITests {
 
         waitForRuntimeLogFiles(
             containing: [
+                "phase=installed staleMs=260",
+                "phase=released staleMs=260",
                 "initial panel occlusion stale released",
                 "presentationRecovery trigger=global_show action=complete"
             ],

@@ -127,9 +127,9 @@ and Process/Tooling.
 | SYNC-028B1 | `SpaceFixtureWorkflowReadinessAggregateOwner`, `launchResolvedSpaceFixtureWorkflow`, `launchResolvedEdgeInputsWorkflow`; all-process readiness aggregation | A workflow-wide `settleTimeout` and fixed RunLoop advancement inferred when independently launched fixture processes and their Space topology were ready. Evidence migration plus watchdog. | Install a unique distributed observer for every workflow app before launching any process. Capture each exact configured baseline and accept its later ready evidence only for the configured workflow app ID, bundle ID, PID, observation generation, window plan, fullscreen plan, and titles. Complete after every app has terminal evidence. The workflow invocation owns all observers and aggregate-generation cancellation; one named watchdog reports every unmet app and last observation. | H multi-process fixture topology; Unit, Behavior, standard and edge multi-application UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-028B2 | `SpaceFixtureWorkflowDesktopAnchorObservationOwner`, `launchResolvedSpaceFixtureWorkflow`, `launchResolvedEdgeInputsWorkflow`; final desktop-anchor activation | After aggregate readiness, the launchers call `activate()` and use generic foreground state as the final desktop-anchor result. Evidence migration with exact readback. | Establish workspace observers and initial readback before activation. Resolve only when the exact readiness PID is active and frontmost, XCUI reports it foreground, the exact plan-identified XCUI window frame matches the PID-scoped topmost on-screen CG window, and that CG frame satisfies the desktop-Space non-fullscreen-size readback. The workflow invocation owns generation cancellation, observers, polling, and a diagnostic terminal watchdog. | H desktop/Space topology; Unit, Behavior, affected standard and edge UI, runtime-topology Pressure, Process/Tooling. | completed |
 | SYNC-029 | `FlowTabUITestInitialPresentationObservationOwner`, `FlowTabUITestBootstrapper.presentInitialUIIfNeeded`; initial UI-test Search/switcher presentation | Twenty 150ms retries and two equal snapshots infer runtime projection stability before opening Search/switcher. Evidence migration. | Install exact projection observers before the baseline readback and readiness request. Resolve from an initially complete projection, a monotonic later generation, or a same-generation completeness transition; require the exact filtered projection/session item signature and a compatible post-presentation readback. A complete empty projection is authoritative no-content. The bootstrapper owns replacement, prepare, termination, resolution, observer, generation, task, and watchdog cleanup. | H test orchestration; Behavior, UI, runtime-topology/Search Pressure. | completed |
-| SYNC-030 | Composite TestingSupport fault-injection timing boundary | Semantic owner review separated mock preview-capture latency from initial panel-occlusion staleness. Domain fixture duration routing. | Close preview-capture latency through SYNC-030A and panel-occlusion staleness through SYNC-030B. | M aggregate; child rows define required validation. | in-progress |
+| SYNC-030 | Composite TestingSupport fault-injection timing boundary | Semantic owner review separated mock preview-capture latency from initial panel-occlusion staleness. Domain fixture duration routing. | Close preview-capture latency through SYNC-030A and panel-occlusion staleness through SYNC-030B. | M aggregate; child rows define required validation. | completed |
 | SYNC-030A | `FlowTabUITestMockWindowPreviewLatencyOwner`, `FlowTabUITestBootstrapper.installMockWindowPreviewsIfNeeded`; mock preview I/O latency | A blocking thread sleep intentionally delays preview capture, has no cancellation owner, and exposes no TestingSupport completion evidence. Domain fixture duration. | Retain the compatible millisecond launch option as a bounded named latency policy. A TestingSupport generation owner performs a cancellable monotonic deadline wait and publishes exact owner/batch/request/outcome evidence. Preview result identity remains the success Oracle. Bootstrap preparation, replacement, termination, and deinitialization own cancellation. | M asynchronous preview path; Unit, Behavior, affected UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
-| SYNC-030B | Initial panel-occlusion stale hook in `FlowTabUITestBootstrapper` | A task sleep intentionally holds stale occlusion state before releasing visibility, while generation equality informally rejects replacement. Domain fixture duration. | Retain the compatible millisecond launch option as a bounded named staleness policy; inject a cancellable scheduler, publish installed/released/cancelled evidence, and make bootstrap preparation, replacement, termination, and deinitialization own cleanup. The panel visibility/recovery state remains the success Oracle. | M presentation lifecycle; Unit, Behavior, affected UI, deterministic lifecycle Pressure, Process/Tooling. | planned |
+| SYNC-030B | Initial panel-occlusion stale hook in `FlowTabUITestBootstrapper` | A task sleep intentionally holds stale occlusion state before releasing visibility, while generation equality informally rejects replacement. Domain fixture duration. | Retain the compatible millisecond launch option as a bounded named staleness policy; inject a cancellable scheduler, publish installed/released/cancelled evidence, and make bootstrap preparation, replacement, termination, and deinitialization own cleanup. The panel visibility/recovery state remains the success Oracle. | M presentation lifecycle; Unit, Behavior, affected UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-031 | `FlowTab/TestingSupport/FlowTabLaunchTesting.swift`; `TabSwitchStressRunner` | Switch cadence and total duration define the pressure workload. Domain duration. | Retain named protocol inputs, use a monotonic injectable clock/scheduler, propagate cancellation, and terminate only after the required workload/duration evidence. Runner task owns cancellation and cleanup. | M hot path; Unit/Behavior for runner, tab-switch Pressure, Process/Tooling. | verification-needed |
 | SYNC-032 | `FlowTabTests/FlowTabTests+Support.swift`, `FlowTabPriorityCoverageTests+AsyncSupport.swift`; shared async waits | Generic polling is used even where production callbacks, notifications, generations, or task completion are available; cancellation is swallowed. Evidence migration/conditional observation. | Add expectation/notification/task-completion helpers that observe before triggering. Keep one named immediate-check condition observer only for predicates without an event source, with cancellation and last-observation diagnostics. | M; app Unit/Behavior, Process/Tooling. | planned |
 | SYNC-033 | App tests with direct fixed waits: `FlowTabTests+CompactActionButton`, `+EnglishLayout`, `+PreferencesAndDiagnostics`, `FlowTabPriorityCoverageTests+PanelSessionBehavior`, `+RuntimeProjectionNotificationPublication`, `+RuntimeSpaceClassification`, `+SwitcherInteractionRegressions`; simulated latency in `+RuntimeSnapshotPressure` | Raw RunLoop advances and 60/80/250ms sleeps are used for settling or race setup; snapshot pressure sleep represents injected I/O latency. Evidence migration/domain pressure duration. | Replace settling with callbacks/state/generation expectations. Retain simulated latency only as a named injectable workload gate or pressure policy. Each test owns expectation cleanup and watchdog reporting. | M; affected Unit/Behavior and Pressure, Process/Tooling. | planned |
@@ -2888,5 +2888,60 @@ polling cadence, deadline, or timeout in the scoped paths.
   source-size checks, `git diff --check`, and exact staged-content review are
   recorded before commit. Startup `prompts.zip` remains unchanged and outside
   the slice.
-- Commit: pending
+- Commit: `65a74c1b672aa62fc4a0ed7ca4ec1c7bc7eaa4fd`
   (`refactor(sync): migrate SYNC-030A preview latency`).
+
+### SYNC-030B Closure Record
+
+- Classification and policy:
+  `--flowtab-ui-initial-panel-occlusion-stale-ms` remains compatible and is
+  classified as an intentional TestingSupport staleness interval. The named
+  `FlowTabUITestInitialPanelOcclusionStalenessPolicy` bounds the retained
+  interval from one to 5,000 milliseconds. Elapsed time releases the injected
+  stale state; exact panel readback and the existing recovery state establish
+  the result.
+- Owner and evidence:
+  `FlowTabUITestInitialPanelOcclusionStalenessOwner` assigns monotonic owner and
+  transition generations and publishes `installed`, `released`, or `cancelled`
+  evidence with the bounded policy plus panel-availability, override-installed,
+  and override-visible readback. The injected scheduler returns one cancellable
+  release token. Replacement cancels the preceding generation before installing
+  the next override, and a force-delivered stale callback is rejected by exact
+  generation. Bootstrap preparation and explicit stop own synchronous cleanup;
+  AppDelegate termination stops the owner, and owner deinitialization schedules
+  token and injection cleanup on the main actor.
+- Independent Oracle: the representative UI path requires exact installed and
+  released evidence for the 260ms policy, the existing
+  `presentationRecovery trigger=global_show action=complete` evidence, and the
+  exact mock-browser switcher tile. The duration remains isolated from the
+  panel-visibility and recovery success Oracle.
+- Unit and Behavior: the final focused canonical wrapper passed 5/5 with zero
+  failures in 0.108 seconds (0.109 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-030B/targeted-attempt-003`.
+  Coverage verifies policy bounds, installed/released readback, explicit
+  cancellation, replacement, force-delivered stale work, synchronous scheduler
+  delivery, and deinitialization cleanup. Attempt 001 captured a compiler
+  diagnostic for main-actor cleanup from `deinit`; the final implementation
+  transfers the captured token and mutation into a main-actor cleanup task.
+- Expanded Behavior: the complete canonical wrapper passed 1011/1011 with zero
+  failures in 48.035 seconds (48.192 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-030B/full-attempt-001`.
+- FlowTabCore: not relevant because this fault-injection policy and owner are
+  confined to app TestingSupport, app tests, and the UI-test launch protocol.
+- UI: the current signed test app installed successfully. The canonical
+  `testSwitcherInitialPresentationStaleOcclusionDoesNotHardRecover` execution
+  passed 1/1 with zero failures in 4.994 seconds (4.997 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-030B/ui-attempt-001`. It observed both
+  exact staleness phases, completed presentation recovery, and found the exact
+  visible switcher item.
+- Pressure: the deterministic 500-generation replacement workload cancelled
+  generations 1 through 499, force-delivered all of their callbacks, and
+  accepted a release only for generation 500. Every scheduler token finished
+  cancelled, so scheduling latency changes completion time while the exact
+  generation determines the outcome.
+- Process/Tooling: project-file lint, Swift parse checks, scoped timing review,
+  source-size checks, `git diff --check`, and exact staged-content review are
+  recorded before commit. Startup `prompts.zip` remains unchanged and outside
+  the slice.
+- Commit: pending
+  (`refactor(sync): migrate SYNC-030B occlusion staleness`).

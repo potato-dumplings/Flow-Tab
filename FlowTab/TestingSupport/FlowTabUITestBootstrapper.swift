@@ -7,7 +7,8 @@ enum FlowTabUITestBootstrapper {
     private static var hotkeyReloadDiagnosticsObserver: NSObjectProtocol?
     private static var switcherTriggerObservers: [SwitcherTriggerNotificationObserver] = []
     private static var switcherCommandObservers: [SwitcherCommandNotificationObserver] = []
-    private static var initialPanelOcclusionStaleGeneration = 0
+    static var initialPanelOcclusionStalenessOwner:
+        FlowTabUITestInitialPanelOcclusionStalenessOwner?
     private static var mockWindowPreviewLatencyGeneration:
         UInt64 = 0
     private static var mockWindowPreviewLatencyOwner:
@@ -54,6 +55,7 @@ enum FlowTabUITestBootstrapper {
     }
 
     static func prepareIfNeeded(userDefaults: UserDefaults = .standard) {
+        stopInitialPanelOcclusionStalenessInjection()
         stopMockWindowPreviewLatencyInjection()
         stopInitialUIPresentationObservation()
         if FlowTabTestLaunchOptions.isRunningUITests {
@@ -360,33 +362,6 @@ enum FlowTabUITestBootstrapper {
     nonisolated private static func normalizedMockWindowTitle(_ title: String?) -> String {
         let normalized = (title ?? "Window").trimmingCharacters(in: .whitespacesAndNewlines)
         return normalized.isEmpty ? "Window" : normalized
-    }
-
-    static func installInitialPanelOcclusionStaleOverrideIfNeeded(
-        panelController: SwitcherPanelController
-    ) {
-        guard let rawMilliseconds = FlowTabTestLaunchOptions.initialPanelOcclusionStaleMilliseconds else {
-            return
-        }
-        let milliseconds = max(1, min(rawMilliseconds, 5_000))
-        initialPanelOcclusionStaleGeneration += 1
-        let generation = initialPanelOcclusionStaleGeneration
-        panelController.panelOcclusionStateOverride = []
-        RuntimeLog.info(
-            "UITest",
-            "initial panel occlusion stale installed generation=\(generation) ms=\(milliseconds)"
-        )
-
-        Task { @MainActor [weak panelController] in
-            try? await Task.sleep(nanoseconds: UInt64(milliseconds) * 1_000_000)
-            guard generation == initialPanelOcclusionStaleGeneration else { return }
-            panelController?.panelOcclusionStateOverride = .visible
-            panelController?.handlePanelOcclusionStateDidChangeForTesting()
-            RuntimeLog.info(
-                "UITest",
-                "initial panel occlusion stale released generation=\(generation) ms=\(milliseconds)"
-            )
-        }
     }
 
     private static func installSwitcherTriggerNotificationsIfNeeded(
