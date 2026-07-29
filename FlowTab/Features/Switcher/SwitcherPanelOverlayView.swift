@@ -426,6 +426,9 @@ private struct CommandTabOverlay: View {
 
     private var standardOverlayAppStrip: some View {
         let appIDs = session.apps.map(\.id)
+        let removalAnimationDuration =
+            SwitcherAppRemovalAnimationPolicy.default
+                .animationDuration(appCount: session.apps.count)
         return HStack(alignment: .center, spacing: appTileSpacing) {
             ForEach(Array(session.apps.enumerated()), id: \.element.id) { index, app in
                 AppTileView(
@@ -446,7 +449,9 @@ private struct CommandTabOverlay: View {
             }
         }
         .animation(
-            session.apps.count <= 16 ? .easeOut(duration: 0.14) : nil,
+            removalAnimationDuration.map {
+                Animation.easeOut(duration: $0)
+            },
             value: appIDs
         )
         .frame(maxWidth: .infinity, alignment: .center)

@@ -108,7 +108,7 @@ and Process/Tooling.
 | SYNC-024 | Composite visual-timing baseline | Semantic owner review found five independent animation or degraded-reveal contracts in the baseline row. Migration routing. | Preserve the baseline ID as the parent and close each lifecycle independently through SYNC-024A–SYNC-024E. | M aggregate; child rows define required validation. | planned: split into SYNC-024A–SYNC-024E |
 | SYNC-024A | `TerminatePressFeedbackCompletionOwner`, `SwitcherPanelController.terminateSelectedApp`, `AppTileView`; terminate press feedback | An 80ms task sleep gated the terminate request while the rendered press animation used an unrelated 120ms duration. Domain duration plus scheduler-completion evidence. | Use one named 120ms press-feedback policy for the animation and an injectable completion scheduler. The panel controller owns one generation, cancellable token, request continuation, and late-callback rejection through session cancellation. | M; Unit, Behavior, termination UI, deterministic Pressure. | completed |
 | SYNC-024B | `InitialWindowOnlyPreviewRevealObservationOwner`, `SwitcherPanelController.prepareInitialWindowOnlyPanelReveal`; initial preview reveal | A 250ms task sleep forced a degraded reveal when preview readiness had not arrived. Watchdog migration. | Use preview-batch completion plus pending-capture readback as the success Oracle. The named injectable watchdog performs a final readback and reports the last event plus unmet condition before degraded reveal; the presentation session owns cancellation and generation replacement. | M; Unit, Behavior, in-app switcher UI, deterministic Pressure. | completed |
-| SYNC-024C | `SwitcherPanelOverlayView`; app-removal transition | A 140ms ease-out duration is a visual-only product contract for small app sets. Domain duration. | Retain it as a named Switcher removal-animation policy. SwiftUI view identity owns the animation; no functional continuation or success result depends on elapsed time. | L; Behavior/visual policy assertion, affected switcher UI, Process/Tooling. | verification-needed |
+| SYNC-024C | `SwitcherAppRemovalAnimationPolicy`, `SwitcherPanelOverlayView`; app-removal transition | A 140ms ease-out duration is a visual-only product contract for app sets up to 16 items. Domain duration. | Retain it as a named Switcher removal-animation policy. SwiftUI app-strip identity owns the animation; exact process termination and projection refresh remain the tile-removal Oracle. | L; Behavior/visual policy assertion, affected switcher UI, Process/Tooling. | completed |
 | SYNC-024D | `HomeChrome`; pressed-button transition | A 120ms ease-out duration is a visual-only Home button contract. Domain duration. | Retain it as a named Home control-animation policy. SwiftUI view identity owns the animation; actions continue from input callbacks. | L; Behavior/visual policy assertion, affected Home UI, Process/Tooling. | verification-needed |
 | SYNC-024E | `AppSettingsView`; app-visibility navigation transition | A 180ms ease-in-out duration is a visual-only Settings navigation contract. Domain duration. | Retain it as a named Settings navigation-animation policy. Settings view state owns the transition; destination visibility remains the UI Oracle. | L; Behavior/visual policy assertion, affected Settings UI, Process/Tooling. | verification-needed |
 | SYNC-025 | `SwitcherPanelController+PresentationDiagnostics.swift`; frame-delay probe | A 16ms sleep samples an assumed later display frame for diagnostics only. Domain measurement. | Drive the second probe from an actual display/update callback or explicitly named diagnostic scheduler; it must not affect behavior. The probe task is canceled with the presentation session. | L; Behavior diagnostic assertion, Process/Tooling. | planned |
@@ -1857,5 +1857,47 @@ polling cadence, deadline, or timeout in the scoped paths.
   recorded before commit. The owner and both new test files remain below 400
   lines; the touched controller remains below 800 lines. The startup
   `prompts.zip` remains unchanged and outside the slice.
-- Commit: pending
+- Commit: `845d353574cb99c384cee9eae543747d5bdfb7f8`
   (`refactor(sync): migrate SYNC-024B initial preview reveal`).
+
+### SYNC-024C Closure Record
+
+- Design and Oracle: `SwitcherAppRemovalAnimationPolicy` names the 140ms
+  ease-out duration and the existing 16-app animation ceiling. The app strip
+  resolves only an optional `Animation` from this immutable policy. Terminate
+  request delivery, process state, workspace termination, runtime projection
+  refresh, session membership, and tile identity never read the duration.
+- Retained time policy and lifecycle: 140ms is a visual product contract for
+  opacity/scale removal. SwiftUI app-strip identity owns and cancels its render
+  transition as view identity changes or leaves the hierarchy. App sets above
+  16 retain the existing no-animation path, preventing large-list render work.
+  No callback, continuation, retry, success result, or model mutation is
+  scheduled from this policy.
+- Unit and Behavior: the focused canonical run passed 5/5 in 0.380 seconds
+  under
+  `.build-local/evidence-driven-sync/SYNC-024C/targeted-attempt-003`.
+  Policy coverage verifies the named duration, inclusive 16-app boundary,
+  invalid/large-count no-animation paths, and injected policy values. The
+  behavior cases prove a sent terminate request retains the app, while matching
+  workspace-termination evidence refreshes the projection and removes it.
+- FlowTabCore: not relevant because the animation policy and SwiftUI app-strip
+  rendering belong to the app target.
+- UI: the fixed-path Apple Development-signed app and real Space Fixture test
+  passed 1/1 in 28.010 seconds under
+  `.build-local/evidence-driven-sync/SYNC-024C/ui-real-termination-attempt-002`.
+  The fixture intentionally remained alive for 2.4 seconds after the quit
+  request. Its exact tile remained present throughout that interval, then
+  disappeared only after process termination and the matching runtime refresh.
+- Pressure: not relevant because this slice adds one immutable constant lookup
+  during app-strip rendering and owns no observer, timer, retry, callback, or
+  repeated asynchronous work. The existing 16-app ceiling is covered at both
+  sides of its boundary.
+- Process/Tooling: canonical app-test and UI wrappers built all six targets.
+  The UI workflow prepared and signed real fixture variants, installed and
+  verified the fixed app signature, then executed the real-process topology.
+  Project lint, stale-literal scan, source-size checks, `git diff --check`, and
+  exact staged-content review are recorded before commit. Both new files remain
+  below 400 lines, and the touched overlay remains below 800 lines. The startup
+  `prompts.zip` remains unchanged and outside the slice.
+- Commit: pending
+  (`refactor(sync): classify SYNC-024C app removal animation`).
