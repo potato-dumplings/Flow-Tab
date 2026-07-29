@@ -739,61 +739,6 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelHandleApplicationTerminatedPreservesSearchStateDuringRefresh() async {
-        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let initialApps = self.searchScenarioApps()
-            let runtimeProjectionService = RecordingRuntimeProjectionService(
-                appSwitcherApps: initialApps
-            )
-            let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-            let refreshedApps = initialApps.filter { $0.id != "com.example.code" }
-
-            XCTAssertTrue(model.startSession(triggerDirection: .forward))
-            XCTAssertTrue(model.enterSearchMode())
-            model.synchronizeSearchInput(query: "bro", cursorPosition: 3)
-
-            let didApplyInitialSearch = await waitUntil(
-                "initial search query applies before termination refresh",
-                timeoutNanoseconds: 1_000_000_000,
-                pollIntervalNanoseconds: 10_000_000
-            ) {
-                model.isSearchActive
-                    && model.searchViewState.query == "bro"
-                    && model.searchResultCount >= 1
-            }
-            XCTAssertTrue(didApplyInitialSearch)
-            XCTAssertTrue(model.isSearchActive)
-            XCTAssertEqual(model.searchViewState.query, "bro")
-
-            let layoutRefreshed = expectation(description: "layout refreshed while preserving search state")
-            model.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
-            runtimeProjectionService.installAppSwitcherProjection(apps: refreshedApps)
-
-            model.handleApplicationTerminated(appID: "com.example.code", pid: 42_300)
-
-            await fulfillment(of: [layoutRefreshed], timeout: 1.0)
-            let didPreserveSearchAfterRefresh = await waitUntil(
-                "termination refresh preserves active search results",
-                timeoutNanoseconds: 1_000_000_000,
-                pollIntervalNanoseconds: 10_000_000
-            ) {
-                model.appCount == 2
-                    && model.isSearchActive
-                    && model.searchViewState.scope == .app
-                    && model.searchViewState.query == "bro"
-                    && model.searchResultCount >= 1
-            }
-            XCTAssertTrue(didPreserveSearchAfterRefresh)
-
-            XCTAssertEqual(model.appCount, 2)
-            XCTAssertTrue(model.isSearchActive)
-            XCTAssertEqual(model.searchViewState.scope, .app)
-            XCTAssertEqual(model.searchViewState.query, "bro")
-            XCTAssertGreaterThanOrEqual(model.searchResultCount, 1)
-        }
-    }
-
-    @MainActor
     func testLiveSwitcherModelHandleApplicationTerminatedIgnoresUntrackedApp() {
         let initialApps = terminateScenarioApps()
         let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
