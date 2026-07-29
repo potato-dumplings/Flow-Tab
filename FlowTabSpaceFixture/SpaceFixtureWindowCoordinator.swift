@@ -11,6 +11,14 @@ protocol SpaceFixtureWindowing: AnyObject {
     func enterFullScreen(
         completion: @escaping @MainActor () -> Void
     ) -> any SpaceFixtureCancellable
+    func desktopPresentationSnapshot()
+        -> SpaceFixtureDesktopPresentationSnapshot
+    func observeDesktopPresentationChanges(
+        _ onChange:
+            @escaping @MainActor (
+                SpaceFixtureDesktopPresentationEvidenceSource
+            ) -> Void
+    ) -> any SpaceFixtureCancellable
     func updateWorkflowReadiness(windowTitles: [String])
 }
 
@@ -23,7 +31,10 @@ final class SpaceFixtureWindowCoordinator {
 
     private static let defaultApplicationAccessibilitySuppressionDelayMilliseconds = 5_000
     private static let fullscreenAccessibilitySuppressionSettleDelayMilliseconds = 8_000
-    private static let desktopRefocusDelayMilliseconds = 1_200
+    private static let desktopRefocusWatchdogMilliseconds =
+        15_000
+    private static let desktopRefocusRetryIntervalMilliseconds =
+        100
 
     private let configuration: SpaceFixtureLaunchConfiguration
     private let visibleFrameProvider: VisibleFrameProvider
@@ -31,15 +42,22 @@ final class SpaceFixtureWindowCoordinator {
     private let scheduler: any SpaceFixtureScheduling
     private let fullscreenTransitionOwner:
         SpaceFixtureFullscreenTransitionOwner
+    private let desktopRefocusOwner:
+        SpaceFixtureDesktopRefocusOwner
     private let activateApplication: ActivationHandler
     private let applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher
 
     private(set) var windows: [any SpaceFixtureWindowing] = []
     private var suppressesApplicationAccessibilityElements = false
     private var windowCloseToken: (any SpaceFixtureCancellable)?
-    private var desktopRefocusToken: (any SpaceFixtureCancellable)?
     private var accessibilitySuppressionToken:
         (any SpaceFixtureCancellable)?
+
+    var lastDesktopRefocusWatchdogFailure:
+        SpaceFixtureDesktopRefocusWatchdogFailure?
+    {
+        desktopRefocusOwner.lastFailure
+    }
 
     init(
         configuration: SpaceFixtureLaunchConfiguration,
@@ -56,6 +74,10 @@ final class SpaceFixtureWindowCoordinator {
         self.scheduler = resolvedScheduler
         fullscreenTransitionOwner =
             SpaceFixtureFullscreenTransitionOwner(
+                scheduler: resolvedScheduler
+            )
+        desktopRefocusOwner =
+            SpaceFixtureDesktopRefocusOwner(
                 scheduler: resolvedScheduler
             )
         self.activateApplication = activateApplication ?? {
@@ -179,14 +201,27 @@ final class SpaceFixtureWindowCoordinator {
     private func scheduleDesktopRefocusIfNeeded(_ desktopAnchorWindow: (any SpaceFixtureWindowing)?) {
         guard let desktopAnchorWindow else { return }
 
-        desktopRefocusToken = scheduler.schedule(
-            afterMilliseconds:
-                Self.desktopRefocusDelayMilliseconds
-        ) {
-            self.activateApplication()
-            desktopAnchorWindow.show(isKey: true)
-            self.publishApplicationAccessibilityElements()
-        }
+        desktopRefocusOwner.start(
+            window: desktopAnchorWindow,
+            watchdogMilliseconds:
+                Self.desktopRefocusWatchdogMilliseconds,
+            retryIntervalMilliseconds:
+                Self.desktopRefocusRetryIntervalMilliseconds,
+            trigger: { [weak self] in
+                guard let self else { return }
+                self.activateApplication()
+                desktopAnchorWindow.show(isKey: true)
+            },
+            onResolved: { [weak self] _ in
+                self?.publishApplicationAccessibilityElements()
+            },
+            onWatchdog: { failure in
+                NSLog(
+                    "SpaceFixture desktop refocus watchdog failed: %@",
+                    failure.logFields
+                )
+            }
+        )
     }
 
     private func scheduleApplicationAccessibilitySuppressionAfterFullscreenSettleIfNeeded() {
@@ -237,10 +272,9 @@ final class SpaceFixtureWindowCoordinator {
 
     private func cancelScheduledWork() {
         fullscreenTransitionOwner.cancel()
+        desktopRefocusOwner.cancel()
         windowCloseToken?.cancel()
         windowCloseToken = nil
-        desktopRefocusToken?.cancel()
-        desktopRefocusToken = nil
         accessibilitySuppressionToken?.cancel()
         accessibilitySuppressionToken = nil
     }

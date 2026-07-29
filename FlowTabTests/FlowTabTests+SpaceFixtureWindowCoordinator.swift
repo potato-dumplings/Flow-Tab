@@ -6,6 +6,8 @@ import XCTest
 final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
     let plan: SpaceFixtureWindowPlan
     let applicationAccessibilityElement: Any
+    let desktopPresentationProbe:
+        SpaceFixtureDesktopPresentationProbe
 
     private(set) var showCalls: [Bool] = []
     private(set) var closeCallCount = 0
@@ -25,6 +27,10 @@ final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
     ) {
         self.plan = plan
         self.applicationAccessibilityElement = "ax-element-\(plan.index)"
+        self.desktopPresentationProbe =
+            SpaceFixtureDesktopPresentationProbe(
+                windowPlanIndex: plan.index
+            )
         self.completesFullScreenImmediately =
             completesFullScreenImmediately
         self.showRecorder = showRecorder
@@ -50,6 +56,21 @@ final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
             completion()
         }
         return token
+    }
+
+    func desktopPresentationSnapshot()
+        -> SpaceFixtureDesktopPresentationSnapshot
+    {
+        desktopPresentationProbe.snapshot
+    }
+
+    func observeDesktopPresentationChanges(
+        _ onChange:
+            @escaping @MainActor (
+                SpaceFixtureDesktopPresentationEvidenceSource
+            ) -> Void
+    ) -> any SpaceFixtureCancellable {
+        desktopPresentationProbe.observe(onChange)
     }
 
     func updateWorkflowReadiness(windowTitles: [String]) {
@@ -155,7 +176,14 @@ extension FlowTabTests {
 
         windowSpies[1].completeFullScreenTransition()
 
-        XCTAssertEqual(scheduler.scheduledDelays, [1200, 1200])
+        XCTAssertEqual(
+            scheduler.scheduledDelays,
+            [1200, 15_000, 100]
+        )
+        XCTAssertEqual(windowSpies[0].showCalls, [false, true])
+        XCTAssertEqual(windowSpies[1].showCalls, [true])
+        XCTAssertEqual(windowSpies[2].showCalls, [false])
+        XCTAssertEqual(activationCallCount, 2)
         XCTAssertEqual(
             publishedAccessibilityElements,
             [
@@ -164,7 +192,13 @@ extension FlowTabTests {
             ]
         )
 
-        XCTAssertTrue(scheduler.fire(at: 1))
+        windowSpies[0].desktopPresentationProbe.snapshot =
+            SpaceFixtureDesktopPresentationProbe.presentedSnapshot(
+                windowPlanIndex: 1
+            )
+        windowSpies[0].desktopPresentationProbe.emit(
+            .activeSpaceDidChange
+        )
 
         XCTAssertEqual(windowSpies[0].showCalls, [false, true])
         XCTAssertEqual(windowSpies[1].showCalls, [true])
@@ -177,6 +211,11 @@ extension FlowTabTests {
                 ["ax-element-1", "ax-element-2", "ax-element-3"],
                 ["ax-element-1", "ax-element-2", "ax-element-3"]
             ]
+        )
+        XCTAssertFalse(scheduler.fire(at: 1))
+        XCTAssertFalse(scheduler.fire(at: 2))
+        XCTAssertNil(
+            coordinator.lastDesktopRefocusWatchdogFailure
         )
     }
 

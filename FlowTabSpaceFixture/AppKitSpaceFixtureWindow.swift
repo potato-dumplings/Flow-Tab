@@ -9,6 +9,8 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
     private let noisyCGSiblings: NoisyCGSiblingWindowSet?
     private var fullScreenObservation:
         SpaceFixtureFullScreenObservation?
+    private var desktopPresentationObservation:
+        SpaceFixtureDesktopPresentationObservation?
 
     var applicationAccessibilityElement: Any {
         window
@@ -74,6 +76,8 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
     func close() {
         fullScreenObservation?.cancel()
         fullScreenObservation = nil
+        desktopPresentationObservation?.cancel()
+        desktopPresentationObservation = nil
         noisyCGSiblings?.close()
         window.close()
     }
@@ -100,6 +104,47 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         return observation
     }
 
+    func desktopPresentationSnapshot()
+        -> SpaceFixtureDesktopPresentationSnapshot
+    {
+        let windowNumber = CGWindowID(window.windowNumber)
+        return SpaceFixtureDesktopPresentationSnapshot(
+            windowPlanIndex: plan.index,
+            windowNumber: windowNumber,
+            applicationIsActive:
+                NSApplication.shared.isActive,
+            isKeyWindow: window.isKeyWindow,
+            isMainWindow: window.isMainWindow,
+            isVisible: window.isVisible,
+            isMiniaturized: window.isMiniaturized,
+            isOnActiveSpace: window.isOnActiveSpace,
+            isOcclusionVisible:
+                window.occlusionState.contains(.visible),
+            isCGWindowOnScreen:
+                Self.isExactCGWindowOnScreen(
+                    windowNumber,
+                    ownerProcessIdentifier:
+                        ProcessInfo.processInfo.processIdentifier
+                )
+        )
+    }
+
+    func observeDesktopPresentationChanges(
+        _ onChange:
+            @escaping @MainActor (
+                SpaceFixtureDesktopPresentationEvidenceSource
+            ) -> Void
+    ) -> any SpaceFixtureCancellable {
+        desktopPresentationObservation?.cancel()
+        let observation =
+            SpaceFixtureDesktopPresentationObservation(
+                window: window,
+                onChange: onChange
+            )
+        desktopPresentationObservation = observation
+        return observation
+    }
+
     func updateWorkflowReadiness(windowTitles: [String]) {
         contentView.updateWorkflowReadiness(windowTitles: windowTitles)
         noisyCGSiblings?.updateWorkflowReadiness(windowTitles: windowTitles)
@@ -118,6 +163,40 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
     private func suppressNoisyFullScreenContentAccessibilityIfNeeded() {
         guard plan.noisyCGSiblings, plan.isFullscreenTarget else { return }
         window.suppressAccessibilityExposure()
+    }
+
+    private static func isExactCGWindowOnScreen(
+        _ windowNumber: CGWindowID,
+        ownerProcessIdentifier: pid_t
+    ) -> Bool {
+        guard windowNumber != 0,
+              let windowInfo = CGWindowListCopyWindowInfo(
+                [.optionIncludingWindow, .optionOnScreenOnly],
+                windowNumber
+              ) as? [[String: Any]]
+        else {
+            return false
+        }
+        return windowInfo.contains { entry in
+            guard
+                let observedWindowNumber =
+                    entry[kCGWindowNumber as String]
+                        as? NSNumber,
+                let observedOwnerProcessIdentifier =
+                    entry[kCGWindowOwnerPID as String]
+                        as? NSNumber,
+                let isOnScreen =
+                    entry[kCGWindowIsOnscreen as String]
+                        as? NSNumber
+            else {
+                return false
+            }
+            return observedWindowNumber.uint32Value
+                    == windowNumber
+                && observedOwnerProcessIdentifier.int32Value
+                    == ownerProcessIdentifier
+                && isOnScreen.boolValue
+        }
     }
 
 }

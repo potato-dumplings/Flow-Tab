@@ -112,9 +112,9 @@ and Process/Tooling.
 | SYNC-024D | `HomeControlPressAnimationPolicy`, `FlowPageActionButton`; pressed-button transition | A 120ms ease-out duration is a visual-only Home button contract. Domain duration. | Retain it as a named injectable Home control-animation policy. SwiftUI view identity owns the animation; actions continue directly from input callbacks. | L; Behavior/visual policy assertion, affected Home UI, Process/Tooling. | completed |
 | SYNC-024E | `SettingsAppVisibilityNavigationAnimationPolicy`, `AppSettingsView`, `AppVisibilityManagerView`; app-visibility navigation transition | A 180ms ease-in-out duration is a visual-only Settings navigation contract. Domain duration. | Retain it as a named injectable Settings navigation-animation policy. Settings view state owns the transition; the manager exposes contained AX children, and destination visibility remains the UI Oracle. | L; Behavior/visual policy assertion, affected Settings UI, Process/Tooling. | completed |
 | SYNC-025 | `PanelPresentationDiagnosticProbeOwner`, `SwitcherPanelController+PresentationDiagnostics.swift`; frame-delay probe | A 16ms sleep sampled an assumed later display frame for diagnostics only. Domain measurement. | Retain 16ms only as a named frame-sample interval in an injectable diagnostic scheduler. A generation owner sequences next-main-turn and frame-sample callbacks, while presentation begin/end owns replacement and cancellation. Probe callbacks only emit measured diagnostics, so delayed delivery changes the recorded timestamp without affecting behavior. | L; Behavior diagnostic assertion, deterministic Pressure, Process/Tooling. | completed |
-| SYNC-026 | Composite fixture-topology timing baseline | Semantic review separated the fullscreen chain, desktop refocus, and application AX suppression into independent observable contracts. Migration routing. | Preserve this parent ID as the routing boundary and close each lifecycle through SYNC-026A–SYNC-026C. | H aggregate; child rows define required validation. | planned: SYNC-026A completed; SYNC-026B–SYNC-026C remain |
+| SYNC-026 | Composite fixture-topology timing baseline | Semantic review separated the fullscreen chain, desktop refocus, and application AX suppression into independent observable contracts. Migration routing. | Preserve this parent ID as the routing boundary and close each lifecycle through SYNC-026A–SYNC-026C. | H aggregate; child rows define required validation. | in progress: SYNC-026A completed; SYNC-026B implementation and deterministic validation completed with UI/runtime-topology validation environment-blocked; SYNC-026C remains |
 | SYNC-026A | `SpaceFixtureFullscreenTransitionOwner`, `AppKitSpaceFixtureWindow`, `SpaceFixtureWindowCoordinator`; ordered fullscreen transition chain | The workflow-configured initial delay intentionally stages fixture launch, while a fixed 1.4s gap assumed each preceding fullscreen animation had settled enough to start the next window. Domain duration plus evidence migration. | Retain the configured delay only before the first transition. Install the exact-window `didEnterFullScreen` observer before `toggleFullScreen`, then begin every later window directly from the preceding completion evidence. The coordinator-owned generation cancels scheduled work and exact-window observers on replacement; window close owns observer cleanup. | H fixture topology; Unit, Behavior, real multi-fullscreen UI, deterministic Pressure, Process/Tooling. | completed |
-| SYNC-026B | `SpaceFixtureWindowCoordinator.scheduleDesktopRefocusIfNeeded`; desktop-anchor refocus | A fixed 1.2s delay after the final fullscreen callback assumes AppKit is ready to activate and key the desktop anchor. Evidence migration. | Establish exact desktop-anchor key/main/occlusion observation before activation, perform an immediate readback, and complete from the matching window transition or later readback. The coordinator owns one cancellable generation and terminal diagnostic watchdog. | H fixture topology; Unit, Behavior, desktop-preserving real fixture UI, runtime-topology Pressure. | planned |
+| SYNC-026B | `SpaceFixtureDesktopRefocusOwner`, `AppKitSpaceFixtureWindow`, `SpaceFixtureWindowCoordinator`; desktop-anchor refocus | A fixed 1.2s delay after the final fullscreen callback assumes AppKit is ready to activate and key the desktop anchor. Evidence migration with controlled condition polling. | Install exact-window and active-Space observers before activation, then read back application activity, exact plan/window identity, key/main/visible/minimized/active-Space/occlusion state, and the exact on-screen CG window. Because AppKit exposes no request-acceptance callback, use an immediate-condition-first, named 100ms retry owned by the coordinator generation. Completion comes only from the exact readback; a named 15s watchdog reports the final unmet conditions and last evidence. | H fixture topology; Unit, Behavior, desktop-preserving real fixture UI, runtime-topology Pressure. | environment-blocked: implementation, Unit, Behavior, and deterministic Pressure completed; UI test execution and runtime-topology Pressure blocked before test-body execution by LocalAuthentication Code -4 |
 | SYNC-026C | `SpaceFixtureWindowCoordinator.scheduleApplicationAccessibilitySuppressionIfNeeded`; fixture application AX suppression | Fixed 5s and post-fullscreen 8s delays assume workflow consumers have captured the application AX window list. Evidence migration. | Suppress only after the matching fixture stage acknowledgement and exact planned-window/fullscreen publication readback. Publish a monotonic suppression generation and read back the resulting application AX exposure. The coordinator owns cancellation, observer cleanup, and terminal diagnostics. | H fixture topology; Unit, Behavior, AX-suppressed real fixture UI, runtime-topology Pressure. | planned |
 | SYNC-027 | `SpaceFixtureAppDelegate`, `SpaceFixtureLaunchConfiguration`; terminate and close delay options | Configured terminate/close latency intentionally creates a slow-process or window-removal scenario. Domain duration. | Retain as named fixture fault policies with injectable scheduler, cancellation, and explicit “scheduled/applied” acknowledgement. App delegate/coordinator own pending work. | M; Unit, Behavior, representative fixture UI. | verification-needed |
 | SYNC-028 | `SpaceFixtureWindowContentView`, `SpaceFixtureWindowCoordinator`; workflow readiness labels | “Ready” is published before asynchronous fullscreen/refocus/close topology transitions complete, forcing UI settle waits. Evidence migration. | Publish a monotonic fixture transition generation/stage only after exact planned windows and requested fullscreen/key/AX exposure states are read back. UI observers establish a baseline before launch/action and wait for a later matching stage. | H; Unit, Behavior, all affected real fixture UI, runtime-topology Pressure. | planned |
@@ -2084,5 +2084,70 @@ polling cadence, deadline, or timeout in the scoped paths.
   review are recorded before commit. New production and test files remain
   below 400 lines, and touched coordinator/test files remain below 800 lines.
   The startup `prompts.zip` remains unchanged and outside the slice.
-- Commit: pending
+- Commit: `e934fd2a5abc61bb0fdbd8d745e6d5993884ccf9`
   (`refactor(sync): migrate SYNC-026A fullscreen transition chain`).
+
+### SYNC-026B Validation Checkpoint
+
+- Design and Oracle: the final fullscreen completion now starts desktop-anchor
+  recovery immediately. `SpaceFixtureDesktopRefocusOwner` installs
+  exact-window and active-Space observers before activation, captures an
+  initial readback, arms one generation-bound watchdog, invokes activation and
+  `show(isKey: true)`, and captures a trigger-return readback. Accepted evidence
+  must match the owner generation and planned desktop-anchor identity and must
+  read back the application as active, the exact AppKit window as key, main,
+  visible, unminimized, on the active Space, and occlusion-visible, plus that
+  exact window number as an on-screen CG window owned by the fixture process.
+  Application AX publication resumes only after that evidence resolves.
+- Event gap, retry, and lifecycle: exact `NSWindow` key, main, occlusion, and
+  deminiaturize notifications, application activation, and active-Space
+  notifications all drive fresh readback. AppKit supplies no acceptance
+  callback for activation/order-front requests, so a named 100ms retry first
+  checks the full condition, repeats the request only while it remains unmet,
+  and reads back again after the request. The coordinator-owned generation
+  cancels its observer, retry, and watchdog on success, failure, replacement,
+  or launch cancellation. Each AppKit fixture window also cancels its retained
+  observation on close. Duplicate, stale-identity, replaced, canceled, and
+  out-of-order callbacks cannot resolve another generation.
+- Failure bound: the named 15s watchdog is terminal diagnostic policy only. Its
+  final readback can still resolve success. A remaining failure records the
+  generation, expected plan identity, last evidence source and snapshot, final
+  snapshot, and every unmet exact condition.
+- Unit and Behavior: the final focused canonical run passed 9/9 with zero
+  failures in 0.016 seconds under
+  `.build-local/evidence-driven-sync/SYNC-026B/targeted-attempt-007`.
+  Coverage verifies observer-before-trigger ordering, initially satisfied
+  state, synchronous trigger-return readback, independent key/main/CG
+  conditions, exact identity and stale-generation rejection, retry after a
+  rejected request, slow scheduling, terminal failure diagnostics,
+  replacement/cancellation, and the representative coordinator path.
+- FlowTabCore: not relevant because this contract belongs to the AppKit fixture
+  topology and app-test targets and does not change a core-domain API.
+- Pressure: the deterministic 500-cycle workload alternated successful
+  observation and replacement/cancellation, forcibly delivered canceled
+  event, retry, and watchdog work, accepted exactly the 250 live generations
+  in monotonic order, produced no watchdog failures, and left no observation
+  or scheduled work active. Delayed retry delivery changed only resolution
+  time. Runtime-topology pressure remains coupled to the blocked UI layer.
+- UI and environment evidence: the required install wrapper rebuilt, signed,
+  installed, and verified `/Users/lk/Applications/Flow Tab UITest.app`.
+  Earlier diagnostic attempts replaced title and XCUI-query assumptions with
+  an exact PID plus AX-identifier-to-CG-window-number readback and corrected
+  stale build-product selection at the UI-test resource boundary. The current
+  test resolves the fixture from the active Build Products boundary, removes
+  prior fixture processes through observer plus process-state readback, and
+  polls the exact frontmost PID/AX/CG condition with a named cadence and a 25s
+  failure bound. Attempts 006 and 007 both built all targets, prepared fixture
+  variants, and signed the runner successfully. The runner then failed to
+  initialize with `com.apple.LocalAuthentication` Code -4, “System
+  authentication is running,” before the test body executed. The latest result
+  bundle is
+  `.build-local/evidence-driven-sync/SYNC-026B/ui-attempt-007/results/FlowTabUITests.xcresult`.
+  UI and real-topology pressure therefore remain environment-blocked.
+- Process/Tooling: project-file lint, stale 1.2-second refocus-delay search,
+  source-size checks, `git diff --check`, and exact staged-content review are
+  recorded before commit. New production, test, and UI support files remain
+  below 400 lines; the touched shared UI observation file remains below 800
+  lines. Startup `prompts.zip` remains unchanged and outside the slice.
+- Commit: pending
+  (`refactor(sync): migrate SYNC-026B desktop refocus`).
