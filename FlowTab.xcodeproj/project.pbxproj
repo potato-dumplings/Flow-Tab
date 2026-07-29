@@ -138,6 +138,8 @@
 		FAD100063D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD100053D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift */; };
 		FBD100023D28000100B0D737 /* SwitcherAppRemovalAnimationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBD100013D28000100B0D737 /* SwitcherAppRemovalAnimationPolicy.swift */; };
 		FBD100043D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBD100033D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift */; };
+		FCD100023D29000100B0D737 /* HomeControlPressAnimationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCD100013D29000100B0D737 /* HomeControlPressAnimationPolicy.swift */; };
+		FCD100043D29000100B0D737 /* FlowTabTests+HomeControlPressAnimationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCD100033D29000100B0D737 /* FlowTabTests+HomeControlPressAnimationPolicy.swift */; };
 		D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000022FF500100B0D737 /* RuntimeProjectionService.swift */; };
 		D10000032FF500200B0D737 /* RuntimeProjectionServing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000042FF500200B0D737 /* RuntimeProjectionServing.swift */; };
 		B26010012FE000100B0D737 /* RuntimePerformanceClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */; };
@@ -469,6 +471,8 @@
 		FAD100053D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift"; sourceTree = "<group>"; };
 		FBD100013D28000100B0D737 /* SwitcherAppRemovalAnimationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherAppRemovalAnimationPolicy.swift; sourceTree = "<group>"; };
 		FBD100033D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift"; sourceTree = "<group>"; };
+		FCD100013D29000100B0D737 /* HomeControlPressAnimationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeControlPressAnimationPolicy.swift; sourceTree = "<group>"; };
+		FCD100033D29000100B0D737 /* FlowTabTests+HomeControlPressAnimationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HomeControlPressAnimationPolicy.swift"; sourceTree = "<group>"; };
 		F6E7E20135C4000100B0D737 /* RuntimeSearchIndexReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSearchIndexReadModel.swift; sourceTree = "<group>"; };
 		F6E7E30135C4000200B0D737 /* RuntimeProjectionReadModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionReadModels.swift; sourceTree = "<group>"; };
 		D10000022FF500100B0D737 /* RuntimeProjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionService.swift; sourceTree = "<group>"; };
@@ -769,6 +773,7 @@
 				FAD100033D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealObservation.swift */,
 				FAD100053D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift */,
 				FBD100033D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift */,
+				FCD100033D29000100B0D737 /* FlowTabTests+HomeControlPressAnimationPolicy.swift */,
 				A12000013C00000100B0D737 /* FlowTabTests+RuntimeLogDeletion.swift */,
 				B7A7E00135C0000100B0D737 /* FlowTabTests+SettingsAppearanceSelectControls.swift */,
 				C1D900013700000100B0D737 /* FlowTabTests+FlowDropdownPlacement.swift */,
@@ -1136,6 +1141,7 @@
 		F100000B2F74000100B0D737 /* SharedUI */ = {
 			isa = PBXGroup;
 			children = (
+				FCD100013D29000100B0D737 /* HomeControlPressAnimationPolicy.swift */,
 				C10000142F75000100B0D737 /* HomeChrome.swift */,
 				C10000302F75000100B0D737 /* FlowSnappedListScrollView.swift */,
 				FD00000136A0000100B0D737 /* FlowDropdownTypes.swift */,
@@ -1388,6 +1394,7 @@
 				E50000063601000100B0D737 /* FlowSettingsCardView.swift in Sources */,
 				C10000062F75000100B0D737 /* AppKitMeasurementControls.swift in Sources */,
 				C10000052F75000100B0D737 /* HotkeySettingsCard.swift in Sources */,
+				FCD100023D29000100B0D737 /* HomeControlPressAnimationPolicy.swift in Sources */,
 				C10000042F75000100B0D737 /* HomeChrome.swift in Sources */,
 				C10000312F75000100B0D737 /* FlowSnappedListScrollView.swift in Sources */,
 				FD00010136A0000100B0D737 /* FlowDropdownTypes.swift in Sources */,
@@ -1581,6 +1588,7 @@
 				FAD100043D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealObservation.swift in Sources */,
 				FAD100063D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift in Sources */,
 				FBD100043D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift in Sources */,
+				FCD100043D29000100B0D737 /* FlowTabTests+HomeControlPressAnimationPolicy.swift in Sources */,
 				A12000113C00000100B0D737 /* FlowTabTests+RuntimeLogDeletion.swift in Sources */,
 				B7A7E00235C0000100B0D737 /* FlowTabTests+SettingsAppearanceSelectControls.swift in Sources */,
 				C1D900023700000100B0D737 /* FlowTabTests+FlowDropdownPlacement.swift in Sources */,

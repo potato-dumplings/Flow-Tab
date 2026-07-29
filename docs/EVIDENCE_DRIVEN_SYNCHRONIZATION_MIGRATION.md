@@ -109,7 +109,7 @@ and Process/Tooling.
 | SYNC-024A | `TerminatePressFeedbackCompletionOwner`, `SwitcherPanelController.terminateSelectedApp`, `AppTileView`; terminate press feedback | An 80ms task sleep gated the terminate request while the rendered press animation used an unrelated 120ms duration. Domain duration plus scheduler-completion evidence. | Use one named 120ms press-feedback policy for the animation and an injectable completion scheduler. The panel controller owns one generation, cancellable token, request continuation, and late-callback rejection through session cancellation. | M; Unit, Behavior, termination UI, deterministic Pressure. | completed |
 | SYNC-024B | `InitialWindowOnlyPreviewRevealObservationOwner`, `SwitcherPanelController.prepareInitialWindowOnlyPanelReveal`; initial preview reveal | A 250ms task sleep forced a degraded reveal when preview readiness had not arrived. Watchdog migration. | Use preview-batch completion plus pending-capture readback as the success Oracle. The named injectable watchdog performs a final readback and reports the last event plus unmet condition before degraded reveal; the presentation session owns cancellation and generation replacement. | M; Unit, Behavior, in-app switcher UI, deterministic Pressure. | completed |
 | SYNC-024C | `SwitcherAppRemovalAnimationPolicy`, `SwitcherPanelOverlayView`; app-removal transition | A 140ms ease-out duration is a visual-only product contract for app sets up to 16 items. Domain duration. | Retain it as a named Switcher removal-animation policy. SwiftUI app-strip identity owns the animation; exact process termination and projection refresh remain the tile-removal Oracle. | L; Behavior/visual policy assertion, affected switcher UI, Process/Tooling. | completed |
-| SYNC-024D | `HomeChrome`; pressed-button transition | A 120ms ease-out duration is a visual-only Home button contract. Domain duration. | Retain it as a named Home control-animation policy. SwiftUI view identity owns the animation; actions continue from input callbacks. | L; Behavior/visual policy assertion, affected Home UI, Process/Tooling. | verification-needed |
+| SYNC-024D | `HomeControlPressAnimationPolicy`, `FlowPageActionButton`; pressed-button transition | A 120ms ease-out duration is a visual-only Home button contract. Domain duration. | Retain it as a named injectable Home control-animation policy. SwiftUI view identity owns the animation; actions continue directly from input callbacks. | L; Behavior/visual policy assertion, affected Home UI, Process/Tooling. | completed |
 | SYNC-024E | `AppSettingsView`; app-visibility navigation transition | A 180ms ease-in-out duration is a visual-only Settings navigation contract. Domain duration. | Retain it as a named Settings navigation-animation policy. Settings view state owns the transition; destination visibility remains the UI Oracle. | L; Behavior/visual policy assertion, affected Settings UI, Process/Tooling. | verification-needed |
 | SYNC-025 | `SwitcherPanelController+PresentationDiagnostics.swift`; frame-delay probe | A 16ms sleep samples an assumed later display frame for diagnostics only. Domain measurement. | Drive the second probe from an actual display/update callback or explicitly named diagnostic scheduler; it must not affect behavior. The probe task is canceled with the presentation session. | L; Behavior diagnostic assertion, Process/Tooling. | planned |
 | SYNC-026 | `FlowTabSpaceFixture/SpaceFixtureWindowCoordinator.swift`; fullscreen chain, desktop refocus, AX suppression | Fullscreen entry has a completion callback, while 1.2s/1.4s/5s/8s settle delays sequence later fixture state. Evidence migration. | Chain fullscreen/refocus/accessibility publication from window/fullscreen/key/occlusion readbacks and explicit transition acknowledgements. Retain only workflow-configured latency that is itself a fixture scenario. The coordinator owns cancellable scheduled actions/observers. | H fixture topology; Unit, Behavior, real fixture UI, runtime-topology Pressure. | planned |
@@ -1899,5 +1899,43 @@ polling cadence, deadline, or timeout in the scoped paths.
   exact staged-content review are recorded before commit. Both new files remain
   below 400 lines, and the touched overlay remains below 800 lines. The startup
   `prompts.zip` remains unchanged and outside the slice.
-- Commit: pending
+- Commit: `5a3e470c7e7d6cbd8bc6eb5788d657dfe0b7f203`
   (`refactor(sync): classify SYNC-024C app removal animation`).
+
+### SYNC-024D Closure Record
+
+- Design and Oracle: `HomeControlPressAnimationPolicy` names the 120ms
+  ease-out duration and is injected into `FlowPageActionButton`. The SwiftUI
+  `Button` continues to invoke its action closure directly from the input
+  callback. The duration is read only while deriving the
+  `configuration.isPressed` render animation; action delivery, preference
+  mutation, navigation, and success state never read it.
+- Retained time policy and lifecycle: 120ms is a visual product contract for
+  pressed-gradient feedback. SwiftUI button identity owns and cancels the
+  render transition as its pressed state or view identity changes. The policy
+  owns no callback, continuation, timer, retry, observer, or success result.
+- Unit and Behavior: the focused canonical run passed 2/2 in 0.002 seconds
+  under
+  `.build-local/evidence-driven-sync/SYNC-024D/targeted-attempt-001`.
+  Coverage verifies the named default duration, injected policy propagation,
+  and direct action-closure delivery independent of the visual duration.
+- FlowTabCore: not relevant because the animation policy and SwiftUI button
+  rendering belong to the app target.
+- UI: the fixed-path Apple Development-signed app test passed 1/1 in 15.245
+  seconds under
+  `.build-local/evidence-driven-sync/SYNC-024D/ui-home-dismiss-attempt-001`.
+  The affected Home action button accepted the real click, removed the
+  permission banner from state evidence, and preserved the resulting
+  preference across process termination and relaunch.
+- Pressure: not relevant because this slice adds one immutable duration lookup
+  during SwiftUI rendering and owns no observer, timer, retry, callback, or
+  repeated asynchronous work.
+- Process/Tooling: the canonical app-test wrapper passed, the fixed app rebuilt
+  and verified its Apple Development signature, and the UI wrapper built all
+  six targets before executing the affected path. Project lint,
+  stale-literal scan, source-size checks, `git diff --check`, and exact
+  staged-content review are recorded before commit. Both new files and the
+  touched Home chrome file remain below 400 lines. The startup `prompts.zip`
+  remains unchanged and outside the slice.
+- Commit: pending
+  (`refactor(sync): classify SYNC-024D home press animation`).

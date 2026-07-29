@@ -121,6 +121,7 @@ struct FlowPageActionButton: View {
     let height: CGFloat
     let horizontalPadding: CGFloat
     let accessibilityIdentifier: String?
+    let pressAnimationPolicy: HomeControlPressAnimationPolicy
     let action: () -> Void
 
     init(
@@ -131,6 +132,7 @@ struct FlowPageActionButton: View {
         height: CGFloat = 30,
         horizontalPadding: CGFloat = 12,
         accessibilityIdentifier: String? = nil,
+        pressAnimationPolicy: HomeControlPressAnimationPolicy = .default,
         action: @escaping () -> Void
     ) {
         self.title = title
@@ -140,6 +142,7 @@ struct FlowPageActionButton: View {
         self.height = height
         self.horizontalPadding = horizontalPadding
         self.accessibilityIdentifier = accessibilityIdentifier
+        self.pressAnimationPolicy = pressAnimationPolicy
         self.action = action
     }
 
@@ -158,7 +161,8 @@ struct FlowPageActionButton: View {
                 tone: tone,
                 width: width,
                 height: height,
-                horizontalPadding: horizontalPadding
+                horizontalPadding: horizontalPadding,
+                pressAnimationPolicy: pressAnimationPolicy
             )
         )
 
@@ -183,6 +187,7 @@ private struct FlowPageActionButtonStyle: ButtonStyle {
     let width: CGFloat?
     let height: CGFloat
     let horizontalPadding: CGFloat
+    let pressAnimationPolicy: HomeControlPressAnimationPolicy
 
     @Environment(\.isEnabled) private var isEnabled
 
@@ -204,7 +209,10 @@ private struct FlowPageActionButtonStyle: ButtonStyle {
             )
             .shadow(color: shadowColor, radius: 6, y: 2)
             .opacity(isEnabled ? 1 : 0.55)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(
+                .easeOut(duration: pressAnimationPolicy.duration),
+                value: configuration.isPressed
+            )
     }
 
     private var cornerRadius: CGFloat {
