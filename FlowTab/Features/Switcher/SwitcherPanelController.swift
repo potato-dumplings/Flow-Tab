@@ -168,11 +168,12 @@ final class SwitcherPanelController {
     let terminatePressFeedbackCompletionOwner:
         TerminatePressFeedbackCompletionOwner
     let terminatePressFeedbackPolicy: TerminatePressFeedbackPolicy
+    let initialWindowOnlyPreviewRevealObservationOwner:
+        InitialWindowOnlyPreviewRevealObservationOwner
     let terminateTargetProcessStateReader:
         any TerminateTargetProcessStateReading
     var modifierReleaseState: ModifierReleaseState = .idle
     var presentationSessionGeneration = 0
-    var initialWindowOnlyPreviewRevealTask: Task<Void, Never>?
     var panelPresentationRecoveryGeneration = 0
     var panelVisibilityRecoveryState: PanelVisibilityRecoveryState = .idle
     var lastPanelVisibilityRecoveryDiagnostic: PanelVisibilityRecoveryDiagnostic?
@@ -198,7 +199,6 @@ final class SwitcherPanelController {
     let activeSpaceTransitionPolicy: ActiveSpaceTransitionPolicy = .default
     let terminateInterruptionProtectionPolicy:
         TerminateInterruptionProtectionPolicy = .default
-    let initialWindowOnlyPreviewRevealTimeoutNs: UInt64 = 250_000_000
     var initialPresentationVisibilityWatchdogInterval: TimeInterval {
         panelVisibilityRecoveryPolicy.initialPresentationWatchdogInterval
     }
@@ -340,6 +340,8 @@ final class SwitcherPanelController {
             (any DelayedWindowLayerEntryScheduling)? = nil,
         terminatePressFeedbackScheduler:
             (any TerminatePressFeedbackScheduling)? = nil,
+        initialWindowOnlyPreviewRevealScheduler:
+            (any InitialWindowOnlyPreviewRevealScheduling)? = nil,
         terminatePressFeedbackPolicy:
             TerminatePressFeedbackPolicy = .default,
         terminateTargetProcessStateReader:
@@ -378,6 +380,10 @@ final class SwitcherPanelController {
         terminatePressFeedbackCompletionOwner =
             TerminatePressFeedbackCompletionOwner(
                 scheduler: terminatePressFeedbackScheduler
+            )
+        initialWindowOnlyPreviewRevealObservationOwner =
+            InitialWindowOnlyPreviewRevealObservationOwner(
+                scheduler: initialWindowOnlyPreviewRevealScheduler
             )
         self.terminatePressFeedbackPolicy =
             terminatePressFeedbackPolicy
@@ -448,7 +454,9 @@ final class SwitcherPanelController {
             self.scheduleDelayedWindowLayerEntryIfNeeded(preservingDeadline: true)
         }
         model.onWindowOnlyPreviewPreparationChanged = { [weak self] in
-            self?.revealInitialWindowOnlyPanelIfReady(reason: "preview_batch_completed")
+            self?.observeInitialWindowOnlyPreviewReadiness(
+                source: .previewBatchCompleted
+            )
         }
 
         appDidResignActiveObserver = NotificationCenter.default.addObserver(
@@ -716,8 +724,6 @@ final class SwitcherPanelController {
     }
 
     deinit {
-        initialWindowOnlyPreviewRevealTask?.cancel()
-        initialWindowOnlyPreviewRevealTask = nil
         if let appDidResignActiveObserver {
             NotificationCenter.default.removeObserver(appDidResignActiveObserver)
         }

@@ -2,61 +2,89 @@ import Foundation
 
 extension SwitcherPanelController {
     func prepareInitialWindowOnlyPanelReveal(kind: HotkeySessionKind) {
-        initialWindowOnlyPreviewRevealTask?.cancel()
-        initialWindowOnlyPreviewRevealTask = nil
-        guard
-            kind == .inAppWindowSwitcher,
-            !model.isWindowOnlyPreviewPreparationComplete
-        else {
+        initialWindowOnlyPreviewRevealObservationOwner.cancel()
+        guard kind == .inAppWindowSwitcher else {
             panel.alphaValue = 1
             return
         }
 
         panel.alphaValue = 0
-        let generation = presentationSessionGeneration
-        initialWindowOnlyPreviewRevealTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            try? await Task.sleep(nanoseconds: self.initialWindowOnlyPreviewRevealTimeoutNs)
-            guard !Task.isCancelled else { return }
-            self.revealInitialWindowOnlyPanel(
-                generation: generation,
-                force: true,
-                reason: "preview_timeout"
-            )
-        }
+        initialWindowOnlyPreviewRevealObservationOwner.start(
+            presentationGeneration: presentationSessionGeneration,
+            readback: { [unowned self] in
+                initialWindowOnlyPreviewReadinessSnapshot()
+            },
+            onReady: { [weak self] evidence in
+                self?.revealInitialWindowOnlyPanel(evidence: evidence)
+            },
+            onWatchdog: { [weak self] failure in
+                self?.revealInitialWindowOnlyPanelAfterWatchdog(failure)
+            }
+        )
     }
 
-    func revealInitialWindowOnlyPanelIfReady(reason: String) {
-        revealInitialWindowOnlyPanel(
-            generation: presentationSessionGeneration,
-            force: false,
-            reason: reason
+    func observeInitialWindowOnlyPreviewReadiness(
+        source: InitialWindowOnlyPreviewRevealEvidenceSource
+    ) {
+        _ = initialWindowOnlyPreviewRevealObservationOwner.observe(
+            source: source,
+            observationGeneration:
+                initialWindowOnlyPreviewRevealObservationOwner.generation,
+            presentationGeneration: presentationSessionGeneration
         )
     }
 
     private func revealInitialWindowOnlyPanel(
-        generation: Int,
-        force: Bool,
-        reason: String
+        evidence: InitialWindowOnlyPreviewRevealEvidence
     ) {
-        guard generation == presentationSessionGeneration else { return }
+        guard
+            evidence.presentationGeneration
+                == presentationSessionGeneration
+        else {
+            return
+        }
         guard activeHotkeySessionKind == .inAppWindowSwitcher else { return }
         guard panel.alphaValue < 1 else { return }
-        guard force || model.isWindowOnlyPreviewPreparationComplete else { return }
+        guard evidence.snapshot.previewsReady else { return }
 
-        initialWindowOnlyPreviewRevealTask?.cancel()
-        initialWindowOnlyPreviewRevealTask = nil
         panel.alphaValue = 1
         RuntimeLog.debug(
             .preview,
-            "initial window-only panel revealed reason=\(reason) previewsReady=\(model.isWindowOnlyPreviewPreparationComplete ? 1 : 0)"
+            "initial window-only panel revealed reason=\(evidence.source.rawValue) \(evidence.snapshot.logFields)"
+        )
+    }
+
+    private func revealInitialWindowOnlyPanelAfterWatchdog(
+        _ failure: InitialWindowOnlyPreviewRevealWatchdogFailure
+    ) {
+        guard
+            failure.presentationGeneration
+                == presentationSessionGeneration
+        else {
+            return
+        }
+        guard activeHotkeySessionKind == .inAppWindowSwitcher else { return }
+        guard panel.alphaValue < 1 else { return }
+
+        panel.alphaValue = 1
+        RuntimeLog.warning(
+            .preview,
+            "initial window-only panel degraded reveal reason=preview_watchdog \(failure.logFields)"
         )
     }
 
     func cancelInitialWindowOnlyPanelReveal() {
-        initialWindowOnlyPreviewRevealTask?.cancel()
-        initialWindowOnlyPreviewRevealTask = nil
+        initialWindowOnlyPreviewRevealObservationOwner.cancel()
         panel.alphaValue = 1
+    }
+
+    private func initialWindowOnlyPreviewReadinessSnapshot()
+        -> InitialWindowOnlyPreviewReadinessSnapshot
+    {
+        InitialWindowOnlyPreviewReadinessSnapshot(
+            pendingCaptureCount:
+                model.windowOnlyPreviewCaptureInFlightCount
+        )
     }
 
     @discardableResult
