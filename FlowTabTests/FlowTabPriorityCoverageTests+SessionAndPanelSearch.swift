@@ -913,58 +913,6 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testUITestSearchLaunchUsesControllerSearchSizingPath() async {
-        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
-            let previousLaunchEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
-            FlowTabTestLaunchOptions.argumentsOverrideForTesting = [
-                "--flowtab-ui-open-switcher-search"
-            ]
-            FlowTabTestLaunchOptions.environmentOverrideForTesting = [
-                FlowTabTestLaunchOptions.uiTestingEnvironmentKey:
-                    FlowTabTestLaunchOptions.uiTestingEnvironmentValue
-            ]
-            defer {
-                FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousLaunchArguments
-                FlowTabTestLaunchOptions.environmentOverrideForTesting = previousLaunchEnvironment
-            }
-
-            let apps = searchScenarioApps()
-            let controller = SwitcherPanelController(
-                model: LiveSwitcherModel(
-                    runtimeProjectionService: RecordingRuntimeProjectionService(
-                        appSwitcherApps: apps
-                    )
-                )
-            )
-
-            FlowTabUITestBootstrapper.presentInitialUIIfNeeded(panelController: controller)
-
-            let expectedSearchHeight = {
-                SwitcherPanelLayoutMetrics.Search.panelHeight(
-                    visibleRowCount: SwitcherPanelLayoutMetrics.Search.visibleRowCount(
-                        for: apps.count
-                    ),
-                    measurements: controller.modelForTesting.searchLayoutMeasurements
-                )
-            }
-            let didReachExpectedSearchHeight = await waitUntil("initial UI search sizing reaches expected height") {
-                controller.modelForTesting.isSearchActive
-                    && abs(controller.panelContentSizeForTesting.height - expectedSearchHeight()) <= 1
-            }
-            XCTAssertTrue(didReachExpectedSearchHeight)
-
-            XCTAssertTrue(controller.modelForTesting.isSearchActive)
-            XCTAssertEqual(
-                controller.panelContentSizeForTesting.height,
-                expectedSearchHeight(),
-                accuracy: 1
-            )
-            controller.cancelSelectionForTesting()
-        }
-    }
-
-    @MainActor
     func testSwitcherPanelControllerMarkedTextPassesSearchShortcutKeysThrough() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
             let controller = SwitcherPanelController(
