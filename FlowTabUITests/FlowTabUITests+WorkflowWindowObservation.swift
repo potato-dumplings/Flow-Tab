@@ -10,7 +10,6 @@ private enum FlowTabUITestCGWindowDefaults {
     static let fullscreenSpaceWindowScreenCoverageRatio: CGFloat = 0.8
     static let visibleAlphaThreshold = 0.001
     static let standardBufferedStoreType = 1
-    static let evidencePollInterval: TimeInterval = 0.1
 }
 
 struct WorkflowCGWindowObservation: Equatable {
@@ -119,66 +118,59 @@ extension FlowTabUITests {
         bundleIdentifier: String,
         timeout: TimeInterval
     ) -> WorkflowCGWindowObservation? {
-        let deadline = Date().addingTimeInterval(timeout)
-        let applicationElement =
-            AXUIElementCreateApplication(processIdentifier)
-        var latestFrontmostBundleIdentifier: String?
-        var latestFrontmostProcessIdentifier: pid_t?
-        var latestCGWindow: WorkflowCGWindowObservation?
-        var latestAXWindowNumber: CGWindowID?
-
-        repeat {
-            latestFrontmostBundleIdentifier =
-                NSWorkspace.shared.frontmostApplication?
-                    .bundleIdentifier
-            latestFrontmostProcessIdentifier =
-                NSWorkspace.shared.frontmostApplication?
-                    .processIdentifier
-            latestCGWindow = topmostOnScreenCGWindow(
-                forPID: processIdentifier
-            )
-            latestAXWindowNumber =
-                axWindowContainingIdentifier(
-                    titleAccessibilityIdentifier,
-                    in: applicationElement
-                )
-                .flatMap(
-                    FlowTabUITestAXWindowBridge.windowNumber
-                )
-            if latestFrontmostProcessIdentifier
-                    == processIdentifier,
-               latestAXWindowNumber
-                    == latestCGWindow?.number
-            {
-                return latestCGWindow
-            }
-
-            let remaining = deadline.timeIntervalSinceNow
-            guard remaining > 0 else { break }
-            RunLoop.current.run(
-                until: Date().addingTimeInterval(
-                    min(
-                        FlowTabUITestCGWindowDefaults
-                            .evidencePollInterval,
-                        remaining
+        let expectation =
+            SpaceFixtureWorkflowDesktopAnchorExpectation(
+                bundleIdentifier: bundleIdentifier,
+                processIdentifier: processIdentifier,
+                windows: [
+                    SpaceFixtureWorkflowDesktopAnchorWindowExpectation(
+                        planIndex: 1,
+                        title: title,
+                        accessibilityIdentifier:
+                            titleAccessibilityIdentifier
                     )
-                )
+                ]
             )
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected exact frontmost fixture window \(bundleIdentifier) / \(title), \
-            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil") \
-            with pid \(latestFrontmostProcessIdentifier?.description ?? "nil"), \
-            expected pid \(processIdentifier), \
-            CG title \(latestCGWindow?.title ?? "nil"), \
-            window number \(latestCGWindow?.number.description ?? "nil"), \
-            CG frame \(workflowCGFrameDescription(latestCGWindow?.frame)), \
-            and exact AX window number \(latestAXWindowNumber?.description ?? "nil").
-            """
+        let application = XCUIApplication(
+            bundleIdentifier: bundleIdentifier
         )
-        return nil
+        let observationOwner =
+            SpaceFixtureWorkflowDesktopAnchorObservationOwner(
+                expectation: expectation,
+                watchdogSeconds: timeout
+            ) {
+                self.workflowDesktopAnchorSnapshot(
+                    expectation: expectation,
+                    application: application
+                )
+            }
+        observationOwner.start()
+        defer { observationOwner.cancel() }
+
+        guard let evidence =
+                observationOwner.waitForResolution()
+        else {
+            XCTFail(
+                "Expected exact frontmost fixture window "
+                    + "\(bundleIdentifier) / \(title): "
+                    + observationOwner.diagnosticSummary
+            )
+            return nil
+        }
+        guard let windowNumber =
+                evidence.snapshot.topmostCGWindowNumber
+        else {
+            XCTFail(
+                "Resolved fixture evidence omitted the CG window: "
+                    + evidence.snapshot.logFields
+            )
+            return nil
+        }
+        return WorkflowCGWindowObservation(
+            number: windowNumber,
+            title: evidence.snapshot.topmostCGWindowTitle,
+            frame: evidence.snapshot.topmostCGWindowFrame
+        )
     }
 
     func frontmostCGWindow(
@@ -686,54 +678,6 @@ extension FlowTabUITests {
             return []
         }
         return value as? [AXUIElement] ?? []
-    }
-
-    private func axWindowContainingIdentifier(
-        _ identifier: String,
-        in appElement: AXUIElement
-    ) -> AXUIElement? {
-        for window in axWindows(in: appElement) {
-            var remainingNodeBudget = 500
-            if axTreeContainsIdentifier(
-                window,
-                identifier: identifier,
-                remainingDepth: 12,
-                remainingNodeBudget:
-                    &remainingNodeBudget
-            ) {
-                return window
-            }
-        }
-        return nil
-    }
-
-    private func axTreeContainsIdentifier(
-        _ element: AXUIElement,
-        identifier: String,
-        remainingDepth: Int,
-        remainingNodeBudget: inout Int
-    ) -> Bool {
-        guard remainingDepth >= 0,
-              remainingNodeBudget > 0
-        else {
-            return false
-        }
-        remainingNodeBudget -= 1
-        if axStringAttribute(
-            kAXIdentifierAttribute as CFString,
-            in: element
-        ) == identifier {
-            return true
-        }
-        return axChildren(in: element).contains {
-            axTreeContainsIdentifier(
-                $0,
-                identifier: identifier,
-                remainingDepth: remainingDepth - 1,
-                remainingNodeBudget:
-                    &remainingNodeBudget
-            )
-        }
     }
 
     private func axTreeContainsExpectedTitle(

@@ -297,7 +297,7 @@ extension FlowTabUITests {
         return evidence
     }
 
-    private func workflowDesktopAnchorSnapshot(
+    func workflowDesktopAnchorSnapshot(
         expectation:
             SpaceFixtureWorkflowDesktopAnchorExpectation,
         application: XCUIApplication
@@ -310,8 +310,11 @@ extension FlowTabUITests {
             topmostOnScreenCGWindow(
                 forPID: expectation.processIdentifier
             )
+        let xcuiApplicationState = application.state
         let xcuiWindows =
-            application.windows.allElementsBoundByIndex
+            xcuiApplicationState == .notRunning
+            ? []
+            : application.windows.allElementsBoundByIndex
         let identifiedWindow = xcuiWindows.lazy
             .filter {
                 SpaceFixtureWorkflowDesktopAnchorSnapshot
@@ -356,7 +359,7 @@ extension FlowTabUITests {
             applicationIsTerminated:
                 runningApplication?.isTerminated ?? true,
             xcuiRunningForeground:
-                application.state == .runningForeground,
+                xcuiApplicationState == .runningForeground,
             frontmostBundleIdentifier:
                 frontmostApplication?.bundleIdentifier,
             frontmostProcessIdentifier:

@@ -112,9 +112,9 @@ and Process/Tooling.
 | SYNC-024D | `HomeControlPressAnimationPolicy`, `FlowPageActionButton`; pressed-button transition | A 120ms ease-out duration is a visual-only Home button contract. Domain duration. | Retain it as a named injectable Home control-animation policy. SwiftUI view identity owns the animation; actions continue directly from input callbacks. | L; Behavior/visual policy assertion, affected Home UI, Process/Tooling. | completed |
 | SYNC-024E | `SettingsAppVisibilityNavigationAnimationPolicy`, `AppSettingsView`, `AppVisibilityManagerView`; app-visibility navigation transition | A 180ms ease-in-out duration is a visual-only Settings navigation contract. Domain duration. | Retain it as a named injectable Settings navigation-animation policy. Settings view state owns the transition; the manager exposes contained AX children, and destination visibility remains the UI Oracle. | L; Behavior/visual policy assertion, affected Settings UI, Process/Tooling. | completed |
 | SYNC-025 | `PanelPresentationDiagnosticProbeOwner`, `SwitcherPanelController+PresentationDiagnostics.swift`; frame-delay probe | A 16ms sleep sampled an assumed later display frame for diagnostics only. Domain measurement. | Retain 16ms only as a named frame-sample interval in an injectable diagnostic scheduler. A generation owner sequences next-main-turn and frame-sample callbacks, while presentation begin/end owns replacement and cancellation. Probe callbacks only emit measured diagnostics, so delayed delivery changes the recorded timestamp without affecting behavior. | L; Behavior diagnostic assertion, deterministic Pressure, Process/Tooling. | completed |
-| SYNC-026 | Composite fixture-topology timing baseline | Semantic review separated the fullscreen chain, desktop refocus, and application AX suppression into independent observable contracts. Migration routing. | Preserve this parent ID as the routing boundary and close each lifecycle through SYNC-026A–SYNC-026C2. | H aggregate; child rows define required validation. | validation-blocked: SYNC-026A, SYNC-026C1, and SYNC-026C2 completed; SYNC-026B implementation plus deterministic validation completed, while current UI execution exposes the SYNC-034A shared exact-window Oracle defect |
+| SYNC-026 | Composite fixture-topology timing baseline | Semantic review separated the fullscreen chain, desktop refocus, and application AX suppression into independent observable contracts. Migration routing. | Preserve this parent ID as the routing boundary and close each lifecycle through SYNC-026A–SYNC-026C2. | H aggregate; child rows define required validation. | completed |
 | SYNC-026A | `SpaceFixtureFullscreenTransitionOwner`, `AppKitSpaceFixtureWindow`, `SpaceFixtureWindowCoordinator`; ordered fullscreen transition chain | The workflow-configured initial delay intentionally stages fixture launch, while a fixed 1.4s gap assumed each preceding fullscreen animation had settled enough to start the next window. Domain duration plus evidence migration. | Retain the configured delay only before the first transition. Install the exact-window `didEnterFullScreen` observer before `toggleFullScreen`, then begin every later window directly from the preceding completion evidence. The coordinator-owned generation cancels scheduled work and exact-window observers on replacement; window close owns observer cleanup. | H fixture topology; Unit, Behavior, real multi-fullscreen UI, deterministic Pressure, Process/Tooling. | completed |
-| SYNC-026B | `SpaceFixtureDesktopRefocusOwner`, `AppKitSpaceFixtureWindow`, `SpaceFixtureWindowCoordinator`; desktop-anchor refocus | A fixed 1.2s delay after the final fullscreen callback assumes AppKit is ready to activate and key the desktop anchor. Evidence migration with controlled condition polling. | Install exact-window and active-Space observers before activation, then read back application activity, exact plan/window identity, key/main/visible/minimized/active-Space/occlusion state, and the exact on-screen CG window. Because AppKit exposes no request-acceptance callback, use an immediate-condition-first, named 100ms retry owned by the coordinator generation. Completion comes only from the exact readback; a named 15s watchdog reports the final unmet conditions and last evidence. | H fixture topology; Unit, Behavior, desktop-preserving real fixture UI, runtime-topology Pressure. | validation-blocked: implementation, Unit, Behavior, and deterministic Pressure completed; current UI execution reaches the test body and exposes the SYNC-034A shared exact-window Oracle defect |
+| SYNC-026B | `SpaceFixtureDesktopRefocusOwner`, `AppKitSpaceFixtureWindow`, `SpaceFixtureWindowCoordinator`; desktop-anchor refocus | A fixed 1.2s delay after the final fullscreen callback assumes AppKit is ready to activate and key the desktop anchor. Evidence migration with controlled condition polling. | Install exact-window and active-Space observers before activation, then read back application activity, exact plan/window identity, key/main/visible/minimized/active-Space/occlusion state, and the exact on-screen CG window. Because AppKit exposes no request-acceptance callback, use an immediate-condition-first, named 100ms retry owned by the coordinator generation. Completion comes only from the exact readback; a named 15s watchdog reports the final unmet conditions and last evidence. | H fixture topology; Unit, Behavior, desktop-preserving real fixture UI, runtime-topology Pressure. | completed |
 | SYNC-026C | Composite application AX-suppression routing boundary | The producer-side projection acknowledgement and fixture-side suppression lifecycle belong to different process and resource owners. Migration routing. | Close producer publication through SYNC-026C1 and fixture suppression through SYNC-026C2. | H aggregate; child rows define required validation. | completed |
 | SYNC-026C1 | `FlowTabUITestProjectionAcknowledgementOwner`, `FlowTabUITestBootstrapper`, `FlowTabTestLaunchOptions`; FlowTab TestingSupport projection acknowledgement | A fixture cannot infer when prelaunched FlowTab has committed the exact fixture process and window topology. Evidence migration. | Parse explicit test-only routes, install the runtime projection observer before initial readback, and publish a distributed acknowledgement only for a complete, clean projection matching bundle ID, positive PID, and exact window count. Include monotonic acknowledgement and source generations. The app TestingSupport bootstrap owns observation and termination cleanup. | H cross-process fixture evidence; Unit, Behavior, deterministic Pressure, Process/Tooling; end-to-end UI transport joins SYNC-026C2. | completed |
 | SYNC-026C2 | `SpaceFixtureApplicationAXSuppressionOwner`, `SpaceFixtureWindowCoordinator`; fixture application AX suppression | Fixed 5s and post-fullscreen 8s delays assume workflow consumers have captured the application AX window list. Evidence migration. | Install the route observer before fixture window publication, then suppress only after the exact local topology stage, exact published application AX readback, and a matching acknowledgement for the fixture PID and window count. Preserve the route-less fixture flag through the local-topology plus exact-readback contract. Require exact zero readback, publish a monotonic suppression generation for every resolved owner, and report routed terminal evidence. The coordinator owns cancellation and cleanup. | H fixture topology; Unit, Behavior, AX-suppressed real fixture UI, runtime-topology Pressure. | completed |
@@ -132,7 +132,7 @@ and Process/Tooling.
 | SYNC-032 | `FlowTabTests/FlowTabTests+Support.swift`, `FlowTabPriorityCoverageTests+AsyncSupport.swift`; shared async waits | Generic polling is used even where production callbacks, notifications, generations, or task completion are available; cancellation is swallowed. Evidence migration/conditional observation. | Add expectation/notification/task-completion helpers that observe before triggering. Keep one named immediate-check condition observer only for predicates without an event source, with cancellation and last-observation diagnostics. | M; app Unit/Behavior, Process/Tooling. | planned |
 | SYNC-033 | App tests with direct fixed waits: `FlowTabTests+CompactActionButton`, `+EnglishLayout`, `+PreferencesAndDiagnostics`, `FlowTabPriorityCoverageTests+PanelSessionBehavior`, `+RuntimeProjectionNotificationPublication`, `+RuntimeSpaceClassification`, `+SwitcherInteractionRegressions`; simulated latency in `+RuntimeSnapshotPressure` | Raw RunLoop advances and 60/80/250ms sleeps are used for settling or race setup; snapshot pressure sleep represents injected I/O latency. Evidence migration/domain pressure duration. | Replace settling with callbacks/state/generation expectations. Retain simulated latency only as a named injectable workload gate or pressure policy. Each test owns expectation cleanup and watchdog reporting. | M; affected Unit/Behavior and Pressure, Process/Tooling. | planned |
 | SYNC-034 | `FlowTabUITests+Support.swift`, `+WorkflowWindowObservation.swift`, `+SpaceFixtureApp.swift`, `+ScrollingSupport.swift`, `+StatusItem.swift`, and fixture assertion helpers; shared UI condition loops | RunLoop cadence advances drive XCUI/CG/AX/process predicate observation. Conditional observation. | Centralize named UI observation cadence and watchdog diagnostics, check immediately, use `waitForExistence`/predicate expectations where possible, and keep exact CG/AX/window/process readback as the sole Oracle. XCTest case lifetime owns the wait. | H test infrastructure; affected UI suites, Process/Tooling. | planned; SYNC-026C2 pressure attempt 002 captured a repeated Darwin-trigger delivery without a fresh matching acknowledgement |
-| SYNC-034A | `FlowTabUITests+WorkflowWindowObservation.waitForExactFrontmostSpaceFixtureWindow`; exact frontmost fixture-window observation | Optional AX and CG window numbers can both be absent and compare equal, allowing the condition loop to return without observing an exact window. Evidence-Oracle defect discovered by the SYNC-028B2 diagnostic run. | Require present PID-scoped AX and topmost CG window identities that compare equal before returning success. Keep immediate readback, the named cancellable condition cadence, and a terminal watchdog that reports the last AX/CG evidence. The XCTest helper invocation owns the wait and cleanup. | H test Oracle; desktop-refocus UI, runtime-topology Pressure, Process/Tooling. | planned: reproduced by `SYNC-028B2/ui-diagnostic-desktop-refocus-attempt-001` |
+| SYNC-034A | `FlowTabUITests+WorkflowWindowObservation.waitForExactFrontmostSpaceFixtureWindow`; exact frontmost fixture-window observation | Optional AX and CG window numbers can both be absent and compare equal, allowing the condition loop to return without observing an exact window. Evidence-Oracle defect discovered by the SYNC-028B2 diagnostic run. | Reuse the generation-owned desktop-anchor observer and require the exact PID to be running, active, frontmost, and XCUI-foreground; join the exact title/identifier XCUI window to a present PID-scoped topmost CG window by valid matching frames and require desktop-Space readback. Install workspace observers before initial readback, treat XCUI attachment as an observed condition, retain only the named cancellable 100ms condition cadence where no exact attachment/window callback exists, and use the caller's named watchdog as a diagnostic failure bound. The helper invocation owns cancellation and cleanup. | H test Oracle; desktop-refocus UI, runtime-topology Pressure, Process/Tooling. | completed |
 | SYNC-035 | Direct UI settle waits in Search, Settings, Home/Logs, MRU, Space fixture and switcher workflow tests; files enumerated in the UI audit scope below | Fixed 80ms–1.2s RunLoop advances occur between input/action and assertion, so assertion timing can change results. Evidence migration. | Remove each settle wait in favor of the affected visible element, log marker, fixture generation, process state, exact frontmost CG/AX window, or nonexistence Oracle. Observer/baseline setup precedes the action. | H; affected UI suites and matching Behavior coverage. | planned |
 | SYNC-036 | All literal XCTest timeouts in `FlowTabTests` and `FlowTabUITests` | 606 literal durations are generally terminal bounds for an independent expectation or XCUI predicate, but policy ownership and diagnostic tiers are implicit. Watchdog. | Replace literals with named app-test and UI-test watchdog policies by operation class; preserve expectation/predicate success Oracles and include unmet condition plus last observation in custom waits. Test case/helper owner supplies cleanup. | M mechanical/test infra; Unit/Behavior/UI, Process/Tooling. | planned |
 | SYNC-037 | `scripts/perf/tab-switch-stress.sh`, `search-committed-index-pressure.sh`, `runtime-topology-pressure.sh`, `lib/runtime-topology-target.sh` | Sampling duration/cadence and identity stability windows are pressure/safety protocols; process termination loops use unnamed 100ms cadence and attempt bounds. Domain duration/conditional observation/watchdog. | Retain measurement durations and sample cadence as named protocol inputs. Name process polling cadence/watchdogs, check state immediately, terminate from PID/start-identity/readback, and report the final `ps`/identity/status evidence. Traps own cancellation and cleanup. | M tooling/hot path; Pressure and Process/Tooling. | verification-needed |
@@ -2096,7 +2096,7 @@ polling cadence, deadline, or timeout in the scoped paths.
 - Commit: `e934fd2a5abc61bb0fdbd8d745e6d5993884ccf9`
   (`refactor(sync): migrate SYNC-026A fullscreen transition chain`).
 
-### SYNC-026B Validation Checkpoint
+### SYNC-026B Closure Record
 
 - Design and Oracle: the final fullscreen completion now starts desktop-anchor
   recovery immediately. `SpaceFixtureDesktopRefocusOwner` installs
@@ -2137,32 +2137,28 @@ polling cadence, deadline, or timeout in the scoped paths.
   event, retry, and watchdog work, accepted exactly the 250 live generations
   in monotonic order, produced no watchdog failures, and left no observation
   or scheduled work active. Delayed retry delivery changed only resolution
-  time. Runtime-topology pressure remains coupled to the blocked UI layer.
-- UI and environment evidence: the required install wrapper rebuilt, signed,
-  installed, and verified `/Users/lk/Applications/Flow Tab UITest.app`.
-  Earlier diagnostic attempts replaced title and XCUI-query assumptions with
-  an exact PID plus AX-identifier-to-CG-window-number readback and corrected
-  stale build-product selection at the UI-test resource boundary. The current
-  test resolves the fixture from the active Build Products boundary, removes
-  prior fixture processes through observer plus process-state readback, and
-  polls the exact frontmost PID/AX/CG condition with a named cadence and a 25s
-  failure bound. Attempts 006 and 007 both built all targets, prepared fixture
-  variants, and signed the runner successfully. The runner then failed to
-  initialize with `com.apple.LocalAuthentication` Code -4, “System
-  authentication is running,” before the test body executed. The latest result
-  bundle is
-  `.build-local/evidence-driven-sync/SYNC-026B/ui-attempt-007/results/FlowTabUITests.xcresult`.
-  UI and real-topology pressure therefore remain environment-blocked.
-- Follow-up validation evidence: the SYNC-028B2 diagnostic execution later
-  reached
+  time. The real two-window topology then exercised the final fullscreen
+  completion, exact desktop-anchor refocus, and non-fullscreen CG readback;
+  scheduling affected elapsed time while preserving the selected window and
+  final Space result.
+- UI: the required install wrapper rebuilt, signed, installed, and verified
+  `/Users/lk/Applications/Flow Tab UITest.app`. The test resolves the fixture
+  from the active Build Products boundary, removes prior fixture processes
+  through observer plus process-state readback, and observes the exact
+  frontmost PID, title/identifier XCUI window, matching CG window, and desktop
+  frame through the SYNC-034A owner. The canonical wrapper passed
+  `testSpaceFixtureRefocusesExactDesktopAnchorAfterFullscreenCompletion` 1/1
+  with zero failures in 4.916 seconds under
+  `.build-local/evidence-driven-sync/SYNC-034A/ui-attempt-002`.
+- Oracle follow-up: the SYNC-028B2 diagnostic execution reached
   `testSpaceFixtureRefocusesExactDesktopAnchorAfterFullscreenCompletion`.
   Its shared `waitForExactFrontmostSpaceFixtureWindow` helper returned without
   a present exact window because absent AX and CG window numbers compared
   equal, and the test's independent nonnil assertion failed in 1.859 seconds
   under
   `.build-local/evidence-driven-sync/SYNC-028B2/ui-diagnostic-desktop-refocus-attempt-001`.
-  SYNC-034A now owns that UI Oracle repair; the SYNC-026B UI and runtime-topology
-  layers remain validation-blocked until its affected path is rerun.
+  SYNC-034A replaced that Oracle and its affected path now resolves only from
+  present exact evidence.
 - Process/Tooling: project-file lint, stale 1.2-second refocus-delay search,
   source-size checks, `git diff --check`, and exact staged-content review are
   recorded before commit. New production, test, and UI support files remain
@@ -2675,5 +2671,76 @@ polling cadence, deadline, or timeout in the scoped paths.
   before commit. All four new sources remain below 400 lines; the touched
   shared UI observation source remains below 800 lines. Startup `prompts.zip`
   remains unchanged and outside the slice.
-- Commit: pending
+- Commit: `397ab8c3f3d70537ff3619754d04181d2a38acba`
   (`refactor(sync): migrate SYNC-028B2 desktop anchor`).
+
+### SYNC-034A Closure Record
+
+- Defect and independent Oracle: the existing shared helper compared optional
+  AX and CG window numbers directly, so two absent observations could return
+  success. The independent nonnil assertion in the SYNC-026B real fixture UI
+  reproduced the false positive in 1.859 seconds under
+  `.build-local/evidence-driven-sync/SYNC-028B2/ui-diagnostic-desktop-refocus-attempt-001`.
+  `SpaceFixtureWorkflowDesktopAnchorSnapshot.exactWindowIdentityMatches`
+  now requires a present CG window number plus valid matching XCUI and CG
+  frames; focused coverage rejects absent frames, missing CG identity, and
+  mismatched frames before accepting exact evidence.
+- Design and Oracle:
+  `waitForExactFrontmostSpaceFixtureWindow` now delegates to
+  `SpaceFixtureWorkflowDesktopAnchorObservationOwner`. Resolution requires the
+  requested bundle and PID to be running, active, frontmost, and
+  XCUI-foreground; the exact requested title and accessibility identifier must
+  identify the XCUI window whose frame matches the present PID-scoped topmost
+  on-screen CG window; and that window must have a desktop-Space frame. The
+  snapshot reads `XCUIApplication.state` first and treats `.notRunning` as
+  incomplete attachment evidence without querying the window tree. A later
+  attachment therefore changes only completion time.
+- Observation and lifecycle: the reused owner installs application-activation
+  and active-Space observers before its initial readback. AppKit and
+  XCUITest expose no exact callback for automation attachment plus the joined
+  cross-process window condition, so the owner retains its named immediate-
+  check-first 100ms condition poll. The helper invocation owns the owner and
+  cancels observers, timer, expectation, generation, and pending delivery on
+  success, failure, or return. The caller-owned named 25-second watchdog is a
+  terminal failure bound whose final readback reports every unmet condition
+  and the last/final process, XCUI, CG, frame, and Space evidence.
+- Implementation cleanup: the private-symbol AX window-number bridge and its
+  recursive identifier walk had no remaining owner after the exact
+  plan-window/CG-frame join, so their source and project entries were removed.
+  The shared UI observation source shrank while preserving its other AX and CG
+  helpers.
+- Unit and Behavior: the focused canonical wrapper rebuilt all six targets and
+  passed 5/5 with zero failures in 0.004 seconds (0.005 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-034A/targeted-attempt-001`.
+  Coverage includes absent and mismatched exact-window evidence, initially
+  satisfied exact evidence, independent process/window/desktop conditions,
+  cancellation, replacement, duplicate delivery rejection, and final watchdog
+  diagnostics. The full canonical wrapper then passed 997/997 with zero
+  failures in 49.190 seconds (49.345 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-034A/full-attempt-001`.
+- FlowTabCore: not relevant because this contract belongs to fixture UI-test
+  orchestration and changes no core-domain API or runtime dependency.
+- UI: the first owner-backed run correctly rejected completion while the
+  NSWorkspace-launched fixture was not yet attached to XCUITest, exposing the
+  attachment-readiness query race. After attachment became explicit snapshot
+  evidence, the desktop-refocus path passed 1/1 in 4.916 seconds under
+  `.build-local/evidence-driven-sync/SYNC-034A/ui-attempt-002`. Expanded shared
+  infrastructure regression passed the standard three-application workflow
+  in 27.587 seconds and the duplicate-title edge workflow in 19.643 seconds,
+  2/2 with zero failures in 47.229 seconds (47.231 seconds total), under
+  `.build-local/evidence-driven-sync/SYNC-034A/ui-shared-regression-attempt-001`.
+- Pressure: the reused owner retained the deterministic 500-generation
+  replacement/cancellation workload, including 50 incomplete condition
+  readbacks and forced stale delivery, and the SYNC-026B owner retained its
+  independent 500-cycle retry/observer/watchdog workload. The three final real
+  UI paths covered desktop refocus, independently scheduled multi-process
+  readiness, and duplicate-title window identity without result drift.
+- Process/Tooling: the canonical install, app-test, and UI wrappers rebuilt the
+  intended six targets and verified signing before execution. Project-file
+  lint, Swift parse checks, obsolete bridge/reference review, source-size
+  checks, `git diff --check`, and exact staged-content review are recorded
+  before commit. The new focused test remains below 400 lines; touched shared
+  UI sources remain below 800 lines. Startup `prompts.zip` remains unchanged
+  and outside the slice.
+- Commit: pending
+  (`refactor(sync): migrate SYNC-034A exact window oracle`).

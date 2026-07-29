@@ -116,12 +116,11 @@ struct SpaceFixtureWorkflowDesktopAnchorSnapshot:
         ) {
             conditions.append("windowPlanIdentity")
         }
-        if topmostCGWindowNumber == nil
-            || !Self.windowFramesMatch(
-                identifiedXCUIWindowFrame,
-                topmostCGWindowFrame
-            )
-        {
+        if !Self.exactWindowIdentityMatches(
+            cgWindowNumber: topmostCGWindowNumber,
+            xcuiWindowFrame: identifiedXCUIWindowFrame,
+            cgWindowFrame: topmostCGWindowFrame
+        ) {
             conditions.append("exactCGWindowIdentity")
         }
         if topmostCGWindowIsFullscreenSpaceSized {
@@ -175,6 +174,18 @@ struct SpaceFixtureWorkflowDesktopAnchorSnapshot:
             && abs(left.minY - right.minY) <= tolerance
             && abs(left.width - right.width) <= tolerance
             && abs(left.height - right.height) <= tolerance
+    }
+
+    static func exactWindowIdentityMatches(
+        cgWindowNumber: CGWindowID?,
+        xcuiWindowFrame: CGRect?,
+        cgWindowFrame: CGRect?
+    ) -> Bool {
+        guard cgWindowNumber != nil else { return false }
+        return windowFramesMatch(
+            xcuiWindowFrame,
+            cgWindowFrame
+        )
     }
 
     private func matchesExpectedWindow(
