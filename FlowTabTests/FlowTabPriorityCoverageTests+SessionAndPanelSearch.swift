@@ -939,121 +939,6 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerQuitShortcutTriggersTerminateSelectedAppFlow() async {
-        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: terminateScenarioApps())
-        let controller = SwitcherPanelController(
-            model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        )
-        controller.modelForTesting.terminateRequestOverride = { _ in
-            (sent: true, pid: 42_100)
-        }
-
-        XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
-        assertAppSwitcherProjectionSessionRead(from: runtimeProjectionService)
-        let selectedAppID = controller.modelForTesting.selectedApp?.id
-        let hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load()
-
-        let handled = controller.handleKeyDownForTesting(
-            Self.makeKeyDownEvent(
-                keyCode: hotkeyConfiguration.quitKeyCode,
-                modifierFlags: hotkeyConfiguration.primaryModifier.eventModifierFlag
-            )
-        )
-
-        XCTAssertTrue(handled)
-        let didEnterTerminateFlow = await waitUntil(
-            "quit shortcut enters terminate flow",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            controller.modelForTesting.pendingTerminateRequest?.appID == selectedAppID
-        }
-        XCTAssertTrue(didEnterTerminateFlow)
-        XCTAssertEqual(controller.modelForTesting.terminatingAppID, selectedAppID)
-        XCTAssertEqual(controller.modelForTesting.pendingTerminateRequest?.appID, selectedAppID)
-        XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
-        assertAppSwitcherProjectionSessionRead(
-            from: runtimeProjectionService,
-            maintenanceRequests: [.switcherSessionStarted, .appLifecycleRefresh]
-        )
-        XCTAssertNotNil(controller.modelForTesting.session)
-        controller.modelForTesting.cancelSelection()
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerQuitFrontmostAppInAppLayerKeepsSessionAfterWorkspaceTerminationRefresh() async {
-        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let initialApps = self.terminateScenarioApps()
-            let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
-            let controller = SwitcherPanelController(
-                model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-            )
-            controller.modelForTesting.terminateRequestOverride = { _ in
-                (sent: true, pid: 42_100)
-            }
-
-            XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-            guard let sessionBeforeTermination = controller.modelForTesting.session else {
-                XCTFail("Expected an active session before workspace terminate refresh")
-                return
-            }
-            let terminatedAppID = sessionBeforeTermination.selectedApp.id
-            let remainingAppIDs = sessionBeforeTermination.apps.map(\.id).filter { $0 != terminatedAppID }
-            let expectedSelectedAppID = remainingAppIDs[
-                min(sessionBeforeTermination.selectedAppIndex, remainingAppIDs.count - 1)
-            ]
-            XCTAssertFalse(controller.modelForTesting.isSearchActive)
-            assertAppSwitcherProjectionSessionRead(from: runtimeProjectionService)
-
-            let layoutRefreshed = expectation(
-                description: "layout refreshed automatically after terminating frontmost app in app layer"
-            )
-            controller.modelForTesting.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
-
-            let hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load()
-            let handled = controller.handleKeyDownForTesting(
-                Self.makeKeyDownEvent(
-                    keyCode: hotkeyConfiguration.quitKeyCode,
-                    modifierFlags: hotkeyConfiguration.primaryModifier.eventModifierFlag
-                )
-            )
-            XCTAssertTrue(handled)
-            let didEnterTerminateFlow = await waitUntil(
-                "quit shortcut enters terminate flow before workspace notification",
-                timeoutNanoseconds: 1_000_000_000,
-                pollIntervalNanoseconds: 10_000_000
-            ) {
-                controller.modelForTesting.pendingTerminateRequest?.appID == terminatedAppID
-            }
-            XCTAssertTrue(didEnterTerminateFlow)
-            assertAppSwitcherProjectionSessionRead(
-                from: runtimeProjectionService,
-                maintenanceRequests: [.switcherSessionStarted, .appLifecycleRefresh]
-            )
-            XCTAssertEqual(controller.modelForTesting.appCount, initialApps.count)
-            XCTAssertTrue(controller.modelForTesting.session?.apps.contains { $0.id == terminatedAppID } ?? false)
-            XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
-
-            controller.handleWorkspaceApplicationTerminatedForTesting(appID: terminatedAppID, pid: 42_100)
-
-            await fulfillment(of: [layoutRefreshed], timeout: 1.0)
-
-            XCTAssertNotNil(controller.modelForTesting.session)
-            XCTAssertEqual(controller.modelForTesting.appCount, 2)
-            XCTAssertEqual(controller.modelForTesting.selectedApp?.id, expectedSelectedAppID)
-            XCTAssertFalse(controller.modelForTesting.session?.apps.contains { $0.id == terminatedAppID } ?? true)
-            XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
-            assertAppSwitcherProjectionSessionRead(
-                from: runtimeProjectionService,
-                minimumReadCount: 2,
-                maintenanceRequests: [.switcherSessionStarted, .appLifecycleRefresh]
-            )
-            XCTAssertFalse(controller.modelForTesting.isSearchActive)
-            controller.cancelSelectionForTesting()
-        }
-    }
-
-    @MainActor
     private func assertCommittedSearchIndexRead(
         _ model: LiveSwitcherModel,
         from runtimeProjectionService: RecordingRuntimeProjectionService,
@@ -1098,7 +983,7 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
-    private func assertAppSwitcherProjectionSessionRead(
+    func assertAppSwitcherProjectionSessionRead(
         from runtimeProjectionService: RecordingRuntimeProjectionService,
         minimumReadCount: Int = 1,
         maintenanceRequests: [RuntimeProjectionMaintenanceReason] = [.switcherSessionStarted],

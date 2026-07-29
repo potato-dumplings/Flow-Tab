@@ -131,7 +131,7 @@ and Process/Tooling.
 | SYNC-030A | `FlowTabUITestMockWindowPreviewLatencyOwner`, `FlowTabUITestBootstrapper.installMockWindowPreviewsIfNeeded`; mock preview I/O latency | A blocking thread sleep intentionally delays preview capture, has no cancellation owner, and exposes no TestingSupport completion evidence. Domain fixture duration. | Retain the compatible millisecond launch option as a bounded named latency policy. A TestingSupport generation owner performs a cancellable monotonic deadline wait and publishes exact owner/batch/request/outcome evidence. Preview result identity remains the success Oracle. Bootstrap preparation, replacement, termination, and deinitialization own cancellation. | M asynchronous preview path; Unit, Behavior, affected UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-030B | Initial panel-occlusion stale hook in `FlowTabUITestBootstrapper` | A task sleep intentionally holds stale occlusion state before releasing visibility, while generation equality informally rejects replacement. Domain fixture duration. | Retain the compatible millisecond launch option as a bounded named staleness policy; inject a cancellable scheduler, publish installed/released/cancelled evidence, and make bootstrap preparation, replacement, termination, and deinitialization own cleanup. The panel visibility/recovery state remains the success Oracle. | M presentation lifecycle; Unit, Behavior, affected UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-031 | `TabSwitchStressPolicy`, `TabSwitchStressRunner`, `TabSwitchStressEvidenceTransport`; tab-switch stress workload | Switch cadence and total duration define an exact planned pressure workload. The former wall-clock loop allowed slower scheduling to reduce the number of switches and swallowed task cancellation. Domain duration plus exact selection evidence. | Preserve the compatible launch inputs as a bounded named policy and derive `ceil(duration / cadence)` planned selections. Start with an immediate selection, count each planned target only after exact selected-tab readback, and complete after both the monotonic duration and workload evidence are satisfied. The runner owns one generation and cancellable wake; AppDelegate termination owns stop. UI establishes a unique distributed evidence route before launch. | M hot path; Unit/Behavior for runner, affected UI, deterministic and real tab-switch Pressure, Process/Tooling. | completed |
-| SYNC-032 | Shared app-test asynchronous wait baseline | Semantic caller review found independent AppVisibility reload, AppDelegate delivery, Search publication, preview publication, panel presentation, termination-feedback, delayed-entry, and launch-bootstrap owners behind the two generic polling helpers. Migration routing. | Remove the generic helpers by closing each observable lifecycle through SYNC-032A–SYNC-032H. Retain a condition observer only if a caller has no callback, notification, task completion, scheduler, generation, or published state. | M aggregate; child rows define required validation. | in progress: SYNC-032A–SYNC-032E and SYNC-032H completed |
+| SYNC-032 | Shared app-test asynchronous wait baseline | Semantic caller review found independent AppVisibility reload, AppDelegate delivery, Search publication, preview publication, panel presentation, termination-feedback, delayed-entry, and launch-bootstrap owners behind the two generic polling helpers. Migration routing. | Remove the generic helpers by closing each observable lifecycle through SYNC-032A–SYNC-032H. Retain a condition observer only if a caller has no callback, notification, task completion, scheduler, generation, or published state. | M aggregate; child rows define required validation. | in progress: SYNC-032A–SYNC-032F and SYNC-032H completed |
 | SYNC-032A | `FlowTabTests+Support.waitUntil`; `AppVisibilityManagerModel.reload` tests | Two app-inventory tests polled wall-clock time and swallowed sleep cancellation while `@Published isLoading` already exposed task lifecycle. Evidence migration. | Subscribe before `reload()`, reject the initial idle value, and resolve only from the observed `loading → idle` transition. The test scope owns and releases the Combine subscription; XCTest timeout is the diagnostic failure bound. | L test synchronization; affected Unit/Behavior, Process/Tooling. | completed |
 | SYNC-032B | AppDelegate notification-delivery routing boundary | Semantic caller review separated workspace lifecycle delivery from hotkey replacement delivery. Migration routing. | Close the independently emitted workspace and hotkey contracts through SYNC-032B1 and SYNC-032B2. | M aggregate; child rows define required validation. | completed: SYNC-032B1 and SYNC-032B2 closed independently |
 | SYNC-032B1 | `FlowTabPriorityCoverageTests+AsyncSupport.waitUntil`; AppDelegate workspace launch and termination delivery tests | Workspace notifications are followed by generic polling of runtime-projection recording state. Evidence migration. | Establish exact app/PID recording callbacks before posting each workspace notification, then fulfill from the matching launch or termination signal and require the final recording readback. Test teardown owns callback removal. | M app lifecycle; affected Behavior, Process/Tooling. | completed |
@@ -143,7 +143,7 @@ and Process/Tooling.
 | SYNC-032E | Search viewport and initial-presentation sizing routing boundary | Semantic caller review found that Search-result viewport scrolling and TestingSupport launch presentation have independent event sources and lifecycles. Migration routing. | Close Search state/scroll publication through SYNC-032E1 and initial launch sizing through SYNC-032E2. | M aggregate; child rows define required validation. | completed: SYNC-032E1 and SYNC-032E2 closed independently |
 | SYNC-032E1 | `FlowTabPriorityCoverageTests+SessionAndPanelSearch`; Search activation and result viewport scrolling | Search activation result state and the SwiftUI scroll request were inferred by two generic condition polls even though activation publishes synchronously and the viewport exposes a completion callback plus monotonic scroll revision. Evidence migration. | Install the viewport callback before presentation. Require the immediate Search activation readback, then accept the first-focus and wrap events only when callback result ID, current scroll revision, selected index, and selected result all match the expected transition. Test scope owns callback restoration and presentation cleanup. | M Search viewport behavior; affected Unit/Behavior, deterministic Search Pressure, Process/Tooling. | completed |
 | SYNC-032E2 | `FlowTabPriorityCoverageTests+SessionAndPanelSearch`; TestingSupport initial Search presentation sizing | The test polls Search-active state and panel height after launch bootstrap even though TestingSupport publishes exact initial-presentation resolution. Evidence migration. | Observe `.flowTabUITestInitialPresentationDidResolve` before bootstrap, require a matching controller object and Search-ready evidence, then read back active Search state, exact result count/layout measurements, and final panel size. Test scope owns notification cleanup and bootstrap cancellation. | M TestingSupport presentation; affected Behavior, deterministic lifecycle Pressure, Process/Tooling. | completed |
-| SYNC-032F | Shared `waitUntil` callers for terminate-shortcut entry | Tests poll pending termination after the named press-feedback completion scheduler already owns the transition. Evidence migration. | Inject the manual completion scheduler or establish the terminate-request callback before input, deliver completion explicitly, and verify the exact pending app/PID generation. | M termination behavior; affected Behavior, deterministic Pressure, Process/Tooling. | planned |
+| SYNC-032F | Shared `waitUntil` callers for terminate-shortcut entry | Tests poll pending termination after the named press-feedback completion scheduler already owns the transition. Evidence migration. | Inject the manual completion scheduler or establish the terminate-request callback before input, deliver completion explicitly, and verify the exact pending app/PID generation. | M termination behavior; affected Behavior, deterministic Pressure, Process/Tooling. | completed |
 | SYNC-032G | Shared `waitUntil` callers for delayed/manual window-layer entry | Tests poll mode and maintenance state after a named delayed-entry owner or explicit projection callback. Evidence migration. | Use the injected delayed-entry scheduler and exact projection-update callback; verify the committed selected-app projection and mode directly after evidence delivery. | M panel lifecycle; affected Behavior, deterministic Pressure, Process/Tooling. | planned |
 | SYNC-032H | `waitForLaunchBootstrapSearchAndSeededLogs`; AppDelegate UI-test bootstrap | A helper polls runtime log I/O and panel state together after launch. In suite order, a second exact pair of hotkey-monitor factory records can also arrive before that polling helper returns, while the isolated test remains green. Evidence and lifecycle migration. | Establish initial-presentation, log-change, and launch hotkey-registration evidence before launch; join the exact Search session, requested seeded-log count, and launch registration generation/readback. Identify and cancel or reject any hosted-app state from an earlier test generation. The test owns observations and one diagnostic XCTest timeout. | H hosted launch orchestration; affected Behavior, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-033 | App tests with direct fixed waits: `FlowTabTests+CompactActionButton`, `+EnglishLayout`, `+PreferencesAndDiagnostics`, `FlowTabPriorityCoverageTests+PanelSessionBehavior`, `+RuntimeProjectionNotificationPublication`, `+RuntimeSpaceClassification`, `+SwitcherInteractionRegressions`; simulated latency in `+RuntimeSnapshotPressure` | Raw RunLoop advances and 60/80/250ms sleeps are used for settling or race setup; snapshot pressure sleep represents injected I/O latency. Evidence migration/domain pressure duration. | Replace settling with callbacks/state/generation expectations. Retain simulated latency only as a named injectable workload gate or pressure policy. Each test owns expectation cleanup and watchdog reporting. | M; affected Unit/Behavior and Pressure, Process/Tooling. | planned |
@@ -3478,5 +3478,57 @@ polling cadence, deadline, or timeout in the scoped paths.
   from 1,194 to 1,142 lines; the new focused initial-Search presentation
   source is 192 lines. Startup `prompts.zip` remains unchanged and outside
   the slice.
-- Commit: pending
+- Commit: `6f00bc18461643a8ccb023d0c71de66c506c4def`
   (`test(sync): migrate SYNC-032E2 initial search presentation`).
+
+### SYNC-032F Closure Record
+
+- Design and Oracle: both quit-shortcut regressions construct the controller
+  with `ManualTerminatePressFeedbackScheduler` before starting the
+  presentation. Key input must first leave
+  `TerminatePressFeedbackCompletionOwner` pending at generation one, schedule
+  the named policy interval, and publish no termination request. Explicitly
+  firing that completion must synchronously clear the owner and publish a
+  `PendingTerminateRequest` with exact selected app ID, PID 42100, and request
+  generation one. Independent readbacks verify the termination animation,
+  projection-maintenance sequence, unchanged pre-notification session, and
+  exact post-workspace-notification layout and selected app.
+- Lifecycle and retained time policy: the controller owns the completion
+  owner/token and presentation-end cancellation. The second regression wraps
+  and restores the controller's existing layout callback; both tests end the
+  presentation in `defer`. The 120ms
+  `TerminatePressFeedbackPolicy.completionInterval` remains the named,
+  injected visual press-feedback contract. It determines when completion is
+  delivered, while request success comes only from the exact scheduler
+  completion and request readback. The one-second layout expectation is a
+  terminal failure watchdog. Both generic 10ms condition cadences and
+  one-second terminate-entry polling deadlines were removed.
+- Unit and Behavior: the focused canonical wrapper passed 8/8 with zero
+  failures in 0.138 seconds (0.141 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-032F/targeted-attempt-001`. It
+  covers both quit entry paths, scheduled completion identity, single
+  delivery, replacement, cancellation, synchronous scheduler delivery, exact
+  controller request publication, and lifecycle pressure. The complete
+  canonical wrapper passed 1022/1022 with zero failures in 49.089 seconds
+  (49.241 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-032F/full-attempt-001`.
+- Pressure: the focused owner workload delivered 500 generations, explicitly
+  cancelled every even generation, force-fired cancelled work, and accepted
+  exactly the 250 current odd generations in monotonic order. Duplicate fire
+  was rejected and synchronous scheduler delivery cleaned its returned token,
+  so scheduler latency changes completion time without changing request
+  identity or result.
+- FlowTabCore and UI: not relevant because this slice migrates app-test
+  synchronization and shares existing scheduler test support without changing
+  core APIs, hotkey configuration, animation duration, termination behavior,
+  accessibility, launch options, or fixture topology. The Behavior tests
+  exercise the real key-routing, visual-feedback owner, projection
+  maintenance, workspace refresh, and panel layout paths.
+- Process/Tooling: project-file lint, Swift parse, scoped stale-`waitUntil`
+  review, source-size checks, `git diff --check`, and exact staged review
+  passed. Extraction reduced the mixed session/Search source from 1,142 to
+  1,027 lines and the completion-owner test source from 306 to 227 lines; the
+  new focused quit-entry source is 294 lines and shared scheduler support is
+  84 lines. Startup `prompts.zip` remains unchanged and outside the slice.
+- Commit: pending
+  (`test(sync): migrate SYNC-032F terminate feedback entry`).
