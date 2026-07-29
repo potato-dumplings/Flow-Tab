@@ -118,9 +118,9 @@ and Process/Tooling.
 | SYNC-026C | Composite application AX-suppression routing boundary | The producer-side projection acknowledgement and fixture-side suppression lifecycle belong to different process and resource owners. Migration routing. | Close producer publication through SYNC-026C1 and fixture suppression through SYNC-026C2. | H aggregate; child rows define required validation. | completed |
 | SYNC-026C1 | `FlowTabUITestProjectionAcknowledgementOwner`, `FlowTabUITestBootstrapper`, `FlowTabTestLaunchOptions`; FlowTab TestingSupport projection acknowledgement | A fixture cannot infer when prelaunched FlowTab has committed the exact fixture process and window topology. Evidence migration. | Parse explicit test-only routes, install the runtime projection observer before initial readback, and publish a distributed acknowledgement only for a complete, clean projection matching bundle ID, positive PID, and exact window count. Include monotonic acknowledgement and source generations. The app TestingSupport bootstrap owns observation and termination cleanup. | H cross-process fixture evidence; Unit, Behavior, deterministic Pressure, Process/Tooling; end-to-end UI transport joins SYNC-026C2. | completed |
 | SYNC-026C2 | `SpaceFixtureApplicationAXSuppressionOwner`, `SpaceFixtureWindowCoordinator`; fixture application AX suppression | Fixed 5s and post-fullscreen 8s delays assume workflow consumers have captured the application AX window list. Evidence migration. | Install the route observer before fixture window publication, then suppress only after the exact local topology stage, exact published application AX readback, and a matching acknowledgement for the fixture PID and window count. Preserve the route-less fixture flag through the local-topology plus exact-readback contract. Require exact zero readback, publish a monotonic suppression generation for every resolved owner, and report routed terminal evidence. The coordinator owns cancellation and cleanup. | H fixture topology; Unit, Behavior, AX-suppressed real fixture UI, runtime-topology Pressure. | completed |
-| SYNC-027 | Composite fixture fault-latency baseline | Semantic owner review found two independent fault-injection contracts: delayed process termination and delayed exact-window close. Domain duration routing record. | Preserve the CLI compatibility boundary and route implementation, lifecycle, evidence, and validation through SYNC-027A and SYNC-027B. | M; child-slice validation. | routed to SYNC-027A and SYNC-027B |
+| SYNC-027 | Composite fixture fault-latency baseline | Semantic owner review found two independent fault-injection contracts: delayed process termination and delayed exact-window close. Domain duration routing record. | Preserve the CLI compatibility boundary and route implementation, lifecycle, evidence, and validation through SYNC-027A and SYNC-027B. | M; child-slice validation. | completed: SYNC-027A and SYNC-027B closed independently |
 | SYNC-027A | `SpaceFixtureAppDelegate`, `SpaceFixtureLaunchConfiguration`, `SpaceFixtureTerminationFaultOwner`; delayed process termination | `--terminate-delay-ms` intentionally keeps the fixture process alive after an application or SIGTERM request. The raw `asyncAfter` work had no cancellation owner and exposed no scheduled/applied evidence. Domain duration. | Retain the positive delay as `SpaceFixtureTerminationFaultPolicy`. A single AppDelegate-owned generation schedules through the injectable fixture scheduler, preserves the first request across duplicate sources, publishes exact scheduled/applied evidence with bundle ID and PID, and cancels the task and signal source at app termination. The optional notification route preserves existing launch configurations while enabling an observer to be established before the termination request. | M repeated async work; Unit, Behavior, representative termination UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
-| SYNC-027B | `SpaceFixtureWindowCoordinator`, `SpaceFixtureLaunchConfiguration`; delayed exact-window close | `--close-window-delay-ms` intentionally delays fixture window removal, while the coordinator currently owns only an unlabelled scheduler token and publishes no scheduled/applied close acknowledgement. Domain duration. | Retain as a named window-close fault policy with exact plan-index identity, generation, injected scheduler, cancellation, scheduled/applied evidence, and post-close topology readback. The coordinator owns pending work. | M repeated async work; Unit, Behavior, representative window-removal UI, deterministic lifecycle Pressure, Process/Tooling. | planned |
+| SYNC-027B | `SpaceFixtureWindowCloseFaultOwner`, `SpaceFixtureWindowCoordinator`, `SpaceFixtureLaunchConfiguration`; delayed exact-window close | `--close-window-delay-ms` intentionally delays fixture window removal, while the former coordinator token exposed no scheduled/applied acknowledgement and fixture launch time could race the consumer's initial topology observation. Domain duration plus evidence-driven orchestration. | Retain the named fault duration behind an exact generation, bundle/PID, plan-index, and stable-window-number contract. Install the optional trigger observer before the initial readback and scheduled evidence; begin the delay from a matching trigger, then resolve only from AppKit visibility, exact CG-window, and coordinator-topology readback. Use an immediate first readback, named cancellable 50ms retry where WindowServer exposes no close-completion event, and a diagnostic 10s watchdog. The coordinator-owned fault owner cancels every observer and token. | M repeated async work; Unit, Behavior, representative window-removal UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-028 | `SpaceFixtureWindowContentView`, `SpaceFixtureWindowCoordinator`; workflow readiness labels | “Ready” is published before asynchronous fullscreen/refocus/close topology transitions complete, forcing UI settle waits. Evidence migration. | Publish a monotonic fixture transition generation/stage only after exact planned windows and requested fullscreen/key/AX exposure states are read back. UI observers establish a baseline before launch/action and wait for a later matching stage. | H; Unit, Behavior, all affected real fixture UI, runtime-topology Pressure. | planned |
 | SYNC-029 | `FlowTab/TestingSupport/FlowTabUITestBootstrapper.swift`; `presentInitialUIIfNeeded` | Twenty 150ms retries and two equal snapshots infer runtime projection stability before opening Search/switcher. Evidence migration. | Observe runtime projection commit notifications before bootstrap, capture baseline generation, perform initial readback, and open from a matching complete later generation. A shared UI-test watchdog reports the last session/projection signature. Bootstrapper owns observer/task cleanup. | H test orchestration; Behavior, UI, runtime-topology/Search Pressure. | planned |
 | SYNC-030 | `FlowTabUITestBootstrapper.installMockWindowPreviewsIfNeeded`, initial stale occlusion hook | Thread sleep and millisecond launch options intentionally inject preview latency or stale visibility. Domain fixture duration. | Retain as named fault-injection policies, preferably backed by controllable gates/acknowledgements; ensure cancellation and completion markers are owned by TestingSupport and UI tests wait on the resulting Oracle. | M; Behavior, affected UI, Pressure when used. | verification-needed |
@@ -2358,5 +2358,72 @@ polling cadence, deadline, or timeout in the scoped paths.
   a clear single responsibility. `git diff --check` and exact staged-content
   review are recorded before commit. Startup `prompts.zip` remains unchanged
   and outside the slice.
-- Commit: pending
+- Commit: `44cb4dc3b9676cbb9444b9041017757912dff570`
   (`refactor(sync): retain SYNC-027A termination fault policy`).
+
+### SYNC-027B Closure Record
+
+- Design and Oracle: `SpaceFixtureWindowCloseFaultPolicy` retains the configured
+  fixture fault latency, while `SpaceFixtureWindowCloseFaultOwner` establishes
+  an exact request generation, bundle ID, PID, target plan index, and stable
+  AppKit window number. The optional distributed trigger observer is installed
+  before the initial topology readback and scheduled evidence. A matching
+  trigger begins the configured delay after the consumer has independently
+  observed its baseline. The route-less launch contract remains compatible and
+  begins the delay after fixture publication. Applied evidence is emitted only
+  after the target is absent from the coordinator plan indices, the AppKit
+  window is invisible, and the exact CG window is off-screen.
+- Lifecycle: the window coordinator owns the fault owner. Each active generation
+  owns its trigger observer, configured-delay token, readback-retry token, and
+  watchdog token. Replacement and cancellation remove every owned resource and
+  reject stale callbacks. Duplicate, out-of-order, wrong-generation,
+  wrong-bundle/PID, and wrong-plan triggers cannot advance the state machine.
+  The target window retains its last positive AppKit window number so post-close
+  WindowServer readback preserves exact-window identity.
+- Retained time policy: `--close-window-delay-ms` is the intentional latency of
+  the fixture's window-removal fault. The owner performs an immediate
+  post-action readback. WindowServer provides no public exact-window
+  close-completion callback, so a named cancellable 50ms condition cadence
+  repeats that readback. A named 10-second watchdog is only a terminal failure
+  bound and reports the final unmet conditions plus the last and final exact
+  topology evidence. Scheduler and compositor load therefore change completion
+  time while the same readback establishes the result.
+- Unit and Behavior: the final focused canonical run rebuilt all six targets and
+  passed 12/12 with zero failures in 0.016 seconds under
+  `.build-local/evidence-driven-sync/SYNC-027B/targeted-attempt-007`.
+  Coverage verifies strict evidence and trigger transport parsing, both simple
+  and workflow launch routes, matching-trigger gating, initial satisfaction,
+  default route compatibility, cancellation and replacement, delayed CG
+  convergence, watchdog diagnostics, synchronous scheduling, and coordinator
+  integration.
+- Full FlowTabTests: the canonical wrapper rebuilt all six targets and passed
+  981/981 with zero failures in 46.348 seconds under
+  `.build-local/evidence-driven-sync/SYNC-027B/full-attempt-001`.
+- FlowTabCore: not relevant because this contract belongs to the standalone
+  fixture, app-test transport, and UI orchestration boundaries and adds no core
+  domain API.
+- Pressure: the deterministic 500-generation lifecycle workload resolved every
+  generation from exact topology evidence, rejected every replaced callback,
+  canceled every owned observer and token, emitted one terminal transition per
+  accepted request, and left no active request.
+- UI: attempt 001 supplied concrete regression evidence for the former
+  orchestration: under the observed build and automation load, the configured
+  7.5-second delay removed window 2 before FlowTab captured the initial
+  two-window projection, yielding `1w` at the baseline assertion. Attempt 002
+  was stopped before test-body execution by macOS UI-runner authentication
+  cancellation (`LocalAuthentication Code=-2`). The elevated canonical rerun
+  then passed the representative real-fixture mutation path 1/1 with zero
+  failures in 21.348 seconds under
+  `.build-local/evidence-driven-sync/SYNC-027B/ui-attempt-003`. Its observer was
+  installed before fixture launch; FlowTab independently displayed `2w` before
+  the exact trigger, and the test then observed matching applied evidence,
+  window-2 nonexistence, retained window 1, and FlowTab's `1w` readback.
+- Process/Tooling: `plutil -lint` passed for the Xcode project, and canonical
+  wrappers compiled the fixture, app-test, and UI-test sources in their intended
+  targets. New production and test sources remain below 800 lines with a single
+  window-close fault responsibility; the UI observation helper remains below
+  400 lines. The obsolete coordinator token and scheduling symbol are absent.
+  `git diff --check` and exact staged-content review are recorded before commit.
+  Startup `prompts.zip` remains unchanged and outside the slice.
+- Commit: pending
+  (`refactor(sync): migrate SYNC-027B window close fault`).

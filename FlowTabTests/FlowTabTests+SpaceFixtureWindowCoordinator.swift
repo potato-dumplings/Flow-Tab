@@ -11,6 +11,9 @@ final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
 
     private(set) var showCalls: [Bool] = []
     private(set) var closeCallCount = 0
+    private(set) var isVisibleForCloseReadback = true
+    private(set) var isCGWindowOnScreenForCloseReadback =
+        true
     private(set) var enterFullScreenCallCount = 0
     private(set) var enterFullScreenCompletions: [(@MainActor () -> Void)] = []
     private(set) var enterFullScreenTokens:
@@ -43,6 +46,24 @@ final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
 
     func close() {
         closeCallCount += 1
+        isVisibleForCloseReadback = false
+        isCGWindowOnScreenForCloseReadback = false
+    }
+
+    func windowCloseTopologySnapshot(
+        remainingWindowPlanIndices: [Int]
+    ) -> SpaceFixtureWindowCloseTopologySnapshot {
+        SpaceFixtureWindowCloseTopologySnapshot(
+            targetWindowPlanIndex: plan.index,
+            targetWindowNumber:
+                CGWindowID(1_000 + plan.index),
+            targetWindowIsVisible:
+                isVisibleForCloseReadback,
+            targetCGWindowIsOnScreen:
+                isCGWindowOnScreenForCloseReadback,
+            remainingWindowPlanIndices:
+                remainingWindowPlanIndices.sorted()
+        )
     }
 
     func enterFullScreen(
@@ -427,12 +448,57 @@ extension FlowTabTests {
         XCTAssertEqual(windowSpies.count, 2)
         XCTAssertEqual(scheduler.scheduledDelays, [1_300])
         XCTAssertEqual(publishedAccessibilityElements, [["ax-element-1", "ax-element-2"]])
+        XCTAssertEqual(
+            coordinator.lastWindowCloseFaultEvidence,
+            SpaceFixtureWindowCloseFaultEvidence(
+                requestGeneration: 1,
+                phase: .scheduled,
+                source: .initialReadback,
+                delayMilliseconds: 1_300,
+                awaitsExplicitTrigger: false,
+                identity: SpaceFixtureWindowCloseFaultIdentity(
+                    bundleIdentifier:
+                        Bundle.main.bundleIdentifier
+                        ?? ProcessInfo.processInfo
+                            .processName,
+                    processIdentifier: getpid()
+                ),
+                snapshot:
+                    SpaceFixtureWindowCloseTopologySnapshot(
+                        targetWindowPlanIndex: 2,
+                        targetWindowNumber: 1_002,
+                        targetWindowIsVisible: true,
+                        targetCGWindowIsOnScreen: true,
+                        remainingWindowPlanIndices: [1, 2]
+                    )
+            )
+        )
 
         XCTAssertTrue(scheduler.fire(at: 0))
 
         XCTAssertEqual(windowSpies[0].closeCallCount, 0)
         XCTAssertEqual(windowSpies[1].closeCallCount, 1)
         XCTAssertEqual(publishedAccessibilityElements, [["ax-element-1", "ax-element-2"], ["ax-element-1"]])
+        XCTAssertEqual(
+            coordinator.lastWindowCloseFaultEvidence?
+                .phase,
+            .applied
+        )
+        XCTAssertEqual(
+            coordinator.lastWindowCloseFaultEvidence?
+                .snapshot,
+            SpaceFixtureWindowCloseTopologySnapshot(
+                targetWindowPlanIndex: 2,
+                targetWindowNumber: 1_002,
+                targetWindowIsVisible: false,
+                targetCGWindowIsOnScreen: false,
+                remainingWindowPlanIndices: [1]
+            )
+        )
+        XCTAssertNil(
+            coordinator
+                .lastWindowCloseFaultWatchdogFailure
+        )
     }
 
     @MainActor

@@ -60,6 +60,10 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         SpaceFixtureApplicationAXSuppressionRoute?
     let terminationFaultEvidenceRoute:
         SpaceFixtureTerminationFaultEvidenceRoute?
+    let windowCloseFaultEvidenceRoute:
+        SpaceFixtureWindowCloseFaultEvidenceRoute?
+    let windowCloseFaultTriggerRoute:
+        SpaceFixtureWindowCloseFaultTriggerRoute?
     let terminationDelayMilliseconds: Int
     let closeWindowIndex: Int?
     let closeWindowDelayMilliseconds: Int
@@ -96,6 +100,10 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             SpaceFixtureApplicationAXSuppressionRoute? = nil,
         terminationFaultEvidenceRoute:
             SpaceFixtureTerminationFaultEvidenceRoute? = nil,
+        windowCloseFaultEvidenceRoute:
+            SpaceFixtureWindowCloseFaultEvidenceRoute? = nil,
+        windowCloseFaultTriggerRoute:
+            SpaceFixtureWindowCloseFaultTriggerRoute? = nil,
         terminationDelayMilliseconds: Int = 0,
         closeWindowIndex: Int? = nil,
         closeWindowDelayMilliseconds: Int = 0,
@@ -113,6 +121,10 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             applicationAXSuppressionRoute
         self.terminationFaultEvidenceRoute =
             terminationFaultEvidenceRoute
+        self.windowCloseFaultEvidenceRoute =
+            windowCloseFaultEvidenceRoute
+        self.windowCloseFaultTriggerRoute =
+            windowCloseFaultTriggerRoute
         self.terminationDelayMilliseconds = max(0, terminationDelayMilliseconds)
         self.closeWindowIndex = closeWindowIndex.flatMap { windows.indices.contains($0 - 1) ? $0 : nil }
         self.closeWindowDelayMilliseconds = max(0, closeWindowDelayMilliseconds)
@@ -133,6 +145,10 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             SpaceFixtureApplicationAXSuppressionRoute? = nil,
         terminationFaultEvidenceRoute:
             SpaceFixtureTerminationFaultEvidenceRoute? = nil,
+        windowCloseFaultEvidenceRoute:
+            SpaceFixtureWindowCloseFaultEvidenceRoute? = nil,
+        windowCloseFaultTriggerRoute:
+            SpaceFixtureWindowCloseFaultTriggerRoute? = nil,
         terminationDelayMilliseconds: Int = 0,
         closeWindowIndex: Int? = nil,
         closeWindowDelayMilliseconds: Int = 0
@@ -175,6 +191,10 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
                 applicationAXSuppressionRoute,
             terminationFaultEvidenceRoute:
                 terminationFaultEvidenceRoute,
+            windowCloseFaultEvidenceRoute:
+                windowCloseFaultEvidenceRoute,
+            windowCloseFaultTriggerRoute:
+                windowCloseFaultTriggerRoute,
             terminationDelayMilliseconds: terminationDelayMilliseconds,
             closeWindowIndex: closeWindowIndex,
             closeWindowDelayMilliseconds: closeWindowDelayMilliseconds
@@ -228,6 +248,14 @@ extension SpaceFixtureLaunchConfiguration {
                 ),
             terminationFaultEvidenceRoute:
                 Self.terminationFaultEvidenceRoute(
+                    arguments: arguments
+                ),
+            windowCloseFaultEvidenceRoute:
+                Self.windowCloseFaultEvidenceRoute(
+                    arguments: arguments
+                ),
+            windowCloseFaultTriggerRoute:
+                Self.windowCloseFaultTriggerRoute(
                     arguments: arguments
                 ),
             terminationDelayMilliseconds: normalizedTerminationDelayMilliseconds,
@@ -292,6 +320,14 @@ extension SpaceFixtureLaunchConfiguration {
                 ),
             terminationFaultEvidenceRoute:
                 Self.terminationFaultEvidenceRoute(
+                    arguments: arguments
+                ),
+            windowCloseFaultEvidenceRoute:
+                Self.windowCloseFaultEvidenceRoute(
+                    arguments: arguments
+                ),
+            windowCloseFaultTriggerRoute:
+                Self.windowCloseFaultTriggerRoute(
                     arguments: arguments
                 ),
             terminationDelayMilliseconds: max(
@@ -405,6 +441,46 @@ extension SpaceFixtureLaunchConfiguration {
             return nil
         }
         return SpaceFixtureTerminationFaultEvidenceRoute(
+            notificationName: Notification.Name(
+                notificationName
+            )
+        )
+    }
+
+    private static func windowCloseFaultEvidenceRoute(
+        arguments: [String]
+    ) -> SpaceFixtureWindowCloseFaultEvidenceRoute? {
+        guard let notificationName = stringValue(
+            after:
+                SpaceFixtureWindowCloseFaultEvidenceRoute
+                    .notificationArgument,
+            in: arguments
+        )?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !notificationName.isEmpty
+        else {
+            return nil
+        }
+        return SpaceFixtureWindowCloseFaultEvidenceRoute(
+            notificationName: Notification.Name(
+                notificationName
+            )
+        )
+    }
+
+    private static func windowCloseFaultTriggerRoute(
+        arguments: [String]
+    ) -> SpaceFixtureWindowCloseFaultTriggerRoute? {
+        guard let notificationName = stringValue(
+            after:
+                SpaceFixtureWindowCloseFaultTriggerRoute
+                    .notificationArgument,
+            in: arguments
+        )?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !notificationName.isEmpty
+        else {
+            return nil
+        }
+        return SpaceFixtureWindowCloseFaultTriggerRoute(
             notificationName: Notification.Name(
                 notificationName
             )

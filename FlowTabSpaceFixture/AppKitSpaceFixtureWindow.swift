@@ -11,6 +11,7 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         SpaceFixtureFullScreenObservation?
     private var desktopPresentationObservation:
         SpaceFixtureDesktopPresentationObservation?
+    private var closeIdentityWindowNumber: CGWindowID = 0
 
     var applicationAccessibilityElement: Any {
         window
@@ -80,6 +81,33 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         desktopPresentationObservation = nil
         noisyCGSiblings?.close()
         window.close()
+    }
+
+    func windowCloseTopologySnapshot(
+        remainingWindowPlanIndices: [Int]
+    ) -> SpaceFixtureWindowCloseTopologySnapshot {
+        let currentWindowNumber = CGWindowID(
+            max(0, window.windowNumber)
+        )
+        if currentWindowNumber > 0 {
+            closeIdentityWindowNumber =
+                currentWindowNumber
+        }
+        let windowNumber = closeIdentityWindowNumber
+        return SpaceFixtureWindowCloseTopologySnapshot(
+            targetWindowPlanIndex: plan.index,
+            targetWindowNumber: windowNumber,
+            targetWindowIsVisible: window.isVisible,
+            targetCGWindowIsOnScreen:
+                Self.isExactCGWindowOnScreen(
+                    windowNumber,
+                    ownerProcessIdentifier:
+                        ProcessInfo.processInfo
+                            .processIdentifier
+                ),
+            remainingWindowPlanIndices:
+                remainingWindowPlanIndices.sorted()
+        )
     }
 
     func enterFullScreen(

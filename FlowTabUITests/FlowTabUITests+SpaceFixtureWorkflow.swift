@@ -273,6 +273,15 @@ extension FlowTabUITests {
 
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
 
+        let windowCloseRoute =
+            makeSpaceFixtureWindowCloseFaultRoute()
+        let windowCloseObservation =
+            SpaceFixtureWindowCloseFaultObservationOwner(
+                route: windowCloseRoute
+            )
+        windowCloseObservation.start()
+        defer { windowCloseObservation.cancel() }
+
         let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
         let fixtureApp = launchSpaceFixtureWorkflow(
             identity: identity,
@@ -281,7 +290,9 @@ extension FlowTabUITests {
             titlePrefix: "Mutation",
             enterFullscreenDelayMilliseconds: 0,
             closeWindowIndex: 2,
-            closeWindowDelayMilliseconds: 7_500
+            closeWindowDelayMilliseconds: 250,
+            fixtureAdditionalArguments:
+                windowCloseRoute.fixtureLaunchArguments
         )
         defer {
             if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
@@ -289,12 +300,119 @@ extension FlowTabUITests {
                 waitForSpaceFixtureApplicationToTerminate(fixtureApp)
             }
         }
+        guard let scheduledClose =
+                windowCloseObservation.waitForScheduled(
+                    timeout: 8
+                )
+        else {
+            XCTFail(
+                "Missing scheduled fixture window-close evidence: "
+                    + windowCloseObservation
+                        .diagnosticSummary
+            )
+            return
+        }
+        XCTAssertEqual(
+            scheduledClose.snapshot
+                .targetWindowPlanIndex,
+            2
+        )
+        XCTAssertEqual(
+            scheduledClose.delayMilliseconds,
+            250
+        )
+        XCTAssertTrue(
+            scheduledClose.awaitsExplicitTrigger
+        )
+        XCTAssertEqual(
+            scheduledClose.identity.bundleIdentifier,
+            identity.bundleIdentifier
+        )
+        XCTAssertTrue(
+            NSRunningApplication.runningApplications(
+                withBundleIdentifier:
+                    identity.bundleIdentifier
+            ).contains {
+                !$0.isTerminated
+                    && $0.processIdentifier
+                        == scheduledClose.identity
+                            .processIdentifier
+            }
+        )
+        XCTAssertTrue(
+            scheduledClose.snapshot
+                .targetWindowIsVisible
+        )
+        XCTAssertEqual(
+            scheduledClose.snapshot
+                .remainingWindowPlanIndices,
+            [1, 2]
+        )
 
         app.activate()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
         let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity, timeout: 12)
         assertValue(of: fixtureAppRow, equals: "2w", timeout: 12)
 
+        windowCloseObservation.requestClose(
+            from: scheduledClose
+        )
+        guard let appliedClose =
+                windowCloseObservation.waitForApplied(
+                    requestGeneration:
+                        scheduledClose.requestGeneration,
+                    timeout: 15
+                )
+        else {
+            XCTFail(
+                "Missing applied fixture window-close evidence: "
+                    + windowCloseObservation
+                        .diagnosticSummary
+            )
+            return
+        }
+        XCTAssertEqual(
+            appliedClose.identity,
+            scheduledClose.identity
+        )
+        XCTAssertEqual(
+            appliedClose.snapshot
+                .targetWindowPlanIndex,
+            2
+        )
+        XCTAssertEqual(
+            appliedClose.snapshot
+                .targetWindowNumber,
+            scheduledClose.snapshot
+                .targetWindowNumber
+        )
+        XCTAssertFalse(
+            appliedClose.snapshot
+                .targetWindowIsVisible
+        )
+        XCTAssertFalse(
+            appliedClose.snapshot
+                .targetCGWindowIsOnScreen
+        )
+        XCTAssertEqual(
+            appliedClose.snapshot
+                .remainingWindowPlanIndices,
+            [1]
+        )
+        XCTAssertTrue(
+            fixtureApp.windows[
+                "flowtab.spacefixture.window.1"
+            ].exists
+        )
+        XCTAssertTrue(
+            waitForNonExistence(
+                fixtureApp.windows[
+                    "flowtab.spacefixture.window.2"
+                ],
+                timeout: 5
+            ),
+            windowCloseObservation.diagnosticSummary
+        )
         assertValue(of: fixtureAppRow, equals: "1w", timeout: 15)
         waitForRuntimeLogFiles(
             containing: [

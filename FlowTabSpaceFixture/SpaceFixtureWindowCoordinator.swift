@@ -9,6 +9,9 @@ protocol SpaceFixtureWindowing: AnyObject {
     var applicationAccessibilityElement: Any { get }
     func show(isKey: Bool)
     func close()
+    func windowCloseTopologySnapshot(
+        remainingWindowPlanIndices: [Int]
+    ) -> SpaceFixtureWindowCloseTopologySnapshot
     func enterFullScreen(
         completion: @escaping @MainActor () -> Void
     ) -> any SpaceFixtureCancellable
@@ -46,6 +49,8 @@ final class SpaceFixtureWindowCoordinator {
         SpaceFixtureDesktopRefocusOwner
     private let applicationAXSuppressionOwner:
         SpaceFixtureApplicationAXSuppressionOwner
+    private let windowCloseFaultOwner:
+        SpaceFixtureWindowCloseFaultOwner
     private let activateApplication: ActivationHandler
     private let applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher
     private let applicationIdentityProvider:
@@ -53,7 +58,6 @@ final class SpaceFixtureWindowCoordinator {
 
     private(set) var windows: [any SpaceFixtureWindowing] = []
     private var suppressesApplicationAccessibilityElements = false
-    private var windowCloseToken: (any SpaceFixtureCancellable)?
 
     var lastDesktopRefocusWatchdogFailure:
         SpaceFixtureDesktopRefocusWatchdogFailure?
@@ -67,6 +71,18 @@ final class SpaceFixtureWindowCoordinator {
         applicationAXSuppressionOwner.lastFailure
     }
 
+    var lastWindowCloseFaultEvidence:
+        SpaceFixtureWindowCloseFaultEvidence?
+    {
+        windowCloseFaultOwner.lastEvidence
+    }
+
+    var lastWindowCloseFaultWatchdogFailure:
+        SpaceFixtureWindowCloseFaultWatchdogFailure?
+    {
+        windowCloseFaultOwner.lastFailure
+    }
+
     init(
         configuration: SpaceFixtureLaunchConfiguration,
         visibleFrameProvider: VisibleFrameProvider? = nil,
@@ -76,6 +92,8 @@ final class SpaceFixtureWindowCoordinator {
         applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher? = nil,
         applicationAXSuppressionOwner:
             SpaceFixtureApplicationAXSuppressionOwner? = nil,
+        windowCloseFaultOwner:
+            SpaceFixtureWindowCloseFaultOwner? = nil,
         applicationIdentityProvider:
             ApplicationIdentityProvider? = nil
     ) {
@@ -98,6 +116,20 @@ final class SpaceFixtureWindowCoordinator {
                 scheduler: resolvedScheduler,
                 exposureProvider: {
                     Self.applicationAccessibilityExposure()
+                }
+            )
+        self.windowCloseFaultOwner =
+            windowCloseFaultOwner
+            ?? SpaceFixtureWindowCloseFaultOwner(
+                scheduler: resolvedScheduler,
+                evidencePublisher: { evidence in
+                    SpaceFixtureWindowCloseFaultEvidenceTransport
+                        .publish(
+                            evidence,
+                            route:
+                                configuration
+                                    .windowCloseFaultEvidenceRoute
+                        )
                 }
             )
         self.activateApplication = activateApplication ?? {
@@ -136,7 +168,7 @@ final class SpaceFixtureWindowCoordinator {
         }
         windows.forEach { $0.updateWorkflowReadiness(windowTitles: windowTitles) }
         publishApplicationAccessibilityElements()
-        scheduleWindowCloseIfNeeded()
+        startWindowCloseFaultIfNeeded()
 
         guard !configuration.fullscreenWindowIndices.isEmpty else {
             applicationAXSuppressionOwner
@@ -156,19 +188,69 @@ final class SpaceFixtureWindowCoordinator {
         cancelScheduledWork()
     }
 
-    private func scheduleWindowCloseIfNeeded() {
-        guard let closeWindowIndex = configuration.closeWindowIndex else { return }
-        windowCloseToken = scheduler.schedule(
-            afterMilliseconds:
-                configuration.closeWindowDelayMilliseconds
-        ) {
-            guard let index = self.windows.firstIndex(where: { $0.plan.index == closeWindowIndex }) else {
-                return
-            }
-            let window = self.windows.remove(at: index)
-            window.close()
-            self.publishApplicationAccessibilityElements()
+    private func startWindowCloseFaultIfNeeded() {
+        guard let closeWindowIndex =
+                configuration.closeWindowIndex,
+              let policy =
+                SpaceFixtureWindowCloseFaultPolicy(
+                    targetWindowPlanIndex:
+                        closeWindowIndex,
+                    delayMilliseconds:
+                        configuration
+                            .closeWindowDelayMilliseconds
+                ),
+              let targetWindow =
+                windows.first(where: {
+                    $0.plan.index == closeWindowIndex
+                })
+        else {
+            return
         }
+        let applicationIdentity =
+            applicationIdentityProvider()
+        windowCloseFaultOwner.start(
+            policy: policy,
+            identity:
+                SpaceFixtureWindowCloseFaultIdentity(
+                    bundleIdentifier:
+                        applicationIdentity
+                            .bundleIdentifier,
+                    processIdentifier:
+                        applicationIdentity
+                            .processIdentifier
+                ),
+            triggerRoute:
+                configuration
+                    .windowCloseFaultTriggerRoute,
+            snapshotProvider: { [weak self, targetWindow] in
+                targetWindow.windowCloseTopologySnapshot(
+                    remainingWindowPlanIndices:
+                        self?.windows
+                            .map(\.plan.index) ?? []
+                )
+            },
+            applyClose: { [weak self, targetWindow] in
+                guard let self,
+                      let index = self.windows.firstIndex(
+                        where: {
+                            $0.plan.index
+                                == targetWindow.plan.index
+                        }
+                      )
+                else {
+                    return
+                }
+                targetWindow.close()
+                self.windows.remove(at: index)
+                self.publishApplicationAccessibilityElements()
+            },
+            onWatchdog: { failure in
+                NSLog(
+                    "SpaceFixture window close watchdog failed: %@",
+                    failure.logFields
+                )
+            }
+        )
     }
 
     private func showInitialWindows() -> [any SpaceFixtureWindowing] {
@@ -310,8 +392,7 @@ final class SpaceFixtureWindowCoordinator {
         fullscreenTransitionOwner.cancel()
         desktopRefocusOwner.cancel()
         applicationAXSuppressionOwner.cancel()
-        windowCloseToken?.cancel()
-        windowCloseToken = nil
+        windowCloseFaultOwner.cancel()
     }
 
     private static func applicationAccessibilityExposure()
