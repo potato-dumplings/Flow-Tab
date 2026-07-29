@@ -111,7 +111,7 @@ and Process/Tooling.
 | SYNC-024C | `SwitcherAppRemovalAnimationPolicy`, `SwitcherPanelOverlayView`; app-removal transition | A 140ms ease-out duration is a visual-only product contract for app sets up to 16 items. Domain duration. | Retain it as a named Switcher removal-animation policy. SwiftUI app-strip identity owns the animation; exact process termination and projection refresh remain the tile-removal Oracle. | L; Behavior/visual policy assertion, affected switcher UI, Process/Tooling. | completed |
 | SYNC-024D | `HomeControlPressAnimationPolicy`, `FlowPageActionButton`; pressed-button transition | A 120ms ease-out duration is a visual-only Home button contract. Domain duration. | Retain it as a named injectable Home control-animation policy. SwiftUI view identity owns the animation; actions continue directly from input callbacks. | L; Behavior/visual policy assertion, affected Home UI, Process/Tooling. | completed |
 | SYNC-024E | `SettingsAppVisibilityNavigationAnimationPolicy`, `AppSettingsView`, `AppVisibilityManagerView`; app-visibility navigation transition | A 180ms ease-in-out duration is a visual-only Settings navigation contract. Domain duration. | Retain it as a named injectable Settings navigation-animation policy. Settings view state owns the transition; the manager exposes contained AX children, and destination visibility remains the UI Oracle. | L; Behavior/visual policy assertion, affected Settings UI, Process/Tooling. | completed |
-| SYNC-025 | `SwitcherPanelController+PresentationDiagnostics.swift`; frame-delay probe | A 16ms sleep samples an assumed later display frame for diagnostics only. Domain measurement. | Drive the second probe from an actual display/update callback or explicitly named diagnostic scheduler; it must not affect behavior. The probe task is canceled with the presentation session. | L; Behavior diagnostic assertion, Process/Tooling. | planned |
+| SYNC-025 | `PanelPresentationDiagnosticProbeOwner`, `SwitcherPanelController+PresentationDiagnostics.swift`; frame-delay probe | A 16ms sleep sampled an assumed later display frame for diagnostics only. Domain measurement. | Retain 16ms only as a named frame-sample interval in an injectable diagnostic scheduler. A generation owner sequences next-main-turn and frame-sample callbacks, while presentation begin/end owns replacement and cancellation. Probe callbacks only emit measured diagnostics, so delayed delivery changes the recorded timestamp without affecting behavior. | L; Behavior diagnostic assertion, deterministic Pressure, Process/Tooling. | completed |
 | SYNC-026 | `FlowTabSpaceFixture/SpaceFixtureWindowCoordinator.swift`; fullscreen chain, desktop refocus, AX suppression | Fullscreen entry has a completion callback, while 1.2s/1.4s/5s/8s settle delays sequence later fixture state. Evidence migration. | Chain fullscreen/refocus/accessibility publication from window/fullscreen/key/occlusion readbacks and explicit transition acknowledgements. Retain only workflow-configured latency that is itself a fixture scenario. The coordinator owns cancellable scheduled actions/observers. | H fixture topology; Unit, Behavior, real fixture UI, runtime-topology Pressure. | planned |
 | SYNC-027 | `SpaceFixtureAppDelegate`, `SpaceFixtureLaunchConfiguration`; terminate and close delay options | Configured terminate/close latency intentionally creates a slow-process or window-removal scenario. Domain duration. | Retain as named fixture fault policies with injectable scheduler, cancellation, and explicit “scheduled/applied” acknowledgement. App delegate/coordinator own pending work. | M; Unit, Behavior, representative fixture UI. | verification-needed |
 | SYNC-028 | `SpaceFixtureWindowContentView`, `SpaceFixtureWindowCoordinator`; workflow readiness labels | “Ready” is published before asynchronous fullscreen/refocus/close topology transitions complete, forcing UI settle waits. Evidence migration. | Publish a monotonic fixture transition generation/stage only after exact planned windows and requested fullscreen/key/AX exposure states are read back. UI observers establish a baseline before launch/action and wait for a later matching stage. | H; Unit, Behavior, all affected real fixture UI, runtime-topology Pressure. | planned |
@@ -1984,5 +1984,48 @@ polling cadence, deadline, or timeout in the scoped paths.
   400 lines. Touched Settings source and UI-test files remain below 800 lines
   with one Settings-view or Settings-test responsibility each. The startup
   `prompts.zip` remains unchanged and outside the slice.
-- Commit: pending
+- Commit: `0e682598d51861495185b6bf2fdeed038504d4c7`
   (`refactor(sync): classify SYNC-024E settings navigation animation`).
+
+### SYNC-025 Closure Record
+
+- Design and Oracle: `PanelPresentationDiagnosticProbeOwner` replaces the
+  anonymous task with a generation-scoped sequence. An injectable scheduler
+  first publishes a next-main-turn probe, then schedules the named frame
+  sample. Each callback records its actual monotonic timestamp in
+  `PanelPresentationDiagnosticProbe`; neither callback provides a readiness or
+  success result, and both only feed the existing diagnostic log.
+- Retained time policy and lifecycle: 16ms is retained as
+  `PanelPresentationDiagnosticPolicy.frameSampleInterval`, a diagnostic
+  sampling contract for observing an approximately subsequent display frame.
+  `SwitcherPanelController` owns the probe owner, and every presentation begin
+  or invalidation cancels its current token and advances generation. Replaced,
+  canceled, and late callbacks cannot publish into another presentation
+  session.
+- Unit and Behavior: the final focused canonical run passed 4/4 in 0.088
+  seconds under
+  `.build-local/evidence-driven-sync/SYNC-025/targeted-attempt-002`.
+  Coverage verifies the named 16ms cadence, independently injected clock,
+  actual callback timestamps, replacement, explicit cancellation, late
+  callback rejection, and the representative global `show` path. Ending that
+  presentation canceled the pending frame sample and preserved the last
+  accepted probe.
+- FlowTabCore: not relevant because the probe observes app-target panel
+  presentation diagnostics and introduces no core-domain contract.
+- UI: not relevant because the slice changes no rendered state, accessibility
+  state, input result, recovery decision, or user-visible behavior. The
+  representative AppKit presentation path is covered by the behavior test.
+- Pressure: the deterministic 500-cycle workload alternated cancellation and
+  deliberately delayed callback delivery. It published frame samples for
+  exactly the 250 live generations in monotonic generation order, rejected
+  every canceled callback, and left no pending work. The delayed clock values
+  changed only probe timestamps.
+- Process/Tooling: the canonical wrapper built all six targets and passed the
+  focused tests. Project lint, stale anonymous-sleep scan, source-size checks,
+  `git diff --check`, and exact staged-content review are recorded before
+  commit. The new owner and test files remain below 400 lines. Existing
+  visibility diagnostic value types moved from the oversized panel controller
+  into its dedicated diagnostics file, leaving the controller below 800
+  lines. The startup `prompts.zip` remains unchanged and outside the slice.
+- Commit: pending
+  (`refactor(sync): classify SYNC-025 presentation diagnostic sampling`).

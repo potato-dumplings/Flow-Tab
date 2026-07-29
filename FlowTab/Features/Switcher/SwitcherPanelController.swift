@@ -28,54 +28,6 @@ struct ModifierReleaseConfirmationPolicy: Equatable {
     )
 }
 
-struct PanelVisibilitySnapshot: Equatable {
-    let panelPresented: Bool
-    let userVisible: Bool
-    let occlusionVisible: Bool
-    let panelKey: Bool
-    let appActive: Bool
-    let searchActive: Bool
-    let inputFocused: Bool
-    let firstResponder: String
-
-    var logFields: String {
-        "panelVisible=\(panelPresented ? 1 : 0) "
-            + "userVisible=\(userVisible ? 1 : 0) "
-            + "occlusionVisible=\(occlusionVisible ? 1 : 0) "
-            + "panelKey=\(panelKey ? 1 : 0) "
-            + "appActive=\(appActive ? 1 : 0) "
-            + "searchActive=\(searchActive ? 1 : 0) "
-            + "inputFocused=\(inputFocused ? 1 : 0) "
-            + "firstResponder=\(firstResponder)"
-    }
-}
-
-struct PanelVisibilityRecoveryDiagnostic: Equatable {
-    let trigger: String
-    let generation: Int?
-    let attempt: Int?
-    let totalAttempts: Int?
-    let mode: SwitcherPanelController.PanelVisibilityRecoveryMode
-    let before: PanelVisibilitySnapshot
-    let after: PanelVisibilitySnapshot
-
-    var logMessage: String {
-        var fields = [
-            "presentationRecovery",
-            "trigger=\(trigger)",
-            "action=visibilityReadback",
-            "mode=\(mode.debugName)",
-            "generation=\(generation.map(String.init) ?? "nil")"
-        ]
-        if let attempt, let totalAttempts {
-            fields.append("attempt=\(attempt)/\(totalAttempts)")
-        }
-        fields.append("before{\(before.logFields)}")
-        fields.append("after{\(after.logFields)}")
-        return fields.joined(separator: " ")
-    }
-}
-
 @MainActor
 final class SwitcherPanelController {
     enum HotkeySessionKind {
@@ -170,6 +122,8 @@ final class SwitcherPanelController {
     let terminatePressFeedbackPolicy: TerminatePressFeedbackPolicy
     let initialWindowOnlyPreviewRevealObservationOwner:
         InitialWindowOnlyPreviewRevealObservationOwner
+    let panelPresentationDiagnosticProbeOwner:
+        PanelPresentationDiagnosticProbeOwner
     let terminateTargetProcessStateReader:
         any TerminateTargetProcessStateReading
     var modifierReleaseState: ModifierReleaseState = .idle
@@ -342,6 +296,8 @@ final class SwitcherPanelController {
             (any TerminatePressFeedbackScheduling)? = nil,
         initialWindowOnlyPreviewRevealScheduler:
             (any InitialWindowOnlyPreviewRevealScheduling)? = nil,
+        panelPresentationDiagnosticScheduler:
+            (any PanelPresentationDiagnosticScheduling)? = nil,
         terminatePressFeedbackPolicy:
             TerminatePressFeedbackPolicy = .default,
         terminateTargetProcessStateReader:
@@ -384,6 +340,10 @@ final class SwitcherPanelController {
         initialWindowOnlyPreviewRevealObservationOwner =
             InitialWindowOnlyPreviewRevealObservationOwner(
                 scheduler: initialWindowOnlyPreviewRevealScheduler
+            )
+        panelPresentationDiagnosticProbeOwner =
+            PanelPresentationDiagnosticProbeOwner(
+                scheduler: panelPresentationDiagnosticScheduler
             )
         self.terminatePressFeedbackPolicy =
             terminatePressFeedbackPolicy

@@ -289,6 +289,7 @@ extension SwitcherPanelController {
     }
 
     func beginPresentationSession(kind: HotkeySessionKind, trigger: String) {
+        cancelPanelVisibilityProbe()
         presentationSessionGeneration += 1
         activeHotkeySessionKind = kind
         resetPointerSelectionGate()
@@ -298,6 +299,7 @@ extension SwitcherPanelController {
     }
 
     func invalidatePresentationSessionGeneration(trigger: String) {
+        cancelPanelVisibilityProbe()
         presentationSessionGeneration += 1
         logInputTrace(
             "presentationSession trigger=\(trigger) action=invalidate generation=\(presentationSessionGeneration)"
