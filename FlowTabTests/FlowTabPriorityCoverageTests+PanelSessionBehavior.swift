@@ -1707,9 +1707,11 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerDelayedAutoEnterAppliesSelectedProjectionCommittedAfterDirtySignal() async {
+    func testSwitcherPanelControllerDelayedAutoEnterAppliesSelectedProjectionCommittedAfterDirtySignal() {
         let currentApp = NSRunningApplication.current
         let appID = "com.example.deferred-selected-projection"
+        let scheduler =
+            ManualDelayedWindowLayerEntryScheduler()
         let windows = [
             WindowCandidate(id: "deferred-after-dirty-1", title: "Deferred One", isMinimized: false, lastActiveAt: 30),
             WindowCandidate(id: "deferred-after-dirty-2", title: "Deferred Two", isMinimized: false, lastActiveAt: 20)
@@ -1762,7 +1764,8 @@ extension FlowTabPriorityCoverageTests {
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(
                 runtimeProjectionService: runtimeProjectionService
-            )
+            ),
+            delayedWindowLayerEntryScheduler: scheduler
         )
         controller.windowLayerPresentationDelayOverride = 0.05
 
@@ -1771,14 +1774,12 @@ extension FlowTabPriorityCoverageTests {
 
         controller.scheduleDelayedWindowLayerEntryForTesting()
 
-        let didRequestProjection = await waitUntil(
-            "delayed auto-enter requests selected-app projection maintenance",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            !runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().isEmpty
-        }
-        XCTAssertTrue(didRequestProjection)
+        XCTAssertEqual(
+            runtimeProjectionService
+                .selectedCurrentAppWindowChangeSignalsRecorded()
+                .map(\.appID),
+            [appID]
+        )
         XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
         runtimeProjectionService.setCurrentAppWindowProjection(
             RuntimeCurrentAppWindowProjection(
@@ -1788,22 +1789,28 @@ extension FlowTabPriorityCoverageTests {
             ),
             appID: appID
         )
-
-        let didUseProjection = await waitUntil(
-            "delayed auto-enter applies projection committed after dirty signal",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            controller.modelForTesting.session?.mode == .windowCycle(appID: appID)
-        }
-        XCTAssertTrue(didUseProjection)
+        XCTAssertTrue(
+            controller.handleCurrentAppWindowProjectionDidUpdateForTesting(
+                appID: appID
+            )
+        )
         XCTAssertGreaterThanOrEqual(
             runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID),
             2
         )
         XCTAssertEqual(
+            controller.modelForTesting.session?.mode,
+            .appCycle
+        )
+        XCTAssertEqual(
             controller.modelForTesting.session?.selectedApp.windows.map(\.id),
             ["deferred-after-dirty-1", "deferred-after-dirty-2"]
+        )
+
+        XCTAssertTrue(scheduler.fireNextDeadline())
+        XCTAssertEqual(
+            controller.modelForTesting.session?.mode,
+            .windowCycle(appID: appID)
         )
         controller.cancelSelectionForTesting()
     }
@@ -1886,6 +1893,11 @@ extension FlowTabPriorityCoverageTests {
                 freshness: freshness
             ),
             appID: appID
+        )
+        XCTAssertTrue(
+            controller.handleCurrentAppWindowProjectionDidUpdateForTesting(
+                appID: appID
+            )
         )
 
         let didUseProjection = await waitUntil(

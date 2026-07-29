@@ -444,6 +444,9 @@ extension SwitcherPanelController {
         let updated = model.handleAppSwitcherProjectionDidUpdate()
         observeTerminateInterruptionProtectionProjectionUpdate()
         guard updated else { return false }
+        observeDelayedWindowLayerProjectionUpdate(
+            source: .appSwitcherProjectionUpdated
+        )
         resetPointerSelectionGate()
         updatePanelSize()
         scheduleDelayedWindowLayerEntryIfNeeded(preservingDeadline: true)
@@ -454,6 +457,10 @@ extension SwitcherPanelController {
     func handleCurrentAppWindowProjectionDidUpdate(appID: String?) -> Bool {
         guard isPanelPresented else { return false }
         guard model.handleCurrentAppWindowProjectionDidUpdate(appID: appID) else { return false }
+        observeDelayedWindowLayerProjectionUpdate(
+            source: .currentAppWindowProjectionUpdated,
+            appID: appID
+        )
         resetPointerSelectionGate()
         updatePanelSize()
         scheduleDelayedWindowLayerEntryIfNeeded(preservingDeadline: true)

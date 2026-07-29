@@ -162,28 +162,7 @@ extension FlowTabUITests {
     }
 
     func testOptionTabDelayedWindowLayerEntryShowsPrewarmedPreviewAtTransition() throws {
-        let app = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-mock-window-previews",
-                "--flowtab-ui-mock-runtime-variant",
-                "single-app-five-windows",
-                "--flowtab-ui-enable-mock-hotkey-effects",
-                "--flowtab-ui-listen-switcher-trigger",
-                "--flowtab-ui-runtime-log-level",
-                "DEBUG",
-                "--flowtab-ui-enable-verbose-logs",
-                "--flowtab-ui-ax-trusted",
-                "YES",
-                "--flowtab-ui-screen-trusted",
-                "YES",
-                "-windowLayerAutoEnterDelay",
-                "0.30",
-                "-showPermissionReminder",
-                "NO",
-            ]
-        )
+        let app = makeDelayedWindowLayerEntryApp()
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
 
@@ -220,10 +199,91 @@ extension FlowTabUITests {
         waitForRuntimeLogFiles(
             containing: [
                 "prewarmed=5",
-                "entered reason=timer",
+                "entered source=deadlineReadback",
             ],
             since: logSnapshot,
             timeout: 8
+        )
+    }
+
+    func testOptionTabDelayedWindowLayerEntryRepeatedPresentationPressure() throws {
+        let app = makeDelayedWindowLayerEntryApp()
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+
+        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
+        let firstWindowID =
+            "flowtab.switcher.window.\("mock-browser-normal-1".flowTabUITestAccessibilityIdentifierComponent)"
+        let firstPreview = element(
+            in: app,
+            identifier: previewImageIdentifier(for: firstWindowID)
+        )
+        let presentationCount = 12
+
+        for iteration in 1...presentationCount {
+            let traceLabel = "delayed-entry-pressure.\(iteration)"
+            let logSnapshot = makeRuntimeLogFileSnapshot()
+            app.activate()
+            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                .global,
+                traceLabel: traceLabel
+            )
+
+            XCTAssertTrue(
+                diagnosticsSummary.waitForExistence(timeout: 5),
+                "Delayed-entry pressure iteration \(iteration) must present the switcher."
+            )
+            XCTAssertTrue(
+                waitForWindowLayerPreviewAtTransition(
+                    diagnosticsSummary: diagnosticsSummary,
+                    previewElement: firstPreview,
+                    timeout: 5,
+                    previewGrace: 0.10
+                ),
+                "Delayed-entry pressure iteration \(iteration) must expose the prewarmed preview."
+            )
+            waitForRuntimeLogFiles(
+                containing: [
+                    "prewarmed=5",
+                    "entered source=deadlineReadback",
+                ],
+                since: logSnapshot,
+                timeout: 8
+            )
+
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                .confirm,
+                traceLabel: "\(traceLabel).confirm"
+            )
+            XCTAssertTrue(
+                waitForNonExistence(diagnosticsSummary, timeout: 5),
+                "Delayed-entry pressure iteration \(iteration) must release its presentation owner."
+            )
+        }
+    }
+
+    private func makeDelayedWindowLayerEntryApp() -> XCUIApplication {
+        makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-mock-window-previews",
+                "--flowtab-ui-mock-runtime-variant",
+                "single-app-five-windows",
+                "--flowtab-ui-enable-mock-hotkey-effects",
+                "--flowtab-ui-listen-switcher-trigger",
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES",
+                "-windowLayerAutoEnterDelay",
+                "0.30",
+                "-showPermissionReminder",
+                "NO",
+            ]
         )
     }
 

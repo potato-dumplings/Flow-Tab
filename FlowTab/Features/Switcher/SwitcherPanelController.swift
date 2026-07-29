@@ -163,6 +163,8 @@ final class SwitcherPanelController {
         ActiveSpaceTransitionObservationOwner
     let terminateInterruptionProtectionObservationOwner:
         TerminateInterruptionProtectionObservationOwner
+    let delayedWindowLayerEntryObservationOwner:
+        DelayedWindowLayerEntryObservationOwner
     let terminateTargetProcessStateReader:
         any TerminateTargetProcessStateReading
     var modifierReleaseState: ModifierReleaseState = .idle
@@ -171,10 +173,6 @@ final class SwitcherPanelController {
     var panelPresentationRecoveryGeneration = 0
     var panelVisibilityRecoveryState: PanelVisibilityRecoveryState = .idle
     var lastPanelVisibilityRecoveryDiagnostic: PanelVisibilityRecoveryDiagnostic?
-    var delayedWindowLayerTimer: Timer?
-    var delayedWindowLayerTimerGeneration = 0
-    var delayedWindowLayerDeadlineMs: Double?
-    var delayedWindowLayerAppID: String?
     var activeSpaceApplicationActivationSuppression:
         ActiveSpaceApplicationActivationSuppression?
     var windowLayerPresentationDelay: TimeInterval {
@@ -215,7 +213,6 @@ final class SwitcherPanelController {
     {
         initialPanelVisibilityObservationOwner.lastFailure
     }
-    let manualWindowLayerProjectionApplyDelay: TimeInterval = 0.35
     var activeSpaceTransitionWatchdogInterval: TimeInterval {
         activeSpaceTransitionPolicy.topologyReadbackWatchdogInterval
     }
@@ -337,6 +334,8 @@ final class SwitcherPanelController {
             (any ActiveSpaceTransitionObservationScheduling)? = nil,
         terminateInterruptionProtectionScheduler:
             (any TerminateInterruptionProtectionScheduling)? = nil,
+        delayedWindowLayerEntryScheduler:
+            (any DelayedWindowLayerEntryScheduling)? = nil,
         terminateTargetProcessStateReader:
             (any TerminateTargetProcessStateReading)? = nil
     ) {
@@ -365,6 +364,10 @@ final class SwitcherPanelController {
         terminateInterruptionProtectionObservationOwner =
             TerminateInterruptionProtectionObservationOwner(
                 scheduler: terminateInterruptionProtectionScheduler
+            )
+        delayedWindowLayerEntryObservationOwner =
+            DelayedWindowLayerEntryObservationOwner(
+                scheduler: delayedWindowLayerEntryScheduler
             )
         panel = SwitcherOverlayPanel(
             contentRect: NSRect(x: 0, y: 0, width: 880, height: 290),
@@ -414,6 +417,9 @@ final class SwitcherPanelController {
         model.onSearchStateChanged = { [weak self] in
             guard let self else { return }
             self.resetPointerSelectionGate()
+            if self.model.isSearchActive {
+                self.clearDelayedWindowLayerEntryState()
+            }
             guard self.isPanelPresented else { return }
             self.updatePanelSize()
         }
@@ -678,6 +684,19 @@ final class SwitcherPanelController {
 
     func scheduleDelayedWindowLayerEntryForTesting() {
         scheduleDelayedWindowLayerEntryIfNeeded()
+    }
+
+    var delayedWindowLayerEntryGenerationForTesting: Int {
+        delayedWindowLayerEntryObservationOwner.generation
+    }
+
+    var hasPendingDelayedWindowLayerEntryForTesting: Bool {
+        delayedWindowLayerEntryObservationOwner.isObserving
+    }
+
+    var delayedWindowLayerEntryDeadlineForTesting: Double? {
+        delayedWindowLayerEntryObservationOwner
+            .deadlineMilliseconds
     }
 
     var suppressHotkeyReplayUntilReleaseForTesting: Bool {

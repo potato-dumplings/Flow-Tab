@@ -298,7 +298,9 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testDelayedWindowLayerEntryIgnoresStaleTimerGeneration() {
+    func testDelayedWindowLayerEntryReplacesStaleDeadlineGeneration() {
+        let scheduler =
+            ManualDelayedWindowLayerEntryScheduler()
         let currentApp = NSRunningApplication.current
         let appID = "com.flowtab.tests.auto-enter-generation"
         let windows = [
@@ -324,24 +326,36 @@ extension FlowTabPriorityCoverageTests {
             )
         )
         model.previewCaptureOverride = { _, _, _, _ in nil }
-        let controller = SwitcherPanelController(model: model)
+        let controller = SwitcherPanelController(
+            model: model,
+            delayedWindowLayerEntryScheduler: scheduler
+        )
         controller.windowLayerPresentationDelayOverride = 10
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         controller.scheduleDelayedWindowLayerEntryForTesting()
-        let staleGeneration = controller.delayedWindowLayerTimerGeneration
+        let staleGeneration =
+            controller.delayedWindowLayerEntryGenerationForTesting
 
         controller.scheduleDelayedWindowLayerEntryForTesting()
-        let currentGeneration = controller.delayedWindowLayerTimerGeneration
+        let currentGeneration =
+            controller.delayedWindowLayerEntryGenerationForTesting
         XCTAssertGreaterThan(currentGeneration, staleGeneration)
+        XCTAssertEqual(scheduler.pendingCount, 1)
+        XCTAssertEqual(scheduler.scheduledIntervals, [10, 10])
 
-        controller.enterDelayedWindowLayerIfReady(
-            reason: "testing_stale_timer",
-            generation: staleGeneration
+        XCTAssertTrue(
+            scheduler.fireNextDeadline()
         )
 
-        XCTAssertEqual(model.session?.mode, .appCycle)
-        XCTAssertTrue(controller.delayedWindowLayerTimer?.isValid == true)
+        XCTAssertEqual(
+            model.session?.mode,
+            .windowCycle(appID: appID)
+        )
+        XCTAssertFalse(
+            controller.hasPendingDelayedWindowLayerEntryForTesting
+        )
+        XCTAssertEqual(scheduler.pendingCount, 0)
         controller.cancelSelectionForTesting()
     }
 
