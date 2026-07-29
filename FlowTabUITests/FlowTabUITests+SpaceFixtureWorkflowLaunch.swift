@@ -130,17 +130,35 @@ extension FlowTabUITests {
                 }
             )
         {
+            let desktopAnchorWorkflowApp =
+                workflow.apps[desktopAnchorIndex]
             let desktopAnchorApp =
                 launchedApps[desktopAnchorIndex]
             logFullscreenWorkflowSpaceObservations(
                 "workflow.beforeDesktopAnchorActivate",
                 workflow: workflow
             )
-            desktopAnchorApp.activate()
-            _ = desktopAnchorApp.wait(
-                for: .runningForeground,
-                timeout: 5
-            )
+            if let readinessEvidence =
+                readinessSnapshot
+                    .readyEvidenceByWorkflowAppID[
+                        desktopAnchorWorkflowApp.appID
+                    ]
+            {
+                _ = activateSpaceFixtureWorkflowDesktopAnchor(
+                    workflowApp:
+                        desktopAnchorWorkflowApp,
+                    application: desktopAnchorApp,
+                    readinessEvidence:
+                        readinessEvidence
+                )
+            } else {
+                XCTFail(
+                    "Missing desktop-anchor readiness identity for "
+                        + desktopAnchorWorkflowApp.appID
+                        + ": "
+                        + readinessSnapshot.logFields
+                )
+            }
             logFullscreenWorkflowSpaceObservations(
                 "workflow.afterDesktopAnchorActivate",
                 workflow: workflow

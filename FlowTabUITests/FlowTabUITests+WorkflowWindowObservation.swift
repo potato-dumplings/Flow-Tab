@@ -454,7 +454,7 @@ extension FlowTabUITests {
         return topmostOnScreenCGWindow(forPID: runningApp.processIdentifier)
     }
 
-    private func topmostOnScreenCGWindow(forPID pid: pid_t) -> WorkflowCGWindowObservation? {
+    func topmostOnScreenCGWindow(forPID pid: pid_t) -> WorkflowCGWindowObservation? {
         guard let windows = CGWindowListCopyWindowInfo(
             [.optionOnScreenOnly, .excludeDesktopElements],
             kCGNullWindowID

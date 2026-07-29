@@ -372,9 +372,29 @@ extension FlowTabUITests {
             workflow: workflow,
             launchedApps: launchedApps
         )
-        if let desktopAnchorApp = launchedApps.first {
-            desktopAnchorApp.activate()
-            _ = desktopAnchorApp.wait(for: .runningForeground, timeout: 5)
+        if let desktopAnchorWorkflowApp =
+                workflow.apps.first,
+           let desktopAnchorApp = launchedApps.first
+        {
+            guard let readinessEvidence =
+                    readinessSnapshot
+                        .readyEvidenceByWorkflowAppID[
+                            desktopAnchorWorkflowApp.appID
+                        ]
+            else {
+                XCTFail(
+                    "Missing edge desktop-anchor readiness identity for "
+                        + desktopAnchorWorkflowApp.appID
+                        + ": "
+                        + readinessSnapshot.logFields
+                )
+                return launchedApps
+            }
+            _ = activateSpaceFixtureWorkflowDesktopAnchor(
+                workflowApp: desktopAnchorWorkflowApp,
+                application: desktopAnchorApp,
+                readinessEvidence: readinessEvidence
+            )
         }
         return launchedApps
     }
