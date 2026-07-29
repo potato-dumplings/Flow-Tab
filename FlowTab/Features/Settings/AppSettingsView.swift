@@ -4,6 +4,18 @@ import FlowTabCore
 
 struct AppSettingsView: View {
     let isActive: Bool
+    let appVisibilityNavigationAnimationPolicy:
+        SettingsAppVisibilityNavigationAnimationPolicy
+
+    init(
+        isActive: Bool,
+        appVisibilityNavigationAnimationPolicy:
+            SettingsAppVisibilityNavigationAnimationPolicy = .default
+    ) {
+        self.isActive = isActive
+        self.appVisibilityNavigationAnimationPolicy =
+            appVisibilityNavigationAnimationPolicy
+    }
 
     @ObservedObject private var presentation = FlowPresentationState.shared
     @AppStorage(AppPreferenceKeys.showShortcutHint) private var showShortcutHint = true
@@ -50,9 +62,12 @@ struct AppSettingsView: View {
     @State private var hiddenAppCount = AppVisibilityPreferencesStore.loadHiddenAppIDs().count
     @State private var showsAppVisibilityManager = false
 
-    private let appVisibilityNavigationAnimation = Animation.easeInOut(duration: 0.18)
     private let permissionObservationPolicy:
         RuntimePermissionObservationPolicy = .standard
+
+    private var appVisibilityNavigationAnimation: Animation {
+        .easeInOut(duration: appVisibilityNavigationAnimationPolicy.duration)
+    }
 
     private var bundleIdentifier: String {
         Bundle.main.bundleIdentifier ?? "unknown"

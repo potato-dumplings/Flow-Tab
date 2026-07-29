@@ -140,6 +140,8 @@
 		FBD100043D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBD100033D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift */; };
 		FCD100023D29000100B0D737 /* HomeControlPressAnimationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCD100013D29000100B0D737 /* HomeControlPressAnimationPolicy.swift */; };
 		FCD100043D29000100B0D737 /* FlowTabTests+HomeControlPressAnimationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCD100033D29000100B0D737 /* FlowTabTests+HomeControlPressAnimationPolicy.swift */; };
+		FDD100023D2A000100B0D737 /* SettingsAppVisibilityNavigationAnimationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDD100013D2A000100B0D737 /* SettingsAppVisibilityNavigationAnimationPolicy.swift */; };
+		FDD100043D2A000100B0D737 /* FlowTabTests+SettingsAppVisibilityNavigationAnimationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDD100033D2A000100B0D737 /* FlowTabTests+SettingsAppVisibilityNavigationAnimationPolicy.swift */; };
 		D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000022FF500100B0D737 /* RuntimeProjectionService.swift */; };
 		D10000032FF500200B0D737 /* RuntimeProjectionServing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000042FF500200B0D737 /* RuntimeProjectionServing.swift */; };
 		B26010012FE000100B0D737 /* RuntimePerformanceClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */; };
@@ -473,6 +475,8 @@
 		FBD100033D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift"; sourceTree = "<group>"; };
 		FCD100013D29000100B0D737 /* HomeControlPressAnimationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeControlPressAnimationPolicy.swift; sourceTree = "<group>"; };
 		FCD100033D29000100B0D737 /* FlowTabTests+HomeControlPressAnimationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HomeControlPressAnimationPolicy.swift"; sourceTree = "<group>"; };
+		FDD100013D2A000100B0D737 /* SettingsAppVisibilityNavigationAnimationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsAppVisibilityNavigationAnimationPolicy.swift; sourceTree = "<group>"; };
+		FDD100033D2A000100B0D737 /* FlowTabTests+SettingsAppVisibilityNavigationAnimationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SettingsAppVisibilityNavigationAnimationPolicy.swift"; sourceTree = "<group>"; };
 		F6E7E20135C4000100B0D737 /* RuntimeSearchIndexReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSearchIndexReadModel.swift; sourceTree = "<group>"; };
 		F6E7E30135C4000200B0D737 /* RuntimeProjectionReadModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionReadModels.swift; sourceTree = "<group>"; };
 		D10000022FF500100B0D737 /* RuntimeProjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionService.swift; sourceTree = "<group>"; };
@@ -774,6 +778,7 @@
 				FAD100053D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift */,
 				FBD100033D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift */,
 				FCD100033D29000100B0D737 /* FlowTabTests+HomeControlPressAnimationPolicy.swift */,
+				FDD100033D2A000100B0D737 /* FlowTabTests+SettingsAppVisibilityNavigationAnimationPolicy.swift */,
 				A12000013C00000100B0D737 /* FlowTabTests+RuntimeLogDeletion.swift */,
 				B7A7E00135C0000100B0D737 /* FlowTabTests+SettingsAppearanceSelectControls.swift */,
 				C1D900013700000100B0D737 /* FlowTabTests+FlowDropdownPlacement.swift */,
@@ -1114,6 +1119,7 @@
 		F100000A2F74000100B0D737 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				FDD100013D2A000100B0D737 /* SettingsAppVisibilityNavigationAnimationPolicy.swift */,
 				C100001F2F75000100B0D737 /* AppSettingsView.swift */,
 				F0D100033D1E000100B0D737 /* HotkeyRegistrationObservationOwner.swift */,
 				C10000192F75000100B0D737 /* AppKitSettingsPage.swift */,
@@ -1373,6 +1379,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C10000102F75000100B0D737 /* AppDelegate.swift in Sources */,
+				FDD100023D2A000100B0D737 /* SettingsAppVisibilityNavigationAnimationPolicy.swift in Sources */,
 				C100000F2F75000100B0D737 /* AppSettingsView.swift in Sources */,
 				F0D100043D1E000100B0D737 /* HotkeyRegistrationObservationOwner.swift in Sources */,
 				C100000E2F75000100B0D737 /* AppLogsView.swift in Sources */,
@@ -1589,6 +1596,7 @@
 				FAD100063D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift in Sources */,
 				FBD100043D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift in Sources */,
 				FCD100043D29000100B0D737 /* FlowTabTests+HomeControlPressAnimationPolicy.swift in Sources */,
+				FDD100043D2A000100B0D737 /* FlowTabTests+SettingsAppVisibilityNavigationAnimationPolicy.swift in Sources */,
 				A12000113C00000100B0D737 /* FlowTabTests+RuntimeLogDeletion.swift in Sources */,
 				B7A7E00235C0000100B0D737 /* FlowTabTests+SettingsAppearanceSelectControls.swift in Sources */,
 				C1D900023700000100B0D737 /* FlowTabTests+FlowDropdownPlacement.swift in Sources */,

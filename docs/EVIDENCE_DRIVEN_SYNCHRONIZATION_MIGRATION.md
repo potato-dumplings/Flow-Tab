@@ -105,12 +105,12 @@ and Process/Tooling.
 | SYNC-021 | `ActiveSpaceTransitionObservationOwner`, `SwitcherPanelController+ActiveSpaceTransition.swift`; active-Space ignore and activation-suppression windows | 350ms/500ms windows assume which Space notifications belong to FlowTab's own presentation/migration. Evidence migration plus watchdog. | Establish the observation and exact runtime-service baseline before requesting topology refresh. Resolve only after the Space projection generation advances, then correlate current-Space identity, presentation generation, and exact panel visibility. Independent request-return and projection-notification readbacks close synchronous and missed-event races. The presentation session owns replacement, cancellation, activation suppression, and a one-second diagnostic watchdog. | H; Unit, Behavior, cross-Space UI, runtime-topology Pressure. | blocked: implementation, Unit/Behavior, deterministic Pressure, and Process passed; macOS LocalAuthentication blocked cross-Space UI and real-topology Pressure before test start |
 | SYNC-022 | `TerminateInterruptionProtectionObservationOwner`, `SwitcherPanelController+TerminateInterruptionProtection.swift`, `+Hotkeys.swift`, `+InputHandling.swift`; terminate interruption protection | Five-second and 500ms uptime windows inferred that termination, projection refresh, and related AppKit presentation interruptions had finished. Evidence migration plus watchdog. | Establish an exact appID/PID/request-generation and projection baseline before sending the terminate request. Latch target completion only from matching workspace termination or terminated-process readback plus exact projection removal/replacement. Cancel the completion watchdog at that point, then retain an untimed presentation latch until active-Space, panel-visibility, or consumed interruption evidence is followed by a stable visible/active readback. The presentation session owns replacement and cancellation. | H; Unit, Behavior, termination UI, runtime-topology Pressure. | completed |
 | SYNC-023 | `SwitcherPanelController+Hotkeys.swift`, `AppPreferences.swift`; delayed window-layer entry | The user-configured delay is the product contract. A secondary 350ms timer currently probes projection readiness. Domain duration plus evidence migration. | Retain the persisted auto-entry deadline under a named injectable scheduler. Enter only when both the user deadline and matching projection readiness are observed; remove the secondary readiness timer and react to projection generation events. The panel session owns timer cancellation. | H; Unit, Behavior, switcher UI, interaction Pressure. | completed |
-| SYNC-024 | Composite visual-timing baseline | Semantic owner review found five independent animation or degraded-reveal contracts in the baseline row. Migration routing. | Preserve the baseline ID as the parent and close each lifecycle independently through SYNC-024A–SYNC-024E. | M aggregate; child rows define required validation. | planned: split into SYNC-024A–SYNC-024E |
+| SYNC-024 | Composite visual-timing baseline | Semantic owner review found five independent animation or degraded-reveal contracts in the baseline row. Migration routing. | Preserve the baseline ID as the parent and close each lifecycle independently through SYNC-024A–SYNC-024E. | M aggregate; child rows define required validation. | completed: SYNC-024A–SYNC-024E closed independently |
 | SYNC-024A | `TerminatePressFeedbackCompletionOwner`, `SwitcherPanelController.terminateSelectedApp`, `AppTileView`; terminate press feedback | An 80ms task sleep gated the terminate request while the rendered press animation used an unrelated 120ms duration. Domain duration plus scheduler-completion evidence. | Use one named 120ms press-feedback policy for the animation and an injectable completion scheduler. The panel controller owns one generation, cancellable token, request continuation, and late-callback rejection through session cancellation. | M; Unit, Behavior, termination UI, deterministic Pressure. | completed |
 | SYNC-024B | `InitialWindowOnlyPreviewRevealObservationOwner`, `SwitcherPanelController.prepareInitialWindowOnlyPanelReveal`; initial preview reveal | A 250ms task sleep forced a degraded reveal when preview readiness had not arrived. Watchdog migration. | Use preview-batch completion plus pending-capture readback as the success Oracle. The named injectable watchdog performs a final readback and reports the last event plus unmet condition before degraded reveal; the presentation session owns cancellation and generation replacement. | M; Unit, Behavior, in-app switcher UI, deterministic Pressure. | completed |
 | SYNC-024C | `SwitcherAppRemovalAnimationPolicy`, `SwitcherPanelOverlayView`; app-removal transition | A 140ms ease-out duration is a visual-only product contract for app sets up to 16 items. Domain duration. | Retain it as a named Switcher removal-animation policy. SwiftUI app-strip identity owns the animation; exact process termination and projection refresh remain the tile-removal Oracle. | L; Behavior/visual policy assertion, affected switcher UI, Process/Tooling. | completed |
 | SYNC-024D | `HomeControlPressAnimationPolicy`, `FlowPageActionButton`; pressed-button transition | A 120ms ease-out duration is a visual-only Home button contract. Domain duration. | Retain it as a named injectable Home control-animation policy. SwiftUI view identity owns the animation; actions continue directly from input callbacks. | L; Behavior/visual policy assertion, affected Home UI, Process/Tooling. | completed |
-| SYNC-024E | `AppSettingsView`; app-visibility navigation transition | A 180ms ease-in-out duration is a visual-only Settings navigation contract. Domain duration. | Retain it as a named Settings navigation-animation policy. Settings view state owns the transition; destination visibility remains the UI Oracle. | L; Behavior/visual policy assertion, affected Settings UI, Process/Tooling. | verification-needed |
+| SYNC-024E | `SettingsAppVisibilityNavigationAnimationPolicy`, `AppSettingsView`, `AppVisibilityManagerView`; app-visibility navigation transition | A 180ms ease-in-out duration is a visual-only Settings navigation contract. Domain duration. | Retain it as a named injectable Settings navigation-animation policy. Settings view state owns the transition; the manager exposes contained AX children, and destination visibility remains the UI Oracle. | L; Behavior/visual policy assertion, affected Settings UI, Process/Tooling. | completed |
 | SYNC-025 | `SwitcherPanelController+PresentationDiagnostics.swift`; frame-delay probe | A 16ms sleep samples an assumed later display frame for diagnostics only. Domain measurement. | Drive the second probe from an actual display/update callback or explicitly named diagnostic scheduler; it must not affect behavior. The probe task is canceled with the presentation session. | L; Behavior diagnostic assertion, Process/Tooling. | planned |
 | SYNC-026 | `FlowTabSpaceFixture/SpaceFixtureWindowCoordinator.swift`; fullscreen chain, desktop refocus, AX suppression | Fullscreen entry has a completion callback, while 1.2s/1.4s/5s/8s settle delays sequence later fixture state. Evidence migration. | Chain fullscreen/refocus/accessibility publication from window/fullscreen/key/occlusion readbacks and explicit transition acknowledgements. Retain only workflow-configured latency that is itself a fixture scenario. The coordinator owns cancellable scheduled actions/observers. | H fixture topology; Unit, Behavior, real fixture UI, runtime-topology Pressure. | planned |
 | SYNC-027 | `SpaceFixtureAppDelegate`, `SpaceFixtureLaunchConfiguration`; terminate and close delay options | Configured terminate/close latency intentionally creates a slow-process or window-removal scenario. Domain duration. | Retain as named fixture fault policies with injectable scheduler, cancellation, and explicit “scheduled/applied” acknowledgement. App delegate/coordinator own pending work. | M; Unit, Behavior, representative fixture UI. | verification-needed |
@@ -1937,5 +1937,52 @@ polling cadence, deadline, or timeout in the scoped paths.
   staged-content review are recorded before commit. Both new files and the
   touched Home chrome file remain below 400 lines. The startup `prompts.zip`
   remains unchanged and outside the slice.
-- Commit: pending
+- Commit: `a0096673a73927dd02b1959f80b016f965f4a247`
   (`refactor(sync): classify SYNC-024D home press animation`).
+
+### SYNC-024E Closure Record
+
+- Design and Oracle: `SettingsAppVisibilityNavigationAnimationPolicy` names
+  the 180ms ease-in-out duration and is injected into `AppSettingsView`.
+  Manage and back input callbacks synchronously update
+  `showsAppVisibilityManager`; the duration is read only while deriving the
+  opacity animation. `AppVisibilityManagerView` explicitly contains its AX
+  children so its manager and back identities form independently observable
+  evidence. Navigation success is the requested destination's visible state.
+- Retained time policy and lifecycle: 180ms is a visual product contract for
+  the Settings/app-visibility opacity transition. Settings SwiftUI view
+  identity owns and cancels the transition as state or view identity changes.
+  The policy owns no callback, continuation, timer, retry, observer, success
+  result, or delayed state mutation.
+- Unit and Behavior: the focused canonical run passed 2/2 in 0.001 seconds
+  under
+  `.build-local/evidence-driven-sync/SYNC-024E/targeted-attempt-001`.
+  Coverage verifies the named default duration and injected policy propagation
+  into the Settings view.
+- FlowTabCore: not relevant because the animation policy, navigation state,
+  and SwiftUI rendering belong to the app target.
+- UI: the first navigation run under
+  `.build-local/evidence-driven-sync/SYNC-024E/ui-navigation-attempt-001`
+  reached the manager but exposed only its root AX group, so the stable back
+  identity was absent and the action was not attempted. After assigning AX
+  child containment to the manager, the fixed-path Apple Development-signed
+  navigation test passed 1/1 in 14.511 seconds under
+  `.build-local/evidence-driven-sync/SYNC-024E/ui-navigation-attempt-002`.
+  It observed the manager and back identities, clicked back, then observed
+  manager removal and the Settings manage action's return. The existing
+  pinyin-search manager regression also passed 1/1 in 13.510 seconds under
+  `.build-local/evidence-driven-sync/SYNC-024E/ui-manager-regression-attempt-001`,
+  retaining search-field and exact application-row visibility.
+- Pressure: not relevant because this slice adds immutable duration lookup and
+  AX containment during SwiftUI rendering and owns no observer, timer, retry,
+  callback, or repeated asynchronous work.
+- Process/Tooling: the canonical app-test wrapper passed, the fixed app rebuilt
+  and verified its Apple Development signature, and the UI wrapper built all
+  six targets before the final affected-path execution. Project lint,
+  stale-literal scan, source-size checks, `git diff --check`, and exact
+  staged-content review are recorded before commit. New files remain below
+  400 lines. Touched Settings source and UI-test files remain below 800 lines
+  with one Settings-view or Settings-test responsibility each. The startup
+  `prompts.zip` remains unchanged and outside the slice.
+- Commit: pending
+  (`refactor(sync): classify SYNC-024E settings navigation animation`).

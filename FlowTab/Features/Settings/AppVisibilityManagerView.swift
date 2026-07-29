@@ -63,6 +63,7 @@ struct AppVisibilityManagerView: View {
         .onChange(of: model.filter) { _ in
             resolveSelectionAfterVisibleAppsChange()
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("flowtab.settings.app-visibility.manager")
     }
 

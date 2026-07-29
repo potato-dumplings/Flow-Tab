@@ -146,6 +146,39 @@ extension FlowTabUITests {
         assertValue(of: scopeControl, equals: "app")
     }
 
+    func testSettingsAppVisibilityNavigationConvergesFromVisibleState() throws {
+        let app = makeApp(
+            additionalArguments: appVisibilityRuntimeArguments(
+                resetDefaults: true
+            )
+        )
+        launchFlowTabUITestApplication(app)
+        openSettingsTab(in: app)
+
+        let manageButton = element(
+            in: app,
+            identifier: Identifier.settingsAppVisibilityManage
+        )
+        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
+        tapElement(manageButton)
+
+        let manager = element(
+            in: app,
+            identifier: Identifier.settingsAppVisibilityManager
+        )
+        XCTAssertTrue(manager.waitForExistence(timeout: 6))
+
+        let backButton = element(
+            in: app,
+            identifier: Identifier.settingsAppVisibilityBack
+        )
+        XCTAssertTrue(backButton.waitForExistence(timeout: 6))
+        tapElement(backButton)
+
+        XCTAssertTrue(waitForNonExistence(manager, timeout: 6))
+        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
+    }
+
     func testSettingsAppVisibilityHidesMockAppFromSwitcherAndSearch() throws {
         let settingsApp = makeApp(
             additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)
