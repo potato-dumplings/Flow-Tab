@@ -126,9 +126,14 @@ final class SpyCommandTabTakeoverController: CommandTabTakeoverControlling {
 @MainActor
 final class SpyStressRunner: TabSwitchStressRunning {
     private(set) var startCallCount = 0
+    private(set) var stopCallCount = 0
 
     func startIfNeeded() {
         startCallCount += 1
+    }
+
+    func stop() {
+        stopCallCount += 1
     }
 }
 

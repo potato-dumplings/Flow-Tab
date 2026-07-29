@@ -130,7 +130,7 @@ and Process/Tooling.
 | SYNC-030 | Composite TestingSupport fault-injection timing boundary | Semantic owner review separated mock preview-capture latency from initial panel-occlusion staleness. Domain fixture duration routing. | Close preview-capture latency through SYNC-030A and panel-occlusion staleness through SYNC-030B. | M aggregate; child rows define required validation. | completed |
 | SYNC-030A | `FlowTabUITestMockWindowPreviewLatencyOwner`, `FlowTabUITestBootstrapper.installMockWindowPreviewsIfNeeded`; mock preview I/O latency | A blocking thread sleep intentionally delays preview capture, has no cancellation owner, and exposes no TestingSupport completion evidence. Domain fixture duration. | Retain the compatible millisecond launch option as a bounded named latency policy. A TestingSupport generation owner performs a cancellable monotonic deadline wait and publishes exact owner/batch/request/outcome evidence. Preview result identity remains the success Oracle. Bootstrap preparation, replacement, termination, and deinitialization own cancellation. | M asynchronous preview path; Unit, Behavior, affected UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-030B | Initial panel-occlusion stale hook in `FlowTabUITestBootstrapper` | A task sleep intentionally holds stale occlusion state before releasing visibility, while generation equality informally rejects replacement. Domain fixture duration. | Retain the compatible millisecond launch option as a bounded named staleness policy; inject a cancellable scheduler, publish installed/released/cancelled evidence, and make bootstrap preparation, replacement, termination, and deinitialization own cleanup. The panel visibility/recovery state remains the success Oracle. | M presentation lifecycle; Unit, Behavior, affected UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
-| SYNC-031 | `FlowTab/TestingSupport/FlowTabLaunchTesting.swift`; `TabSwitchStressRunner` | Switch cadence and total duration define the pressure workload. Domain duration. | Retain named protocol inputs, use a monotonic injectable clock/scheduler, propagate cancellation, and terminate only after the required workload/duration evidence. Runner task owns cancellation and cleanup. | M hot path; Unit/Behavior for runner, tab-switch Pressure, Process/Tooling. | verification-needed |
+| SYNC-031 | `TabSwitchStressPolicy`, `TabSwitchStressRunner`, `TabSwitchStressEvidenceTransport`; tab-switch stress workload | Switch cadence and total duration define an exact planned pressure workload. The former wall-clock loop allowed slower scheduling to reduce the number of switches and swallowed task cancellation. Domain duration plus exact selection evidence. | Preserve the compatible launch inputs as a bounded named policy and derive `ceil(duration / cadence)` planned selections. Start with an immediate selection, count each planned target only after exact selected-tab readback, and complete after both the monotonic duration and workload evidence are satisfied. The runner owns one generation and cancellable wake; AppDelegate termination owns stop. UI establishes a unique distributed evidence route before launch. | M hot path; Unit/Behavior for runner, affected UI, deterministic and real tab-switch Pressure, Process/Tooling. | completed |
 | SYNC-032 | `FlowTabTests/FlowTabTests+Support.swift`, `FlowTabPriorityCoverageTests+AsyncSupport.swift`; shared async waits | Generic polling is used even where production callbacks, notifications, generations, or task completion are available; cancellation is swallowed. Evidence migration/conditional observation. | Add expectation/notification/task-completion helpers that observe before triggering. Keep one named immediate-check condition observer only for predicates without an event source, with cancellation and last-observation diagnostics. | M; app Unit/Behavior, Process/Tooling. | planned |
 | SYNC-033 | App tests with direct fixed waits: `FlowTabTests+CompactActionButton`, `+EnglishLayout`, `+PreferencesAndDiagnostics`, `FlowTabPriorityCoverageTests+PanelSessionBehavior`, `+RuntimeProjectionNotificationPublication`, `+RuntimeSpaceClassification`, `+SwitcherInteractionRegressions`; simulated latency in `+RuntimeSnapshotPressure` | Raw RunLoop advances and 60/80/250ms sleeps are used for settling or race setup; snapshot pressure sleep represents injected I/O latency. Evidence migration/domain pressure duration. | Replace settling with callbacks/state/generation expectations. Retain simulated latency only as a named injectable workload gate or pressure policy. Each test owns expectation cleanup and watchdog reporting. | M; affected Unit/Behavior and Pressure, Process/Tooling. | planned |
 | SYNC-034 | `FlowTabUITests+Support.swift`, `+WorkflowWindowObservation.swift`, `+SpaceFixtureApp.swift`, `+ScrollingSupport.swift`, `+StatusItem.swift`, and fixture assertion helpers; shared UI condition loops | RunLoop cadence advances drive XCUI/CG/AX/process predicate observation. Conditional observation. | Centralize named UI observation cadence and watchdog diagnostics, check immediately, use `waitForExistence`/predicate expectations where possible, and keep exact CG/AX/window/process readback as the sole Oracle. XCTest case lifetime owns the wait. | H test infrastructure; affected UI suites, Process/Tooling. | planned; SYNC-026C2 pressure attempt 002 captured a repeated Darwin-trigger delivery without a fresh matching acknowledgement |
@@ -2943,5 +2943,72 @@ polling cadence, deadline, or timeout in the scoped paths.
   source-size checks, `git diff --check`, and exact staged-content review are
   recorded before commit. Startup `prompts.zip` remains unchanged and outside
   the slice.
-- Commit: pending
+- Commit: `e6ee592e35033f64b478b0a740e370e992e7a9ab`
   (`refactor(sync): migrate SYNC-030B occlusion staleness`).
+
+### SYNC-031 Closure Record
+
+- Classification and workload contract: the compatible
+  `--flowtab-tab-stress-duration` and
+  `--flowtab-tab-stress-interval-ms` inputs remain domain-duration pressure
+  controls. `TabSwitchStressPolicy` bounds and converts them to monotonic
+  nanoseconds, then derives an exact `ceil(duration / cadence)` selection
+  workload. The first selection is immediate. Every later selection uses the
+  named cadence, while completion requires both the requested duration and the
+  complete planned workload.
+- Owner and evidence: `TabSwitchStressRunner` owns one monotonic run
+  generation, one transition generation, and at most one cancellable scheduler
+  token. Each attempt records the requested target and reads back the exact
+  selected tab. A matching readback advances the planned sequence; a mismatch
+  retains the same target for a later attempt. Completion publishes the policy,
+  attempts, confirmed switches, final requested/observed target, elapsed time,
+  and both terminal conditions before requesting application termination.
+  Explicit stop, AppDelegate termination, owner replacement, and
+  deinitialization cancel the owned wake and reject stale callbacks.
+- Independent Oracle: elapsed time releases cadence/deadline scheduling.
+  Selection success comes from the exact `HomeTabState.selectedTab` readback.
+  UI establishes a unique distributed-notification observer before launching
+  the app, accepts the exact completed evidence, and then requires the process
+  state to become `notRunning`. The stdout evidence route gives the pressure
+  workflow the same exact workload and readback record.
+- Unit and Behavior: the final focused canonical wrapper passed 10/10 with zero
+  failures in 0.020 seconds (0.022 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-031/targeted-attempt-002`.
+  Coverage verifies compatible input normalization, exact workload plus
+  duration completion, immediate first selection, five-second delayed
+  scheduling with the same target sequence and count, mismatched-readback
+  retry, explicit cancellation, stale-generation rejection, synchronous
+  scheduler delivery, deinitialization cleanup, and AppDelegate stop ownership.
+- Expanded Behavior: the complete canonical wrapper passed 1020/1020 with zero
+  failures in 48.257 seconds (48.440 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-031/full-attempt-001`.
+- FlowTabCore: not relevant because this pressure workload is confined to the
+  app TestingSupport boundary and its app/UI test targets.
+- UI: the current Apple Development-signed test app installed successfully.
+  The canonical `testTabSwitchStressCPUAndMemory` execution passed 1/1 with
+  zero failures in 59.702 seconds (59.705 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-031/ui-attempt-001`. Each of its three
+  measured launches established the observer before launch, accepted exactly
+  125/125 readback-confirmed selections for the two-second/16ms policy, and
+  observed exact process termination.
+- Pressure: the deterministic 5,000-selection run preserved the exact cyclic
+  sequence, count, five-second duration, one terminal result, and cancellation
+  of every scheduler token. The 1,000-generation replacement run
+  force-delivered every cancelled wake and allowed only generation 1,001 to
+  complete. The real 20-second/20ms workload completed 1,000/1,000 exact
+  selections in 87.399 seconds with 175 samples under
+  `.build-local/evidence-driven-sync/SYNC-031/tab-switch-pressure-20ms-attempt-001`.
+  The 20-second/50ms comparison completed 400/400 exact selections in 35.279
+  seconds with 71 samples under
+  `.build-local/evidence-driven-sync/SYNC-031/tab-switch-pressure-50ms-attempt-001`.
+  Both recorded zero process/build failures and true duration/workload terminal
+  evidence. The scheduling load changed completion latency while preserving
+  the exact workload result.
+- Process/Tooling: canonical app-test, install, UI, and pressure wrappers built
+  the intended targets. Project-file lint, Swift parse checks, scoped timing
+  review, source-size checks, `git diff --check`, and exact staged-content
+  review are recorded before commit. Every new production and test source
+  remains within the 400-line guardrail; the touched oversized switcher UI test
+  source shrank. Startup `prompts.zip` remains unchanged and outside the slice.
+- Commit: pending
+  (`refactor(sync): migrate SYNC-031 tab stress`).

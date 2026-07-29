@@ -100,6 +100,19 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(hotkeyFactory.records.map(\.signature), [0x46544142, 0x4654574E])
         XCTAssertEqual(hotkeyFactory.records.map(\.forwardHotkeyID), [1, 101])
         XCTAssertEqual(hotkeyFactory.records.map(\.backwardHotkeyID), [2, 102])
+
+        delegate?.applicationWillTerminate(
+            Notification(
+                name:
+                    NSApplication
+                        .willTerminateNotification
+            )
+        )
+        delegate = nil
+        XCTAssertEqual(
+            stressRunner.stopCallCount,
+            1
+        )
     }
 
     @MainActor

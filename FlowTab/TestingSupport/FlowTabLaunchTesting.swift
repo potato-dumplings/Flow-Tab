@@ -1,5 +1,4 @@
 #if FLOWTAB_TESTING
-import AppKit
 import Foundation
 
 enum FlowTabTestLaunchOptions {
@@ -8,6 +7,8 @@ enum FlowTabTestLaunchOptions {
     static let unitTestingBundlePathEnvironmentKey = "XCTestBundlePath"
     static let projectionAcknowledgementRouteArgument =
         "--flowtab-ui-projection-acknowledgement-route"
+    static let tabSwitchStressEvidenceNotificationArgument =
+        "--flowtab-tab-stress-evidence-notification-name"
 
     static var argumentsOverrideForTesting: [String]?
     static var environmentOverrideForTesting: [String: String]?
@@ -236,6 +237,15 @@ enum FlowTabTestLaunchOptions {
         max(1, Double(value(after: "--flowtab-tab-stress-interval-ms") ?? "") ?? 20)
     }
 
+    static var tabSwitchStressEvidenceNotificationName:
+        String?
+    {
+        value(
+            after:
+                tabSwitchStressEvidenceNotificationArgument
+        )
+    }
+
     private static func value(after flag: String) -> String? {
         guard let index = arguments.firstIndex(of: flag) else { return nil }
         let nextIndex = arguments.index(after: index)
@@ -297,44 +307,6 @@ enum FlowTabTestLaunchOptions {
             return false
         default:
             return nil
-        }
-    }
-}
-
-protocol TabSwitchStressRunning: AnyObject {
-    @MainActor func startIfNeeded()
-}
-
-@MainActor
-final class TabSwitchStressRunner: TabSwitchStressRunning {
-    static let shared = TabSwitchStressRunner()
-
-    private var task: Task<Void, Never>?
-
-    private init() {}
-
-    func startIfNeeded() {
-        guard task == nil else { return }
-        guard FlowTabTestLaunchOptions.runsTabSwitchStressTest else { return }
-
-        let sleepNanoseconds = UInt64(
-            FlowTabTestLaunchOptions.tabSwitchStressIntervalMilliseconds * 1_000_000
-        )
-        let endTime = Date().addingTimeInterval(
-            FlowTabTestLaunchOptions.tabSwitchStressDurationSeconds
-        )
-
-        task = Task { @MainActor in
-            defer { self.task = nil }
-
-            let cycle: [HomeTab] = [.home, .logs, .settings]
-            var index = 0
-            while Date() < endTime {
-                HomeTabState.shared.selectedTab = cycle[index % cycle.count]
-                index += 1
-                try? await Task.sleep(nanoseconds: sleepNanoseconds)
-            }
-            NSApp.terminate(nil)
         }
     }
 }

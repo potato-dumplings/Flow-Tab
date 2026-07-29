@@ -707,30 +707,6 @@ extension FlowTabUITests {
         )
     }
 
-    func testTabSwitchStressCPUAndMemory() throws {
-        let options = XCTMeasureOptions()
-        options.iterationCount = 3
-
-        measure(metrics: [XCTClockMetric(), XCTCPUMetric(), XCTMemoryMetric()], options: options) {
-            let app = makeApp(
-                additionalArguments: [
-                    "--flowtab-ui-reset-defaults",
-                    "--flowtab-ui-mock-runtime",
-                    "--flowtab-tab-stress",
-                    "--flowtab-tab-stress-duration",
-                    "2",
-                    "--flowtab-tab-stress-interval-ms",
-                    "16",
-                    "-showPermissionReminder",
-                    "NO"
-                ]
-            )
-            launchFlowTabUITestApplication(app)
-            XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 5))
-            XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
-        }
-    }
-
     private func waitForSwitcherDiagnosticsValue(
         _ diagnosticsSummary: XCUIElement,
         key: String,
