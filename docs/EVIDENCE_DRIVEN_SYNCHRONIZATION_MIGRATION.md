@@ -149,7 +149,7 @@ and Process/Tooling.
 | SYNC-032G2 | `FlowTabPriorityCoverageTests+ManualWindowLayerEntry`; manual window-layer projection readiness | A manual entry test polls first for projection maintenance and then for mode after invoking the explicit projection-update callback. Evidence migration. | Require the exact selected-app maintenance request immediately after input, publish the committed projection, invoke the matching update callback, and verify projection generation, selected windows, mode, and delayed-owner cancellation directly. | M panel lifecycle; affected Behavior, deterministic owner Pressure, Process/Tooling. | completed |
 | SYNC-032H | `waitForLaunchBootstrapSearchAndSeededLogs`; AppDelegate UI-test bootstrap | A helper polls runtime log I/O and panel state together after launch. In suite order, a second exact pair of hotkey-monitor factory records can also arrive before that polling helper returns, while the isolated test remains green. Evidence and lifecycle migration. | Establish initial-presentation, log-change, and launch hotkey-registration evidence before launch; join the exact Search session, requested seeded-log count, and launch registration generation/readback. Identify and cancel or reject any hosted-app state from an earlier test generation. The test owns observations and one diagnostic XCTest timeout. | H hosted launch orchestration; affected Behavior, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-033 | App tests with direct fixed waits; semantic review routing boundary | Raw RunLoop advances and sleeps represented independently owned SwiftUI/AppKit materialization, Settings bridge publication, notification nonblocking, AX background execution, and pressure-workload contracts. Migration routing. | Close each observable lifecycle through SYNC-033A–SYNC-033E. Earlier `PanelSessionBehavior` and `SwitcherInteractionRegressions` waits closed with their SYNC-032 owners. | M aggregate; child rows define required validation. | in progress |
-| SYNC-033A | `FlowTabTests+CompactActionButton`, `FlowTabTests+PreferencesAndDiagnostics`; initial hosted Logs control materialization | Two generic RunLoop condition loops wait for exact AppKit controls to appear below a SwiftUI host. Conditional observation. | Establish a named, cancellable hosted-view condition observation before the layout trigger, check the exact identifier/type readback immediately, and accept only the required control topology. The test scope owns observation cancellation; the XCTest watchdog reports the last hierarchy readback. | L test synchronization; affected Behavior, Process/Tooling. | planned |
+| SYNC-033A | `FlowTabTests+CompactActionButton`, `FlowTabTests+RuntimeLogsHostedControls`; initial hosted Logs control materialization | Two generic RunLoop condition loops wait for exact AppKit controls to appear below a SwiftUI host. Semantic review shows both representables materialize during the explicit host layout pass. | Perform the layout trigger once, then require immediate exact identifier/type hierarchy readback. Keep action-binding, style, and absence-of-native-popup assertions as independent Oracles. No observer or timer is needed when the synchronous readback is complete. | L test synchronization; affected Behavior, Process/Tooling. | completed |
 | SYNC-033B | `FlowTabTests+EnglishLayout`, `FlowTabTests+PreferencesAndDiagnostics`; Settings bridge language, theme, permission, and system-appearance publication | Generic RunLoop condition loops infer that stored/published presentation and permission state reached the hosted AppKit Settings bridge. Evidence migration with conditional view readback where SwiftUI exposes no render-completion callback. | Establish state observation or a named hosted-view condition observation before each trigger, record a context/update baseline, check initial state immediately, and require exact localized text, appearance, permission-title, or system-theme readback. Test scope owns subscriptions and cancellation; XCTest watchdog reports the last state/view evidence. | M Settings behavior; affected Unit/Behavior, Settings UI only if runtime behavior changes, Process/Tooling. | planned |
 | SYNC-033C | `FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication`; background notification publication while MainActor is unavailable | A 500ms blocking wait proves publishers return, then a raw 10ms RunLoop loop assumes cleanup eventually completes. Evidence migration plus watchdog. | Enter all publishers and register DispatchGroup completion before dispatch. Keep a named blocking watchdog solely as the nonblocking failure bound, then wait for exact publisher-return completion through XCTest to release MainActor and clean up. Test scope owns the group expectation and controller lifetime; failure reports completed notification names. | M runtime-notification delivery; affected Behavior, Process/Tooling. | completed |
 | SYNC-033D | `FlowTabPriorityCoverageTests+RuntimeAXBackgroundResolution`; background remote AX resolution | A 250ms main-thread sleep is treated as proof that remote AX resolution can proceed without MainActor availability. Evidence migration plus watchdog. | Establish worker-start, resolver-invoked, and fetch-completed evidence before dispatch. Block MainActor only on a named resolver-invocation watchdog, then require exact off-main-thread readback and terminal worker completion. Test scope owns semaphores and override cleanup. | M AX runtime behavior; affected Behavior, runtime-topology Pressure, Process/Tooling. | completed |
@@ -3741,5 +3741,37 @@ polling cadence, deadline, or timeout in the scoped paths.
   217 lines with one pressure-workload responsibility. Final
   `git diff --check` and exact staged-content review are recorded before commit.
   Startup `prompts.zip` remains unchanged and outside the slice.
-- Commit: pending
+- Commit: `c76b13c9c24f515fe7be223cfbdb835d38bc54c5`
   (`test(sync): migrate SYNC-033E AX collection pressure`).
+
+### SYNC-033A Closure Record
+
+- Design and Oracle: both hosted Logs control tests now perform one explicit
+  layout pass and immediately require the exact AppKit control type and
+  accessibility identifier from the resulting hierarchy. The action-button
+  test independently verifies localized titles, metrics, font, and
+  appearance-derived style. The dropdown test independently verifies the
+  bound log-level update, selected identifier, and absence of a native
+  `NSPopUpButton`. The scoped paths retain no duration, observer, timer,
+  retry, polling cadence, or timeout.
+- Behavior targeted: 2/2 passed in 0.020/0.021 seconds through the canonical
+  FlowTabTests runner at
+  `.build-local/evidence-driven-sync/SYNC-033A/targeted-attempt-001`.
+- Pressure: 100 repeated iterations of each path, 200/200 total, passed in
+  1.956/1.987 seconds at
+  `.build-local/evidence-driven-sync/SYNC-033A/pressure-attempt-001`.
+- Behavior full: 1023/1023 passed in 49.004/49.157 seconds at
+  `.build-local/evidence-driven-sync/SYNC-033A/full-attempt-001`.
+- Process/Tooling: changed Swift files parse, the Xcode project plist is
+  valid, changed-file compiler diagnostics contain no warnings, scoped
+  literal search confirms the removed waits do not remain, and source-file
+  sizes are 142 lines for `FlowTabTests+CompactActionButton`, 83 lines for
+  `FlowTabTests+RuntimeLogsHostedControls`, and 1639 lines for the pre-existing
+  oversized `FlowTabTests+PreferencesAndDiagnostics` after extracting the
+  migrated test. Final `git diff --check` and exact staged-content review are
+  recorded before commit. Startup `prompts.zip` remains unchanged and outside
+  the slice.
+- Unit, UI, and FlowTabCore: not relevant because this slice changes only
+  app-test synchronization around existing hosted controls.
+- Commit: pending
+  (`test(sync): migrate SYNC-033A hosted Logs controls`).

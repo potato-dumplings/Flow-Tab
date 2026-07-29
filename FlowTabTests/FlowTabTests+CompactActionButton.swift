@@ -61,25 +61,19 @@ extension FlowTabTests {
         hostedView.frame = NSRect(x: 0, y: 0, width: 620, height: 620)
         hostedView.layoutSubtreeIfNeeded()
 
-        var openDirectoryButton: FlowCompactActionButtonControl?
-        var clearLogsButton: FlowCompactActionButtonControl?
-        XCTAssertTrue(
-            waitForCompactActionButtonCondition(timeout: 1.0) {
-                hostedView.layoutSubtreeIfNeeded()
-                openDirectoryButton = compactActionButton(
-                    in: hostedView,
-                    identifier: "flowtab.logs.open-directory"
-                )
-                clearLogsButton = compactActionButton(
-                    in: hostedView,
-                    identifier: "flowtab.logs.clear"
-                )
-                return openDirectoryButton != nil && clearLogsButton != nil
-            }
+        let openButton = try XCTUnwrap(
+            compactActionButton(
+                in: hostedView,
+                identifier: "flowtab.logs.open-directory"
+            )
+        )
+        let clearButton = try XCTUnwrap(
+            compactActionButton(
+                in: hostedView,
+                identifier: "flowtab.logs.clear"
+            )
         )
 
-        let openButton = try XCTUnwrap(openDirectoryButton)
-        let clearButton = try XCTUnwrap(clearLogsButton)
         XCTAssertEqual(openButton.attributedTitle.string, "Open Directory")
         XCTAssertEqual(clearButton.attributedTitle.string, "Clear Logs")
         XCTAssertEqual(openButton.presentationForTesting.metrics.height, 32)
@@ -107,20 +101,6 @@ extension FlowTabTests {
             }
         }
         return nil
-    }
-
-    private func waitForCompactActionButtonCondition(
-        timeout: TimeInterval,
-        condition: () -> Bool
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if condition() {
-                return true
-            }
-            _ = RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.02))
-        } while Date() < deadline
-        return condition()
     }
 
     private func assertCompactActionButtonStyle(
