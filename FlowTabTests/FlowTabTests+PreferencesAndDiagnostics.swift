@@ -611,34 +611,6 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testSystemThemeStateMatchesCurrentSystemAppearanceWhenAppDefaultsContainAppleInterfaceStyle() {
-        let systemAppearanceKey = "AppleInterfaceStyle"
-        let previousAppearance = NSApp.appearance
-        let previousAppAppearanceRaw = currentAppScopedDefaultString(forKey: systemAppearanceKey)
-        NSApp.appearance = nil
-        SystemThemeState.shared.refreshColorScheme()
-        let expectedSystemColorScheme = SystemThemeState.colorScheme(for: NSApp.effectiveAppearance)
-        let appScopedContamination = expectedSystemColorScheme == .dark ? "Light" : "Dark"
-        UserDefaults.standard.set(appScopedContamination, forKey: systemAppearanceKey)
-        postSystemAppearanceChangedNotification()
-        defer {
-            NSApp.appearance = previousAppearance
-            restoreUserDefaultsValue(previousAppAppearanceRaw, forKey: systemAppearanceKey)
-            postSystemAppearanceChangedNotification()
-        }
-
-        let state = SystemThemeState.shared
-
-        XCTAssertTrue(
-            waitForRunLoopCondition(timeout: 1.0) {
-                state.colorScheme == expectedSystemColorScheme
-                    && SystemThemeState.colorScheme(for: NSApp.effectiveAppearance) == expectedSystemColorScheme
-            },
-            "Follow-system theme should match the current system appearance, not app-scoped AppleInterfaceStyle defaults."
-        )
-    }
-
-    @MainActor
     func testFlowPresentationStateInitializesWithNormalizedWritebackWithoutLanguageNotification() {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
         defer { clearIsolatedUserDefaults(userDefaults) }
@@ -1577,20 +1549,6 @@ extension FlowTabTests {
         } else {
             UserDefaults.standard.removeObject(forKey: key)
         }
-    }
-
-    private func currentAppScopedDefaultString(forKey key: String) -> String? {
-        guard let domainName = Bundle.main.bundleIdentifier else { return nil }
-        return UserDefaults.standard.persistentDomain(forName: domainName)?[key] as? String
-    }
-
-    private func postSystemAppearanceChangedNotification() {
-        DistributedNotificationCenter.default().postNotificationName(
-            Notification.Name("AppleInterfaceThemeChangedNotification"),
-            object: nil,
-            userInfo: nil,
-            deliverImmediately: true
-        )
     }
 
     private func settingsCardBackgroundIsDark(in view: NSView) -> Bool {

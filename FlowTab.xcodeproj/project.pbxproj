@@ -237,6 +237,7 @@
 		B10011012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */; };
 		B10011022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift */; };
 		B10011032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift */; };
+		9D6F70B3709646D09744E552 /* FlowTabTests+SystemThemeReadback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 125C23FC5F5849C4B80EC194 /* FlowTabTests+SystemThemeReadback.swift */; };
 		A12000113C00000100B0D737 /* FlowTabTests+RuntimeLogDeletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12000013C00000100B0D737 /* FlowTabTests+RuntimeLogDeletion.swift */; };
 		B7A7E00235C0000100B0D737 /* FlowTabTests+SettingsAppearanceSelectControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A7E00135C0000100B0D737 /* FlowTabTests+SettingsAppearanceSelectControls.swift */; };
 		C1D900023700000100B0D737 /* FlowTabTests+FlowDropdownPlacement.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D900013700000100B0D737 /* FlowTabTests+FlowDropdownPlacement.swift */; };
@@ -590,6 +591,7 @@
 		B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+CoreConfiguration.swift"; sourceTree = "<group>"; };
 		B10001022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimeInteraction.swift"; sourceTree = "<group>"; };
 		B10001032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+PreferencesAndDiagnostics.swift"; sourceTree = "<group>"; };
+		125C23FC5F5849C4B80EC194 /* FlowTabTests+SystemThemeReadback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SystemThemeReadback.swift"; sourceTree = "<group>"; };
 		A12000013C00000100B0D737 /* FlowTabTests+RuntimeLogDeletion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimeLogDeletion.swift"; sourceTree = "<group>"; };
 		B7A7E00135C0000100B0D737 /* FlowTabTests+SettingsAppearanceSelectControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SettingsAppearanceSelectControls.swift"; sourceTree = "<group>"; };
 		C1D900013700000100B0D737 /* FlowTabTests+FlowDropdownPlacement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+FlowDropdownPlacement.swift"; sourceTree = "<group>"; };
@@ -930,6 +932,7 @@
 				B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */,
 				B10001022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift */,
 				B10001032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift */,
+				125C23FC5F5849C4B80EC194 /* FlowTabTests+SystemThemeReadback.swift */,
 				F0D100053D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift */,
 				F1D100053D1F000100B0D737 /* FlowTabTests+ModifierReleaseObservation.swift */,
 				F2D100033D20000100B0D737 /* FlowTabTests+HotkeyInputEvidence.swift */,
@@ -1839,6 +1842,7 @@
 				B10011012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift in Sources */,
 				B10011022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift in Sources */,
 				B10011032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift in Sources */,
+				9D6F70B3709646D09744E552 /* FlowTabTests+SystemThemeReadback.swift in Sources */,
 				F0D100063D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift in Sources */,
 				F1D100063D1F000100B0D737 /* FlowTabTests+ModifierReleaseObservation.swift in Sources */,
 				F2D100043D20000100B0D737 /* FlowTabTests+HotkeyInputEvidence.swift in Sources */,
