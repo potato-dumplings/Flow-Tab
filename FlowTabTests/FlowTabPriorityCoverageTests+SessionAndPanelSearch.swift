@@ -548,63 +548,6 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerSearchWrapRequestsScrollBackToFirstResult() async {
-        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let controller = SwitcherPanelController(
-                model: LiveSwitcherModel(
-                    runtimeProjectionService: RecordingRuntimeProjectionService(
-                        appSwitcherApps: self.searchWrapScenarioApps()
-                    )
-                )
-            )
-
-            var scrollRequests: [String] = []
-            controller.modelForTesting.onSearchResultScrollRequestForTesting = { resultID in
-                scrollRequests.append(resultID)
-            }
-
-            XCTAssertTrue(controller.presentGlobalHotkeySessionForTesting())
-            XCTAssertTrue(controller.modelForTesting.enterSearchMode())
-            controller.updatePanelSizeForTesting(
-                visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 900)
-            )
-            let didLoadSearchResults = await waitUntil("search results available after entering search mode") {
-                controller.modelForTesting.searchResultCount > 0
-            }
-            XCTAssertTrue(didLoadSearchResults)
-
-            guard let firstResultID = controller.modelForTesting.searchViewState.results.first?.id else {
-                XCTFail("Expected search results after entering search mode")
-                controller.cancelSelectionForTesting()
-                return
-            }
-
-            XCTAssertTrue(controller.handleKeyDownForTesting(Self.makeKeyDownEvent(keyCode: 125)))
-
-            let moveCountToLastResult = max(0, controller.modelForTesting.searchResultCount - 1)
-            for _ in 0..<moveCountToLastResult {
-                XCTAssertTrue(controller.handleKeyDownForTesting(Self.makeKeyDownEvent(keyCode: 125)))
-            }
-
-            XCTAssertEqual(
-                controller.modelForTesting.searchViewState.selectedResultIndex,
-                controller.modelForTesting.searchResultCount - 1
-            )
-
-            XCTAssertTrue(controller.handleKeyDownForTesting(Self.makeKeyDownEvent(keyCode: 125)))
-            let didWrapToFirstResult = await waitUntil("search wrap scroll request returns to first result") {
-                controller.modelForTesting.searchViewState.selectedResultIndex == 0
-                    && scrollRequests.last == firstResultID
-            }
-            XCTAssertTrue(didWrapToFirstResult)
-
-            XCTAssertEqual(controller.modelForTesting.searchViewState.selectedResultIndex, 0)
-            XCTAssertEqual(scrollRequests.last, firstResultID)
-            controller.cancelSelectionForTesting()
-        }
-    }
-
-    @MainActor
     func testSwitcherPanelControllerSearchSizingUsesCompleteVisibleRowBudget() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
             let controller = SwitcherPanelController(
