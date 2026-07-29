@@ -25,6 +25,10 @@ final class SpaceFixtureApplicationAXSuppressionOwner {
         let expectedProjectionWindowCount: Int
         let expectedPublishedAXWindowCount: Int
         let suppress: @MainActor () -> Void
+        let onResolved:
+            @MainActor (
+                SpaceFixtureApplicationAXExposure
+            ) -> Void
         var localTopologyStageReached = false
         var suppressionRequested = false
         var lastAcknowledgement: SpaceFixtureProjectionAcknowledgement?
@@ -87,7 +91,11 @@ final class SpaceFixtureApplicationAXSuppressionOwner {
         identity: SpaceFixtureApplicationIdentity,
         expectedProjectionWindowCount: Int,
         expectedPublishedAXWindowCount: Int,
-        suppress: @escaping @MainActor () -> Void
+        suppress: @escaping @MainActor () -> Void,
+        onResolved:
+            @escaping @MainActor (
+                SpaceFixtureApplicationAXExposure
+            ) -> Void = { _ in }
     ) -> Int {
         precondition(!identity.bundleIdentifier.isEmpty)
         precondition(identity.processIdentifier > 0)
@@ -105,7 +113,8 @@ final class SpaceFixtureApplicationAXSuppressionOwner {
             expectedProjectionWindowCount:
                 expectedProjectionWindowCount,
             expectedPublishedAXWindowCount: expectedPublishedAXWindowCount,
-            suppress: suppress
+            suppress: suppress,
+            onResolved: onResolved
         )
         if let route {
             let token = acknowledgementObservationInstaller(
@@ -329,6 +338,7 @@ final class SpaceFixtureApplicationAXSuppressionOwner {
     ) {
         cancelActive()
         suppressionGeneration &+= 1
+        current.onResolved(exposure)
         guard let route = current.route,
               let acknowledgement =
                 current.matchingAcknowledgement

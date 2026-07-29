@@ -14,6 +14,8 @@ extension FlowTabTests {
         var events: [String] = []
         var completions:
             [SpaceFixtureApplicationAXSuppressionCompletion] = []
+        var resolvedExposures:
+            [SpaceFixtureApplicationAXExposure] = []
         observation.onInstall = { handler in
             events.append("observer")
             handler(
@@ -56,6 +58,9 @@ extension FlowTabTests {
             suppress: {
                 events.append("suppress")
                 exposure.set(windowCount: 0)
+            },
+            onResolved: {
+                resolvedExposures.append($0)
             }
         )
 
@@ -82,6 +87,15 @@ extension FlowTabTests {
         XCTAssertEqual(
             completions.map(\.suppressionGeneration),
             [1]
+        )
+        XCTAssertEqual(
+            resolvedExposures,
+            [
+                SpaceFixtureApplicationAXExposure(
+                    childWindowCount: 0,
+                    windowsAttributeCount: 0
+                )
+            ]
         )
         XCTAssertFalse(owner.isObserving)
         XCTAssertTrue(

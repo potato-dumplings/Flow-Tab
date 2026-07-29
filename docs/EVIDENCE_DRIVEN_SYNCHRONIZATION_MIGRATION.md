@@ -121,7 +121,9 @@ and Process/Tooling.
 | SYNC-027 | Composite fixture fault-latency baseline | Semantic owner review found two independent fault-injection contracts: delayed process termination and delayed exact-window close. Domain duration routing record. | Preserve the CLI compatibility boundary and route implementation, lifecycle, evidence, and validation through SYNC-027A and SYNC-027B. | M; child-slice validation. | completed: SYNC-027A and SYNC-027B closed independently |
 | SYNC-027A | `SpaceFixtureAppDelegate`, `SpaceFixtureLaunchConfiguration`, `SpaceFixtureTerminationFaultOwner`; delayed process termination | `--terminate-delay-ms` intentionally keeps the fixture process alive after an application or SIGTERM request. The raw `asyncAfter` work had no cancellation owner and exposed no scheduled/applied evidence. Domain duration. | Retain the positive delay as `SpaceFixtureTerminationFaultPolicy`. A single AppDelegate-owned generation schedules through the injectable fixture scheduler, preserves the first request across duplicate sources, publishes exact scheduled/applied evidence with bundle ID and PID, and cancels the task and signal source at app termination. The optional notification route preserves existing launch configurations while enabling an observer to be established before the termination request. | M repeated async work; Unit, Behavior, representative termination UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-027B | `SpaceFixtureWindowCloseFaultOwner`, `SpaceFixtureWindowCoordinator`, `SpaceFixtureLaunchConfiguration`; delayed exact-window close | `--close-window-delay-ms` intentionally delays fixture window removal, while the former coordinator token exposed no scheduled/applied acknowledgement and fixture launch time could race the consumer's initial topology observation. Domain duration plus evidence-driven orchestration. | Retain the named fault duration behind an exact generation, bundle/PID, plan-index, and stable-window-number contract. Install the optional trigger observer before the initial readback and scheduled evidence; begin the delay from a matching trigger, then resolve only from AppKit visibility, exact CG-window, and coordinator-topology readback. Use an immediate first readback, named cancellable 50ms retry where WindowServer exposes no close-completion event, and a diagnostic 10s watchdog. The coordinator-owned fault owner cancels every observer and token. | M repeated async work; Unit, Behavior, representative window-removal UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
-| SYNC-028 | `SpaceFixtureWindowContentView`, `SpaceFixtureWindowCoordinator`; workflow readiness labels | “Ready” is published before asynchronous fullscreen/refocus/close topology transitions complete, forcing UI settle waits. Evidence migration. | Publish a monotonic fixture transition generation/stage only after exact planned windows and requested fullscreen/key/AX exposure states are read back. UI observers establish a baseline before launch/action and wait for a later matching stage. | H; Unit, Behavior, all affected real fixture UI, runtime-topology Pressure. | planned |
+| SYNC-028 | Composite fixture workflow-readiness baseline | Semantic owner review separated per-process fixture readiness from multi-application launch aggregation and desktop-anchor orchestration. Migration routing. | Close coordinator-owned process readiness through SYNC-028A, then replace global multi-application settling through SYNC-028B. | H aggregate; child rows define required validation. | in progress: SYNC-028A completed; SYNC-028B planned |
+| SYNC-028A | `SpaceFixtureWorkflowReadinessOwner`, `SpaceFixtureWindowCoordinator`, `SpaceFixtureWindowContentView`, `launchSpaceFixtureWorkflow`; one fixture process readiness | The visible “Ready” state and shared single-process UI launcher previously advanced before fullscreen and desktop-refocus completion, then used a fixed settle duration to infer usable topology. Evidence migration. | Start a coordinator-owned readiness generation before window publication and emit exact configured, planned-window, fullscreen-completion, desktop-presentation, application-AX-exposure, and terminal-ready evidence. Update the visible state only from terminal evidence. The UI installs a unique observer before launch, captures the configured baseline, and accepts the later ready stage only for the same generation, bundle ID, PID, window plan, and fullscreen plan. Coordinator and XCTest-case lifecycles own cancellation and observer cleanup. | H fixture topology; Unit, Behavior, representative real fullscreen UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
+| SYNC-028B | `launchResolvedSpaceFixtureWorkflow`, `launchResolvedEdgeInputsWorkflow`; multi-application workflow aggregation and desktop anchor | A workflow-wide `settleTimeout` and fixed RunLoop advancement currently infer when independently launched fixture processes and their Space topology are ready for the final desktop-anchor activation. Evidence migration. | Install per-process readiness observers before each launch, aggregate exact later generations for the configured app identities and window plans, and establish desktop-anchor success from exact foreground/Space readback. The workflow invocation owns all observations and cancellation; a shared diagnostic watchdog reports every unmet app or anchor condition. | H multi-process fixture topology; Behavior, affected multi-application UI, runtime-topology Pressure, Process/Tooling. | planned |
 | SYNC-029 | `FlowTab/TestingSupport/FlowTabUITestBootstrapper.swift`; `presentInitialUIIfNeeded` | Twenty 150ms retries and two equal snapshots infer runtime projection stability before opening Search/switcher. Evidence migration. | Observe runtime projection commit notifications before bootstrap, capture baseline generation, perform initial readback, and open from a matching complete later generation. A shared UI-test watchdog reports the last session/projection signature. Bootstrapper owns observer/task cleanup. | H test orchestration; Behavior, UI, runtime-topology/Search Pressure. | planned |
 | SYNC-030 | `FlowTabUITestBootstrapper.installMockWindowPreviewsIfNeeded`, initial stale occlusion hook | Thread sleep and millisecond launch options intentionally inject preview latency or stale visibility. Domain fixture duration. | Retain as named fault-injection policies, preferably backed by controllable gates/acknowledgements; ensure cancellation and completion markers are owned by TestingSupport and UI tests wait on the resulting Oracle. | M; Behavior, affected UI, Pressure when used. | verification-needed |
 | SYNC-031 | `FlowTab/TestingSupport/FlowTabLaunchTesting.swift`; `TabSwitchStressRunner` | Switch cadence and total duration define the pressure workload. Domain duration. | Retain named protocol inputs, use a monotonic injectable clock/scheduler, propagate cancellation, and terminate only after the required workload/duration evidence. Runner task owns cancellation and cleanup. | M hot path; Unit/Behavior for runner, tab-switch Pressure, Process/Tooling. | verification-needed |
@@ -2425,5 +2427,78 @@ polling cadence, deadline, or timeout in the scoped paths.
   400 lines. The obsolete coordinator token and scheduling symbol are absent.
   `git diff --check` and exact staged-content review are recorded before commit.
   Startup `prompts.zip` remains unchanged and outside the slice.
-- Commit: pending
+- Commit: `80254968b03675f233928159d55e03c80e98e2d1`
   (`refactor(sync): migrate SYNC-027B window close fault`).
+
+### SYNC-028A Closure Record
+
+- Design and Oracle: `SpaceFixtureWindowCoordinator` starts one
+  `SpaceFixtureWorkflowReadinessOwner` generation before showing any window.
+  The owner publishes a configured baseline followed by evidence for the exact
+  planned-window indices, ordered fullscreen completion, exact desktop-anchor
+  presentation, and exact zero application-AX exposure when suppression is
+  configured. It publishes terminal ready evidence only when every configured
+  condition is satisfied, then updates the visible workflow label and summary.
+  The shared single-process UI launcher installs a unique distributed observer
+  before fixture launch, captures the configured generation, and accepts only a
+  later ready stage with the same bundle ID, PID, exact window plan, and exact
+  fullscreen plan. The independent UI Oracle also matches that PID to the
+  running application and reads back the visible Ready label, workflow summary,
+  fullscreen marker, and FlowTab's three exact window titles.
+- Lifecycle: the window coordinator owns readiness replacement, cancellation,
+  and application-lifetime cleanup together with the fullscreen, desktop, and
+  AX evidence producers. One application identity snapshot supplies readiness,
+  AX suppression, and window-fault evidence for the launch. Generations reject
+  canceled, replaced, duplicate, out-of-order, and stale transitions.
+  `SpaceFixtureWorkflowReadinessObservationOwner` owns the distributed token;
+  the XCTest invocation starts it before launch and removes it on every exit.
+  The readiness owner clears its completed generation before publishing the
+  terminal callback, preserving a synchronously installed replacement.
+- Retained time policy: the configured pre-fullscreen delay remains the fixture
+  staging contract classified by SYNC-026A and is driven by the fixture
+  scheduler. Readiness itself introduces no sleep, retry, timer, or polling
+  cadence. `SpaceFixtureWorkflowReadinessUITestPolicy` supplies a named 20-second
+  terminal bound, extended only by an explicitly configured fullscreen staging
+  duration. Success comes exclusively from exact evidence and visible
+  readback. A failure reports all observed stages, their unmet conditions,
+  identity and generations; the final visible-state watchdog also reports its
+  last label and terminal evidence.
+- Unit and Behavior: the final focused canonical run rebuilt all six targets and
+  passed 17/17 with zero failures in 0.029 seconds under
+  `.build-local/evidence-driven-sync/SYNC-028A/targeted-attempt-009`.
+  Coverage verifies strict transport parsing, malformed ready rejection, every
+  exact topology prerequisite, initially satisfied no-fullscreen and route-less
+  AX paths, ordered multi-fullscreen and desktop-refocus integration, routed AX
+  completion, duplicate and out-of-order rejection, cancellation, replacement,
+  stale generation rejection, synchronous publication reentrancy, launch-route
+  compatibility, and one shared application identity snapshot.
+- Full FlowTabTests: the canonical wrapper rebuilt all six targets and passed
+  986/986 with zero failures in 58.560 seconds under
+  `.build-local/evidence-driven-sync/SYNC-028A/full-attempt-001`.
+- FlowTabCore: not relevant because this contract belongs to the standalone
+  fixture, app-test transport, and UI orchestration boundaries and adds no core
+  domain API.
+- Pressure: the deterministic 500-generation lifecycle workload replaced every
+  prior owner, delivered every stale generation, completed only the final
+  generation once, and left no active observation. The focused state-machine
+  test also delivered prerequisites late and out of order; changed delivery
+  timing altered completion latency while preserving the terminal result.
+- UI: the install wrapper rebuilt and verified the signed UI application. The
+  final UI wrapper then rebuilt the current fixture and runner and passed
+  `testHomePageShowsRealSpaceFixtureWorkflowWindows` 1/1 with zero failures in
+  21.570 seconds under
+  `.build-local/evidence-driven-sync/SYNC-028A/ui-attempt-002`. The observer was
+  installed before launch. With a configured five-second fullscreen staging
+  delay, the fixture completed exact fullscreen and desktop-refocus evidence,
+  published the matching Ready generation, and FlowTab independently exposed
+  all three planned windows.
+- Process/Tooling: `swiftc -parse` passed for every touched Swift source,
+  `plutil -lint` passed for the Xcode project, and canonical wrappers compiled
+  the fixture, app-test, and UI-test sources in their intended targets. The new
+  readiness owner and UI observer remain below 400 lines; the evidence
+  transport and focused test source remain between 400 and 800 lines with one
+  clear responsibility. Touched shared sources remain below 800 lines.
+  `git diff --check` and exact staged-content review are recorded before
+  commit. Startup `prompts.zip` remains unchanged and outside the slice.
+- Commit: pending
+  (`refactor(sync): migrate SYNC-028A fixture readiness`).

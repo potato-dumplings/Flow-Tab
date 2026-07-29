@@ -32,6 +32,7 @@ extension FlowTabTests {
                     exposure: exposure
                 )
         var publishedAccessibilityElements: [[String]] = []
+        var identityProviderCallCount = 0
         let coordinator = SpaceFixtureWindowCoordinator(
             configuration: configuration,
             visibleFrameProvider: {
@@ -58,18 +59,32 @@ extension FlowTabTests {
             applicationAXSuppressionOwner:
                 suppressionOwner,
             applicationIdentityProvider: {
-                SpaceFixtureApplicationAXSuppressionTestSupport
+                identityProviderCallCount += 1
+                return SpaceFixtureApplicationAXSuppressionTestSupport
                     .identity
             }
         )
 
         coordinator.launch()
 
+        XCTAssertEqual(identityProviderCallCount, 1)
         XCTAssertEqual(windowSpies.count, 2)
         XCTAssertEqual(scheduler.scheduledDelays, [])
         XCTAssertEqual(
             publishedAccessibilityElements,
             [["ax-element-1", "ax-element-2"], []]
+        )
+        XCTAssertEqual(
+            windowSpies.map(\.workflowReadyCalls),
+            [
+                [["Fixture 1", "Fixture 2"]],
+                [["Fixture 1", "Fixture 2"]]
+            ]
+        )
+        XCTAssertEqual(
+            coordinator.lastWorkflowReadinessEvidence?
+                .stage,
+            .ready
         )
         XCTAssertTrue(
             suppressionScheduler.token(at: 0).isCancelled
@@ -159,6 +174,11 @@ extension FlowTabTests {
             ]
         )
         XCTAssertTrue(completionProbe.completions.isEmpty)
+        XCTAssertTrue(
+            windowSpies.allSatisfy {
+                $0.workflowReadyCalls.isEmpty
+            }
+        )
 
         windowSpies[0].desktopPresentationProbe.snapshot =
             SpaceFixtureDesktopPresentationProbe
@@ -177,6 +197,13 @@ extension FlowTabTests {
             ]
         )
         XCTAssertEqual(completionProbe.completions.count, 1)
+        XCTAssertEqual(
+            windowSpies.map(\.workflowReadyCalls),
+            [
+                [["Fixture 1", "Fixture 2"]],
+                [["Fixture 1", "Fixture 2"]]
+            ]
+        )
         XCTAssertNil(
             coordinator
                 .lastApplicationAXSuppressionWatchdogFailure

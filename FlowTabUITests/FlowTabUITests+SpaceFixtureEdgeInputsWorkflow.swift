@@ -338,11 +338,10 @@ extension FlowTabUITests {
                 "--workflow-app-id", workflowApp.appID
             ]
             launchSpaceFixtureApplicationAndWaitForForeground(app)
-            waitForSpaceFixtureWorkflowToStabilize(
+            waitForSpaceFixtureWorkflowMetadata(
                 in: app,
                 expectedWindowTitles: workflowApp.expectedWindowTitles,
-                fullscreenWindowIndex: nil,
-                settleTimeout: 0
+                fullscreenWindowIndex: nil
             )
             launchedApps.append(app)
         }

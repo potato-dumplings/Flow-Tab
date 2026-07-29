@@ -109,6 +109,11 @@ extension FlowTabTests {
             [["ax-element-1", "ax-element-2", "ax-element-3"]]
         )
         XCTAssertEqual(activationCallCount, 1)
+        XCTAssertTrue(
+            windowSpies.allSatisfy {
+                $0.workflowReadyCalls.isEmpty
+            }
+        )
 
         XCTAssertTrue(scheduler.fire(at: 0))
 
@@ -173,6 +178,19 @@ extension FlowTabTests {
             ]
         )
         XCTAssertEqual(completionProbe.completions.count, 1)
+        XCTAssertEqual(
+            windowSpies.map(\.workflowReadyCalls),
+            Array(
+                repeating: [
+                    [
+                        "Normal Tab",
+                        "Fullscreen Tab",
+                        "Second Fullscreen Tab"
+                    ]
+                ],
+                count: 3
+            )
+        )
         XCTAssertTrue(
             suppressionScheduler.token(at: 0).isCancelled
         )

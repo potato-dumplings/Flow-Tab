@@ -59,11 +59,13 @@ extension FlowTabUITests {
         }
 
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
-        waitForSpaceFixtureWorkflowToStabilize(
+        waitForSpaceFixtureWorkflowReadiness(
             in: app,
             expectedWindowTitles: ["Docs", "Mail"],
             fullscreenWindowIndex: nil,
-            settleTimeout: 1
+            readinessTimeout:
+                SpaceFixtureWorkflowReadinessUITestPolicy
+                    .defaultWatchdog
         )
 
         let firstWindowTitle = element(in: app, identifier: "flowtab.spacefixture.window.title.1")

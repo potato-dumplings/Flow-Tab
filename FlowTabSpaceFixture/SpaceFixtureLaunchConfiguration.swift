@@ -64,6 +64,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         SpaceFixtureWindowCloseFaultEvidenceRoute?
     let windowCloseFaultTriggerRoute:
         SpaceFixtureWindowCloseFaultTriggerRoute?
+    let workflowReadinessRoute:
+        SpaceFixtureWorkflowReadinessRoute?
     let terminationDelayMilliseconds: Int
     let closeWindowIndex: Int?
     let closeWindowDelayMilliseconds: Int
@@ -104,6 +106,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             SpaceFixtureWindowCloseFaultEvidenceRoute? = nil,
         windowCloseFaultTriggerRoute:
             SpaceFixtureWindowCloseFaultTriggerRoute? = nil,
+        workflowReadinessRoute:
+            SpaceFixtureWorkflowReadinessRoute? = nil,
         terminationDelayMilliseconds: Int = 0,
         closeWindowIndex: Int? = nil,
         closeWindowDelayMilliseconds: Int = 0,
@@ -125,6 +129,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             windowCloseFaultEvidenceRoute
         self.windowCloseFaultTriggerRoute =
             windowCloseFaultTriggerRoute
+        self.workflowReadinessRoute =
+            workflowReadinessRoute
         self.terminationDelayMilliseconds = max(0, terminationDelayMilliseconds)
         self.closeWindowIndex = closeWindowIndex.flatMap { windows.indices.contains($0 - 1) ? $0 : nil }
         self.closeWindowDelayMilliseconds = max(0, closeWindowDelayMilliseconds)
@@ -149,6 +155,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             SpaceFixtureWindowCloseFaultEvidenceRoute? = nil,
         windowCloseFaultTriggerRoute:
             SpaceFixtureWindowCloseFaultTriggerRoute? = nil,
+        workflowReadinessRoute:
+            SpaceFixtureWorkflowReadinessRoute? = nil,
         terminationDelayMilliseconds: Int = 0,
         closeWindowIndex: Int? = nil,
         closeWindowDelayMilliseconds: Int = 0
@@ -195,6 +203,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
                 windowCloseFaultEvidenceRoute,
             windowCloseFaultTriggerRoute:
                 windowCloseFaultTriggerRoute,
+            workflowReadinessRoute:
+                workflowReadinessRoute,
             terminationDelayMilliseconds: terminationDelayMilliseconds,
             closeWindowIndex: closeWindowIndex,
             closeWindowDelayMilliseconds: closeWindowDelayMilliseconds
@@ -256,6 +266,10 @@ extension SpaceFixtureLaunchConfiguration {
                 ),
             windowCloseFaultTriggerRoute:
                 Self.windowCloseFaultTriggerRoute(
+                    arguments: arguments
+                ),
+            workflowReadinessRoute:
+                Self.workflowReadinessRoute(
                     arguments: arguments
                 ),
             terminationDelayMilliseconds: normalizedTerminationDelayMilliseconds,
@@ -328,6 +342,10 @@ extension SpaceFixtureLaunchConfiguration {
                 ),
             windowCloseFaultTriggerRoute:
                 Self.windowCloseFaultTriggerRoute(
+                    arguments: arguments
+                ),
+            workflowReadinessRoute:
+                Self.workflowReadinessRoute(
                     arguments: arguments
                 ),
             terminationDelayMilliseconds: max(
@@ -481,6 +499,26 @@ extension SpaceFixtureLaunchConfiguration {
             return nil
         }
         return SpaceFixtureWindowCloseFaultTriggerRoute(
+            notificationName: Notification.Name(
+                notificationName
+            )
+        )
+    }
+
+    private static func workflowReadinessRoute(
+        arguments: [String]
+    ) -> SpaceFixtureWorkflowReadinessRoute? {
+        guard let notificationName = stringValue(
+            after:
+                SpaceFixtureWorkflowReadinessRoute
+                    .notificationArgument,
+            in: arguments
+        )?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !notificationName.isEmpty
+        else {
+            return nil
+        }
+        return SpaceFixtureWorkflowReadinessRoute(
             notificationName: Notification.Name(
                 notificationName
             )

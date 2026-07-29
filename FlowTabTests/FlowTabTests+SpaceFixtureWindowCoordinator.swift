@@ -175,9 +175,9 @@ extension FlowTabTests {
         XCTAssertEqual(windowSpies[0].showCalls, [false])
         XCTAssertEqual(windowSpies[1].showCalls, [true])
         XCTAssertEqual(windowSpies[2].showCalls, [false])
-        XCTAssertEqual(windowSpies[0].workflowReadyCalls, [["Fixture 1", "Fixture 2", "Fixture 3"]])
-        XCTAssertEqual(windowSpies[1].workflowReadyCalls, [["Fixture 1", "Fixture 2", "Fixture 3"]])
-        XCTAssertEqual(windowSpies[2].workflowReadyCalls, [["Fixture 1", "Fixture 2", "Fixture 3"]])
+        XCTAssertTrue(windowSpies[0].workflowReadyCalls.isEmpty)
+        XCTAssertTrue(windowSpies[1].workflowReadyCalls.isEmpty)
+        XCTAssertTrue(windowSpies[2].workflowReadyCalls.isEmpty)
         XCTAssertEqual(activationCallCount, 1)
         XCTAssertEqual(scheduler.scheduledDelays, [1200])
         XCTAssertEqual(publishedAccessibilityElements, [["ax-element-1", "ax-element-2", "ax-element-3"]])
@@ -197,6 +197,9 @@ extension FlowTabTests {
 
         windowSpies[1].completeFullScreenTransition()
 
+        XCTAssertTrue(windowSpies[0].workflowReadyCalls.isEmpty)
+        XCTAssertTrue(windowSpies[1].workflowReadyCalls.isEmpty)
+        XCTAssertTrue(windowSpies[2].workflowReadyCalls.isEmpty)
         XCTAssertEqual(
             scheduler.scheduledDelays,
             [1200, 15_000, 100]
@@ -221,6 +224,14 @@ extension FlowTabTests {
             .activeSpaceDidChange
         )
 
+        XCTAssertEqual(windowSpies[0].workflowReadyCalls, [["Fixture 1", "Fixture 2", "Fixture 3"]])
+        XCTAssertEqual(windowSpies[1].workflowReadyCalls, [["Fixture 1", "Fixture 2", "Fixture 3"]])
+        XCTAssertEqual(windowSpies[2].workflowReadyCalls, [["Fixture 1", "Fixture 2", "Fixture 3"]])
+        XCTAssertEqual(
+            coordinator.lastWorkflowReadinessEvidence?
+                .stage,
+            .ready
+        )
         XCTAssertEqual(windowSpies[0].showCalls, [false, true])
         XCTAssertEqual(windowSpies[1].showCalls, [true])
         XCTAssertEqual(windowSpies[2].showCalls, [false])
@@ -281,6 +292,9 @@ extension FlowTabTests {
         XCTAssertEqual(windowSpies[2].showCalls, [false])
         XCTAssertEqual(activationCallCount, 1)
         XCTAssertEqual(scheduler.scheduledDelays, [800])
+        XCTAssertTrue(windowSpies[0].workflowReadyCalls.isEmpty)
+        XCTAssertTrue(windowSpies[1].workflowReadyCalls.isEmpty)
+        XCTAssertTrue(windowSpies[2].workflowReadyCalls.isEmpty)
 
         XCTAssertTrue(scheduler.fire(at: 0))
 
@@ -298,6 +312,9 @@ extension FlowTabTests {
 
         windowSpies[1].completeFullScreenTransition()
 
+        XCTAssertEqual(windowSpies[0].workflowReadyCalls, [["Fixture 1", "Fixture 2", "Fixture 3"]])
+        XCTAssertEqual(windowSpies[1].workflowReadyCalls, [["Fixture 1", "Fixture 2", "Fixture 3"]])
+        XCTAssertEqual(windowSpies[2].workflowReadyCalls, [["Fixture 1", "Fixture 2", "Fixture 3"]])
         XCTAssertEqual(
             publishedAccessibilityElements,
             [
@@ -552,6 +569,13 @@ extension FlowTabTests {
         XCTAssertEqual(windowSpies[0].plan.title, "Docs")
         XCTAssertEqual(windowSpies[0].plan.subtitleText, "Chrome Window 1")
         XCTAssertEqual(windowSpies[1].plan.title, "Mail")
+        XCTAssertTrue(windowSpies[0].workflowReadyCalls.isEmpty)
+        XCTAssertTrue(windowSpies[1].workflowReadyCalls.isEmpty)
+        XCTAssertTrue(scheduler.fire(at: 0))
+        XCTAssertTrue(
+            windowSpies[1]
+                .completeFullScreenTransition()
+        )
         XCTAssertEqual(windowSpies[0].workflowReadyCalls, [["Docs", "Mail"]])
         XCTAssertEqual(windowSpies[1].workflowReadyCalls, [["Docs", "Mail"]])
     }

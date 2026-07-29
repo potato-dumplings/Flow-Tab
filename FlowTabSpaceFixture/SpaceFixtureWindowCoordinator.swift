@@ -51,6 +51,8 @@ final class SpaceFixtureWindowCoordinator {
         SpaceFixtureApplicationAXSuppressionOwner
     private let windowCloseFaultOwner:
         SpaceFixtureWindowCloseFaultOwner
+    private let workflowReadinessOwner:
+        SpaceFixtureWorkflowReadinessOwner
     private let activateApplication: ActivationHandler
     private let applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher
     private let applicationIdentityProvider:
@@ -83,6 +85,12 @@ final class SpaceFixtureWindowCoordinator {
         windowCloseFaultOwner.lastFailure
     }
 
+    var lastWorkflowReadinessEvidence:
+        SpaceFixtureWorkflowReadinessEvidence?
+    {
+        workflowReadinessOwner.lastEvidence
+    }
+
     init(
         configuration: SpaceFixtureLaunchConfiguration,
         visibleFrameProvider: VisibleFrameProvider? = nil,
@@ -94,6 +102,8 @@ final class SpaceFixtureWindowCoordinator {
             SpaceFixtureApplicationAXSuppressionOwner? = nil,
         windowCloseFaultOwner:
             SpaceFixtureWindowCloseFaultOwner? = nil,
+        workflowReadinessOwner:
+            SpaceFixtureWorkflowReadinessOwner? = nil,
         applicationIdentityProvider:
             ApplicationIdentityProvider? = nil
     ) {
@@ -132,6 +142,19 @@ final class SpaceFixtureWindowCoordinator {
                         )
                 }
             )
+        self.workflowReadinessOwner =
+            workflowReadinessOwner
+            ?? SpaceFixtureWorkflowReadinessOwner(
+                evidencePublisher: { evidence in
+                    SpaceFixtureWorkflowReadinessTransport
+                        .publish(
+                            evidence,
+                            route:
+                                configuration
+                                    .workflowReadinessRoute
+                        )
+                }
+            )
         self.activateApplication = activateApplication ?? {
             NSApplication.shared.activate(ignoringOtherApps: true)
         }
@@ -158,37 +181,122 @@ final class SpaceFixtureWindowCoordinator {
             visibleFrame: visibleFrameProvider()
         )
         windows = windowPlans.map(windowFactory)
-        let windowTitles = windowPlans.map(\.title)
-        prepareApplicationAXSuppressionIfNeeded()
+        let fullscreenWindows =
+            orderedFullscreenWindowsForTransition()
+        let desktopAnchorWindow =
+            desktopAnchorWindow(
+                for: fullscreenWindows
+            )
+        let applicationIdentity =
+            applicationIdentityProvider()
+        let readinessGeneration =
+            startWorkflowReadiness(
+                windowPlans: windowPlans,
+                fullscreenWindows: fullscreenWindows,
+                desktopAnchorWindow:
+                    desktopAnchorWindow,
+                applicationIdentity:
+                    applicationIdentity
+            )
+        prepareApplicationAXSuppressionIfNeeded(
+            readinessGeneration:
+                readinessGeneration,
+            applicationIdentity:
+                applicationIdentity
+        )
 
         let deferredPanelWindows = showInitialWindows()
         activateApplication()
         for panelWindow in deferredPanelWindows {
             panelWindow.show(isKey: true)
         }
-        windows.forEach { $0.updateWorkflowReadiness(windowTitles: windowTitles) }
         publishApplicationAccessibilityElements()
-        startWindowCloseFaultIfNeeded()
+        workflowReadinessOwner
+            .windowTopologyDidResolve(
+                planIndices:
+                    windows.map(\.plan.index),
+                observationGeneration:
+                    readinessGeneration
+            )
+        startWindowCloseFaultIfNeeded(
+            applicationIdentity: applicationIdentity
+        )
 
         guard !configuration.fullscreenWindowIndices.isEmpty else {
             applicationAXSuppressionOwner
                 .localTopologyStageDidResolve()
             return
         }
-        let fullscreenWindows = orderedFullscreenWindowsForTransition()
         guard !fullscreenWindows.isEmpty else {
             applicationAXSuppressionOwner
                 .localTopologyStageDidResolve()
             return
         }
-        scheduleFullscreenTransitions(fullscreenWindows)
+        scheduleFullscreenTransitions(
+            fullscreenWindows,
+            desktopAnchorWindow:
+                desktopAnchorWindow,
+            readinessGeneration:
+                readinessGeneration
+        )
     }
 
     func cancel() {
         cancelScheduledWork()
     }
 
-    private func startWindowCloseFaultIfNeeded() {
+    private func startWorkflowReadiness(
+        windowPlans: [SpaceFixtureWindowPlan],
+        fullscreenWindows:
+            [any SpaceFixtureWindowing],
+        desktopAnchorWindow:
+            (any SpaceFixtureWindowing)?,
+        applicationIdentity:
+            SpaceFixtureApplicationIdentity
+    ) -> Int {
+        workflowReadinessOwner.start(
+            expectation:
+                SpaceFixtureWorkflowReadinessExpectation(
+                    identity:
+                        SpaceFixtureWorkflowReadinessIdentity(
+                            bundleIdentifier:
+                                applicationIdentity
+                                    .bundleIdentifier,
+                            processIdentifier:
+                                applicationIdentity
+                                    .processIdentifier
+                        ),
+                    windowPlanIndices:
+                        windowPlans.map(\.index),
+                    fullscreenWindowPlanIndices:
+                        fullscreenWindows
+                            .map(\.plan.index)
+                            .sorted(),
+                    desktopAnchorWindowPlanIndex:
+                        desktopAnchorWindow?
+                            .plan.index,
+                    requiresApplicationAXSuppression:
+                        !configuration
+                            .publishesApplicationAccessibilityChildren,
+                    windowTitles:
+                        windowPlans.map(\.title)
+                ),
+            onReady: { [weak self] evidence in
+                guard let self else { return }
+                self.windows.forEach {
+                    $0.updateWorkflowReadiness(
+                        windowTitles:
+                            evidence.snapshot.windowTitles
+                    )
+                }
+            }
+        )
+    }
+
+    private func startWindowCloseFaultIfNeeded(
+        applicationIdentity:
+            SpaceFixtureApplicationIdentity
+    ) {
         guard let closeWindowIndex =
                 configuration.closeWindowIndex,
               let policy =
@@ -206,8 +314,6 @@ final class SpaceFixtureWindowCoordinator {
         else {
             return
         }
-        let applicationIdentity =
-            applicationIdentityProvider()
         windowCloseFaultOwner.start(
             policy: policy,
             identity:
@@ -287,11 +393,28 @@ final class SpaceFixtureWindowCoordinator {
         return fullscreenWindows.filter { $0.plan.index != primaryFullscreenIndex } + [primaryWindow]
     }
 
-    private func scheduleFullscreenTransitions(_ fullscreenWindows: [any SpaceFixtureWindowing]) {
-        let desktopAnchorWindow = configuration.preservesDesktopAfterFullscreen
-            ? windows.first(where: { !$0.plan.isFullscreenTarget })
-            : nil
+    private func desktopAnchorWindow(
+        for fullscreenWindows:
+            [any SpaceFixtureWindowing]
+    ) -> (any SpaceFixtureWindowing)? {
+        guard configuration
+                .preservesDesktopAfterFullscreen,
+              !fullscreenWindows.isEmpty
+        else {
+            return nil
+        }
+        return windows.first {
+            !$0.plan.isFullscreenTarget
+        }
+    }
 
+    private func scheduleFullscreenTransitions(
+        _ fullscreenWindows:
+            [any SpaceFixtureWindowing],
+        desktopAnchorWindow:
+            (any SpaceFixtureWindowing)?,
+        readinessGeneration: Int
+    ) {
         fullscreenTransitionOwner.start(
             windows: fullscreenWindows,
             initialDelayMilliseconds:
@@ -306,10 +429,18 @@ final class SpaceFixtureWindowCoordinator {
             onDidEnter: { [weak self] _ in
                 self?.publishApplicationAccessibilityElements()
             },
-            onComplete: { [weak self] _ in
+            onComplete: { [weak self] completion in
                 guard let self else { return }
+                self.workflowReadinessOwner
+                    .fullscreenTopologyDidResolve(
+                        completion,
+                        observationGeneration:
+                            readinessGeneration
+                    )
                 self.resolveApplicationAXSuppressionTopology(
-                    desktopAnchorWindow
+                    desktopAnchorWindow,
+                    readinessGeneration:
+                        readinessGeneration
                 )
             }
         )
@@ -317,7 +448,8 @@ final class SpaceFixtureWindowCoordinator {
 
     private func resolveApplicationAXSuppressionTopology(
         _ desktopAnchorWindow:
-            (any SpaceFixtureWindowing)?
+            (any SpaceFixtureWindowing)?,
+        readinessGeneration: Int
     ) {
         guard let desktopAnchorWindow else {
             applicationAXSuppressionOwner
@@ -336,9 +468,15 @@ final class SpaceFixtureWindowCoordinator {
                 self.activateApplication()
                 desktopAnchorWindow.show(isKey: true)
             },
-            onResolved: { [weak self] _ in
+            onResolved: { [weak self] evidence in
                 guard let self else { return }
                 self.publishApplicationAccessibilityElements()
+                self.workflowReadinessOwner
+                    .desktopPresentationDidResolve(
+                        evidence,
+                        observationGeneration:
+                            readinessGeneration
+                    )
                 self.applicationAXSuppressionOwner
                     .localTopologyStageDidResolve()
             },
@@ -351,7 +489,11 @@ final class SpaceFixtureWindowCoordinator {
         )
     }
 
-    private func prepareApplicationAXSuppressionIfNeeded() {
+    private func prepareApplicationAXSuppressionIfNeeded(
+        readinessGeneration: Int,
+        applicationIdentity:
+            SpaceFixtureApplicationIdentity
+    ) {
         guard
             !configuration
                 .publishesApplicationAccessibilityChildren
@@ -360,7 +502,7 @@ final class SpaceFixtureWindowCoordinator {
         }
         applicationAXSuppressionOwner.start(
             route: configuration.applicationAXSuppressionRoute,
-            identity: applicationIdentityProvider(),
+            identity: applicationIdentity,
             expectedProjectionWindowCount:
                 configuration.windowCount,
             expectedPublishedAXWindowCount:
@@ -372,6 +514,14 @@ final class SpaceFixtureWindowCoordinator {
                 self.suppressesApplicationAccessibilityElements =
                     true
                 self.publishApplicationAccessibilityElements()
+            },
+            onResolved: { [weak self] exposure in
+                self?.workflowReadinessOwner
+                    .applicationAXExposureDidResolve(
+                        exposure,
+                        observationGeneration:
+                            readinessGeneration
+                    )
             }
         )
     }
@@ -393,6 +543,7 @@ final class SpaceFixtureWindowCoordinator {
         desktopRefocusOwner.cancel()
         applicationAXSuppressionOwner.cancel()
         windowCloseFaultOwner.cancel()
+        workflowReadinessOwner.cancel()
     }
 
     private static func applicationAccessibilityExposure()

@@ -56,8 +56,10 @@ extension FlowTabTests {
             SpaceFixtureApplicationAXExposureProbe(
                 childWindowCount: 2,
                 windowsAttributeCount: 2
-            )
+        )
         var suppressCount = 0
+        var resolvedExposures:
+            [SpaceFixtureApplicationAXExposure] = []
         let owner =
             SpaceFixtureApplicationAXSuppressionOwner(
                 scheduler: scheduler,
@@ -75,12 +77,24 @@ extension FlowTabTests {
             suppress: {
                 suppressCount += 1
                 exposure.set(windowCount: 0)
+            },
+            onResolved: {
+                resolvedExposures.append($0)
             }
         )
 
         owner.localTopologyStageDidResolve()
 
         XCTAssertEqual(suppressCount, 1)
+        XCTAssertEqual(
+            resolvedExposures,
+            [
+                SpaceFixtureApplicationAXExposure(
+                    childWindowCount: 0,
+                    windowsAttributeCount: 0
+                )
+            ]
+        )
         XCTAssertEqual(owner.suppressionGeneration, 1)
         XCTAssertFalse(owner.isObserving)
         XCTAssertTrue(scheduler.token(at: 0).isCancelled)
@@ -94,8 +108,9 @@ extension FlowTabTests {
             SpaceFixtureApplicationAXExposureProbe(
                 childWindowCount: 2,
                 windowsAttributeCount: 2
-            )
+        )
         var suppressCount = 0
+        var resolutionCount = 0
         let owner =
             SpaceFixtureApplicationAXSuppressionOwner(
                 scheduler: scheduler,
@@ -114,6 +129,9 @@ extension FlowTabTests {
             expectedPublishedAXWindowCount: 2,
             suppress: {
                 suppressCount += 1
+            },
+            onResolved: { _ in
+                resolutionCount += 1
             }
         )
         owner.localTopologyStageDidResolve()
@@ -122,6 +140,7 @@ extension FlowTabTests {
 
         let failure = owner.lastFailure
         XCTAssertEqual(suppressCount, 0)
+        XCTAssertEqual(resolutionCount, 0)
         XCTAssertFalse(owner.isObserving)
         XCTAssertEqual(
             failure?.finalEvidence.unmetConditions,

@@ -76,6 +76,9 @@ extension FlowTabTests {
         XCTAssertNil(
             configuration.windowCloseFaultTriggerRoute
         )
+        XCTAssertNil(
+            configuration.workflowReadinessRoute
+        )
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 0)
         XCTAssertNil(configuration.closeWindowIndex)
         XCTAssertEqual(configuration.closeWindowDelayMilliseconds, 0)
@@ -112,6 +115,9 @@ extension FlowTabTests {
         XCTAssertNil(
             configuration.windowCloseFaultTriggerRoute
         )
+        XCTAssertNil(
+            configuration.workflowReadinessRoute
+        )
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 0)
         XCTAssertNil(configuration.closeWindowIndex)
         XCTAssertEqual(configuration.closeWindowDelayMilliseconds, 0)
@@ -129,6 +135,8 @@ extension FlowTabTests {
                 "test.fixture.window-close",
                 "--window-close-trigger-notification-name",
                 "test.fixture.window-close.trigger",
+                "--workflow-readiness-notification-name",
+                "test.fixture.workflow-readiness",
                 "--close-window-index", "2",
                 "--close-window-delay-ms", "1800"
             ]
@@ -158,6 +166,14 @@ extension FlowTabTests {
             SpaceFixtureWindowCloseFaultTriggerRoute(
                 notificationName: Notification.Name(
                     "test.fixture.window-close.trigger"
+                )
+            )
+        )
+        XCTAssertEqual(
+            configuration.workflowReadinessRoute,
+            SpaceFixtureWorkflowReadinessRoute(
+                notificationName: Notification.Name(
+                    "test.fixture.workflow-readiness"
                 )
             )
         )
@@ -240,6 +256,8 @@ extension FlowTabTests {
                 "test.fixture.workflow.window-close",
                 "--window-close-trigger-notification-name",
                 "test.fixture.workflow.window-close.trigger",
+                "--workflow-readiness-notification-name",
+                "test.fixture.workflow.readiness",
                 "--close-window-index", "2",
                 "--close-window-delay-ms", "1800",
                 "--preserve-desktop-after-fullscreen",
@@ -283,6 +301,14 @@ extension FlowTabTests {
             SpaceFixtureWindowCloseFaultTriggerRoute(
                 notificationName: Notification.Name(
                     "test.fixture.workflow.window-close.trigger"
+                )
+            )
+        )
+        XCTAssertEqual(
+            configuration.workflowReadinessRoute,
+            SpaceFixtureWorkflowReadinessRoute(
+                notificationName: Notification.Name(
+                    "test.fixture.workflow.readiness"
                 )
             )
         )

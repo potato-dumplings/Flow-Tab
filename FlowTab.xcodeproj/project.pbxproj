@@ -41,6 +41,13 @@
 		FFF201053D31000100B0D737 /* SpaceFixtureWindowCloseFault.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF200023D31000100B0D737 /* SpaceFixtureWindowCloseFault.swift */; };
 		FFF201063D31000100B0D737 /* FlowTabTests+SpaceFixtureWindowCloseFault.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF200033D31000100B0D737 /* FlowTabTests+SpaceFixtureWindowCloseFault.swift */; };
 		FFF201073D31000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFault.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF200043D31000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFault.swift */; };
+		FFF301013D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF300013D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift */; };
+		FFF301023D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF300013D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift */; };
+		FFF301033D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF300013D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift */; };
+		FFF301043D32000100B0D737 /* SpaceFixtureWorkflowReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF300023D32000100B0D737 /* SpaceFixtureWorkflowReadiness.swift */; };
+		FFF301053D32000100B0D737 /* SpaceFixtureWorkflowReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF300023D32000100B0D737 /* SpaceFixtureWorkflowReadiness.swift */; };
+		FFF301063D32000100B0D737 /* FlowTabTests+SpaceFixtureWorkflowReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF300033D32000100B0D737 /* FlowTabTests+SpaceFixtureWorkflowReadiness.swift */; };
+		FFF301073D32000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF300043D32000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowReadiness.swift */; };
 		4A6DAE9D2F727C0900B0D737 /* FlowTabCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4A6DAE9C2F727C0900B0D737 /* FlowTabCore */; };
 		7A1B2C3D4E5F600100B0D737 /* FlowTabPriorityCoverageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1B2C3D4E5F600200B0D737 /* FlowTabPriorityCoverageTests.swift */; };
 		A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */; };
@@ -717,6 +724,10 @@
 		FFF200023D31000100B0D737 /* SpaceFixtureWindowCloseFault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWindowCloseFault.swift; sourceTree = "<group>"; };
 		FFF200033D31000100B0D737 /* FlowTabTests+SpaceFixtureWindowCloseFault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SpaceFixtureWindowCloseFault.swift"; sourceTree = "<group>"; };
 		FFF200043D31000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureWindowCloseFault.swift"; sourceTree = "<group>"; };
+		FFF300013D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWorkflowReadinessEvidence.swift; sourceTree = "<group>"; };
+		FFF300023D32000100B0D737 /* SpaceFixtureWorkflowReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWorkflowReadiness.swift; sourceTree = "<group>"; };
+		FFF300033D32000100B0D737 /* FlowTabTests+SpaceFixtureWorkflowReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SpaceFixtureWorkflowReadiness.swift"; sourceTree = "<group>"; };
+		FFF300043D32000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureWorkflowReadiness.swift"; sourceTree = "<group>"; };
 		F500000B2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureApp.swift"; sourceTree = "<group>"; };
 		F50000122F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureWorkflow.swift"; sourceTree = "<group>"; };
 		F50000132F90000100B0D737 /* SpaceFixtureWorkflowConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWorkflowConfiguration.swift; sourceTree = "<group>"; };
@@ -931,6 +942,7 @@
 				FFE300093D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppressionFullscreenCoordinator.swift */,
 				FFF100033D30000100B0D737 /* FlowTabTests+SpaceFixtureTerminationFault.swift */,
 				FFF200033D31000100B0D737 /* FlowTabTests+SpaceFixtureWindowCloseFault.swift */,
+				FFF300033D32000100B0D737 /* FlowTabTests+SpaceFixtureWorkflowReadiness.swift */,
 			);
 			path = FlowTabTests;
 			sourceTree = "<group>";
@@ -961,6 +973,7 @@
 				FFE3000A3D2F000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowLaunch.swift */,
 				FFF100043D30000100B0D737 /* FlowTabUITests+SpaceFixtureTerminationFault.swift */,
 				FFF200043D31000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFault.swift */,
+				FFF300043D32000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowReadiness.swift */,
 				F50000122F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift */,
 				F50000152FA1000100B0D737 /* FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift */,
 				B20002012FBD000100B0D737 /* FlowTabUITests+SpaceFixtureHomeActivation.swift */,
@@ -1305,6 +1318,8 @@
 				FFF100023D30000100B0D737 /* SpaceFixtureTerminationFault.swift */,
 				FFF200013D31000100B0D737 /* SpaceFixtureWindowCloseFaultEvidence.swift */,
 				FFF200023D31000100B0D737 /* SpaceFixtureWindowCloseFault.swift */,
+				FFF300013D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift */,
+				FFF300023D32000100B0D737 /* SpaceFixtureWorkflowReadiness.swift */,
 				F50000072F90000100B0D737 /* AppKitSpaceFixtureWindow.swift */,
 				F50000082F90000100B0D737 /* SpaceFixtureWindowContentView.swift */,
 				F6D0C0013C00000100B0D737 /* PublishedDockIcon.svg */,
@@ -1801,6 +1816,9 @@
 				FFF201023D31000100B0D737 /* SpaceFixtureWindowCloseFaultEvidence.swift in Sources */,
 				FFF201053D31000100B0D737 /* SpaceFixtureWindowCloseFault.swift in Sources */,
 				FFF201063D31000100B0D737 /* FlowTabTests+SpaceFixtureWindowCloseFault.swift in Sources */,
+				FFF301023D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift in Sources */,
+				FFF301053D32000100B0D737 /* SpaceFixtureWorkflowReadiness.swift in Sources */,
+				FFF301063D32000100B0D737 /* FlowTabTests+SpaceFixtureWorkflowReadiness.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1846,6 +1864,8 @@
 				FFF101073D30000100B0D737 /* FlowTabUITests+SpaceFixtureTerminationFault.swift in Sources */,
 				FFF201033D31000100B0D737 /* SpaceFixtureWindowCloseFaultEvidence.swift in Sources */,
 				FFF201073D31000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFault.swift in Sources */,
+				FFF301033D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift in Sources */,
+				FFF301073D32000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowReadiness.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1870,6 +1890,8 @@
 				FFF101043D30000100B0D737 /* SpaceFixtureTerminationFault.swift in Sources */,
 				FFF201013D31000100B0D737 /* SpaceFixtureWindowCloseFaultEvidence.swift in Sources */,
 				FFF201043D31000100B0D737 /* SpaceFixtureWindowCloseFault.swift in Sources */,
+				FFF301013D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift in Sources */,
+				FFF301043D32000100B0D737 /* SpaceFixtureWorkflowReadiness.swift in Sources */,
 				F50001062F90000100B0D737 /* AppKitSpaceFixtureWindow.swift in Sources */,
 				F50001072F90000100B0D737 /* SpaceFixtureWindowContentView.swift in Sources */,
 			);

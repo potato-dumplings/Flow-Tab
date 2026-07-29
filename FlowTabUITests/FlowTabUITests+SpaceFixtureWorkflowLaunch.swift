@@ -73,15 +73,14 @@ extension FlowTabUITests {
                     app: workflowApp
                 )
             }
-            waitForSpaceFixtureWorkflowToStabilize(
+            waitForSpaceFixtureWorkflowMetadata(
                 in: app,
                 expectedWindowTitles:
                     workflowApp.expectedWindowTitles,
                 fullscreenWindowIndex:
                     waitsForFullscreenMarkers
                     ? workflowApp.fullscreenWindowIndex
-                    : nil,
-                settleTimeout: 0
+                    : nil
             )
             if workflowApp.fullscreenWindowIndex != nil {
                 logWorkflowSpaceObservation(
