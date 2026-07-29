@@ -170,11 +170,14 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private var appLaunchSignals: [
         (appID: String, pid: pid_t, appDirectoryEntry: RuntimeAppDirectoryEntry?)
     ] = []
+    private var appLaunchSignalHandler:
+        ((String, pid_t, RuntimeAppDirectoryEntry?) -> Void)?
     private var appWindowChangeSignals: [(appID: String, pid: pid_t)] = []
     private var selectedCurrentAppWindowChangeSignals: [(appID: String, pid: pid_t)] = []
     private var selectedCurrentAppWindowChangeSignalHandler:
         ((String, pid_t) -> Void)?
     private var appTerminationSignals: [(appID: String, pid: pid_t)] = []
+    private var appTerminationSignalHandler: ((String, pid_t) -> Void)?
     private var windowFocusVerifiedSignals: [(appID: String, pid: pid_t)] = []
     private var windowFocusVerificationSignals: [RuntimeWindowFocusVerification] = []
     private var windowFocusReadbackMismatchSignals: [WindowBindingReadbackDiagnostic] = []
@@ -379,6 +382,14 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         return appLaunchSignals
     }
 
+    func setAppLaunchSignalHandler(
+        _ handler: ((String, pid_t, RuntimeAppDirectoryEntry?) -> Void)?
+    ) {
+        lock.lock()
+        appLaunchSignalHandler = handler
+        lock.unlock()
+    }
+
     func appWindowChangeSignalsRecorded() -> [(appID: String, pid: pid_t)] {
         lock.lock()
         defer { lock.unlock() }
@@ -403,6 +414,14 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.lock()
         defer { lock.unlock() }
         return appTerminationSignals
+    }
+
+    func setAppTerminationSignalHandler(
+        _ handler: ((String, pid_t) -> Void)?
+    ) {
+        lock.lock()
+        appTerminationSignalHandler = handler
+        lock.unlock()
     }
 
     func windowFocusVerifiedSignalsRecorded() -> [(appID: String, pid: pid_t)] {
@@ -568,7 +587,9 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     ) {
         lock.lock()
         appLaunchSignals.append((appID, pid, appDirectoryEntry))
+        let handler = appLaunchSignalHandler
         lock.unlock()
+        handler?(appID, pid, appDirectoryEntry)
     }
 
     func signalAppWindowsChanged(appID: String, pid: pid_t) {
@@ -603,28 +624,28 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     func signalAppTerminated(appID: String, pid: pid_t) {
         lock.lock()
         appTerminationSignals.append((appID, pid))
-        guard shouldRemoveTerminatedApp(appID: appID, pid: pid) else {
-            lock.unlock()
-            return
-        }
-        if let projection = appSwitcherProjection {
-            appSwitcherProjection = RuntimeAppSwitcherProjection(
-                apps: projection.apps.filter { $0.id != appID },
-                contextsByID: projection.contextsByID.filter { $0.key != appID },
-                freshness: projection.freshness
-            )
-        }
-        if let searchIndexRead = committedSearchIndexRead,
-           let projection = searchIndexRead.projection {
-            committedSearchIndexRead = RuntimeSearchIndexRead(
-                projection: projection.removingApp(
-                    appID,
+        let handler = appTerminationSignalHandler
+        if shouldRemoveTerminatedApp(appID: appID, pid: pid) {
+            if let projection = appSwitcherProjection {
+                appSwitcherProjection = RuntimeAppSwitcherProjection(
+                    apps: projection.apps.filter { $0.id != appID },
+                    contextsByID: projection.contextsByID.filter { $0.key != appID },
                     freshness: projection.freshness
-                ),
-                readiness: searchIndexRead.readiness
-            )
+                )
+            }
+            if let searchIndexRead = committedSearchIndexRead,
+               let projection = searchIndexRead.projection {
+                committedSearchIndexRead = RuntimeSearchIndexRead(
+                    projection: projection.removingApp(
+                        appID,
+                        freshness: projection.freshness
+                    ),
+                    readiness: searchIndexRead.readiness
+                )
+            }
         }
         lock.unlock()
+        handler?(appID, pid)
     }
 
     private func shouldRemoveTerminatedApp(appID: String, pid: pid_t) -> Bool {

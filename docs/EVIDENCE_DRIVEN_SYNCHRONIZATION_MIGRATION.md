@@ -131,10 +131,10 @@ and Process/Tooling.
 | SYNC-030A | `FlowTabUITestMockWindowPreviewLatencyOwner`, `FlowTabUITestBootstrapper.installMockWindowPreviewsIfNeeded`; mock preview I/O latency | A blocking thread sleep intentionally delays preview capture, has no cancellation owner, and exposes no TestingSupport completion evidence. Domain fixture duration. | Retain the compatible millisecond launch option as a bounded named latency policy. A TestingSupport generation owner performs a cancellable monotonic deadline wait and publishes exact owner/batch/request/outcome evidence. Preview result identity remains the success Oracle. Bootstrap preparation, replacement, termination, and deinitialization own cancellation. | M asynchronous preview path; Unit, Behavior, affected UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-030B | Initial panel-occlusion stale hook in `FlowTabUITestBootstrapper` | A task sleep intentionally holds stale occlusion state before releasing visibility, while generation equality informally rejects replacement. Domain fixture duration. | Retain the compatible millisecond launch option as a bounded named staleness policy; inject a cancellable scheduler, publish installed/released/cancelled evidence, and make bootstrap preparation, replacement, termination, and deinitialization own cleanup. The panel visibility/recovery state remains the success Oracle. | M presentation lifecycle; Unit, Behavior, affected UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-031 | `TabSwitchStressPolicy`, `TabSwitchStressRunner`, `TabSwitchStressEvidenceTransport`; tab-switch stress workload | Switch cadence and total duration define an exact planned pressure workload. The former wall-clock loop allowed slower scheduling to reduce the number of switches and swallowed task cancellation. Domain duration plus exact selection evidence. | Preserve the compatible launch inputs as a bounded named policy and derive `ceil(duration / cadence)` planned selections. Start with an immediate selection, count each planned target only after exact selected-tab readback, and complete after both the monotonic duration and workload evidence are satisfied. The runner owns one generation and cancellable wake; AppDelegate termination owns stop. UI establishes a unique distributed evidence route before launch. | M hot path; Unit/Behavior for runner, affected UI, deterministic and real tab-switch Pressure, Process/Tooling. | completed |
-| SYNC-032 | Shared app-test asynchronous wait baseline | Semantic caller review found independent AppVisibility reload, AppDelegate delivery, Search publication, preview publication, panel presentation, termination-feedback, delayed-entry, and launch-bootstrap owners behind the two generic polling helpers. Migration routing. | Remove the generic helpers by closing each observable lifecycle through SYNC-032A–SYNC-032H. Retain a condition observer only if a caller has no callback, notification, task completion, scheduler, generation, or published state. | M aggregate; child rows define required validation. | in progress: SYNC-032A completed |
+| SYNC-032 | Shared app-test asynchronous wait baseline | Semantic caller review found independent AppVisibility reload, AppDelegate delivery, Search publication, preview publication, panel presentation, termination-feedback, delayed-entry, and launch-bootstrap owners behind the two generic polling helpers. Migration routing. | Remove the generic helpers by closing each observable lifecycle through SYNC-032A–SYNC-032H. Retain a condition observer only if a caller has no callback, notification, task completion, scheduler, generation, or published state. | M aggregate; child rows define required validation. | in progress: SYNC-032A and SYNC-032B1 completed |
 | SYNC-032A | `FlowTabTests+Support.waitUntil`; `AppVisibilityManagerModel.reload` tests | Two app-inventory tests polled wall-clock time and swallowed sleep cancellation while `@Published isLoading` already exposed task lifecycle. Evidence migration. | Subscribe before `reload()`, reject the initial idle value, and resolve only from the observed `loading → idle` transition. The test scope owns and releases the Combine subscription; XCTest timeout is the diagnostic failure bound. | L test synchronization; affected Unit/Behavior, Process/Tooling. | completed |
-| SYNC-032B | AppDelegate notification-delivery routing boundary | Semantic caller review separated workspace lifecycle delivery from hotkey replacement delivery. Migration routing. | Close the independently emitted workspace and hotkey contracts through SYNC-032B1 and SYNC-032B2. | M aggregate; child rows define required validation. | planned |
-| SYNC-032B1 | `FlowTabPriorityCoverageTests+AsyncSupport.waitUntil`; AppDelegate workspace launch and termination delivery tests | Workspace notifications are followed by generic polling of runtime-projection recording state. Evidence migration. | Establish exact app/PID recording callbacks before posting each workspace notification, then fulfill from the matching launch or termination signal and require the final recording readback. Test teardown owns callback removal. | M app lifecycle; affected Behavior, Process/Tooling. | planned |
+| SYNC-032B | AppDelegate notification-delivery routing boundary | Semantic caller review separated workspace lifecycle delivery from hotkey replacement delivery. Migration routing. | Close the independently emitted workspace and hotkey contracts through SYNC-032B1 and SYNC-032B2. | M aggregate; child rows define required validation. | in progress: SYNC-032B1 completed |
+| SYNC-032B1 | `FlowTabPriorityCoverageTests+AsyncSupport.waitUntil`; AppDelegate workspace launch and termination delivery tests | Workspace notifications are followed by generic polling of runtime-projection recording state. Evidence migration. | Establish exact app/PID recording callbacks before posting each workspace notification, then fulfill from the matching launch or termination signal and require the final recording readback. Test teardown owns callback removal. | M app lifecycle; affected Behavior, Process/Tooling. | completed |
 | SYNC-032B2 | `FlowTabPriorityCoverageTests+AsyncSupport.waitUntil`; AppDelegate hotkey-notification delivery test | A hotkey-reload notification is followed by generic polling of replacement-monitor records. Evidence migration. | Establish an exact monitor-construction callback before posting the notification, join both expected registration identities for the request, and require final registration-evidence and monitor readback. Test teardown owns callback removal. | M hotkey lifecycle; affected Behavior, Process/Tooling. | planned |
 | SYNC-032C | Shared `waitUntil` callers in `HotkeyMonitorAndRuntimeState` and Search behavior | Search scheduling and termination refresh publish model/layout completion, while tests poll derived state. Evidence migration. | Establish search-result or layout completion observation before mutating query/projection state; resolve from the matching revision and final state readback. Test scope owns callback/subscription cleanup. | M Search behavior; affected Unit/Behavior, deterministic Pressure, Process/Tooling. | planned |
 | SYNC-032D | Shared `waitUntil` callers in `WindowPreviewProviders` and `SwitcherInteractionRegressions` | Preview capture completion and failure publication are inferred by polling snapshots and panel alpha. Evidence migration. | Observe model publication or preview-batch completion before requesting capture; require exact capture state, resolved preview identity, and panel reveal readback. Test scope owns subscription cleanup. | M preview pipeline; affected Behavior, preview Pressure, Process/Tooling. | planned |
@@ -3064,5 +3064,42 @@ polling cadence, deadline, or timeout in the scoped paths.
   1,733 to 1,679 lines, and support shrank from 568 to 551 lines.
   `git diff --check` and exact staged-content review are recorded before commit.
   Startup `prompts.zip` remains unchanged and outside the slice.
-- Commit: pending
+- Commit: `83dc6d6adba43da1f3d4c5bf8ce7aa9c57718ed2`
   (`test(sync): migrate SYNC-032A app visibility reload`).
+
+### SYNC-032B1 Closure Record
+
+- Design and Oracle: the runtime-projection recording double exposes exact
+  launch and termination callbacks. The test installs both callbacks before
+  posting either workspace notification, accepts only the current appID/PID
+  instance, and additionally requires the launch directory entry to carry that
+  same identity. Callback expectations establish delivery; independent final
+  arrays establish exact one-event readback. The existing coordinator assertion
+  also proves that launch-window observation was prepared before the launch
+  signal.
+- Lifecycle: the test scope removes both recording callbacks in explicit
+  teardown and in `defer`. It terminates the AppDelegate, posts launch and
+  termination notifications again, and verifies that both recording arrays
+  remain unchanged, proving workspace-observer cleanup.
+- Retained time policy: the one-second XCTest expectation timeout is a terminal
+  failure watchdog. Delivery succeeds only from the exact callback. The
+  expectation descriptions identify the unmet transition and the following
+  array assertions expose the final observed appID/PID evidence.
+- Unit and Behavior: the final focused canonical wrapper passed 1/1 with zero
+  failures in 0.038 seconds (0.039 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-032B1/targeted-attempt-002`.
+  The final complete canonical wrapper passed 1020/1020 with zero failures in
+  47.899 seconds (48.046 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-032B1/full-attempt-002`.
+- FlowTabCore, UI, and Pressure: not relevant because this slice changes only
+  app-test observation around existing synchronous workspace notification
+  delivery and does not change runtime behavior, visible behavior, repeated
+  asynchronous work, or a hot path.
+- Process/Tooling: project-file lint, Swift parse, scoped timing review,
+  `git diff --check`, and exact staged-content review are recorded before
+  commit. The focused source is 169 lines. The touched pre-existing oversized
+  AppDelegate test source shrank from 1,337 to 1,225 lines; the shared
+  test-double source remains below its 800-line guardrail at 785 lines. Startup
+  `prompts.zip` remains unchanged and outside the slice.
+- Commit: pending
+  (`test(sync): migrate SYNC-032B1 workspace delivery`).
