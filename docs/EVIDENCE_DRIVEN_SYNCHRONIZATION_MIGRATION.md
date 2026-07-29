@@ -152,7 +152,7 @@ and Process/Tooling.
 | SYNC-033A | `FlowTabTests+CompactActionButton`, `FlowTabTests+PreferencesAndDiagnostics`; initial hosted Logs control materialization | Two generic RunLoop condition loops wait for exact AppKit controls to appear below a SwiftUI host. Conditional observation. | Establish a named, cancellable hosted-view condition observation before the layout trigger, check the exact identifier/type readback immediately, and accept only the required control topology. The test scope owns observation cancellation; the XCTest watchdog reports the last hierarchy readback. | L test synchronization; affected Behavior, Process/Tooling. | planned |
 | SYNC-033B | `FlowTabTests+EnglishLayout`, `FlowTabTests+PreferencesAndDiagnostics`; Settings bridge language, theme, permission, and system-appearance publication | Generic RunLoop condition loops infer that stored/published presentation and permission state reached the hosted AppKit Settings bridge. Evidence migration with conditional view readback where SwiftUI exposes no render-completion callback. | Establish state observation or a named hosted-view condition observation before each trigger, record a context/update baseline, check initial state immediately, and require exact localized text, appearance, permission-title, or system-theme readback. Test scope owns subscriptions and cancellation; XCTest watchdog reports the last state/view evidence. | M Settings behavior; affected Unit/Behavior, Settings UI only if runtime behavior changes, Process/Tooling. | planned |
 | SYNC-033C | `FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication`; background notification publication while MainActor is unavailable | A 500ms blocking wait proves publishers return, then a raw 10ms RunLoop loop assumes cleanup eventually completes. Evidence migration plus watchdog. | Enter all publishers and register DispatchGroup completion before dispatch. Keep a named blocking watchdog solely as the nonblocking failure bound, then wait for exact publisher-return completion through XCTest to release MainActor and clean up. Test scope owns the group expectation and controller lifetime; failure reports completed notification names. | M runtime-notification delivery; affected Behavior, Process/Tooling. | completed |
-| SYNC-033D | `FlowTabPriorityCoverageTests+RuntimeSpaceClassification`; background remote AX resolution | A 250ms main-thread sleep is treated as proof that remote AX resolution can proceed without MainActor availability. Evidence migration plus watchdog. | Establish worker-start, resolver-invoked, and fetch-completed evidence before dispatch. Block MainActor only on a named resolver-invocation watchdog, then require exact off-main-thread readback and terminal worker completion. Test scope owns semaphores and override cleanup. | M AX runtime behavior; affected Behavior, runtime-topology Pressure, Process/Tooling. | planned |
+| SYNC-033D | `FlowTabPriorityCoverageTests+RuntimeAXBackgroundResolution`; background remote AX resolution | A 250ms main-thread sleep is treated as proof that remote AX resolution can proceed without MainActor availability. Evidence migration plus watchdog. | Establish worker-start, resolver-invoked, and fetch-completed evidence before dispatch. Block MainActor only on a named resolver-invocation watchdog, then require exact off-main-thread readback and terminal worker completion. Test scope owns semaphores and override cleanup. | M AX runtime behavior; affected Behavior, runtime-topology Pressure, Process/Tooling. | completed |
 | SYNC-033E | `FlowTabPriorityCoverageTests+RuntimeSnapshotPressure`; bounded AX collection workload | Per-item thread sleep simulates I/O latency and elapsed-time comparison is treated as concurrency success. Deterministic pressure workload migration. | Replace sleep with a named, test-owned blocking workload gate. Require the configured number of workers to enter concurrently, release work from explicit evidence, and verify bounded maximum concurrency plus ordered results independently of elapsed wall time. | M runtime hot path; affected Behavior, deterministic Pressure, Process/Tooling. | planned |
 | SYNC-034 | `FlowTabUITests+Support.swift`, `+WorkflowWindowObservation.swift`, `+SpaceFixtureApp.swift`, `+ScrollingSupport.swift`, `+StatusItem.swift`, and fixture assertion helpers; shared UI condition loops | RunLoop cadence advances drive XCUI/CG/AX/process predicate observation. Conditional observation. | Centralize named UI observation cadence and watchdog diagnostics, check immediately, use `waitForExistence`/predicate expectations where possible, and keep exact CG/AX/window/process readback as the sole Oracle. XCTest case lifetime owns the wait. | H test infrastructure; affected UI suites, Process/Tooling. | planned; SYNC-026C2 pressure attempt 002 captured a repeated Darwin-trigger delivery without a fresh matching acknowledgement |
 | SYNC-034A | `FlowTabUITests+WorkflowWindowObservation.waitForExactFrontmostSpaceFixtureWindow`; exact frontmost fixture-window observation | Optional AX and CG window numbers can both be absent and compare equal, allowing the condition loop to return without observing an exact window. Evidence-Oracle defect discovered by the SYNC-028B2 diagnostic run. | Reuse the generation-owned desktop-anchor observer and require the exact PID to be running, active, frontmost, and XCUI-foreground; join the exact title/identifier XCUI window to a present PID-scoped topmost CG window by valid matching frames and require desktop-Space readback. Install workspace observers before initial readback, treat XCUI attachment as an observed condition, retain only the named cancellable 100ms condition cadence where no exact attachment/window callback exists, and use the caller's named watchdog as a diagnostic failure bound. The helper invocation owns cancellation and cleanup. | H test Oracle; desktop-refocus UI, runtime-topology Pressure, Process/Tooling. | completed |
@@ -3664,5 +3664,46 @@ polling cadence, deadline, or timeout in the scoped paths.
   warnings. Final `git diff --check` and exact staged-content review are
   recorded before commit. Startup `prompts.zip` remains unchanged and outside
   the slice.
-- Commit: pending
+- Commit: `4322115a746fb82a0930b7d6d066fb4d8470e27a`
   (`test(sync): migrate SYNC-033C notification publication`).
+
+### SYNC-033D Closure Record
+
+- Design and Oracle: the test establishes one-shot worker-start,
+  resolver-invoked, and fetch-completed evidence before dispatching the
+  background read. Once the worker has started, MainActor blocks only on the
+  resolver-invocation watchdog. Success requires that exact signal, an
+  off-main-thread resolver identity, and terminal fetch completion; no elapsed
+  duration participates in the success Oracle.
+- Lifecycle and diagnostics: the test scope owns both semaphores, the
+  completion expectation, the locked evidence recorder, and all AX/permission
+  override restoration. Named two-second watchdogs are terminal failure bounds.
+  Every failure path reports the last worker-start, resolver-thread, and
+  fetch-completion readback.
+- Unit and Behavior: the final focused canonical wrapper passed 1/1 with zero
+  failures in 0.003 seconds (0.004 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-033D/targeted-attempt-002`. The
+  complete canonical wrapper passed 1022/1022 with zero failures in 49.480
+  seconds (49.644 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-033D/full-attempt-001`.
+- Pressure: 100 consecutive repetitions passed with zero failures in 0.101
+  seconds (0.112 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-033D/pressure-attempt-001`. Each
+  iteration independently required the exact background resolver and terminal
+  completion evidence.
+- UI: not relevant because this slice changes only app-test synchronization
+  around the existing off-main AX resolver path and does not change visible
+  behavior.
+- FlowTabCore: not relevant because the slice changes no core-domain source or
+  API.
+- Process/Tooling: project-file lint, Swift parse, source-literal review, and
+  source-size review passed. Focused attempt 001 passed 1/1 but exposed a Swift
+  6 warning for capturing `NSRunningApplication` in a Sendable closure; the
+  worker now performs that read in its own context and attempt 002 compiled
+  without the warning. Extracting the test reduced the pre-existing oversized
+  Runtime Space classification source from 1,169 to 1,116 lines; the focused
+  source is 139 lines. Final `git diff --check` and exact staged-content review
+  are recorded before commit. Startup `prompts.zip` remains unchanged and
+  outside the slice.
+- Commit: pending
+  (`test(sync): migrate SYNC-033D AX background resolution`).
