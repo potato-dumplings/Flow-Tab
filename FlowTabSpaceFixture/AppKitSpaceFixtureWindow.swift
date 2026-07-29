@@ -7,7 +7,8 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
     private let contentView: SpaceFixtureWindowContentView
     private let window: NSWindow & FixtureAccessibilitySuppressing
     private let noisyCGSiblings: NoisyCGSiblingWindowSet?
-    private var fullScreenObservationToken: NSObjectProtocol?
+    private var fullScreenObservation:
+        SpaceFixtureFullScreenObservation?
 
     var applicationAccessibilityElement: Any {
         window
@@ -71,14 +72,32 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
     }
 
     func close() {
+        fullScreenObservation?.cancel()
+        fullScreenObservation = nil
         noisyCGSiblings?.close()
         window.close()
     }
 
-    func enterFullScreen(completion: @escaping @MainActor () -> Void) {
+    func enterFullScreen(
+        completion: @escaping @MainActor () -> Void
+    ) -> any SpaceFixtureCancellable {
         suppressNoisyFullScreenContentAccessibilityIfNeeded()
-        installFullScreenCompletionObserver(completion: completion)
+        fullScreenObservation?.cancel()
+        let observation = SpaceFixtureFullScreenObservation(
+            window: window
+        ) { [weak self] in
+            guard let self else { return }
+            self.fullScreenObservation = nil
+            self.showNoisyCGSiblingsIfNeeded()
+            completion()
+        }
+        fullScreenObservation = observation
+        if window.styleMask.contains(.fullScreen) {
+            observation.completeFromInitialReadback()
+            return observation
+        }
         window.toggleFullScreen(nil)
+        return observation
     }
 
     func updateWorkflowReadiness(windowTitles: [String]) {
@@ -101,31 +120,62 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         window.suppressAccessibilityExposure()
     }
 
-    private func installFullScreenCompletionObserver(completion: @escaping @MainActor () -> Void) {
-        if let fullScreenObservationToken {
-            NotificationCenter.default.removeObserver(fullScreenObservationToken)
-            self.fullScreenObservationToken = nil
-        }
+}
 
-        var token: NSObjectProtocol?
-        token = NotificationCenter.default.addObserver(
+@MainActor
+private final class SpaceFixtureFullScreenObservation:
+    SpaceFixtureCancellable
+{
+    private var notificationToken: NSObjectProtocol?
+    private var completion: (@MainActor () -> Void)?
+
+    init(
+        window: NSWindow,
+        completion: @escaping @MainActor () -> Void
+    ) {
+        self.completion = completion
+        notificationToken = NotificationCenter.default.addObserver(
             forName: NSWindow.didEnterFullScreenNotification,
             object: window,
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self else { return }
-                if let token {
-                    NotificationCenter.default.removeObserver(token)
-                }
-                self.fullScreenObservationToken = nil
-                self.showNoisyCGSiblingsIfNeeded()
-                completion()
+                self?.finish()
             }
         }
-        fullScreenObservationToken = token
     }
 
+    func cancel() {
+        removeObserver()
+        completion = nil
+    }
+
+    func completeFromInitialReadback() {
+        finish()
+    }
+
+    private func finish() {
+        guard let completion else { return }
+        removeObserver()
+        self.completion = nil
+        completion()
+    }
+
+    private func removeObserver() {
+        guard let notificationToken else { return }
+        NotificationCenter.default.removeObserver(
+            notificationToken
+        )
+        self.notificationToken = nil
+    }
+
+    deinit {
+        if let notificationToken {
+            NotificationCenter.default.removeObserver(
+                notificationToken
+            )
+        }
+    }
 }
 
 @MainActor

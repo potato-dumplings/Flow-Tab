@@ -8,7 +8,9 @@ protocol SpaceFixtureWindowing: AnyObject {
     var applicationAccessibilityElement: Any { get }
     func show(isKey: Bool)
     func close()
-    func enterFullScreen(completion: @escaping @MainActor () -> Void)
+    func enterFullScreen(
+        completion: @escaping @MainActor () -> Void
+    ) -> any SpaceFixtureCancellable
     func updateWorkflowReadiness(windowTitles: [String])
 }
 
@@ -16,37 +18,46 @@ protocol SpaceFixtureWindowing: AnyObject {
 final class SpaceFixtureWindowCoordinator {
     typealias VisibleFrameProvider = () -> CGRect
     typealias WindowFactory = (SpaceFixtureWindowPlan) -> any SpaceFixtureWindowing
-    typealias FullscreenScheduler = (Int, @escaping @MainActor () -> Void) -> Void
     typealias ActivationHandler = () -> Void
     typealias ApplicationAccessibilityElementsPublisher = ([Any]) -> Void
 
     private static let defaultApplicationAccessibilitySuppressionDelayMilliseconds = 5_000
     private static let fullscreenAccessibilitySuppressionSettleDelayMilliseconds = 8_000
     private static let desktopRefocusDelayMilliseconds = 1_200
-    private static let additionalFullscreenTransitionSpacingMilliseconds = 1_400
 
     private let configuration: SpaceFixtureLaunchConfiguration
     private let visibleFrameProvider: VisibleFrameProvider
     private let windowFactory: WindowFactory
-    private let fullscreenScheduler: FullscreenScheduler
+    private let scheduler: any SpaceFixtureScheduling
+    private let fullscreenTransitionOwner:
+        SpaceFixtureFullscreenTransitionOwner
     private let activateApplication: ActivationHandler
     private let applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher
 
     private(set) var windows: [any SpaceFixtureWindowing] = []
     private var suppressesApplicationAccessibilityElements = false
+    private var windowCloseToken: (any SpaceFixtureCancellable)?
+    private var desktopRefocusToken: (any SpaceFixtureCancellable)?
+    private var accessibilitySuppressionToken:
+        (any SpaceFixtureCancellable)?
 
     init(
         configuration: SpaceFixtureLaunchConfiguration,
         visibleFrameProvider: VisibleFrameProvider? = nil,
         windowFactory: WindowFactory? = nil,
-        fullscreenScheduler: FullscreenScheduler? = nil,
+        scheduler: (any SpaceFixtureScheduling)? = nil,
         activateApplication: ActivationHandler? = nil,
         applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher? = nil
     ) {
+        let resolvedScheduler = scheduler ?? SpaceFixtureScheduler()
         self.configuration = configuration
         self.visibleFrameProvider = visibleFrameProvider ?? Self.defaultVisibleFrame
         self.windowFactory = windowFactory ?? { AppKitSpaceFixtureWindow(plan: $0) }
-        self.fullscreenScheduler = fullscreenScheduler ?? Self.defaultFullscreenScheduler
+        self.scheduler = resolvedScheduler
+        fullscreenTransitionOwner =
+            SpaceFixtureFullscreenTransitionOwner(
+                scheduler: resolvedScheduler
+            )
         self.activateApplication = activateApplication ?? {
             NSApplication.shared.activate(ignoringOtherApps: true)
         }
@@ -57,6 +68,7 @@ final class SpaceFixtureWindowCoordinator {
     }
 
     func launch() {
+        cancelScheduledWork()
         let windowPlans = SpaceFixtureWindowPlanner.makePlans(
             configuration: configuration,
             visibleFrame: visibleFrameProvider()
@@ -87,7 +99,10 @@ final class SpaceFixtureWindowCoordinator {
 
     private func scheduleWindowCloseIfNeeded() {
         guard let closeWindowIndex = configuration.closeWindowIndex else { return }
-        fullscreenScheduler(configuration.closeWindowDelayMilliseconds) {
+        windowCloseToken = scheduler.schedule(
+            afterMilliseconds:
+                configuration.closeWindowDelayMilliseconds
+        ) {
             guard let index = self.windows.firstIndex(where: { $0.plan.index == closeWindowIndex }) else {
                 return
             }
@@ -136,49 +151,38 @@ final class SpaceFixtureWindowCoordinator {
             ? windows.first(where: { !$0.plan.isFullscreenTarget })
             : nil
 
-        scheduleFullscreenTransition(
-            fullscreenWindows,
-            currentIndex: 0,
-            delayMilliseconds: configuration.enterFullscreenDelayMilliseconds,
-            desktopAnchorWindow: desktopAnchorWindow
-        )
-    }
-
-    private func scheduleFullscreenTransition(
-        _ fullscreenWindows: [any SpaceFixtureWindowing],
-        currentIndex: Int,
-        delayMilliseconds: Int,
-        desktopAnchorWindow: (any SpaceFixtureWindowing)?
-    ) {
-        guard fullscreenWindows.indices.contains(currentIndex) else {
-            scheduleDesktopRefocusIfNeeded(desktopAnchorWindow)
-            scheduleApplicationAccessibilitySuppressionAfterFullscreenSettleIfNeeded()
-            return
-        }
-
-        let fullscreenWindow = fullscreenWindows[currentIndex]
-        fullscreenScheduler(delayMilliseconds) {
-            if fullscreenWindows.count > 1 {
-                self.activateApplication()
-                fullscreenWindow.show(isKey: true)
-            }
-            fullscreenWindow.enterFullScreen {
-                let nextIndex = currentIndex + 1
-                self.publishApplicationAccessibilityElements()
-                self.scheduleFullscreenTransition(
-                    fullscreenWindows,
-                    currentIndex: nextIndex,
-                    delayMilliseconds: Self.additionalFullscreenTransitionSpacingMilliseconds,
-                    desktopAnchorWindow: desktopAnchorWindow
+        fullscreenTransitionOwner.start(
+            windows: fullscreenWindows,
+            initialDelayMilliseconds:
+                configuration.enterFullscreenDelayMilliseconds,
+            onWillEnter: { [weak self] window, _, totalWindowCount in
+                guard let self else { return }
+                if totalWindowCount > 1 {
+                    self.activateApplication()
+                    window.show(isKey: true)
+                }
+            },
+            onDidEnter: { [weak self] _ in
+                self?.publishApplicationAccessibilityElements()
+            },
+            onComplete: { [weak self] _ in
+                guard let self else { return }
+                self.scheduleDesktopRefocusIfNeeded(
+                    desktopAnchorWindow
                 )
+                self
+                    .scheduleApplicationAccessibilitySuppressionAfterFullscreenSettleIfNeeded()
             }
-        }
+        )
     }
 
     private func scheduleDesktopRefocusIfNeeded(_ desktopAnchorWindow: (any SpaceFixtureWindowing)?) {
         guard let desktopAnchorWindow else { return }
 
-        fullscreenScheduler(Self.desktopRefocusDelayMilliseconds) {
+        desktopRefocusToken = scheduler.schedule(
+            afterMilliseconds:
+                Self.desktopRefocusDelayMilliseconds
+        ) {
             self.activateApplication()
             desktopAnchorWindow.show(isKey: true)
             self.publishApplicationAccessibilityElements()
@@ -209,7 +213,12 @@ final class SpaceFixtureWindowCoordinator {
 
     private func scheduleApplicationAccessibilitySuppressionIfNeeded(delayMilliseconds: Int? = nil) {
         guard !configuration.publishesApplicationAccessibilityChildren else { return }
-        fullscreenScheduler(delayMilliseconds ?? applicationAccessibilitySuppressionDelayMilliseconds()) {
+        accessibilitySuppressionToken?.cancel()
+        accessibilitySuppressionToken = scheduler.schedule(
+            afterMilliseconds:
+                delayMilliseconds
+                ?? applicationAccessibilitySuppressionDelayMilliseconds()
+        ) {
             self.suppressesApplicationAccessibilityElements = true
             self.publishApplicationAccessibilityElements()
         }
@@ -221,37 +230,24 @@ final class SpaceFixtureWindowCoordinator {
         }
         return max(
             Self.defaultApplicationAccessibilitySuppressionDelayMilliseconds,
-            lastFullscreenTransitionDelayMilliseconds()
+            configuration.enterFullscreenDelayMilliseconds
                 + Self.fullscreenAccessibilitySuppressionSettleDelayMilliseconds
         )
     }
 
-    private func lastFullscreenTransitionDelayMilliseconds() -> Int {
-        fullscreenTransitionDelayMilliseconds(
-            offset: max(0, configuration.fullscreenWindowIndices.count - 1)
-        )
-    }
-
-    private func fullscreenTransitionDelayMilliseconds(offset: Int) -> Int {
-        configuration.enterFullscreenDelayMilliseconds
-            + max(0, offset) * Self.additionalFullscreenTransitionSpacingMilliseconds
+    private func cancelScheduledWork() {
+        fullscreenTransitionOwner.cancel()
+        windowCloseToken?.cancel()
+        windowCloseToken = nil
+        desktopRefocusToken?.cancel()
+        desktopRefocusToken = nil
+        accessibilitySuppressionToken?.cancel()
+        accessibilitySuppressionToken = nil
     }
 
     private static func defaultVisibleFrame() -> CGRect {
         NSScreen.main?.visibleFrame
             ?? NSScreen.screens.first?.visibleFrame
             ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
-    }
-
-    private static func defaultFullscreenScheduler(
-        delayMilliseconds: Int,
-        action: @escaping @MainActor () -> Void
-    ) {
-        let deadline = DispatchTime.now() + .milliseconds(max(0, delayMilliseconds))
-        DispatchQueue.main.asyncAfter(deadline: deadline) {
-            Task { @MainActor in
-                action()
-            }
-        }
     }
 }
