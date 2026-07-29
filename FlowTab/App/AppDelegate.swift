@@ -105,6 +105,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appLaunchWindowEvidenceCoordinator = nil
         hotkeyMonitor?.stop()
         inAppWindowHotkeyMonitor?.stop()
+#if FLOWTAB_TESTING
+        FlowTabUITestProjectionAcknowledgementBootstrap.stop()
+#endif
         commandTabTakeoverController.restoreSystemShortcutsIfNeeded()
     }
 

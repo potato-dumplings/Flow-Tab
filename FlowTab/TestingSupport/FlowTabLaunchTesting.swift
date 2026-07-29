@@ -6,6 +6,8 @@ enum FlowTabTestLaunchOptions {
     static let uiTestingEnvironmentKey = "FLOWTAB_UI_TESTING"
     static let uiTestingEnvironmentValue = "1"
     static let unitTestingBundlePathEnvironmentKey = "XCTestBundlePath"
+    static let projectionAcknowledgementRouteArgument =
+        "--flowtab-ui-projection-acknowledgement-route"
 
     static var argumentsOverrideForTesting: [String]?
     static var environmentOverrideForTesting: [String: String]?
@@ -26,6 +28,7 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-open-switcher",
         "--flowtab-ui-open-switcher-search",
         "--flowtab-ui-permission-state-path",
+        projectionAcknowledgementRouteArgument,
         "--flowtab-ui-record-hotkey-reload-diagnostics",
         "--flowtab-ui-redacted-runtime-logs",
         "--flowtab-ui-reset-defaults",
@@ -99,6 +102,45 @@ enum FlowTabTestLaunchOptions {
 
     static var frontmostBundleIdentifierOverride: String? {
         uiTestValue(after: "--flowtab-ui-frontmost-bundle-id")
+    }
+
+    static var projectionAcknowledgementRoutes:
+        [FlowTabUITestProjectionAcknowledgementRoute]
+    {
+        guard isRunningUITests else { return [] }
+        var routes:
+            [FlowTabUITestProjectionAcknowledgementRoute] = []
+        var notificationNames: Set<String> = []
+        for index in arguments.indices
+        where arguments[index]
+            == projectionAcknowledgementRouteArgument
+        {
+            guard index + 3 < arguments.count else { continue }
+            let notificationName = arguments[index + 1]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let bundleIdentifier = arguments[index + 2]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !notificationName.isEmpty,
+                  !bundleIdentifier.isEmpty,
+                  let expectedWindowCount =
+                    Int(arguments[index + 3]),
+                  expectedWindowCount > 0,
+                  notificationNames.insert(
+                    notificationName
+                  ).inserted
+            else {
+                continue
+            }
+            routes.append(
+                FlowTabUITestProjectionAcknowledgementRoute(
+                    notificationName:
+                        Notification.Name(notificationName),
+                    bundleIdentifier: bundleIdentifier,
+                    expectedWindowCount: expectedWindowCount
+                )
+            )
+        }
+        return routes
     }
 
     static var accessibilityTrustedOverride: Bool? {

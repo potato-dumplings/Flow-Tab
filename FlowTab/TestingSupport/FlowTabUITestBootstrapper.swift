@@ -52,6 +52,10 @@ enum FlowTabUITestBootstrapper {
 
         installMockRuntimeProjectionServiceIfNeeded()
         installFrontmostRuntimeProjectionOverrideIfNeeded()
+        FlowTabUITestProjectionAcknowledgementBootstrap
+            .prepareIfNeeded(
+                service: resolvedRuntimeProjectionService
+            )
 
         if FlowTabTestLaunchOptions.resetsUserDefaultsOnLaunch {
             AppPreferenceKeys.allKeys.forEach { userDefaults.removeObject(forKey: $0) }
