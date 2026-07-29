@@ -86,6 +86,7 @@
 		FFFF01013D3E000100B0D737 /* FlowTabPriorityCoverageTests+TerminationSearchRefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFFF00013D3E000100B0D737 /* FlowTabPriorityCoverageTests+TerminationSearchRefresh.swift */; };
 		ABCD01013D3F000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLaunchBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD00013D3F000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLaunchBootstrap.swift */; };
 		ABCE01013D3F000100B0D737 /* LaunchBootstrapTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCE00013D3F000100B0D737 /* LaunchBootstrapTestSupport.swift */; };
+		ABCF01013D40000100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewPublication.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCF00013D40000100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewPublication.swift */; };
 		4A6DAE9D2F727C0900B0D737 /* FlowTabCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4A6DAE9C2F727C0900B0D737 /* FlowTabCore */; };
 		7A1B2C3D4E5F600100B0D737 /* FlowTabPriorityCoverageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1B2C3D4E5F600200B0D737 /* FlowTabPriorityCoverageTests.swift */; };
 		A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */; };
@@ -799,6 +800,7 @@
 		FFFF00013D3E000100B0D737 /* FlowTabPriorityCoverageTests+TerminationSearchRefresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+TerminationSearchRefresh.swift"; sourceTree = "<group>"; };
 		ABCD00013D3F000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLaunchBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+AppDelegateLaunchBootstrap.swift"; sourceTree = "<group>"; };
 		ABCE00013D3F000100B0D737 /* LaunchBootstrapTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchBootstrapTestSupport.swift; sourceTree = "<group>"; };
+		ABCF00013D40000100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewPublication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+WindowPreviewPublication.swift"; sourceTree = "<group>"; };
 		F500000B2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureApp.swift"; sourceTree = "<group>"; };
 		F50000122F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureWorkflow.swift"; sourceTree = "<group>"; };
 		F50000132F90000100B0D737 /* SpaceFixtureWorkflowConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWorkflowConfiguration.swift; sourceTree = "<group>"; };
@@ -960,6 +962,7 @@
 				FFFF00013D3E000100B0D737 /* FlowTabPriorityCoverageTests+TerminationSearchRefresh.swift */,
 				ABCD00013D3F000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLaunchBootstrap.swift */,
 				ABCE00013D3F000100B0D737 /* LaunchBootstrapTestSupport.swift */,
+				ABCF00013D40000100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewPublication.swift */,
 				E2D100013D10000100B0D737 /* FlowTabPriorityCoverageTests+AppLaunchEvidence.swift */,
 				E3D100033D11000100B0D737 /* FlowTabPriorityCoverageTests+TransientRepairObservation.swift */,
 				E4D100033D12000100B0D737 /* FlowTabPriorityCoverageTests+AXWindowChangeDelivery.swift */,
@@ -1956,6 +1959,7 @@
 				FFFF01013D3E000100B0D737 /* FlowTabPriorityCoverageTests+TerminationSearchRefresh.swift in Sources */,
 				ABCD01013D3F000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLaunchBootstrap.swift in Sources */,
 				ABCE01013D3F000100B0D737 /* LaunchBootstrapTestSupport.swift in Sources */,
+				ABCF01013D40000100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewPublication.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
