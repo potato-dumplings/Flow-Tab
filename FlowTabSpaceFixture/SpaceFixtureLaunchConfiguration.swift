@@ -58,6 +58,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
     let publishesApplicationAccessibilityChildren: Bool
     let applicationAXSuppressionRoute:
         SpaceFixtureApplicationAXSuppressionRoute?
+    let terminationFaultEvidenceRoute:
+        SpaceFixtureTerminationFaultEvidenceRoute?
     let terminationDelayMilliseconds: Int
     let closeWindowIndex: Int?
     let closeWindowDelayMilliseconds: Int
@@ -92,6 +94,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         publishesApplicationAccessibilityChildren: Bool = true,
         applicationAXSuppressionRoute:
             SpaceFixtureApplicationAXSuppressionRoute? = nil,
+        terminationFaultEvidenceRoute:
+            SpaceFixtureTerminationFaultEvidenceRoute? = nil,
         terminationDelayMilliseconds: Int = 0,
         closeWindowIndex: Int? = nil,
         closeWindowDelayMilliseconds: Int = 0,
@@ -107,6 +111,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         self.publishesApplicationAccessibilityChildren = publishesApplicationAccessibilityChildren
         self.applicationAXSuppressionRoute =
             applicationAXSuppressionRoute
+        self.terminationFaultEvidenceRoute =
+            terminationFaultEvidenceRoute
         self.terminationDelayMilliseconds = max(0, terminationDelayMilliseconds)
         self.closeWindowIndex = closeWindowIndex.flatMap { windows.indices.contains($0 - 1) ? $0 : nil }
         self.closeWindowDelayMilliseconds = max(0, closeWindowDelayMilliseconds)
@@ -125,6 +131,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         publishesApplicationAccessibilityChildren: Bool = true,
         applicationAXSuppressionRoute:
             SpaceFixtureApplicationAXSuppressionRoute? = nil,
+        terminationFaultEvidenceRoute:
+            SpaceFixtureTerminationFaultEvidenceRoute? = nil,
         terminationDelayMilliseconds: Int = 0,
         closeWindowIndex: Int? = nil,
         closeWindowDelayMilliseconds: Int = 0
@@ -165,6 +173,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             publishesApplicationAccessibilityChildren: publishesApplicationAccessibilityChildren,
             applicationAXSuppressionRoute:
                 applicationAXSuppressionRoute,
+            terminationFaultEvidenceRoute:
+                terminationFaultEvidenceRoute,
             terminationDelayMilliseconds: terminationDelayMilliseconds,
             closeWindowIndex: closeWindowIndex,
             closeWindowDelayMilliseconds: closeWindowDelayMilliseconds
@@ -214,6 +224,10 @@ extension SpaceFixtureLaunchConfiguration {
             publishesApplicationAccessibilityChildren: !arguments.contains("--suppress-app-accessibility-children"),
             applicationAXSuppressionRoute:
                 Self.applicationAXSuppressionRoute(
+                    arguments: arguments
+                ),
+            terminationFaultEvidenceRoute:
+                Self.terminationFaultEvidenceRoute(
                     arguments: arguments
                 ),
             terminationDelayMilliseconds: normalizedTerminationDelayMilliseconds,
@@ -274,6 +288,10 @@ extension SpaceFixtureLaunchConfiguration {
             publishesApplicationAccessibilityChildren: !arguments.contains("--suppress-app-accessibility-children"),
             applicationAXSuppressionRoute:
                 Self.applicationAXSuppressionRoute(
+                    arguments: arguments
+                ),
+            terminationFaultEvidenceRoute:
+                Self.terminationFaultEvidenceRoute(
                     arguments: arguments
                 ),
             terminationDelayMilliseconds: max(
@@ -370,6 +388,26 @@ extension SpaceFixtureLaunchConfiguration {
                 Notification.Name(acknowledgementName),
             suppressionCompletionNotificationName:
                 Notification.Name(completionName)
+        )
+    }
+
+    private static func terminationFaultEvidenceRoute(
+        arguments: [String]
+    ) -> SpaceFixtureTerminationFaultEvidenceRoute? {
+        guard let notificationName = stringValue(
+            after:
+                SpaceFixtureTerminationFaultEvidenceRoute
+                    .notificationArgument,
+            in: arguments
+        )?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !notificationName.isEmpty
+        else {
+            return nil
+        }
+        return SpaceFixtureTerminationFaultEvidenceRoute(
+            notificationName: Notification.Name(
+                notificationName
+            )
         )
     }
 

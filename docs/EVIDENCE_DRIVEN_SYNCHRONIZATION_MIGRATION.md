@@ -118,7 +118,9 @@ and Process/Tooling.
 | SYNC-026C | Composite application AX-suppression routing boundary | The producer-side projection acknowledgement and fixture-side suppression lifecycle belong to different process and resource owners. Migration routing. | Close producer publication through SYNC-026C1 and fixture suppression through SYNC-026C2. | H aggregate; child rows define required validation. | completed |
 | SYNC-026C1 | `FlowTabUITestProjectionAcknowledgementOwner`, `FlowTabUITestBootstrapper`, `FlowTabTestLaunchOptions`; FlowTab TestingSupport projection acknowledgement | A fixture cannot infer when prelaunched FlowTab has committed the exact fixture process and window topology. Evidence migration. | Parse explicit test-only routes, install the runtime projection observer before initial readback, and publish a distributed acknowledgement only for a complete, clean projection matching bundle ID, positive PID, and exact window count. Include monotonic acknowledgement and source generations. The app TestingSupport bootstrap owns observation and termination cleanup. | H cross-process fixture evidence; Unit, Behavior, deterministic Pressure, Process/Tooling; end-to-end UI transport joins SYNC-026C2. | completed |
 | SYNC-026C2 | `SpaceFixtureApplicationAXSuppressionOwner`, `SpaceFixtureWindowCoordinator`; fixture application AX suppression | Fixed 5s and post-fullscreen 8s delays assume workflow consumers have captured the application AX window list. Evidence migration. | Install the route observer before fixture window publication, then suppress only after the exact local topology stage, exact published application AX readback, and a matching acknowledgement for the fixture PID and window count. Preserve the route-less fixture flag through the local-topology plus exact-readback contract. Require exact zero readback, publish a monotonic suppression generation for every resolved owner, and report routed terminal evidence. The coordinator owns cancellation and cleanup. | H fixture topology; Unit, Behavior, AX-suppressed real fixture UI, runtime-topology Pressure. | completed |
-| SYNC-027 | `SpaceFixtureAppDelegate`, `SpaceFixtureLaunchConfiguration`; terminate and close delay options | Configured terminate/close latency intentionally creates a slow-process or window-removal scenario. Domain duration. | Retain as named fixture fault policies with injectable scheduler, cancellation, and explicit “scheduled/applied” acknowledgement. App delegate/coordinator own pending work. | M; Unit, Behavior, representative fixture UI. | verification-needed |
+| SYNC-027 | Composite fixture fault-latency baseline | Semantic owner review found two independent fault-injection contracts: delayed process termination and delayed exact-window close. Domain duration routing record. | Preserve the CLI compatibility boundary and route implementation, lifecycle, evidence, and validation through SYNC-027A and SYNC-027B. | M; child-slice validation. | routed to SYNC-027A and SYNC-027B |
+| SYNC-027A | `SpaceFixtureAppDelegate`, `SpaceFixtureLaunchConfiguration`, `SpaceFixtureTerminationFaultOwner`; delayed process termination | `--terminate-delay-ms` intentionally keeps the fixture process alive after an application or SIGTERM request. The raw `asyncAfter` work had no cancellation owner and exposed no scheduled/applied evidence. Domain duration. | Retain the positive delay as `SpaceFixtureTerminationFaultPolicy`. A single AppDelegate-owned generation schedules through the injectable fixture scheduler, preserves the first request across duplicate sources, publishes exact scheduled/applied evidence with bundle ID and PID, and cancels the task and signal source at app termination. The optional notification route preserves existing launch configurations while enabling an observer to be established before the termination request. | M repeated async work; Unit, Behavior, representative termination UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
+| SYNC-027B | `SpaceFixtureWindowCoordinator`, `SpaceFixtureLaunchConfiguration`; delayed exact-window close | `--close-window-delay-ms` intentionally delays fixture window removal, while the coordinator currently owns only an unlabelled scheduler token and publishes no scheduled/applied close acknowledgement. Domain duration. | Retain as a named window-close fault policy with exact plan-index identity, generation, injected scheduler, cancellation, scheduled/applied evidence, and post-close topology readback. The coordinator owns pending work. | M repeated async work; Unit, Behavior, representative window-removal UI, deterministic lifecycle Pressure, Process/Tooling. | planned |
 | SYNC-028 | `SpaceFixtureWindowContentView`, `SpaceFixtureWindowCoordinator`; workflow readiness labels | “Ready” is published before asynchronous fullscreen/refocus/close topology transitions complete, forcing UI settle waits. Evidence migration. | Publish a monotonic fixture transition generation/stage only after exact planned windows and requested fullscreen/key/AX exposure states are read back. UI observers establish a baseline before launch/action and wait for a later matching stage. | H; Unit, Behavior, all affected real fixture UI, runtime-topology Pressure. | planned |
 | SYNC-029 | `FlowTab/TestingSupport/FlowTabUITestBootstrapper.swift`; `presentInitialUIIfNeeded` | Twenty 150ms retries and two equal snapshots infer runtime projection stability before opening Search/switcher. Evidence migration. | Observe runtime projection commit notifications before bootstrap, capture baseline generation, perform initial readback, and open from a matching complete later generation. A shared UI-test watchdog reports the last session/projection signature. Bootstrapper owns observer/task cleanup. | H test orchestration; Behavior, UI, runtime-topology/Search Pressure. | planned |
 | SYNC-030 | `FlowTabUITestBootstrapper.installMockWindowPreviewsIfNeeded`, initial stale occlusion hook | Thread sleep and millisecond launch options intentionally inject preview latency or stale visibility. Domain fixture duration. | Retain as named fault-injection policies, preferably backed by controllable gates/acknowledgements; ensure cancellation and completion markers are owned by TestingSupport and UI tests wait on the resulting Oracle. | M; Behavior, affected UI, Pressure when used. | verification-needed |
@@ -2295,5 +2297,66 @@ polling cadence, deadline, or timeout in the scoped paths.
   1130 to 1103 lines, and reduces the UI wrapper from 809 to 670 lines.
   `git diff --check` and exact staged-content review are recorded before
   commit. Startup `prompts.zip` remains unchanged and outside the slice.
-- Commit: pending
+- Commit: `4d3a6222de4c38034625f5a62ca4efc23fb67375`
   (`refactor(sync): migrate SYNC-026C2 AX suppression`).
+
+### SYNC-027A Closure Record
+
+- Design and Oracle: a positive `--terminate-delay-ms` value is represented by
+  `SpaceFixtureTerminationFaultPolicy`. The AppDelegate routes both
+  `applicationShouldTerminate` and SIGTERM through one
+  `SpaceFixtureTerminationFaultOwner`, which accepts the first request and
+  publishes exact scheduled and applied evidence containing a monotonic
+  generation, request source, configured duration, bundle ID, and PID. The
+  optional distributed-notification route keeps existing launch
+  configurations compatible. The representative UI path independently
+  verifies the exact running process and FlowTab projection removal after the
+  applied evidence.
+- Lifecycle: the AppDelegate owns the fault owner, its single scheduled token,
+  and the SIGTERM dispatch source. Application termination cancels the active
+  generation and token, releases the signal source, and restores the default
+  signal disposition. Duplicate application and signal requests share the
+  first accepted generation. Cancellation and replacement reject late
+  callbacks, and applied evidence is published before the termination action.
+- Retained time policy: the configured positive duration is the fixture's
+  intentional termination-latency fault contract. Scheduling publishes only
+  scheduled evidence; applied evidence, exact process state, and FlowTab
+  projection readback establish progress and completion. The named fault owner
+  manages cancellation, so machine or scheduler delay changes when the fault
+  applies while preserving the resulting termination semantics.
+- Unit and Behavior: the final focused canonical run passed 7/7 with zero
+  failures in 0.007 seconds under
+  `.build-local/evidence-driven-sync/SYNC-027A/targeted-attempt-003`.
+  Coverage verifies strict evidence transport parsing, scheduled-to-applied
+  transition order, mixed-source duplicate handling, cancellation, stale
+  callback rejection, synchronous scheduler reentrancy, and launch
+  configuration compatibility for both simple and workflow routes.
+- Full FlowTabTests: the final canonical wrapper rebuilt all six targets and
+  passed 972/972 with zero failures in 47.539 seconds under
+  `.build-local/evidence-driven-sync/SYNC-027A/full-attempt-002`.
+- FlowTabCore: not relevant because this fault policy belongs to the standalone
+  fixture, app-test transport, and UI orchestration boundaries and adds no
+  core-domain API.
+- Pressure: the deterministic 500-generation lifecycle workload accepted each
+  generation exactly once, published every scheduled and applied transition
+  in order, executed every accepted action once, canceled every token, and
+  left no active generation. Scheduler delivery timing changed only the
+  transition latency.
+- UI: after the install wrapper refreshed and verified the signed UI
+  application, the representative real-fixture quit path passed 1/1 with zero
+  failures in 25.245 seconds under
+  `.build-local/evidence-driven-sync/SYNC-027A/ui-attempt-002`. The observer was
+  installed before fixture launch and the termination trigger. Attempt 001
+  established that the real FlowTab quit path reaches the fixture through
+  SIGTERM; the final test therefore validates the exact signal source, duration,
+  bundle ID, PID, and generation across scheduled and applied evidence before
+  independently observing process exit and projection removal.
+- Process/Tooling: `plutil -lint` passed for the Xcode project, the canonical
+  wrappers compiled the new fixture, test, and UI sources in their intended
+  targets, and stale raw AppDelegate `asyncAfter` and pending-reply state are
+  absent. Each new source remains below 400 lines; touched shared sources retain
+  a clear single responsibility. `git diff --check` and exact staged-content
+  review are recorded before commit. Startup `prompts.zip` remains unchanged
+  and outside the slice.
+- Commit: pending
+  (`refactor(sync): retain SYNC-027A termination fault policy`).

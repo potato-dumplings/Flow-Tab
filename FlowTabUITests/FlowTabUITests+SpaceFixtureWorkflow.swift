@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import XCTest
 
@@ -49,13 +50,25 @@ extension FlowTabUITests {
 
     func testSwitcherPanelQuitShortcutKeepsRealFixtureAppUntilProcessTerminates() throws {
         let identity = spaceFixtureAppIdentity
+        let terminationRoute =
+            makeSpaceFixtureTerminationFaultRoute()
+        let terminationObservation =
+            SpaceFixtureTerminationFaultObservationOwner(
+                route: terminationRoute
+            )
+        terminationObservation.start()
+        defer {
+            terminationObservation.cancel()
+        }
         let fixtureApp = launchSpaceFixtureWorkflow(
             identity: identity,
             windowCount: 1,
             fullscreenWindowIndex: nil,
             titlePrefix: "Quit Target",
             enterFullscreenDelayMilliseconds: 0,
-            terminationDelayMilliseconds: 2_400
+            terminationDelayMilliseconds: 2_400,
+            fixtureAdditionalArguments:
+                terminationRoute.fixtureLaunchArguments
         )
         defer {
             if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
@@ -104,12 +117,61 @@ extension FlowTabUITests {
             since: logSnapshot,
             timeout: 8
         )
+        let scheduledEvidence = try XCTUnwrap(
+            terminationObservation.waitForScheduled(
+                timeout: 8
+            ),
+            "Fixture did not publish scheduled termination evidence: "
+                + terminationObservation.diagnosticSummary
+        )
+        XCTAssertEqual(
+            scheduledEvidence.source,
+            .terminationSignal
+        )
+        XCTAssertEqual(
+            scheduledEvidence.delayMilliseconds,
+            2_400
+        )
+        XCTAssertEqual(
+            scheduledEvidence.identity.bundleIdentifier,
+            identity.bundleIdentifier
+        )
+        XCTAssertTrue(
+            NSRunningApplication.runningApplications(
+                withBundleIdentifier:
+                    identity.bundleIdentifier
+            ).contains {
+                !$0.isTerminated
+                    && $0.processIdentifier
+                        == scheduledEvidence
+                            .identity
+                            .processIdentifier
+            },
+            "Scheduled termination evidence did not identify the running fixture process."
+        )
         XCTAssertNotEqual(fixtureApp.state, .notRunning)
         XCTAssertTrue(
             fixtureAppTile.exists,
             "The selected fixture app should remain in the panel while its process is still terminating."
         )
 
+        let appliedEvidence = try XCTUnwrap(
+            terminationObservation.waitForApplied(
+                requestGeneration:
+                    scheduledEvidence.requestGeneration,
+                timeout: 8
+            ),
+            "Fixture did not publish applied termination evidence: "
+                + terminationObservation.diagnosticSummary
+        )
+        XCTAssertEqual(
+            appliedEvidence.identity,
+            scheduledEvidence.identity
+        )
+        XCTAssertEqual(
+            appliedEvidence.source,
+            scheduledEvidence.source
+        )
         XCTAssertTrue(waitForApplicationToTerminate(fixtureApp, timeout: 8))
         waitForRuntimeLogFiles(
             containing: [

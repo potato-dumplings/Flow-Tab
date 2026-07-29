@@ -67,6 +67,9 @@ extension FlowTabTests {
         XCTAssertFalse(configuration.preservesDesktopAfterFullscreen)
         XCTAssertTrue(configuration.publishesApplicationAccessibilityChildren)
         XCTAssertNil(configuration.applicationAXSuppressionRoute)
+        XCTAssertNil(
+            configuration.terminationFaultEvidenceRoute
+        )
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 0)
         XCTAssertNil(configuration.closeWindowIndex)
         XCTAssertEqual(configuration.closeWindowDelayMilliseconds, 0)
@@ -94,6 +97,9 @@ extension FlowTabTests {
         XCTAssertFalse(configuration.preservesDesktopAfterFullscreen)
         XCTAssertFalse(configuration.publishesApplicationAccessibilityChildren)
         XCTAssertNil(configuration.applicationAXSuppressionRoute)
+        XCTAssertNil(
+            configuration.terminationFaultEvidenceRoute
+        )
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 0)
         XCTAssertNil(configuration.closeWindowIndex)
         XCTAssertEqual(configuration.closeWindowDelayMilliseconds, 0)
@@ -105,12 +111,22 @@ extension FlowTabTests {
                 "FlowTabSpaceFixture",
                 "--window-count", "3",
                 "--terminate-delay-ms", "1200",
+                "--termination-evidence-notification-name",
+                "test.fixture.termination",
                 "--close-window-index", "2",
                 "--close-window-delay-ms", "1800"
             ]
         )
 
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 1200)
+        XCTAssertEqual(
+            configuration.terminationFaultEvidenceRoute,
+            SpaceFixtureTerminationFaultEvidenceRoute(
+                notificationName: Notification.Name(
+                    "test.fixture.termination"
+                )
+            )
+        )
         XCTAssertEqual(configuration.closeWindowIndex, 2)
         XCTAssertEqual(configuration.closeWindowDelayMilliseconds, 1800)
     }
@@ -186,6 +202,8 @@ extension FlowTabTests {
                 "--staggered-layout",
                 "--enter-fullscreen-delay-ms", "900",
                 "--terminate-delay-ms", "1100",
+                "--termination-evidence-notification-name",
+                "test.fixture.workflow.termination",
                 "--preserve-desktop-after-fullscreen",
                 "--suppress-app-accessibility-children",
                 "--projection-acknowledgement-notification-name",
@@ -204,6 +222,14 @@ extension FlowTabTests {
         XCTAssertTrue(configuration.usesStaggeredLayout)
         XCTAssertEqual(configuration.enterFullscreenDelayMilliseconds, 900)
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 1100)
+        XCTAssertEqual(
+            configuration.terminationFaultEvidenceRoute,
+            SpaceFixtureTerminationFaultEvidenceRoute(
+                notificationName: Notification.Name(
+                    "test.fixture.workflow.termination"
+                )
+            )
+        )
         XCTAssertTrue(configuration.preservesDesktopAfterFullscreen)
         XCTAssertFalse(configuration.publishesApplicationAccessibilityChildren)
         XCTAssertEqual(
