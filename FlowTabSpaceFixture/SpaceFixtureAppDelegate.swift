@@ -60,6 +60,13 @@ final class SpaceFixtureAppDelegate: NSObject, NSApplicationDelegate {
         true
     }
 
+    func applicationWillTerminate(
+        _ notification: Notification
+    ) {
+        windowCoordinator?.cancel()
+        windowCoordinator = nil
+    }
+
     func application(_ app: NSApplication, shouldSaveApplicationState coder: NSCoder) -> Bool {
         false
     }

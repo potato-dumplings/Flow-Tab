@@ -1,5 +1,4 @@
 import AppKit
-import ApplicationServices
 import CoreGraphics
 import XCTest
 
@@ -437,30 +436,6 @@ extension FlowTabUITests {
         )
     }
 
-    func waitForApplicationAXWindowsSuppressed(
-        bundleIdentifier: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestCounts: ApplicationAXWindowCounts?
-        repeat {
-            latestCounts = applicationAXWindowCounts(bundleIdentifier: bundleIdentifier)
-            if latestCounts?.isSuppressed == true {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected application-level AX windows to be suppressed for \(bundleIdentifier), \
-            found children=\(latestCounts?.childWindowCount.description ?? "nil"), \
-            windows=\(latestCounts?.windowsAttributeCount.description ?? "nil").
-            """
-        )
-        return false
-    }
-
     private func inAppSwitcherLaunchArguments(
         for workflowApp: SpaceFixtureResolvedWorkflow.App
     ) -> [String] {
@@ -752,68 +727,4 @@ extension FlowTabUITests {
         return false
     }
 
-    private struct ApplicationAXWindowCounts {
-        let childWindowCount: Int
-        let windowsAttributeCount: Int
-
-        var isSuppressed: Bool {
-            childWindowCount == 0 && windowsAttributeCount == 0
-        }
-    }
-
-    private func applicationAXWindowCounts(bundleIdentifier: String) -> ApplicationAXWindowCounts? {
-        guard let runningApp = NSRunningApplication
-            .runningApplications(withBundleIdentifier: bundleIdentifier)
-            .first(where: { !$0.isTerminated })
-        else {
-            return nil
-        }
-
-        let appElement = AXUIElementCreateApplication(runningApp.processIdentifier)
-        return ApplicationAXWindowCounts(
-            childWindowCount: applicationAXWindowChildCount(in: appElement),
-            windowsAttributeCount: applicationAXWindowsAttributeCount(in: appElement)
-        )
-    }
-
-    private func applicationAXWindowChildCount(in appElement: AXUIElement) -> Int {
-        var childrenValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            appElement,
-            kAXChildrenAttribute as CFString,
-            &childrenValue
-        ) == .success else {
-            return 0
-        }
-
-        guard let children = childrenValue as? [AXUIElement] else {
-            return 0
-        }
-        return children.filter { axRole(in: $0) == kAXWindowRole as String }.count
-    }
-
-    private func applicationAXWindowsAttributeCount(in appElement: AXUIElement) -> Int {
-        var windowsValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            appElement,
-            kAXWindowsAttribute as CFString,
-            &windowsValue
-        ) == .success else {
-            return 0
-        }
-
-        return (windowsValue as? [AXUIElement])?.count ?? 0
-    }
-
-    private func axRole(in element: AXUIElement) -> String? {
-        var roleValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            element,
-            kAXRoleAttribute as CFString,
-            &roleValue
-        ) == .success else {
-            return nil
-        }
-        return roleValue as? String
-    }
 }

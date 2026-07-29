@@ -112,12 +112,12 @@ and Process/Tooling.
 | SYNC-024D | `HomeControlPressAnimationPolicy`, `FlowPageActionButton`; pressed-button transition | A 120ms ease-out duration is a visual-only Home button contract. Domain duration. | Retain it as a named injectable Home control-animation policy. SwiftUI view identity owns the animation; actions continue directly from input callbacks. | L; Behavior/visual policy assertion, affected Home UI, Process/Tooling. | completed |
 | SYNC-024E | `SettingsAppVisibilityNavigationAnimationPolicy`, `AppSettingsView`, `AppVisibilityManagerView`; app-visibility navigation transition | A 180ms ease-in-out duration is a visual-only Settings navigation contract. Domain duration. | Retain it as a named injectable Settings navigation-animation policy. Settings view state owns the transition; the manager exposes contained AX children, and destination visibility remains the UI Oracle. | L; Behavior/visual policy assertion, affected Settings UI, Process/Tooling. | completed |
 | SYNC-025 | `PanelPresentationDiagnosticProbeOwner`, `SwitcherPanelController+PresentationDiagnostics.swift`; frame-delay probe | A 16ms sleep sampled an assumed later display frame for diagnostics only. Domain measurement. | Retain 16ms only as a named frame-sample interval in an injectable diagnostic scheduler. A generation owner sequences next-main-turn and frame-sample callbacks, while presentation begin/end owns replacement and cancellation. Probe callbacks only emit measured diagnostics, so delayed delivery changes the recorded timestamp without affecting behavior. | L; Behavior diagnostic assertion, deterministic Pressure, Process/Tooling. | completed |
-| SYNC-026 | Composite fixture-topology timing baseline | Semantic review separated the fullscreen chain, desktop refocus, and application AX suppression into independent observable contracts. Migration routing. | Preserve this parent ID as the routing boundary and close each lifecycle through SYNC-026A–SYNC-026C2. | H aggregate; child rows define required validation. | in progress: SYNC-026A and SYNC-026C1 completed; SYNC-026B implementation and deterministic validation completed with UI/runtime-topology validation environment-blocked; SYNC-026C2 remains |
+| SYNC-026 | Composite fixture-topology timing baseline | Semantic review separated the fullscreen chain, desktop refocus, and application AX suppression into independent observable contracts. Migration routing. | Preserve this parent ID as the routing boundary and close each lifecycle through SYNC-026A–SYNC-026C2. | H aggregate; child rows define required validation. | environment-blocked: SYNC-026A, SYNC-026C1, and SYNC-026C2 completed; SYNC-026B implementation plus deterministic validation completed, with UI/runtime-topology validation blocked before test-body execution by LocalAuthentication Code -4 |
 | SYNC-026A | `SpaceFixtureFullscreenTransitionOwner`, `AppKitSpaceFixtureWindow`, `SpaceFixtureWindowCoordinator`; ordered fullscreen transition chain | The workflow-configured initial delay intentionally stages fixture launch, while a fixed 1.4s gap assumed each preceding fullscreen animation had settled enough to start the next window. Domain duration plus evidence migration. | Retain the configured delay only before the first transition. Install the exact-window `didEnterFullScreen` observer before `toggleFullScreen`, then begin every later window directly from the preceding completion evidence. The coordinator-owned generation cancels scheduled work and exact-window observers on replacement; window close owns observer cleanup. | H fixture topology; Unit, Behavior, real multi-fullscreen UI, deterministic Pressure, Process/Tooling. | completed |
 | SYNC-026B | `SpaceFixtureDesktopRefocusOwner`, `AppKitSpaceFixtureWindow`, `SpaceFixtureWindowCoordinator`; desktop-anchor refocus | A fixed 1.2s delay after the final fullscreen callback assumes AppKit is ready to activate and key the desktop anchor. Evidence migration with controlled condition polling. | Install exact-window and active-Space observers before activation, then read back application activity, exact plan/window identity, key/main/visible/minimized/active-Space/occlusion state, and the exact on-screen CG window. Because AppKit exposes no request-acceptance callback, use an immediate-condition-first, named 100ms retry owned by the coordinator generation. Completion comes only from the exact readback; a named 15s watchdog reports the final unmet conditions and last evidence. | H fixture topology; Unit, Behavior, desktop-preserving real fixture UI, runtime-topology Pressure. | environment-blocked: implementation, Unit, Behavior, and deterministic Pressure completed; UI test execution and runtime-topology Pressure blocked before test-body execution by LocalAuthentication Code -4 |
-| SYNC-026C | Composite application AX-suppression routing boundary | The producer-side projection acknowledgement and fixture-side suppression lifecycle belong to different process and resource owners. Migration routing. | Close producer publication through SYNC-026C1 and fixture suppression through SYNC-026C2. | H aggregate; child rows define required validation. | in progress: SYNC-026C1 completed; SYNC-026C2 planned |
+| SYNC-026C | Composite application AX-suppression routing boundary | The producer-side projection acknowledgement and fixture-side suppression lifecycle belong to different process and resource owners. Migration routing. | Close producer publication through SYNC-026C1 and fixture suppression through SYNC-026C2. | H aggregate; child rows define required validation. | completed |
 | SYNC-026C1 | `FlowTabUITestProjectionAcknowledgementOwner`, `FlowTabUITestBootstrapper`, `FlowTabTestLaunchOptions`; FlowTab TestingSupport projection acknowledgement | A fixture cannot infer when prelaunched FlowTab has committed the exact fixture process and window topology. Evidence migration. | Parse explicit test-only routes, install the runtime projection observer before initial readback, and publish a distributed acknowledgement only for a complete, clean projection matching bundle ID, positive PID, and exact window count. Include monotonic acknowledgement and source generations. The app TestingSupport bootstrap owns observation and termination cleanup. | H cross-process fixture evidence; Unit, Behavior, deterministic Pressure, Process/Tooling; end-to-end UI transport joins SYNC-026C2. | completed |
-| SYNC-026C2 | `SpaceFixtureWindowCoordinator.scheduleApplicationAccessibilitySuppressionIfNeeded`; fixture application AX suppression | Fixed 5s and post-fullscreen 8s delays assume workflow consumers have captured the application AX window list. Evidence migration. | Install the route observer before fixture window publication, then suppress only after both the exact local topology stage and a matching acknowledgement for the fixture PID. Publish a monotonic suppression generation and read back the resulting application AX exposure. The coordinator owns cancellation, observer cleanup, and terminal diagnostics. | H fixture topology; Unit, Behavior, AX-suppressed real fixture UI, runtime-topology Pressure. | planned |
+| SYNC-026C2 | `SpaceFixtureApplicationAXSuppressionOwner`, `SpaceFixtureWindowCoordinator`; fixture application AX suppression | Fixed 5s and post-fullscreen 8s delays assume workflow consumers have captured the application AX window list. Evidence migration. | Install the route observer before fixture window publication, then suppress only after the exact local topology stage, exact published application AX readback, and a matching acknowledgement for the fixture PID and window count. Preserve the route-less fixture flag through the local-topology plus exact-readback contract. Require exact zero readback, publish a monotonic suppression generation for every resolved owner, and report routed terminal evidence. The coordinator owns cancellation and cleanup. | H fixture topology; Unit, Behavior, AX-suppressed real fixture UI, runtime-topology Pressure. | completed |
 | SYNC-027 | `SpaceFixtureAppDelegate`, `SpaceFixtureLaunchConfiguration`; terminate and close delay options | Configured terminate/close latency intentionally creates a slow-process or window-removal scenario. Domain duration. | Retain as named fixture fault policies with injectable scheduler, cancellation, and explicit “scheduled/applied” acknowledgement. App delegate/coordinator own pending work. | M; Unit, Behavior, representative fixture UI. | verification-needed |
 | SYNC-028 | `SpaceFixtureWindowContentView`, `SpaceFixtureWindowCoordinator`; workflow readiness labels | “Ready” is published before asynchronous fullscreen/refocus/close topology transitions complete, forcing UI settle waits. Evidence migration. | Publish a monotonic fixture transition generation/stage only after exact planned windows and requested fullscreen/key/AX exposure states are read back. UI observers establish a baseline before launch/action and wait for a later matching stage. | H; Unit, Behavior, all affected real fixture UI, runtime-topology Pressure. | planned |
 | SYNC-029 | `FlowTab/TestingSupport/FlowTabUITestBootstrapper.swift`; `presentInitialUIIfNeeded` | Twenty 150ms retries and two equal snapshots infer runtime projection stability before opening Search/switcher. Evidence migration. | Observe runtime projection commit notifications before bootstrap, capture baseline generation, perform initial readback, and open from a matching complete later generation. A shared UI-test watchdog reports the last session/projection signature. Bootstrapper owns observer/task cleanup. | H test orchestration; Behavior, UI, runtime-topology/Search Pressure. | planned |
@@ -125,7 +125,7 @@ and Process/Tooling.
 | SYNC-031 | `FlowTab/TestingSupport/FlowTabLaunchTesting.swift`; `TabSwitchStressRunner` | Switch cadence and total duration define the pressure workload. Domain duration. | Retain named protocol inputs, use a monotonic injectable clock/scheduler, propagate cancellation, and terminate only after the required workload/duration evidence. Runner task owns cancellation and cleanup. | M hot path; Unit/Behavior for runner, tab-switch Pressure, Process/Tooling. | verification-needed |
 | SYNC-032 | `FlowTabTests/FlowTabTests+Support.swift`, `FlowTabPriorityCoverageTests+AsyncSupport.swift`; shared async waits | Generic polling is used even where production callbacks, notifications, generations, or task completion are available; cancellation is swallowed. Evidence migration/conditional observation. | Add expectation/notification/task-completion helpers that observe before triggering. Keep one named immediate-check condition observer only for predicates without an event source, with cancellation and last-observation diagnostics. | M; app Unit/Behavior, Process/Tooling. | planned |
 | SYNC-033 | App tests with direct fixed waits: `FlowTabTests+CompactActionButton`, `+EnglishLayout`, `+PreferencesAndDiagnostics`, `FlowTabPriorityCoverageTests+PanelSessionBehavior`, `+RuntimeProjectionNotificationPublication`, `+RuntimeSpaceClassification`, `+SwitcherInteractionRegressions`; simulated latency in `+RuntimeSnapshotPressure` | Raw RunLoop advances and 60/80/250ms sleeps are used for settling or race setup; snapshot pressure sleep represents injected I/O latency. Evidence migration/domain pressure duration. | Replace settling with callbacks/state/generation expectations. Retain simulated latency only as a named injectable workload gate or pressure policy. Each test owns expectation cleanup and watchdog reporting. | M; affected Unit/Behavior and Pressure, Process/Tooling. | planned |
-| SYNC-034 | `FlowTabUITests+Support.swift`, `+WorkflowWindowObservation.swift`, `+SpaceFixtureApp.swift`, `+ScrollingSupport.swift`, `+StatusItem.swift`, and fixture assertion helpers; shared UI condition loops | RunLoop cadence advances drive XCUI/CG/AX/process predicate observation. Conditional observation. | Centralize named UI observation cadence and watchdog diagnostics, check immediately, use `waitForExistence`/predicate expectations where possible, and keep exact CG/AX/window/process readback as the sole Oracle. XCTest case lifetime owns the wait. | H test infrastructure; affected UI suites, Process/Tooling. | planned |
+| SYNC-034 | `FlowTabUITests+Support.swift`, `+WorkflowWindowObservation.swift`, `+SpaceFixtureApp.swift`, `+ScrollingSupport.swift`, `+StatusItem.swift`, and fixture assertion helpers; shared UI condition loops | RunLoop cadence advances drive XCUI/CG/AX/process predicate observation. Conditional observation. | Centralize named UI observation cadence and watchdog diagnostics, check immediately, use `waitForExistence`/predicate expectations where possible, and keep exact CG/AX/window/process readback as the sole Oracle. XCTest case lifetime owns the wait. | H test infrastructure; affected UI suites, Process/Tooling. | planned; SYNC-026C2 pressure attempt 002 captured a repeated Darwin-trigger delivery without a fresh matching acknowledgement |
 | SYNC-035 | Direct UI settle waits in Search, Settings, Home/Logs, MRU, Space fixture and switcher workflow tests; files enumerated in the UI audit scope below | Fixed 80ms–1.2s RunLoop advances occur between input/action and assertion, so assertion timing can change results. Evidence migration. | Remove each settle wait in favor of the affected visible element, log marker, fixture generation, process state, exact frontmost CG/AX window, or nonexistence Oracle. Observer/baseline setup precedes the action. | H; affected UI suites and matching Behavior coverage. | planned |
 | SYNC-036 | All literal XCTest timeouts in `FlowTabTests` and `FlowTabUITests` | 606 literal durations are generally terminal bounds for an independent expectation or XCUI predicate, but policy ownership and diagnostic tiers are implicit. Watchdog. | Replace literals with named app-test and UI-test watchdog policies by operation class; preserve expectation/predicate success Oracles and include unmet condition plus last observation in custom waits. Test case/helper owner supplies cleanup. | M mechanical/test infra; Unit/Behavior/UI, Process/Tooling. | planned |
 | SYNC-037 | `scripts/perf/tab-switch-stress.sh`, `search-committed-index-pressure.sh`, `runtime-topology-pressure.sh`, `lib/runtime-topology-target.sh` | Sampling duration/cadence and identity stability windows are pressure/safety protocols; process termination loops use unnamed 100ms cadence and attempt bounds. Domain duration/conditional observation/watchdog. | Retain measurement durations and sample cadence as named protocol inputs. Name process polling cadence/watchdogs, check state immediately, terminate from PID/start-identity/readback, and report the final `ps`/identity/status evidence. Traps own cancellation and cleanup. | M tooling/hot path; Pressure and Process/Tooling. | verification-needed |
@@ -2204,5 +2204,96 @@ polling cadence, deadline, or timeout in the scoped paths.
   exact staged-content review are recorded before commit. New production and
   test files remain below 400 lines; touched shared files remain below 800
   lines. Startup `prompts.zip` remains unchanged and outside the slice.
-- Commit: pending
+- Commit: `ea0b73d19ea0c1d725938a3c97d44648c6100d61`
   (`refactor(sync): publish SYNC-026C1 projection acknowledgement`).
+
+### SYNC-026C2 Closure Record
+
+- Design and Oracle: each workflow fixture receives a unique pair of
+  distributed-notification routes. The fixture installs its projection
+  acknowledgement observer before publishing windows, then records the exact
+  local topology stage after the no-fullscreen path, the final ordered
+  fullscreen transition, or the exact desktop-refocus readback. Suppression
+  begins only when the local stage is complete, both application AX attributes
+  expose the exact locally published count, and FlowTab has acknowledged the
+  same bundle ID, positive PID, and exact projected window count. Completion
+  requires both application AX attributes to read back zero and publishes a
+  monotonic suppression generation together with the accepted projection
+  generation and source generation. The fixture completion evidence carries
+  the exact zero readback for both application AX attributes. The independent
+  UI Oracle matches the exact running bundle/PID and reads the fixture's XCUI
+  window collection as empty. The route-less compatibility mode resolves from
+  the same exact local topology, published-count, and zero-readback evidence;
+  its local owner generation closes without cross-process publication.
+- Lifecycle: `SpaceFixtureWindowCoordinator` owns one
+  `SpaceFixtureApplicationAXSuppressionOwner`. Starting a fixture replaces and
+  cancels the prior observer, readback retry, and watchdog generation.
+  Coordinator cancellation and application termination remove every token.
+  Duplicate, regressed, mismatched, canceled, replaced, and stale-generation
+  acknowledgements cannot request suppression or publish completion. The UI
+  workflow installs all completion observers before launching FlowTab or any
+  fixture and removes them at workflow cleanup.
+- Retained time policy: AppKit and cross-process AX readback provide no
+  delivery callback, so an unmet local AX condition uses an
+  immediate-condition-first, named 100ms retry cadence. The suppression owner
+  owns and cancels that retry; time never establishes success. Its named 15s
+  watchdog performs a final readback and reports every unmet condition plus
+  the previous and final evidence. The UI's 20s bound is terminal failure only
+  and reports the latest completion and independent AX readback.
+- Unit and Behavior: the final focused canonical run passed 13/13 with zero
+  failures in 0.015 seconds under
+  `.build-local/evidence-driven-sync/SYNC-026C2/targeted-attempt-007`.
+  Coverage verifies the exact SYNC-026C1 transport parser,
+  observer-before-initial-readback ordering, synchronously delivered and
+  initially satisfiable evidence, wrong/duplicate/out-of-order
+  acknowledgements, delayed local publication, delayed zero readback,
+  cancellation, replacement, stale callback rejection, route-less
+  configuration compatibility, missing-acknowledgement watchdog diagnostics,
+  no-fullscreen suppression, ordered multi-fullscreen completion,
+  single-fullscreen completion, and exact desktop-refocus gating. Slower retry
+  delivery changes completion latency while preserving the result.
+- Full FlowTabTests: the final canonical wrapper rebuilt all six targets and
+  passed 966/966 with zero failures in 43.669 seconds under
+  `.build-local/evidence-driven-sync/SYNC-026C2/full-attempt-005`. Attempt 003
+  reproduced the assigned SYNC-032/SYNC-033 order-isolation failure in
+  `testSwitcherPanelControllerQuitFrontmostAppInAppLayerKeepsSessionAfterWorkspaceTerminationRefresh`;
+  the isolated diagnostic passed 1/1 in 0.242 seconds before the complete green
+  rerun.
+- FlowTabCore: not relevant because this contract belongs to the standalone
+  fixture, application TestingSupport transport, and UI orchestration
+  boundaries and adds no core-domain API.
+- Pressure: the deterministic 500-generation lifecycle workload synchronously
+  acknowledged each exact fixture identity, alternated immediate and delayed
+  zero readback, published completion generations 1 through 500 exactly once,
+  canceled every watchdog and retry, produced no failure, and left no active
+  observation. The real-topology pressure run then passed the representative
+  AX-suppressed cross-Space/fullscreen test 1/1 in 33.911 seconds under
+  `.build-local/evidence-driven-sync/SYNC-026C2/runtime-topology-pressure-attempt-004`.
+  Its frozen application identity contract matched across 44 checks and all 44
+  CPU/RSS samples, with zero rejected transient identities. The default noisy
+  Option+Tab scenario in attempt 002 completed C2 suppression and its first
+  visible phase, then reproduced a missing fresh acknowledgement for a repeated
+  Darwin trigger. That independent shared UI transport contract remains
+  assigned to SYNC-034.
+- UI: after the install wrapper prepared and verified the configured UI
+  application, the representative AX-suppressed cross-Space/fullscreen test
+  passed 1/1 with zero failures in 33.974 seconds under
+  `.build-local/evidence-driven-sync/SYNC-026C2/ui-attempt-005`. The fixture's
+  terminal notification carried the exact PID, acknowledgement/source
+  generations, and zero counts for both application AX attributes. The UI
+  independently matched that running bundle/PID, observed zero XCUI windows,
+  and completed both visible cross-Space selection phases.
+- Process/Tooling: `plutil -lint` passed for the Xcode project; the canonical
+  wrappers compiled the new fixture, test, and UI sources in their intended
+  targets. The UI wrapper now incrementally rebuilds every fixture variant from
+  the current source boundary for each invocation; this replaced a stale
+  July 28 variant that lacked the C2 routes, and `bash -n` validates the
+  wrapper. Stale-symbol and literal review confirms removal of the fixed 5s
+  and post-fullscreen 8s suppression policies. Source-size review keeps every
+  new source below 400 lines, reduces the touched coordinator test file from
+  763 to 556 lines, reduces the touched multi-app UI orchestration file from
+  1130 to 1103 lines, and reduces the UI wrapper from 809 to 670 lines.
+  `git diff --check` and exact staged-content review are recorded before
+  commit. Startup `prompts.zip` remains unchanged and outside the slice.
+- Commit: pending
+  (`refactor(sync): migrate SYNC-026C2 AX suppression`).

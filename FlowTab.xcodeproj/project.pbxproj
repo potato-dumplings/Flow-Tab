@@ -14,6 +14,19 @@
 		4A6DAE802F727AF600B0D737 /* FlowTabTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE7F2F727AF600B0D737 /* FlowTabTests.swift */; };
 		4A6DAE8A2F727AF600B0D737 /* FlowTabUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE892F727AF600B0D737 /* FlowTabUITests.swift */; };
 		4A6DAE8C2F727AF600B0D737 /* FlowTabUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE8B2F727AF600B0D737 /* FlowTabUITestsLaunchTests.swift */; };
+		FFE301013D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE300013D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionEvidence.swift */; };
+		FFE301023D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE300013D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionEvidence.swift */; };
+		FFE301033D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE300023D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionTransport.swift */; };
+		FFE301043D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE300023D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionTransport.swift */; };
+		FFE301053D2F000100B0D737 /* SpaceFixtureApplicationAXSuppression.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE300033D2F000100B0D737 /* SpaceFixtureApplicationAXSuppression.swift */; };
+		FFE301063D2F000100B0D737 /* SpaceFixtureApplicationAXSuppression.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE300033D2F000100B0D737 /* SpaceFixtureApplicationAXSuppression.swift */; };
+		FFE301073D2F000100B0D737 /* FlowTabUITests+SpaceFixtureApplicationAXSuppression.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE300043D2F000100B0D737 /* FlowTabUITests+SpaceFixtureApplicationAXSuppression.swift */; };
+		FFE301083D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE300053D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionTestSupport.swift */; };
+		FFE301093D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppression.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE300063D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppression.swift */; };
+		FFE3010A3D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppressionLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE300073D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppressionLifecycle.swift */; };
+		FFE3010B3D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppressionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE300083D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppressionCoordinator.swift */; };
+		FFE3010C3D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppressionFullscreenCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE300093D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppressionFullscreenCoordinator.swift */; };
+		FFE3010D3D2F000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowLaunch.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE3000A3D2F000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowLaunch.swift */; };
 		4A6DAE9D2F727C0900B0D737 /* FlowTabCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4A6DAE9C2F727C0900B0D737 /* FlowTabCore */; };
 		7A1B2C3D4E5F600100B0D737 /* FlowTabPriorityCoverageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1B2C3D4E5F600200B0D737 /* FlowTabPriorityCoverageTests.swift */; };
 		A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */; };
@@ -672,6 +685,16 @@
 		FFD300013D2E000100B0D737 /* FlowTabUITestProjectionAcknowledgement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestProjectionAcknowledgement.swift; sourceTree = "<group>"; };
 		FFD300033D2E000100B0D737 /* FlowTabTests+UITestProjectionAcknowledgement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+UITestProjectionAcknowledgement.swift"; sourceTree = "<group>"; };
 		FFD300053D2E000100B0D737 /* FlowTabTests+UITestProjectionAcknowledgementSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+UITestProjectionAcknowledgementSnapshot.swift"; sourceTree = "<group>"; };
+		FFE300013D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureApplicationAXSuppressionEvidence.swift; sourceTree = "<group>"; };
+		FFE300023D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureApplicationAXSuppressionTransport.swift; sourceTree = "<group>"; };
+		FFE300033D2F000100B0D737 /* SpaceFixtureApplicationAXSuppression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureApplicationAXSuppression.swift; sourceTree = "<group>"; };
+		FFE300043D2F000100B0D737 /* FlowTabUITests+SpaceFixtureApplicationAXSuppression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureApplicationAXSuppression.swift"; sourceTree = "<group>"; };
+		FFE300053D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureApplicationAXSuppressionTestSupport.swift; sourceTree = "<group>"; };
+		FFE300063D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SpaceFixtureApplicationAXSuppression.swift"; sourceTree = "<group>"; };
+		FFE300073D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppressionLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SpaceFixtureApplicationAXSuppressionLifecycle.swift"; sourceTree = "<group>"; };
+		FFE300083D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppressionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SpaceFixtureApplicationAXSuppressionCoordinator.swift"; sourceTree = "<group>"; };
+		FFE300093D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppressionFullscreenCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SpaceFixtureApplicationAXSuppressionFullscreenCoordinator.swift"; sourceTree = "<group>"; };
+		FFE3000A3D2F000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowLaunch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureWorkflowLaunch.swift"; sourceTree = "<group>"; };
 		F500000B2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureApp.swift"; sourceTree = "<group>"; };
 		F50000122F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureWorkflow.swift"; sourceTree = "<group>"; };
 		F50000132F90000100B0D737 /* SpaceFixtureWorkflowConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWorkflowConfiguration.swift; sourceTree = "<group>"; };
@@ -879,6 +902,11 @@
 				FFD200073D2D000100B0D737 /* SpaceFixtureDesktopRefocusTestSupport.swift */,
 				FFD300033D2E000100B0D737 /* FlowTabTests+UITestProjectionAcknowledgement.swift */,
 				FFD300053D2E000100B0D737 /* FlowTabTests+UITestProjectionAcknowledgementSnapshot.swift */,
+				FFE300053D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionTestSupport.swift */,
+				FFE300063D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppression.swift */,
+				FFE300073D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppressionLifecycle.swift */,
+				FFE300083D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppressionCoordinator.swift */,
+				FFE300093D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppressionFullscreenCoordinator.swift */,
 			);
 			path = FlowTabTests;
 			sourceTree = "<group>";
@@ -905,6 +933,8 @@
 				F500000B2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift */,
 				FFD200093D2D000100B0D737 /* FlowTabUITests+SpaceFixtureDesktopRefocus.swift */,
 				FFD2000F3D2D000100B0D737 /* FlowTabUITestAXWindowBridge.swift */,
+				FFE300043D2F000100B0D737 /* FlowTabUITests+SpaceFixtureApplicationAXSuppression.swift */,
+				FFE3000A3D2F000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowLaunch.swift */,
 				F50000122F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift */,
 				F50000152FA1000100B0D737 /* FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift */,
 				B20002012FBD000100B0D737 /* FlowTabUITests+SpaceFixtureHomeActivation.swift */,
@@ -1242,6 +1272,9 @@
 				FFD200013D2D000100B0D737 /* SpaceFixtureDesktopRefocus.swift */,
 				FFD2000D3D2D000100B0D737 /* SpaceFixtureDesktopPresentationEvidence.swift */,
 				FFD200033D2D000100B0D737 /* SpaceFixtureDesktopPresentationObservation.swift */,
+				FFE300013D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionEvidence.swift */,
+				FFE300023D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionTransport.swift */,
+				FFE300033D2F000100B0D737 /* SpaceFixtureApplicationAXSuppression.swift */,
 				F50000072F90000100B0D737 /* AppKitSpaceFixtureWindow.swift */,
 				F50000082F90000100B0D737 /* SpaceFixtureWindowContentView.swift */,
 				F6D0C0013C00000100B0D737 /* PublishedDockIcon.svg */,
@@ -1724,6 +1757,14 @@
 				FFD200083D2D000100B0D737 /* SpaceFixtureDesktopRefocusTestSupport.swift in Sources */,
 				FFD300043D2E000100B0D737 /* FlowTabTests+UITestProjectionAcknowledgement.swift in Sources */,
 				FFD300063D2E000100B0D737 /* FlowTabTests+UITestProjectionAcknowledgementSnapshot.swift in Sources */,
+				FFE301023D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionEvidence.swift in Sources */,
+				FFE301043D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionTransport.swift in Sources */,
+				FFE301063D2F000100B0D737 /* SpaceFixtureApplicationAXSuppression.swift in Sources */,
+				FFE301083D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionTestSupport.swift in Sources */,
+				FFE301093D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppression.swift in Sources */,
+				FFE3010A3D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppressionLifecycle.swift in Sources */,
+				FFE3010B3D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppressionCoordinator.swift in Sources */,
+				FFE3010C3D2F000100B0D737 /* FlowTabTests+SpaceFixtureApplicationAXSuppressionFullscreenCoordinator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1763,6 +1804,8 @@
 				F50001162FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift in Sources */,
 				F50001172FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsAssertions.swift in Sources */,
 				F50001132F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift in Sources */,
+				FFE301073D2F000100B0D737 /* FlowTabUITests+SpaceFixtureApplicationAXSuppression.swift in Sources */,
+				FFE3010D3D2F000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowLaunch.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1780,6 +1823,9 @@
 				FFD200023D2D000100B0D737 /* SpaceFixtureDesktopRefocus.swift in Sources */,
 				FFD2000E3D2D000100B0D737 /* SpaceFixtureDesktopPresentationEvidence.swift in Sources */,
 				FFD200043D2D000100B0D737 /* SpaceFixtureDesktopPresentationObservation.swift in Sources */,
+				FFE301013D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionEvidence.swift in Sources */,
+				FFE301033D2F000100B0D737 /* SpaceFixtureApplicationAXSuppressionTransport.swift in Sources */,
+				FFE301053D2F000100B0D737 /* SpaceFixtureApplicationAXSuppression.swift in Sources */,
 				F50001062F90000100B0D737 /* AppKitSpaceFixtureWindow.swift in Sources */,
 				F50001072F90000100B0D737 /* SpaceFixtureWindowContentView.swift in Sources */,
 			);

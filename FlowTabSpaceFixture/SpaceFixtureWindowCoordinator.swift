@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import Darwin
 import Foundation
 
 @MainActor
@@ -28,9 +29,8 @@ final class SpaceFixtureWindowCoordinator {
     typealias WindowFactory = (SpaceFixtureWindowPlan) -> any SpaceFixtureWindowing
     typealias ActivationHandler = () -> Void
     typealias ApplicationAccessibilityElementsPublisher = ([Any]) -> Void
-
-    private static let defaultApplicationAccessibilitySuppressionDelayMilliseconds = 5_000
-    private static let fullscreenAccessibilitySuppressionSettleDelayMilliseconds = 8_000
+    typealias ApplicationIdentityProvider =
+        () -> SpaceFixtureApplicationIdentity
     private static let desktopRefocusWatchdogMilliseconds =
         15_000
     private static let desktopRefocusRetryIntervalMilliseconds =
@@ -44,19 +44,27 @@ final class SpaceFixtureWindowCoordinator {
         SpaceFixtureFullscreenTransitionOwner
     private let desktopRefocusOwner:
         SpaceFixtureDesktopRefocusOwner
+    private let applicationAXSuppressionOwner:
+        SpaceFixtureApplicationAXSuppressionOwner
     private let activateApplication: ActivationHandler
     private let applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher
+    private let applicationIdentityProvider:
+        ApplicationIdentityProvider
 
     private(set) var windows: [any SpaceFixtureWindowing] = []
     private var suppressesApplicationAccessibilityElements = false
     private var windowCloseToken: (any SpaceFixtureCancellable)?
-    private var accessibilitySuppressionToken:
-        (any SpaceFixtureCancellable)?
 
     var lastDesktopRefocusWatchdogFailure:
         SpaceFixtureDesktopRefocusWatchdogFailure?
     {
         desktopRefocusOwner.lastFailure
+    }
+
+    var lastApplicationAXSuppressionWatchdogFailure:
+        SpaceFixtureApplicationAXSuppressionWatchdogFailure?
+    {
+        applicationAXSuppressionOwner.lastFailure
     }
 
     init(
@@ -65,7 +73,11 @@ final class SpaceFixtureWindowCoordinator {
         windowFactory: WindowFactory? = nil,
         scheduler: (any SpaceFixtureScheduling)? = nil,
         activateApplication: ActivationHandler? = nil,
-        applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher? = nil
+        applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher? = nil,
+        applicationAXSuppressionOwner:
+            SpaceFixtureApplicationAXSuppressionOwner? = nil,
+        applicationIdentityProvider:
+            ApplicationIdentityProvider? = nil
     ) {
         let resolvedScheduler = scheduler ?? SpaceFixtureScheduler()
         self.configuration = configuration
@@ -80,6 +92,14 @@ final class SpaceFixtureWindowCoordinator {
             SpaceFixtureDesktopRefocusOwner(
                 scheduler: resolvedScheduler
             )
+        self.applicationAXSuppressionOwner =
+            applicationAXSuppressionOwner
+            ?? SpaceFixtureApplicationAXSuppressionOwner(
+                scheduler: resolvedScheduler,
+                exposureProvider: {
+                    Self.applicationAccessibilityExposure()
+                }
+            )
         self.activateApplication = activateApplication ?? {
             NSApplication.shared.activate(ignoringOtherApps: true)
         }
@@ -87,16 +107,27 @@ final class SpaceFixtureWindowCoordinator {
             NSApplication.shared.setAccessibilityChildren($0)
             NSApplication.shared.setAccessibilityWindows($0)
         }
+        self.applicationIdentityProvider =
+            applicationIdentityProvider ?? {
+                SpaceFixtureApplicationIdentity(
+                    bundleIdentifier:
+                        Bundle.main.bundleIdentifier
+                        ?? ProcessInfo.processInfo.processName,
+                    processIdentifier: getpid()
+                )
+            }
     }
 
     func launch() {
         cancelScheduledWork()
+        suppressesApplicationAccessibilityElements = false
         let windowPlans = SpaceFixtureWindowPlanner.makePlans(
             configuration: configuration,
             visibleFrame: visibleFrameProvider()
         )
         windows = windowPlans.map(windowFactory)
         let windowTitles = windowPlans.map(\.title)
+        prepareApplicationAXSuppressionIfNeeded()
 
         let deferredPanelWindows = showInitialWindows()
         activateApplication()
@@ -108,15 +139,21 @@ final class SpaceFixtureWindowCoordinator {
         scheduleWindowCloseIfNeeded()
 
         guard !configuration.fullscreenWindowIndices.isEmpty else {
-            scheduleApplicationAccessibilitySuppressionIfNeeded()
+            applicationAXSuppressionOwner
+                .localTopologyStageDidResolve()
             return
         }
         let fullscreenWindows = orderedFullscreenWindowsForTransition()
         guard !fullscreenWindows.isEmpty else {
-            scheduleApplicationAccessibilitySuppressionIfNeeded()
+            applicationAXSuppressionOwner
+                .localTopologyStageDidResolve()
             return
         }
         scheduleFullscreenTransitions(fullscreenWindows)
+    }
+
+    func cancel() {
+        cancelScheduledWork()
     }
 
     private func scheduleWindowCloseIfNeeded() {
@@ -189,17 +226,22 @@ final class SpaceFixtureWindowCoordinator {
             },
             onComplete: { [weak self] _ in
                 guard let self else { return }
-                self.scheduleDesktopRefocusIfNeeded(
+                self.resolveApplicationAXSuppressionTopology(
                     desktopAnchorWindow
                 )
-                self
-                    .scheduleApplicationAccessibilitySuppressionAfterFullscreenSettleIfNeeded()
             }
         )
     }
 
-    private func scheduleDesktopRefocusIfNeeded(_ desktopAnchorWindow: (any SpaceFixtureWindowing)?) {
-        guard let desktopAnchorWindow else { return }
+    private func resolveApplicationAXSuppressionTopology(
+        _ desktopAnchorWindow:
+            (any SpaceFixtureWindowing)?
+    ) {
+        guard let desktopAnchorWindow else {
+            applicationAXSuppressionOwner
+                .localTopologyStageDidResolve()
+            return
+        }
 
         desktopRefocusOwner.start(
             window: desktopAnchorWindow,
@@ -213,7 +255,10 @@ final class SpaceFixtureWindowCoordinator {
                 desktopAnchorWindow.show(isKey: true)
             },
             onResolved: { [weak self] _ in
-                self?.publishApplicationAccessibilityElements()
+                guard let self else { return }
+                self.publishApplicationAccessibilityElements()
+                self.applicationAXSuppressionOwner
+                    .localTopologyStageDidResolve()
             },
             onWatchdog: { failure in
                 NSLog(
@@ -224,13 +269,28 @@ final class SpaceFixtureWindowCoordinator {
         )
     }
 
-    private func scheduleApplicationAccessibilitySuppressionAfterFullscreenSettleIfNeeded() {
-        guard !configuration.fullscreenWindowIndices.isEmpty else {
-            scheduleApplicationAccessibilitySuppressionIfNeeded()
+    private func prepareApplicationAXSuppressionIfNeeded() {
+        guard
+            !configuration
+                .publishesApplicationAccessibilityChildren
+        else {
             return
         }
-        scheduleApplicationAccessibilitySuppressionIfNeeded(
-            delayMilliseconds: Self.fullscreenAccessibilitySuppressionSettleDelayMilliseconds
+        applicationAXSuppressionOwner.start(
+            route: configuration.applicationAXSuppressionRoute,
+            identity: applicationIdentityProvider(),
+            expectedProjectionWindowCount:
+                configuration.windowCount,
+            expectedPublishedAXWindowCount:
+                windows.filter(
+                    \.plan.publishesApplicationAXWindow
+                ).count,
+            suppress: { [weak self] in
+                guard let self else { return }
+                self.suppressesApplicationAccessibilityElements =
+                    true
+                self.publishApplicationAccessibilityElements()
+            }
         )
     }
 
@@ -246,37 +306,25 @@ final class SpaceFixtureWindowCoordinator {
         )
     }
 
-    private func scheduleApplicationAccessibilitySuppressionIfNeeded(delayMilliseconds: Int? = nil) {
-        guard !configuration.publishesApplicationAccessibilityChildren else { return }
-        accessibilitySuppressionToken?.cancel()
-        accessibilitySuppressionToken = scheduler.schedule(
-            afterMilliseconds:
-                delayMilliseconds
-                ?? applicationAccessibilitySuppressionDelayMilliseconds()
-        ) {
-            self.suppressesApplicationAccessibilityElements = true
-            self.publishApplicationAccessibilityElements()
-        }
-    }
-
-    private func applicationAccessibilitySuppressionDelayMilliseconds() -> Int {
-        guard !configuration.fullscreenWindowIndices.isEmpty else {
-            return Self.defaultApplicationAccessibilitySuppressionDelayMilliseconds
-        }
-        return max(
-            Self.defaultApplicationAccessibilitySuppressionDelayMilliseconds,
-            configuration.enterFullscreenDelayMilliseconds
-                + Self.fullscreenAccessibilitySuppressionSettleDelayMilliseconds
-        )
-    }
-
     private func cancelScheduledWork() {
         fullscreenTransitionOwner.cancel()
         desktopRefocusOwner.cancel()
+        applicationAXSuppressionOwner.cancel()
         windowCloseToken?.cancel()
         windowCloseToken = nil
-        accessibilitySuppressionToken?.cancel()
-        accessibilitySuppressionToken = nil
+    }
+
+    private static func applicationAccessibilityExposure()
+        -> SpaceFixtureApplicationAXExposure
+    {
+        SpaceFixtureApplicationAXExposure(
+            childWindowCount:
+                NSApplication.shared
+                    .accessibilityChildren()?.count ?? 0,
+            windowsAttributeCount:
+                NSApplication.shared
+                    .accessibilityWindows()?.count ?? 0
+        )
     }
 
     private static func defaultVisibleFrame() -> CGRect {

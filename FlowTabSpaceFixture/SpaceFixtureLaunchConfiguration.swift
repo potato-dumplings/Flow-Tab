@@ -56,6 +56,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
     let enterFullscreenDelayMilliseconds: Int
     let preservesDesktopAfterFullscreen: Bool
     let publishesApplicationAccessibilityChildren: Bool
+    let applicationAXSuppressionRoute:
+        SpaceFixtureApplicationAXSuppressionRoute?
     let terminationDelayMilliseconds: Int
     let closeWindowIndex: Int?
     let closeWindowDelayMilliseconds: Int
@@ -88,6 +90,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         enterFullscreenDelayMilliseconds: Int,
         preservesDesktopAfterFullscreen: Bool,
         publishesApplicationAccessibilityChildren: Bool = true,
+        applicationAXSuppressionRoute:
+            SpaceFixtureApplicationAXSuppressionRoute? = nil,
         terminationDelayMilliseconds: Int = 0,
         closeWindowIndex: Int? = nil,
         closeWindowDelayMilliseconds: Int = 0,
@@ -101,6 +105,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         self.enterFullscreenDelayMilliseconds = enterFullscreenDelayMilliseconds
         self.preservesDesktopAfterFullscreen = preservesDesktopAfterFullscreen
         self.publishesApplicationAccessibilityChildren = publishesApplicationAccessibilityChildren
+        self.applicationAXSuppressionRoute =
+            applicationAXSuppressionRoute
         self.terminationDelayMilliseconds = max(0, terminationDelayMilliseconds)
         self.closeWindowIndex = closeWindowIndex.flatMap { windows.indices.contains($0 - 1) ? $0 : nil }
         self.closeWindowDelayMilliseconds = max(0, closeWindowDelayMilliseconds)
@@ -117,6 +123,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         enterFullscreenDelayMilliseconds: Int,
         preservesDesktopAfterFullscreen: Bool,
         publishesApplicationAccessibilityChildren: Bool = true,
+        applicationAXSuppressionRoute:
+            SpaceFixtureApplicationAXSuppressionRoute? = nil,
         terminationDelayMilliseconds: Int = 0,
         closeWindowIndex: Int? = nil,
         closeWindowDelayMilliseconds: Int = 0
@@ -155,6 +163,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             enterFullscreenDelayMilliseconds: max(0, enterFullscreenDelayMilliseconds),
             preservesDesktopAfterFullscreen: preservesDesktopAfterFullscreen,
             publishesApplicationAccessibilityChildren: publishesApplicationAccessibilityChildren,
+            applicationAXSuppressionRoute:
+                applicationAXSuppressionRoute,
             terminationDelayMilliseconds: terminationDelayMilliseconds,
             closeWindowIndex: closeWindowIndex,
             closeWindowDelayMilliseconds: closeWindowDelayMilliseconds
@@ -202,6 +212,10 @@ extension SpaceFixtureLaunchConfiguration {
             enterFullscreenDelayMilliseconds: normalizedDelayMilliseconds,
             preservesDesktopAfterFullscreen: arguments.contains("--preserve-desktop-after-fullscreen"),
             publishesApplicationAccessibilityChildren: !arguments.contains("--suppress-app-accessibility-children"),
+            applicationAXSuppressionRoute:
+                Self.applicationAXSuppressionRoute(
+                    arguments: arguments
+                ),
             terminationDelayMilliseconds: normalizedTerminationDelayMilliseconds,
             closeWindowIndex: Self.intValue(after: "--close-window-index", in: arguments),
             closeWindowDelayMilliseconds: normalizedCloseWindowDelayMilliseconds
@@ -258,6 +272,10 @@ extension SpaceFixtureLaunchConfiguration {
             ),
             preservesDesktopAfterFullscreen: arguments.contains("--preserve-desktop-after-fullscreen"),
             publishesApplicationAccessibilityChildren: !arguments.contains("--suppress-app-accessibility-children"),
+            applicationAXSuppressionRoute:
+                Self.applicationAXSuppressionRoute(
+                    arguments: arguments
+                ),
             terminationDelayMilliseconds: max(
                 0,
                 Self.intValue(after: "--terminate-delay-ms", in: arguments) ?? 0
@@ -325,6 +343,34 @@ extension SpaceFixtureLaunchConfiguration {
     ) -> String {
         let trimmedValue = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmedValue?.isEmpty == false ? trimmedValue! : fallback
+    }
+
+    private static func applicationAXSuppressionRoute(
+        arguments: [String]
+    ) -> SpaceFixtureApplicationAXSuppressionRoute? {
+        guard let acknowledgementName = stringValue(
+            after:
+                SpaceFixtureApplicationAXSuppressionRoute
+                    .projectionAcknowledgementArgument,
+            in: arguments
+        )?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !acknowledgementName.isEmpty,
+        let completionName = stringValue(
+            after:
+                SpaceFixtureApplicationAXSuppressionRoute
+                    .suppressionCompletionArgument,
+            in: arguments
+        )?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !completionName.isEmpty
+        else {
+            return nil
+        }
+        return SpaceFixtureApplicationAXSuppressionRoute(
+            projectionAcknowledgementNotificationName:
+                Notification.Name(acknowledgementName),
+            suppressionCompletionNotificationName:
+                Notification.Name(completionName)
+        )
     }
 
     fileprivate static func stringValue(after flag: String, in arguments: [String]) -> String? {

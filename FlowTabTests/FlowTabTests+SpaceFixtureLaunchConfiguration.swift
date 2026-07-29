@@ -66,6 +66,7 @@ extension FlowTabTests {
         )
         XCTAssertFalse(configuration.preservesDesktopAfterFullscreen)
         XCTAssertTrue(configuration.publishesApplicationAccessibilityChildren)
+        XCTAssertNil(configuration.applicationAXSuppressionRoute)
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 0)
         XCTAssertNil(configuration.closeWindowIndex)
         XCTAssertEqual(configuration.closeWindowDelayMilliseconds, 0)
@@ -92,6 +93,7 @@ extension FlowTabTests {
         XCTAssertEqual(configuration.enterFullscreenDelayMilliseconds, 0)
         XCTAssertFalse(configuration.preservesDesktopAfterFullscreen)
         XCTAssertFalse(configuration.publishesApplicationAccessibilityChildren)
+        XCTAssertNil(configuration.applicationAXSuppressionRoute)
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 0)
         XCTAssertNil(configuration.closeWindowIndex)
         XCTAssertEqual(configuration.closeWindowDelayMilliseconds, 0)
@@ -185,7 +187,11 @@ extension FlowTabTests {
                 "--enter-fullscreen-delay-ms", "900",
                 "--terminate-delay-ms", "1100",
                 "--preserve-desktop-after-fullscreen",
-                "--suppress-app-accessibility-children"
+                "--suppress-app-accessibility-children",
+                "--projection-acknowledgement-notification-name",
+                "test.fixture.projection.ack",
+                "--accessibility-suppression-notification-name",
+                "test.fixture.ax.suppressed"
             ]
         )
 
@@ -200,6 +206,19 @@ extension FlowTabTests {
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 1100)
         XCTAssertTrue(configuration.preservesDesktopAfterFullscreen)
         XCTAssertFalse(configuration.publishesApplicationAccessibilityChildren)
+        XCTAssertEqual(
+            configuration.applicationAXSuppressionRoute,
+            SpaceFixtureApplicationAXSuppressionRoute(
+                projectionAcknowledgementNotificationName:
+                    Notification.Name(
+                        "test.fixture.projection.ack"
+                    ),
+                suppressionCompletionNotificationName:
+                    Notification.Name(
+                        "test.fixture.ax.suppressed"
+                    )
+            )
+        )
         XCTAssertEqual(configuration.windows[0].configuredTitle, "Chrome Window 1")
         XCTAssertFalse(configuration.windows[0].noisyCGSiblings)
         XCTAssertEqual(configuration.windows[0].kind, .panel)
