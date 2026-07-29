@@ -151,8 +151,15 @@ extension FlowTabPriorityCoverageTests {
             )
         )
         let capturedImage = makeColorImage(color: .systemPurple)
+        let previewBatchStarted = expectation(
+            description:
+                "window-only preview batch starts"
+        )
+        previewBatchStarted.assertForOverFulfill = true
+        let previewBatchRelease = DispatchSemaphore(value: 0)
         model.previewCaptureBatchOverride = { requests in
-            Thread.sleep(forTimeInterval: 0.08)
+            previewBatchStarted.fulfill()
+            previewBatchRelease.wait()
             return requests.enumerated().map { index, _ in
                 RuntimeWindowPreviewProvider.CaptureResult(
                     image: capturedImage,
@@ -165,19 +172,118 @@ extension FlowTabPriorityCoverageTests {
         controller.setModifierReleaseConfirmationSuppressedForTesting(true)
         controller.appIsActiveOverride = true
         controller.hideNonPanelWindowsOverride = {}
+        let previewRevealCompleted = expectation(
+            description:
+                "matching preview-ready evidence reveals panel"
+        )
+        previewRevealCompleted.assertForOverFulfill =
+            true
+        let controllerPreviewBatchObserver =
+            model
+                .onWindowOnlyPreviewPreparationChanged
+        var expectedObservationGeneration: Int?
+        var expectedPresentationGeneration: Int?
+        var didObserveReveal = false
+        model.onWindowOnlyPreviewPreparationChanged = {
+            controllerPreviewBatchObserver?()
+            let owner =
+                controller
+                    .initialWindowOnlyPreviewRevealObservationOwner
+            let previewSnapshot =
+                model.windowPreviewSnapshotForTesting()
+            guard
+                !didObserveReveal,
+                let expectedObservationGeneration,
+                let expectedPresentationGeneration,
+                let evidence = owner.lastReadyEvidence,
+                evidence.source == .previewBatchCompleted,
+                evidence.observationGeneration
+                    == expectedObservationGeneration,
+                evidence.presentationGeneration
+                    == expectedPresentationGeneration,
+                evidence.snapshot.pendingCaptureCount == 0,
+                controller.presentationSessionGeneration
+                    == expectedPresentationGeneration,
+                !owner.isObserving,
+                !owner.hasPendingWatchdog,
+                owner.lastWatchdogFailure == nil,
+                controller.panel.alphaValue == 1,
+                model.windowOnlyPreviewCaptureInFlightCount
+                    == 0,
+                previewSnapshot.count == windows.count,
+                previewSnapshot.allSatisfy(\.hasImage)
+            else {
+                return
+            }
+            didObserveReveal = true
+            previewRevealCompleted.fulfill()
+        }
+        defer {
+            previewBatchRelease.signal()
+            model
+                .onWindowOnlyPreviewPreparationChanged =
+                    controllerPreviewBatchObserver
+            controller.cancelSelectionForTesting()
+        }
 
         XCTAssertTrue(controller.presentInAppWindowHotkeySessionForTesting())
+        await fulfillment(
+            of: [previewBatchStarted],
+            timeout: 1
+        )
         XCTAssertEqual(controller.panel.alphaValue, 0, accuracy: 0.001)
-        let didReveal = await waitUntil(
-            "window-only panel reveals after preview batch",
-            pollIntervalNanoseconds: 5_000_000,
-            predicate: { controller.panel.alphaValue == 1 }
-        )
-        XCTAssertTrue(didReveal)
         XCTAssertTrue(
-            model.windowPreviewSnapshotForTesting().allSatisfy(\.hasImage)
+            controller
+                .initialWindowOnlyPreviewRevealObservationOwner
+                .isObserving
         )
-        controller.cancelSelectionForTesting()
+        expectedObservationGeneration =
+            controller
+                .initialWindowOnlyPreviewRevealObservationOwner
+                .generation
+        expectedPresentationGeneration =
+            controller.presentationSessionGeneration
+
+        previewBatchRelease.signal()
+        await fulfillment(
+            of: [previewRevealCompleted],
+            timeout: 1
+        )
+
+        let evidence =
+            controller
+                .initialWindowOnlyPreviewRevealObservationOwner
+                .lastReadyEvidence
+        XCTAssertEqual(
+            evidence?.source,
+            .previewBatchCompleted
+        )
+        XCTAssertEqual(
+            evidence?.observationGeneration,
+            expectedObservationGeneration
+        )
+        XCTAssertEqual(
+            evidence?.presentationGeneration,
+            expectedPresentationGeneration
+        )
+        XCTAssertEqual(
+            evidence?.snapshot.pendingCaptureCount,
+            0
+        )
+        XCTAssertEqual(
+            controller.panel.alphaValue,
+            1,
+            accuracy: 0.001
+        )
+        let finalPreviewSnapshot =
+            model.windowPreviewSnapshotForTesting()
+        XCTAssertTrue(
+            finalPreviewSnapshot.allSatisfy(\.hasImage)
+        )
+        XCTAssertEqual(
+            finalPreviewSnapshot.count,
+            windows.count
+        )
     }
 
     @MainActor

@@ -136,6 +136,8 @@ final class InitialWindowOnlyPreviewRevealObservationOwner {
     private var pending: PendingObservation?
 
     private(set) var generation = 0
+    private(set) var lastReadyEvidence:
+        InitialWindowOnlyPreviewRevealEvidence?
     private(set) var lastWatchdogFailure:
         InitialWindowOnlyPreviewRevealWatchdogFailure?
 
@@ -178,6 +180,7 @@ final class InitialWindowOnlyPreviewRevealObservationOwner {
         cancel(invalidate: false)
         generation += 1
         let observationGeneration = generation
+        lastReadyEvidence = nil
         lastWatchdogFailure = nil
         pending = PendingObservation(
             generation: observationGeneration,
@@ -311,6 +314,7 @@ final class InitialWindowOnlyPreviewRevealObservationOwner {
         ) else {
             return
         }
+        lastReadyEvidence = evidence
         completed.onReady(evidence)
     }
 
