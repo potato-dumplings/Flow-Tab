@@ -152,6 +152,8 @@ extension FlowTabUITests {
 
         waitForRuntimeLogFiles(
             containing: [
+                "mock window preview latency",
+                "outcome=elapsed delayMs=80",
                 "inAppHotkeyPressed dir=forward panelVisible=0 action=show",
                 "show kind=inApp action=initialAdvance key=tabForward",
                 "initial window-only panel revealed reason=preview_batch_completed previewsReady=1",

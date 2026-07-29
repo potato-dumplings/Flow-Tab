@@ -127,7 +127,9 @@ and Process/Tooling.
 | SYNC-028B1 | `SpaceFixtureWorkflowReadinessAggregateOwner`, `launchResolvedSpaceFixtureWorkflow`, `launchResolvedEdgeInputsWorkflow`; all-process readiness aggregation | A workflow-wide `settleTimeout` and fixed RunLoop advancement inferred when independently launched fixture processes and their Space topology were ready. Evidence migration plus watchdog. | Install a unique distributed observer for every workflow app before launching any process. Capture each exact configured baseline and accept its later ready evidence only for the configured workflow app ID, bundle ID, PID, observation generation, window plan, fullscreen plan, and titles. Complete after every app has terminal evidence. The workflow invocation owns all observers and aggregate-generation cancellation; one named watchdog reports every unmet app and last observation. | H multi-process fixture topology; Unit, Behavior, standard and edge multi-application UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-028B2 | `SpaceFixtureWorkflowDesktopAnchorObservationOwner`, `launchResolvedSpaceFixtureWorkflow`, `launchResolvedEdgeInputsWorkflow`; final desktop-anchor activation | After aggregate readiness, the launchers call `activate()` and use generic foreground state as the final desktop-anchor result. Evidence migration with exact readback. | Establish workspace observers and initial readback before activation. Resolve only when the exact readiness PID is active and frontmost, XCUI reports it foreground, the exact plan-identified XCUI window frame matches the PID-scoped topmost on-screen CG window, and that CG frame satisfies the desktop-Space non-fullscreen-size readback. The workflow invocation owns generation cancellation, observers, polling, and a diagnostic terminal watchdog. | H desktop/Space topology; Unit, Behavior, affected standard and edge UI, runtime-topology Pressure, Process/Tooling. | completed |
 | SYNC-029 | `FlowTabUITestInitialPresentationObservationOwner`, `FlowTabUITestBootstrapper.presentInitialUIIfNeeded`; initial UI-test Search/switcher presentation | Twenty 150ms retries and two equal snapshots infer runtime projection stability before opening Search/switcher. Evidence migration. | Install exact projection observers before the baseline readback and readiness request. Resolve from an initially complete projection, a monotonic later generation, or a same-generation completeness transition; require the exact filtered projection/session item signature and a compatible post-presentation readback. A complete empty projection is authoritative no-content. The bootstrapper owns replacement, prepare, termination, resolution, observer, generation, task, and watchdog cleanup. | H test orchestration; Behavior, UI, runtime-topology/Search Pressure. | completed |
-| SYNC-030 | `FlowTabUITestBootstrapper.installMockWindowPreviewsIfNeeded`, initial stale occlusion hook | Thread sleep and millisecond launch options intentionally inject preview latency or stale visibility. Domain fixture duration. | Retain as named fault-injection policies, preferably backed by controllable gates/acknowledgements; ensure cancellation and completion markers are owned by TestingSupport and UI tests wait on the resulting Oracle. | M; Behavior, affected UI, Pressure when used. | verification-needed |
+| SYNC-030 | Composite TestingSupport fault-injection timing boundary | Semantic owner review separated mock preview-capture latency from initial panel-occlusion staleness. Domain fixture duration routing. | Close preview-capture latency through SYNC-030A and panel-occlusion staleness through SYNC-030B. | M aggregate; child rows define required validation. | in-progress |
+| SYNC-030A | `FlowTabUITestMockWindowPreviewLatencyOwner`, `FlowTabUITestBootstrapper.installMockWindowPreviewsIfNeeded`; mock preview I/O latency | A blocking thread sleep intentionally delays preview capture, has no cancellation owner, and exposes no TestingSupport completion evidence. Domain fixture duration. | Retain the compatible millisecond launch option as a bounded named latency policy. A TestingSupport generation owner performs a cancellable monotonic deadline wait and publishes exact owner/batch/request/outcome evidence. Preview result identity remains the success Oracle. Bootstrap preparation, replacement, termination, and deinitialization own cancellation. | M asynchronous preview path; Unit, Behavior, affected UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
+| SYNC-030B | Initial panel-occlusion stale hook in `FlowTabUITestBootstrapper` | A task sleep intentionally holds stale occlusion state before releasing visibility, while generation equality informally rejects replacement. Domain fixture duration. | Retain the compatible millisecond launch option as a bounded named staleness policy; inject a cancellable scheduler, publish installed/released/cancelled evidence, and make bootstrap preparation, replacement, termination, and deinitialization own cleanup. The panel visibility/recovery state remains the success Oracle. | M presentation lifecycle; Unit, Behavior, affected UI, deterministic lifecycle Pressure, Process/Tooling. | planned |
 | SYNC-031 | `FlowTab/TestingSupport/FlowTabLaunchTesting.swift`; `TabSwitchStressRunner` | Switch cadence and total duration define the pressure workload. Domain duration. | Retain named protocol inputs, use a monotonic injectable clock/scheduler, propagate cancellation, and terminate only after the required workload/duration evidence. Runner task owns cancellation and cleanup. | M hot path; Unit/Behavior for runner, tab-switch Pressure, Process/Tooling. | verification-needed |
 | SYNC-032 | `FlowTabTests/FlowTabTests+Support.swift`, `FlowTabPriorityCoverageTests+AsyncSupport.swift`; shared async waits | Generic polling is used even where production callbacks, notifications, generations, or task completion are available; cancellation is swallowed. Evidence migration/conditional observation. | Add expectation/notification/task-completion helpers that observe before triggering. Keep one named immediate-check condition observer only for predicates without an event source, with cancellation and last-observation diagnostics. | M; app Unit/Behavior, Process/Tooling. | planned |
 | SYNC-033 | App tests with direct fixed waits: `FlowTabTests+CompactActionButton`, `+EnglishLayout`, `+PreferencesAndDiagnostics`, `FlowTabPriorityCoverageTests+PanelSessionBehavior`, `+RuntimeProjectionNotificationPublication`, `+RuntimeSpaceClassification`, `+SwitcherInteractionRegressions`; simulated latency in `+RuntimeSnapshotPressure` | Raw RunLoop advances and 60/80/250ms sleeps are used for settling or race setup; snapshot pressure sleep represents injected I/O latency. Evidence migration/domain pressure duration. | Replace settling with callbacks/state/generation expectations. Retain simulated latency only as a named injectable workload gate or pressure policy. Each test owns expectation cleanup and watchdog reporting. | M; affected Unit/Behavior and Pressure, Process/Tooling. | planned |
@@ -2827,5 +2829,64 @@ polling cadence, deadline, or timeout in the scoped paths.
   commit. Every new production source remains within the 400-line guardrail;
   the touched oversized AppDelegate lifecycle test source shrank. Startup
   `prompts.zip` remains unchanged and outside the slice.
-- Commit: pending
+- Commit: `1c4dae662a0a9179b8edde21fb9ce8adc34e4385`
   (`refactor(sync): migrate SYNC-029 initial UI readiness`).
+
+### SYNC-030A Closure Record
+
+- Classification and policy:
+  `--flowtab-ui-mock-window-preview-delay-ms` remains compatible and is
+  classified as intentional mock I/O latency. The named
+  `FlowTabUITestMockWindowPreviewLatencyPolicy` preserves the previous one-to-
+  1,000 millisecond bounds. Elapsed time releases the injected capture work;
+  it never establishes preview success.
+- Owner and evidence:
+  `FlowTabUITestMockWindowPreviewLatencyOwner` assigns exact owner and batch
+  generations, request count, bounded policy, and `elapsed` or `cancelled`
+  outcome to every wait. Its deadline waiter uses monotonic `DispatchTime`,
+  registers each blocking capture, and signals all registered waiters on
+  cancellation. Bootstrap preparation and replacement cancel the current
+  owner; AppDelegate termination and owner deinitialization provide the final
+  cleanup boundaries. Stopping also removes the installed model batch override.
+  A cancelled batch returns no mock capture result.
+- Independent Oracle: the existing preview pipeline accepts only its capture
+  result, exact resolved window identity, current preview generation, cache
+  application, and visible preview readback. TestingSupport now logs latency
+  evidence independently. The representative UI test requires both exact
+  preview-image identifiers and the `preview_batch_completed` state in addition
+  to the injection marker.
+- Unit and Behavior: the final focused canonical wrapper passed 5/5 with zero
+  failures in 0.012 seconds (0.014 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-030A/targeted-attempt-003`.
+  Coverage verifies policy bounds, exact elapsed evidence, an in-flight
+  cancellation released by owner cancellation, the existing launch-option
+  contract, Bootstrapper replacement/stop generation and override cleanup, and
+  500 owner replacements retaining one final elapsed outcome.
+  Attempt 001 stopped at compilation because two new test callbacks captured
+  mutable arrays under `@Sendable`; the final tests store callback evidence
+  behind an explicit lock.
+- Expanded Behavior: the final complete canonical wrapper passed 1006/1006
+  with zero failures in 48.409 seconds (48.565 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-030A/full-attempt-002`. Attempt 001
+  reproduced the previously recorded suite-order duplicate hotkey-registration
+  pair; its exact isolated rerun passed 1/1, and the final complete execution
+  passed the same case in suite order.
+- FlowTabCore: not relevant because the fault injection is confined to
+  TestingSupport, the app-test target, and the UI-test path.
+- UI: attempt 001 was blocked before the test body when macOS timed out while
+  enabling automation mode. The canonical rerun passed
+  `testControlTabFirstPhysicalGestureSelectsNextWindowWithVisiblePreview` 1/1
+  with zero failures in 8.095 seconds under
+  `.build-local/evidence-driven-sync/SYNC-030A/ui-attempt-003`. It observed the
+  80ms elapsed marker, selected the exact secondary current-app window, exposed
+  both exact preview images, and recorded preview-batch completion.
+- Pressure: the deterministic 500-generation workload cancelled every prior
+  owner, force-observed each stale owner as `cancelled`, and allowed only
+  generation 500 to report `elapsed`. In-flight cancellation used explicit
+  start and release evidence, so scheduler speed changed only completion time.
+- Process/Tooling: project-file lint, Swift parse checks, scoped timing review,
+  source-size checks, `git diff --check`, and exact staged-content review are
+  recorded before commit. Startup `prompts.zip` remains unchanged and outside
+  the slice.
+- Commit: pending
+  (`refactor(sync): migrate SYNC-030A preview latency`).

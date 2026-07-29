@@ -8,6 +8,12 @@ enum FlowTabUITestBootstrapper {
     private static var switcherTriggerObservers: [SwitcherTriggerNotificationObserver] = []
     private static var switcherCommandObservers: [SwitcherCommandNotificationObserver] = []
     private static var initialPanelOcclusionStaleGeneration = 0
+    private static var mockWindowPreviewLatencyGeneration:
+        UInt64 = 0
+    private static var mockWindowPreviewLatencyOwner:
+        FlowTabUITestMockWindowPreviewLatencyOwner?
+    private static var mockWindowPreviewLatencyCaptureReset:
+        (() -> Void)?
     static var initialPresentationObservationOwner:
         FlowTabUITestInitialPresentationObservationOwner?
 
@@ -48,6 +54,7 @@ enum FlowTabUITestBootstrapper {
     }
 
     static func prepareIfNeeded(userDefaults: UserDefaults = .standard) {
+        stopMockWindowPreviewLatencyInjection()
         stopInitialUIPresentationObservation()
         if FlowTabTestLaunchOptions.isRunningUITests {
             RuntimeWindowRecencyTracker.shared.removeAll()
@@ -215,15 +222,51 @@ enum FlowTabUITestBootstrapper {
     private static func installMockWindowPreviewsIfNeeded(
         panelController: SwitcherPanelController
     ) {
+        stopMockWindowPreviewLatencyInjection()
+        let model = panelController.modelForTesting
+        model.previewCaptureOverride = nil
+        model.previewCaptureBatchOverride = nil
         guard FlowTabTestLaunchOptions.usesMockWindowPreviews else { return }
         if let rawDelay = FlowTabTestLaunchOptions.mockWindowPreviewDelayMilliseconds {
-            let delayMilliseconds = max(1, min(rawDelay, 1_000))
+            let policy =
+                FlowTabUITestMockWindowPreviewLatencyPolicy(
+                    rawMilliseconds: rawDelay
+                )
+            mockWindowPreviewLatencyGeneration &+= 1
+            let owner =
+                FlowTabUITestMockWindowPreviewLatencyOwner(
+                    generation:
+                        mockWindowPreviewLatencyGeneration,
+                    policy: policy
+                ) { evidence in
+                    RuntimeLog.info(
+                        "UITest",
+                        "mock window preview latency "
+                            + evidence.logFields
+                    )
+                }
+            mockWindowPreviewLatencyOwner = owner
             let previewImage = makeMockWindowPreviewImage(
                 title: "Delayed Preview",
                 cgWindowID: nil
             )
-            panelController.modelForTesting.previewCaptureBatchOverride = { requests in
-                Thread.sleep(forTimeInterval: Double(delayMilliseconds) / 1_000)
+            model.previewCaptureBatchOverride = {
+                [weak owner] requests in
+                guard let owner else {
+                    return Array(
+                        repeating: nil,
+                        count: requests.count
+                    )
+                }
+                let evidence = owner.waitBeforeCapture(
+                    requestCount: requests.count
+                )
+                guard evidence.outcome == .elapsed else {
+                    return Array(
+                        repeating: nil,
+                        count: requests.count
+                    )
+                }
                 return requests.map { request in
                     RuntimeWindowPreviewProvider.CaptureResult(
                         image: previewImage,
@@ -233,9 +276,13 @@ enum FlowTabUITestBootstrapper {
                     )
                 }
             }
+            mockWindowPreviewLatencyCaptureReset = {
+                [weak model] in
+                model?.previewCaptureBatchOverride = nil
+            }
             return
         }
-        panelController.modelForTesting.previewCaptureOverride = { cgWindowID, _, title, inferTitleBarStyle in
+        model.previewCaptureOverride = { cgWindowID, _, title, inferTitleBarStyle in
             (
                 image: makeMockWindowPreviewImage(
                     title: title ?? "Window",
@@ -245,6 +292,25 @@ enum FlowTabUITestBootstrapper {
                 titleBarStyle: inferTitleBarStyle ? .dark : nil
             )
         }
+    }
+
+    static func stopMockWindowPreviewLatencyInjection() {
+        mockWindowPreviewLatencyOwner?.cancel()
+        mockWindowPreviewLatencyOwner = nil
+        mockWindowPreviewLatencyCaptureReset?()
+        mockWindowPreviewLatencyCaptureReset = nil
+    }
+
+    static var mockWindowPreviewLatencyGenerationForTesting:
+        UInt64
+    {
+        mockWindowPreviewLatencyGeneration
+    }
+
+    static var isMockWindowPreviewLatencyInjectionActiveForTesting:
+        Bool
+    {
+        mockWindowPreviewLatencyOwner != nil
     }
 
     private static func makeMockWindowPreviewImage(
