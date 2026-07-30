@@ -1063,21 +1063,6 @@ extension FlowTabUITests {
         let unexpectedTitles = titles.filter { app.staticTexts[$0].exists }
         XCTFail("Unexpected visible window titles: \(unexpectedTitles)")
     }
-    func tapFirstHittable(in query: XCUIElementQuery, timeout: TimeInterval) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let count = query.count
-            for index in 0..<count {
-                let element = query.element(boundBy: index)
-                if element.exists && element.isHittable {
-                    element.tap()
-                    return true
-                }
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
     func tapFirstHittableAfterScrolling(
         in query: XCUIElementQuery,
         scrollContainer: XCUIElement,
@@ -1123,20 +1108,6 @@ extension FlowTabUITests {
             return min(max(containerFrame.minY - elementFrame.minY, 180), 520)
         }
         return elementFrame.midY >= containerFrame.midY ? -240 : 240
-    }
-    func hasHittableElement(in query: XCUIElementQuery, timeout: TimeInterval) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let count = query.count
-            for index in 0..<count {
-                let element = query.element(boundBy: index)
-                if element.exists && element.isHittable {
-                    return true
-                }
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
     }
     func terminateAppIfRunning() {
         terminateFlowTabUITestApplicationIfRunning()

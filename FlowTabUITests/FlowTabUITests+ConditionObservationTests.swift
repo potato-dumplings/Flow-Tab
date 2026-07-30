@@ -278,4 +278,118 @@ extension FlowTabUITests {
             )
         )
     }
+
+    func testHittableElementObserverUsesInitialExactCandidateEvidence() {
+        let owner =
+            FlowTabUITestHittableElementObservationOwner(
+                observationRegistration: nil,
+                readback: {
+                    FlowTabUITestHittableElementSnapshot(
+                        candidateCount: 2,
+                        observedExistingIndices: [0, 1],
+                        firstHittableIndex: 1,
+                        firstHittableElement: "settings"
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        let evidence = owner.waitForResolution(
+            timeout:
+                FlowTabUITestConditionObservationTestPolicy
+                    .watchdog
+        )
+
+        XCTAssertEqual(evidence?.source, .initialReadback)
+        XCTAssertEqual(
+            evidence?.value.firstHittableElement,
+            "settings"
+        )
+        XCTAssertEqual(evidence?.value.firstHittableIndex, 1)
+    }
+
+    func testHittableElementObserverUsesPreinstalledReadbackAndReportsWatchdogEvidence() {
+        var readback:
+            FlowTabUITestHittableElementSnapshot<String> =
+                FlowTabUITestHittableElementSnapshot(
+                    candidateCount: 2,
+                    observedExistingIndices: [0],
+                    firstHittableIndex: nil,
+                    firstHittableElement: nil
+                )
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var cancellationCount = 0
+        let owner =
+            FlowTabUITestHittableElementObservationOwner(
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {
+                        cancellationCount += 1
+                    }
+                },
+                readback: { readback }
+            )
+        owner.start()
+
+        readback = FlowTabUITestHittableElementSnapshot(
+            candidateCount: 2,
+            observedExistingIndices: [0, 1],
+            firstHittableIndex: 1,
+            firstHittableElement: "logs"
+        )
+        scheduledReadback?(.scheduledReadback)
+        let evidence = owner.waitForResolution(
+            timeout:
+                FlowTabUITestConditionObservationTestPolicy
+                    .watchdog
+        )
+
+        XCTAssertEqual(evidence?.source, .scheduledReadback)
+        XCTAssertEqual(
+            evidence?.value.firstHittableElement,
+            "logs"
+        )
+        XCTAssertEqual(cancellationCount, 1)
+        owner.cancel()
+
+        let watchdogOwner =
+            FlowTabUITestHittableElementObservationOwner<String>(
+                observationRegistration: nil,
+                readback: {
+                    FlowTabUITestHittableElementSnapshot(
+                        candidateCount: 3,
+                        observedExistingIndices: [0, 2],
+                        firstHittableIndex: nil,
+                        firstHittableElement: nil
+                    )
+                }
+            )
+        watchdogOwner.start()
+        defer { watchdogOwner.cancel() }
+
+        XCTAssertNil(
+            watchdogOwner.waitForResolution(
+                timeout:
+                    FlowTabUITestConditionObservationTestPolicy
+                        .watchdog
+            )
+        )
+        XCTAssertTrue(
+            watchdogOwner.diagnosticSummary.contains(
+                "source=watchdogReadback"
+            )
+        )
+        XCTAssertTrue(
+            watchdogOwner.diagnosticSummary.contains(
+                "candidateCount=3"
+            )
+        )
+        XCTAssertTrue(
+            watchdogOwner.diagnosticSummary.contains(
+                "observedExistingIndices=[0, 2]"
+            )
+        )
+    }
 }
