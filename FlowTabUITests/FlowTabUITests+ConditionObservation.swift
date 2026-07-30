@@ -5,6 +5,7 @@ import XCTest
 enum FlowTabUITestConditionObservationSource: String {
     case initialReadback
     case notificationReadback
+    case triggerReadback
     case scheduledReadback
     case watchdogReadback
 }
@@ -139,6 +140,16 @@ final class FlowTabUITestConditionObservationOwner<Value> {
             + "source=\(latestEvidence.source.rawValue) "
             + "last{\(describe(latestEvidence.value))}"
             + waitResult
+    }
+
+    func requestReadback(
+        source: FlowTabUITestConditionObservationSource
+    ) {
+        guard let currentGeneration else { return }
+        observe(
+            source: source,
+            generation: currentGeneration
+        )
     }
 
     func cancel() {

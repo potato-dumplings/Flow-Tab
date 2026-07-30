@@ -95,6 +95,7 @@ final class FlowTabUITestHomeWindowProjectionObservationOwner<Element> {
 
     init(
         expectation: FlowTabUITestHomeWindowProjectionExpectation,
+        acceptsEvidence: @escaping () -> Bool = { true },
         observationRegistration:
             FlowTabUITestConditionObservationRegistration? =
                 FlowTabUITestConditionReadbackScheduler
@@ -109,9 +110,13 @@ final class FlowTabUITestHomeWindowProjectionObservationOwner<Element> {
         conditionOwner = FlowTabUITestConditionObservationOwner(
             observationRegistration: observationRegistration,
             readback: readback,
-            isSatisfied: expectation.isSatisfied(by:),
+            isSatisfied: {
+                acceptsEvidence()
+                    && expectation.isSatisfied(by: $0)
+            },
             describe: { snapshot in
-                "expected{\(expectation.diagnosticSummary)} "
+                "acceptanceEnabled=\(acceptsEvidence()) "
+                    + "expected{\(expectation.diagnosticSummary)} "
                     + snapshot.diagnosticSummary
             }
         )
@@ -137,6 +142,12 @@ final class FlowTabUITestHomeWindowProjectionObservationOwner<Element> {
         FlowTabUITestHomeWindowProjectionSnapshot<Element>
     >? {
         conditionOwner.resolvedEvidence
+    }
+
+    func requestReadback(
+        source: FlowTabUITestConditionObservationSource
+    ) {
+        conditionOwner.requestReadback(source: source)
     }
 
     func cancel() {
@@ -274,7 +285,7 @@ extension FlowTabUITests {
         return (evidence, owner.diagnosticSummary)
     }
 
-    private func homeWindowProjectionSnapshot(
+    func homeWindowProjectionSnapshot(
         in app: XCUIApplication,
         expectation: FlowTabUITestHomeWindowProjectionExpectation
     ) -> FlowTabUITestHomeWindowProjectionSnapshot<XCUIElement> {

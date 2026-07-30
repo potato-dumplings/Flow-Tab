@@ -82,39 +82,73 @@ extension FlowTabUITests {
         in app: XCUIApplication,
         timeout: TimeInterval
     ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
+        let watchdogBudget =
+            FlowTabUITestHomeAppSelectionWatchdogBudget(
+                timeout: timeout
+            )
         let rowIdentifier = workflowApp.identity.homeAppAccessibilityIdentifier
         let expectedTitle = workflowApp.expectedHomeWindowTitles.first
+        let homeRow = app.buttons
+            .matching(identifier: rowIdentifier)
+            .firstMatch
+        let appList = app.scrollViews
+            .matching(identifier: Identifier.homeAppList)
+            .firstMatch
+        let fallbackScrollContainers =
+            app.scrollViews.allElementsBoundByIndex
 
-        repeat {
-            if let expectedTitle,
-               waitForHomeWindowTitle(expectedTitle, in: app, timeout: 0.1) {
-                return true
-            }
-
-            let remainingTime = deadline.timeIntervalSinceNow
-            guard remainingTime > 0 else { break }
-            let homeRow = app.buttons.matching(identifier: rowIdentifier).firstMatch
-            let appList = app.scrollViews.matching(identifier: Identifier.homeAppList).firstMatch
-            guard tapElementAfterScrollingIntoView(
+        guard let expectedTitle else {
+            return tapElementAfterScrollingIntoView(
                 homeRow,
                 in: appList,
-                fallbackScrollContainers: app.scrollViews.allElementsBoundByIndex,
-                timeout: min(2, remainingTime)
-            ) else {
-                continue
-            }
+                fallbackScrollContainers:
+                    fallbackScrollContainers,
+                timeout: watchdogBudget.remaining
+            )
+        }
 
-            guard let expectedTitle else { return true }
-            if waitForHomeWindowTitle(
-                expectedTitle,
-                in: app,
-                timeout: min(1.5, max(0.1, deadline.timeIntervalSinceNow))
-            ) {
-                return true
-            }
-        } while Date() < deadline
+        let owner =
+            FlowTabUITestHomeAppSelectionObservationOwner(
+                expectedTitle: expectedTitle,
+                readback: {
+                    self.homeWindowProjectionSnapshot(
+                        in: app,
+                        expectation: .titleVisible(expectedTitle)
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+        if owner.resolvedEvidence != nil {
+            return true
+        }
 
-        return false
+        guard tapElementAfterScrollingIntoView(
+            homeRow,
+            in: appList,
+            fallbackScrollContainers:
+                fallbackScrollContainers,
+            timeout: watchdogBudget.remaining
+        ) else {
+            logFlowTabUITestTrace(
+                "Home app-row trigger failed for \(workflowApp.appName). "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+
+        owner.markTriggerCompleted()
+        guard owner.waitForResolution(
+            timeout: watchdogBudget.remaining
+        ) != nil else {
+            logFlowTabUITestTrace(
+                "Home app selection watchdog expired for "
+                    + "\(workflowApp.appName). "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+
+        return true
     }
 }
