@@ -142,8 +142,12 @@ extension FlowTabUITests {
         let delayInput = element(in: firstLaunchApp, identifier: Identifier.settingsWindowAutoEnterDelayInput)
         XCTAssertTrue(delayInput.waitForExistence(timeout: 5))
         replaceText(in: delayInput, with: "1.2345", app: firstLaunchApp)
-        commitEditing(in: firstLaunchApp)
-        assertValuePrefix(of: delayInput, expectedPrefix: "1.23")
+        assertTriggerMakesValue(
+            of: delayInput,
+            equals: "1.23"
+        ) {
+            firstLaunchApp.typeKey(.tab, modifierFlags: [])
+        }
 
         let autoRestoreToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsWindowAutoRestoreMinimized)
         let hideMinimizedToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsWindowHideMinimizedApps)

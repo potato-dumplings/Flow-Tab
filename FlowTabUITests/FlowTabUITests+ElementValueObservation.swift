@@ -15,6 +15,9 @@ final class FlowTabUITestElementValueObservationOwner {
 
     init(
         expectedDescription: String,
+        acceptsEvidence: @escaping () -> Bool = {
+            true
+        },
         observationRegistration:
             FlowTabUITestConditionObservationRegistration? =
                 FlowTabUITestConditionReadbackScheduler
@@ -31,12 +34,14 @@ final class FlowTabUITestElementValueObservationOwner {
             observationRegistration: observationRegistration,
             readback: readback,
             isSatisfied: { snapshot in
-                snapshot.exists
+                acceptsEvidence()
+                    && snapshot.exists
                     && snapshot.value.map(isSatisfied) == true
             },
             describe: { snapshot in
                 "identifier=\(snapshot.identifier) "
                     + "exists=\(snapshot.exists) "
+                    + "acceptanceEnabled=\(acceptsEvidence()) "
                     + "expected{\(expectedDescription)} "
                     + "actual=\(snapshot.value ?? "nil")"
             }
@@ -53,6 +58,12 @@ final class FlowTabUITestElementValueObservationOwner {
         FlowTabUITestElementValueSnapshot
     >? {
         conditionOwner.waitForResolution(timeout: timeout)
+    }
+
+    var resolvedEvidence: FlowTabUITestConditionEvidence<
+        FlowTabUITestElementValueSnapshot
+    >? {
+        conditionOwner.resolvedEvidence
     }
 
     var diagnosticSummary: String {
@@ -91,14 +102,34 @@ extension FlowTabUITests {
         )
     }
 
+    func assertTriggerMakesValue(
+        of element: XCUIElement,
+        equals expectedValue: String,
+        timeout: TimeInterval = 5,
+        trigger: @escaping () -> Void
+    ) {
+        assertElementValue(
+            of: element,
+            expectedDescription: "equals \(expectedValue)",
+            timeout: timeout,
+            trigger: trigger,
+            isSatisfied: { $0 == expectedValue }
+        )
+    }
+
     private func assertElementValue(
         of element: XCUIElement,
         expectedDescription: String,
         timeout: TimeInterval,
+        trigger: (() -> Void)? = nil,
         isSatisfied: @escaping (String) -> Bool
     ) {
+        var triggerCompleted = trigger == nil
         let owner = FlowTabUITestElementValueObservationOwner(
             expectedDescription: expectedDescription,
+            acceptsEvidence: {
+                triggerCompleted
+            },
             readback: {
                 let exists = element.exists
                 return FlowTabUITestElementValueSnapshot(
@@ -113,6 +144,9 @@ extension FlowTabUITests {
         )
         owner.start()
         defer { owner.cancel() }
+
+        trigger?()
+        triggerCompleted = true
 
         guard
             owner.waitForResolution(timeout: timeout) != nil

@@ -6,6 +6,44 @@ private enum FlowTabUITestElementValueObservationTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testElementValueObserverRejectsMatchingBaselineUntilTriggerCompletes() {
+        var triggerCompleted = false
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        let owner = FlowTabUITestElementValueObservationOwner(
+            expectedDescription: "equals 1.23",
+            acceptsEvidence: {
+                triggerCompleted
+            },
+            observationRegistration: { callback in
+                scheduledReadback = callback
+                return FlowTabUITestObservationCancellation {}
+            },
+            readback: {
+                FlowTabUITestElementValueSnapshot(
+                    identifier: "delay",
+                    exists: true,
+                    value: "1.23"
+                )
+            },
+            isSatisfied: { $0 == "1.23" }
+        )
+        owner.start()
+        defer { owner.cancel() }
+        XCTAssertNil(owner.resolvedEvidence)
+
+        triggerCompleted = true
+        scheduledReadback?(.scheduledReadback)
+        let evidence = owner.waitForResolution(
+            timeout:
+                FlowTabUITestElementValueObservationTestPolicy
+                    .watchdog
+        )
+
+        XCTAssertEqual(evidence?.source, .scheduledReadback)
+        XCTAssertEqual(evidence?.value.value, "1.23")
+    }
+
     func testElementValueObserverUsesInitialExactValueEvidence() {
         let owner = FlowTabUITestElementValueObservationOwner(
             expectedDescription: "equals dark",

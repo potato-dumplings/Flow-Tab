@@ -542,10 +542,6 @@ extension FlowTabUITests {
         app.typeKey(.delete, modifierFlags: [])
         app.typeText(text)
     }
-    func commitEditing(in app: XCUIApplication) {
-        app.typeKey(.tab, modifierFlags: [])
-        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-    }
     func tapElement(_ element: XCUIElement) {
         if element.isHittable {
             element.tap()
