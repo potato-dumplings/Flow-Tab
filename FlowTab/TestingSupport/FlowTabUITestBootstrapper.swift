@@ -540,13 +540,49 @@ private final class SwitcherTriggerNotificationObserver: NSObject {
         let trigger = trigger
         Task { @MainActor [panelController, notificationName, trigger] in
             panelController.setModifierReleaseConfirmationSuppressedForTesting(true)
+            Self.holdPrimaryModifierForTesting(
+                trigger,
+                panelController: panelController
+            )
             RuntimeLog.info("UITest", "received switcher trigger notification name=\(notificationName)")
             let presented = Self.presentSwitcher(trigger, panelController: panelController)
+            if !presented {
+                Self.releasePrimaryModifierForTesting(
+                    panelController: panelController
+                )
+            }
             RuntimeLog.info(
                 "UITest",
-                "completed switcher trigger notification name=\(notificationName) presented=\(presented ? 1 : 0)"
+                "completed switcher trigger notification name=\(notificationName) presented=\(presented ? 1 : 0) syntheticModifierHeld=\(presented ? 1 : 0)"
             )
         }
+    }
+
+    @MainActor
+    private static func holdPrimaryModifierForTesting(
+        _ trigger: Trigger,
+        panelController: SwitcherPanelController
+    ) {
+        // Darwin test triggers have no hardware key state. The launched test process
+        // owns this hold until its exact termination, matching a user's held shortcut
+        // while visibility recovery publishes an interactable panel.
+        releasePrimaryModifierForTesting(
+            panelController: panelController
+        )
+        switch trigger {
+        case .global, .search:
+            panelController.globalPrimaryModifierPressedOverride = true
+        case .inApp:
+            panelController.inAppPrimaryModifierPressedOverride = true
+        }
+    }
+
+    @MainActor
+    private static func releasePrimaryModifierForTesting(
+        panelController: SwitcherPanelController
+    ) {
+        panelController.globalPrimaryModifierPressedOverride = nil
+        panelController.inAppPrimaryModifierPressedOverride = nil
     }
 
     @MainActor

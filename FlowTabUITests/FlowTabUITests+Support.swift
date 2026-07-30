@@ -330,7 +330,7 @@ extension FlowTabUITests {
         postFlowTabUITestSwitcherTrigger(trigger, traceLabel: traceLabel)
         waitForRuntimeLogFiles(
             containing: [
-                "completed switcher trigger notification name=\(trigger.notificationName.rawValue) presented=1"
+                "completed switcher trigger notification name=\(trigger.notificationName.rawValue) presented=1 syntheticModifierHeld=1"
             ],
             since: logSnapshot,
             timeout: timeout

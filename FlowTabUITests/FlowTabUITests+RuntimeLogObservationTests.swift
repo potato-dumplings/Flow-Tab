@@ -47,10 +47,12 @@ extension FlowTabUITests {
         waitForRuntimeLogFiles(
             matching:
                 "completed switcher trigger notification name="
-                + "\(notificationNamePattern) presented=1",
+                + "\(notificationNamePattern) presented=1 "
+                + "syntheticModifierHeld=1",
             since: baseline,
             description:
-                "the mock runtime reports exact switcher-trigger delivery"
+                "the mock runtime reports exact switcher-trigger delivery "
+                + "with its primary modifier held"
         )
     }
 
