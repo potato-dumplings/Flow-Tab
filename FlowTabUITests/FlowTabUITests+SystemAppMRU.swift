@@ -67,8 +67,10 @@ extension FlowTabUITests {
                 timeout: 10
             )
 
-            app.terminate()
-            waitForFlowTabUITestApplicationToTerminate(app, timeout: 5)
+            terminateFlowTabUITestApplicationAndWait(
+                app,
+                timeout: 5
+            )
             let relaunchedExpectedOrder = [3, 7, 1, 5, 0, 6, 2, 4].map { fixtureAppIDs[$0] }
             establishSystemAppOrder(relaunchedExpectedOrder)
             let relaunchedLogSnapshot = makeRuntimeLogFileSnapshot()
@@ -209,17 +211,15 @@ extension FlowTabUITests {
         return owner.latestEvidence?.value.order ?? []
     }
 
-    private func waitForFlowTabUITestApplicationToTerminate(
+    private func terminateFlowTabUITestApplicationAndWait(
         _ app: XCUIApplication,
         timeout: TimeInterval
     ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if app.state == .notRunning {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        XCTFail("FlowTab did not terminate before the MRU relaunch phase.")
+        app.terminate()
+        XCTAssertTrue(
+            app.wait(for: .notRunning, timeout: timeout),
+            "FlowTab did not terminate before the MRU relaunch phase. "
+                + "lastState=\(String(describing: app.state))"
+        )
     }
 }
