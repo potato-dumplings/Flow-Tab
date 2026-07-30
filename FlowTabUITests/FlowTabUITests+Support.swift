@@ -7,6 +7,10 @@ private enum FlowTabUITestAppEnvironmentKey {
     static let uiTesting = "FLOWTAB_UI_TESTING"
 }
 
+private enum FlowTabUITestOptionSelectionPolicy {
+    static let scrollingWatchdog: TimeInterval = 30
+}
+
 private enum FlowTabUITestAppDefaults {
     static let defaultBundleIdentifier = "io.github.potato-dumplings.flowtab"
 
@@ -437,7 +441,13 @@ extension FlowTabUITests {
             return
         }
         let scopedScrollContainer = app.scrollViews["\(controlIdentifier).options"]
-        if tapFirstHittableAfterScrolling(in: scopedOptionsQuery, scrollContainer: scopedScrollContainer, timeout: 4) {
+        if tapFirstHittableAfterScrolling(
+            in: scopedOptionsQuery,
+            scrollContainer: scopedScrollContainer,
+            timeout:
+                FlowTabUITestOptionSelectionPolicy
+                    .scrollingWatchdog
+        ) {
             return
         }
 
@@ -553,52 +563,6 @@ extension FlowTabUITests {
         let predicate = NSPredicate(format: "exists == false")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
-    }
-    func tapFirstHittableAfterScrolling(
-        in query: XCUIElementQuery,
-        scrollContainer: XCUIElement,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let count = query.count
-            var sawExistingElement = false
-            for index in 0..<count {
-                let element = query.element(boundBy: index)
-                if element.exists && element.isHittable {
-                    element.tap()
-                    return true
-                }
-                if element.exists, scrollContainer.exists {
-                    sawExistingElement = true
-                    let deltaY = dropdownOptionScrollDeltaY(for: element, in: scrollContainer)
-                    scrollContainer.scroll(byDeltaX: 0, deltaY: deltaY)
-                    break
-                }
-            }
-            if !sawExistingElement, scrollContainer.exists {
-                scrollContainer.scroll(byDeltaX: 0, deltaY: -420)
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-    private func dropdownOptionScrollDeltaY(
-        for element: XCUIElement,
-        in container: XCUIElement
-    ) -> CGFloat {
-        let elementFrame = element.frame
-        let containerFrame = container.frame
-        guard isUsableFrame(elementFrame), isUsableFrame(containerFrame) else {
-            return -420
-        }
-        if elementFrame.maxY > containerFrame.maxY {
-            return -min(max(elementFrame.maxY - containerFrame.maxY, 180), 520)
-        }
-        if elementFrame.minY < containerFrame.minY {
-            return min(max(containerFrame.minY - elementFrame.minY, 180), 520)
-        }
-        return elementFrame.midY >= containerFrame.midY ? -240 : 240
     }
     func terminateAppIfRunning() {
         terminateFlowTabUITestApplicationIfRunning()
