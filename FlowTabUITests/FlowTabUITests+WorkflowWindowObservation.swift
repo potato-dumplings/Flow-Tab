@@ -263,38 +263,6 @@ extension FlowTabUITests {
     }
 
     func waitForActiveSpaceWorkflowCGWindow(
-        windowNumber: CGWindowID,
-        title: String,
-        app workflowApp: SpaceFixtureResolvedWorkflow.App,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestWindowNumber: CGWindowID?
-        var latestTitle: String?
-        repeat {
-            let latestCGWindow = topmostOnScreenCGWindow(
-                forBundleIdentifier: workflowApp.identity.bundleIdentifier
-            )
-            latestWindowNumber = latestCGWindow?.number
-            latestTitle = latestCGWindow?.title
-            if latestCGWindow?.number == windowNumber {
-                return true
-            }
-
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected active-space CG window \(workflowApp.appName) / \(title) / \(windowNumber), \
-            found CG title \(latestTitle ?? "nil") \
-            and window number \(latestWindowNumber.map(String.init) ?? "nil").
-            """
-        )
-        return false
-    }
-
-    func waitForActiveSpaceWorkflowCGWindow(
         title: String,
         app workflowApp: SpaceFixtureResolvedWorkflow.App,
         timeout: TimeInterval
