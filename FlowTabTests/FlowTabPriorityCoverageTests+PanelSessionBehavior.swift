@@ -1384,9 +1384,18 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         controller.globalPrimaryModifierPressedOverride = false
+        let primaryModifierKeyCode: UInt16
+        switch controller.activePrimaryModifier() {
+        case .option:
+            primaryModifierKeyCode = UInt16(kVK_Option)
+        case .control:
+            primaryModifierKeyCode = UInt16(kVK_Control)
+        case .command:
+            primaryModifierKeyCode = UInt16(kVK_Command)
+        }
 
         controller.handleFlagsChangedForTesting(
-            Self.makeFlagsChangedEvent(keyCode: UInt16(kVK_Option))
+            Self.makeFlagsChangedEvent(keyCode: primaryModifierKeyCode)
         )
 
         XCTAssertTrue(controller.hasPendingModifierReleaseConfirmation)
