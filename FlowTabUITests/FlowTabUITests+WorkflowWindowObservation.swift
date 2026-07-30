@@ -293,30 +293,23 @@ extension FlowTabUITests {
         app workflowApp: SpaceFixtureResolvedWorkflow.App,
         timeout: TimeInterval
     ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestDescriptions: [String] = []
-        repeat {
-            let observations = workflowCGWindowObservations(
-                bundleIdentifier: workflowApp.identity.bundleIdentifier,
-                options: [.optionOnScreenOnly, .excludeDesktopElements]
+        let owner =
+            makeWorkflowSpaceWindowCollectionObservationOwner(
+                title: title,
+                app: workflowApp
             )
-            latestDescriptions = observations.map { observation in
-                "\(observation.number):\(observation.title ?? "nil")@\(workflowCGFrameDescription(observation.frame))"
-            }
-            if observations.contains(where: { $0.matchesWorkflowSpaceWindow(title: title) }) {
-                return true
-            }
+        owner.start()
+        defer { owner.cancel() }
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected active workflow Space to contain \(workflowApp.appName) / \(title), \
-            found CG windows [\(latestDescriptions.joined(separator: ";"))].
-            """
-        )
-        return false
+        guard owner.waitForResolution(timeout: timeout) != nil else {
+            XCTFail(
+                "Expected active workflow Space to contain "
+                    + "\(workflowApp.appName) / \(title). "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+        return true
     }
 
     func logWorkflowSpaceObservation(
@@ -403,7 +396,7 @@ extension FlowTabUITests {
         }
     }
 
-    private func workflowCGWindowObservations(
+    func workflowCGWindowObservations(
         bundleIdentifier: String,
         options: CGWindowListOption
     ) -> [WorkflowCGWindowObservation] {
