@@ -3,6 +3,12 @@ import XCTest
 
 private enum FlowTabUITestConditionObservationTestPolicy {
     static let watchdog: TimeInterval = 0.01
+    static let scheduledReadbackWatchdog: TimeInterval = 1
+    static let scheduledReadbackPressureCadence:
+        TimeInterval = 0.001
+    static let scheduledReadbackPressureWatchdog:
+        TimeInterval = 0.5
+    static let scheduledReadbackPressureIterations = 100
     static let pressureIterations = 500
 }
 
@@ -12,9 +18,11 @@ extension FlowTabUITests {
         var eventHandler: (() -> Void)?
         var isSatisfied = true
         let owner = FlowTabUITestConditionObservationOwner(
-            eventRegistration: { callback in
+            observationRegistration: { callback in
                 registrationOrder.append("observer")
-                eventHandler = callback
+                eventHandler = {
+                    callback(.notificationReadback)
+                }
                 return FlowTabUITestObservationCancellation {
                     registrationOrder.append("cancel")
                 }
@@ -75,7 +83,7 @@ extension FlowTabUITests {
                 FlowTabUITestConditionObservationTestPolicy
                     .watchdog
         )
-        XCTAssertEqual(evidence?.source, .eventReadback)
+        XCTAssertEqual(evidence?.source, .notificationReadback)
         XCTAssertEqual(
             evidence?.value.bundleIdentifier,
             "com.example.target"
@@ -87,8 +95,10 @@ extension FlowTabUITests {
             var isSatisfied = false
             var eventHandlers: [() -> Void] = []
             let owner = FlowTabUITestConditionObservationOwner(
-                eventRegistration: { callback in
-                    eventHandlers.append(callback)
+                observationRegistration: { callback in
+                    eventHandlers.append {
+                        callback(.notificationReadback)
+                    }
                     return FlowTabUITestObservationCancellation {}
                 },
                 readback: { isSatisfied },
@@ -108,7 +118,93 @@ extension FlowTabUITests {
             currentHandler()
             currentHandler()
             XCTAssertEqual(owner.resolvedEvidence?.generation, 2)
-            XCTAssertEqual(owner.resolvedEvidence?.source, .eventReadback)
+            XCTAssertEqual(
+                owner.resolvedEvidence?.source,
+                .notificationReadback
+            )
+            owner.cancel()
+        }
+    }
+
+    func testUIConditionObserverUsesNamedScheduledReadback() {
+        var isSatisfied = false
+        let owner = FlowTabUITestConditionObservationOwner(
+            observationRegistration:
+                FlowTabUITestConditionReadbackScheduler
+                    .mainRunLoopRegistration(
+                        cadence:
+                            FlowTabUITestConditionObservationPolicy
+                                .xcuiReadbackCadence
+                    ),
+            readback: { isSatisfied },
+            isSatisfied: { $0 },
+            describe: { "satisfied=\($0)" }
+        )
+        owner.start()
+        defer { owner.cancel() }
+
+        isSatisfied = true
+        let evidence = owner.waitForResolution(
+            timeout:
+                FlowTabUITestConditionObservationTestPolicy
+                    .scheduledReadbackWatchdog
+        )
+
+        XCTAssertEqual(evidence?.source, .scheduledReadback)
+        XCTAssertEqual(evidence?.value, true)
+    }
+
+    func testWorkflowAppOrderEvidenceRequiresExpectedPermutation() {
+        let expectedOrder = [
+            "com.example.atlas",
+            "com.example.beacon",
+            "com.example.comet"
+        ]
+        let expectedSet = Set(expectedOrder)
+        let staleOrder = FlowTabUITestWorkflowAppOrderEvidence(
+            diagnosticsValue:
+                "com.example.comet:2|com.example.atlas:1|com.example.beacon:0",
+            expectedAppIdentifiers: expectedSet
+        )
+        let exactOrder = FlowTabUITestWorkflowAppOrderEvidence(
+            diagnosticsValue:
+                "com.example.atlas:2|com.example.beacon:1|com.example.comet:0",
+            expectedAppIdentifiers: expectedSet
+        )
+
+        XCTAssertFalse(staleOrder.matches(expectedOrder))
+        XCTAssertTrue(exactOrder.matches(expectedOrder))
+    }
+
+    func testUIConditionScheduledReadbackLifecycleUnderPressure() {
+        for _ in 0..<FlowTabUITestConditionObservationTestPolicy
+            .scheduledReadbackPressureIterations
+        {
+            var readbackCount = 0
+            let owner = FlowTabUITestConditionObservationOwner(
+                observationRegistration:
+                    FlowTabUITestConditionReadbackScheduler
+                        .mainRunLoopRegistration(
+                            cadence:
+                                FlowTabUITestConditionObservationTestPolicy
+                                    .scheduledReadbackPressureCadence
+                        ),
+                readback: {
+                    readbackCount += 1
+                    return readbackCount > 1
+                },
+                isSatisfied: { $0 },
+                describe: { "satisfied=\($0)" }
+            )
+            owner.start()
+
+            let evidence = owner.waitForResolution(
+                timeout:
+                    FlowTabUITestConditionObservationTestPolicy
+                        .scheduledReadbackPressureWatchdog
+            )
+
+            XCTAssertEqual(evidence?.source, .scheduledReadback)
             owner.cancel()
         }
     }

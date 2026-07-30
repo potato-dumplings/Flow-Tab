@@ -4,7 +4,8 @@ import XCTest
 
 enum FlowTabUITestConditionObservationSource: String {
     case initialReadback
-    case eventReadback
+    case notificationReadback
+    case scheduledReadback
     case watchdogReadback
 }
 
@@ -32,14 +33,17 @@ final class FlowTabUITestObservationCancellation {
     }
 }
 
-final class FlowTabUITestConditionObservationOwner<Value> {
-    typealias EventRegistration =
-        (@escaping () -> Void) -> FlowTabUITestObservationCancellation?
+typealias FlowTabUITestConditionObservationRegistration =
+    (
+        @escaping (FlowTabUITestConditionObservationSource) -> Void
+    ) -> FlowTabUITestObservationCancellation?
 
+final class FlowTabUITestConditionObservationOwner<Value> {
     private let readback: () -> Value
     private let isSatisfied: (Value) -> Bool
     private let describe: (Value) -> String
-    private let eventRegistration: EventRegistration?
+    private let observationRegistration:
+        FlowTabUITestConditionObservationRegistration?
 
     private var nextGeneration: UInt64 = 1
     private var currentGeneration: UInt64?
@@ -53,12 +57,13 @@ final class FlowTabUITestConditionObservationOwner<Value> {
         FlowTabUITestConditionEvidence<Value>?
 
     init(
-        eventRegistration: EventRegistration? = nil,
+        observationRegistration:
+            FlowTabUITestConditionObservationRegistration? = nil,
         readback: @escaping () -> Value,
         isSatisfied: @escaping (Value) -> Bool,
         describe: @escaping (Value) -> String
     ) {
-        self.eventRegistration = eventRegistration
+        self.observationRegistration = observationRegistration
         self.readback = readback
         self.isSatisfied = isSatisfied
         self.describe = describe
@@ -79,9 +84,10 @@ final class FlowTabUITestConditionObservationOwner<Value> {
         resolvedExpectation.assertForOverFulfill = true
         self.resolvedExpectation = resolvedExpectation
 
-        let registrationCancellation = eventRegistration? { [weak self] in
+        let registrationCancellation = observationRegistration? {
+            [weak self] source in
             self?.observe(
-                source: .eventReadback,
+                source: source,
                 generation: generation
             )
         }
@@ -176,6 +182,29 @@ final class FlowTabUITestConditionObservationOwner<Value> {
     }
 }
 
+enum FlowTabUITestConditionObservationPolicy {
+    static let xcuiReadbackCadence: TimeInterval = 0.1
+}
+
+enum FlowTabUITestConditionReadbackScheduler {
+    static func mainRunLoopRegistration(
+        cadence: TimeInterval
+    ) -> FlowTabUITestConditionObservationRegistration {
+        { readback in
+            let timer = Timer(
+                timeInterval: cadence,
+                repeats: true
+            ) { _ in
+                readback(.scheduledReadback)
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            return FlowTabUITestObservationCancellation {
+                timer.invalidate()
+            }
+        }
+    }
+}
+
 struct FlowTabUITestFrontmostApplicationSnapshot: Equatable {
     let bundleIdentifier: String?
 
@@ -204,13 +233,13 @@ final class FlowTabUITestFrontmostApplicationObservationOwner {
     ) {
         self.expectedBundleIdentifier = expectedBundleIdentifier
         conditionOwner = FlowTabUITestConditionObservationOwner(
-            eventRegistration: { callback in
+            observationRegistration: { callback in
                 let token = notificationCenter.addObserver(
                     forName: activationNotificationName,
                     object: nil,
                     queue: .main
                 ) { _ in
-                    callback()
+                    callback(.notificationReadback)
                 }
                 return FlowTabUITestObservationCancellation {
                     notificationCenter.removeObserver(token)

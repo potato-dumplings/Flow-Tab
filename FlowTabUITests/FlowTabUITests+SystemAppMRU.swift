@@ -1,12 +1,42 @@
 import AppKit
 import XCTest
 
+struct FlowTabUITestWorkflowAppOrderEvidence: Equatable {
+    let diagnosticsValue: String?
+    let order: [String]
+
+    init(
+        diagnosticsValue: String?,
+        expectedAppIdentifiers: Set<String>
+    ) {
+        self.diagnosticsValue = diagnosticsValue
+        order = diagnosticsValue?
+            .split(separator: "|")
+            .compactMap { entry in
+                entry
+                    .split(separator: ":", maxSplits: 1)
+                    .first
+                    .map(String.init)
+            }
+            .filter(expectedAppIdentifiers.contains) ?? []
+    }
+
+    var diagnosticSummary: String {
+        "summaryExists=\(diagnosticsValue != nil) "
+            + "order=\(order) "
+            + "appsValue=\(diagnosticsValue ?? "nil")"
+    }
+
+    func matches(_ expectedOrder: [String]) -> Bool {
+        order == expectedOrder
+    }
+}
+
 extension FlowTabUITests {
     func testSystemAppMRURebuildsForEveryFlowTabProcessSession() throws {
         let workflow = try configuredSystemAppMRUFixtureWorkflow()
         var initialLaunchLogSnapshot: [String: UInt64] = [:]
         let launchArguments = [
-            "--flowtab-ui-open-switcher",
             "--flowtab-ui-listen-switcher-trigger",
             "--flowtab-ui-runtime-log-level", "DEBUG",
             "--flowtab-ui-enable-verbose-logs",
@@ -24,10 +54,11 @@ extension FlowTabUITests {
             }
         ) { workflow, app in
             let fixtureAppIDs = workflow.apps.map(\.identity.bundleIdentifier)
-            let initialOrder = waitForWorkflowAppOrder(
+            let initialOrder = triggerAndWaitForWorkflowAppOrder(
                 fixtureAppIDs,
                 in: app,
-                timeout: 10
+                timeout: 10,
+                traceLabel: "system-app-mru.initial"
             )
             XCTAssertEqual(initialOrder, fixtureAppIDs)
             waitForRuntimeLogFiles(
@@ -60,10 +91,11 @@ extension FlowTabUITests {
                 )
             )
 
-            let rebuiltOrder = waitForWorkflowAppOrder(
-                fixtureAppIDs,
+            let rebuiltOrder = triggerAndWaitForWorkflowAppOrder(
+                relaunchedExpectedOrder,
                 in: relaunchedApp,
-                timeout: 10
+                timeout: 10,
+                traceLabel: "system-app-mru.relaunch-order"
             )
             XCTAssertEqual(rebuiltOrder, relaunchedExpectedOrder)
             XCTAssertNotEqual(rebuiltOrder, initialOrder)
@@ -76,14 +108,12 @@ extension FlowTabUITests {
             for iteration in 1...10 {
                 relaunchedApp.typeKey(.escape, modifierFlags: [])
                 RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-                postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
-                    .global,
-                    traceLabel: "system-app-mru.reopen.\(iteration)"
-                )
-                let reopenedOrder = waitForWorkflowAppOrder(
-                    fixtureAppIDs,
+                let reopenedOrder = triggerAndWaitForWorkflowAppOrder(
+                    relaunchedExpectedOrder,
                     in: relaunchedApp,
-                    timeout: 10
+                    timeout: 10,
+                    traceLabel:
+                        "system-app-mru.reopen.\(iteration)"
                 )
                 XCTAssertEqual(reopenedOrder, relaunchedExpectedOrder)
             }
@@ -128,40 +158,55 @@ extension FlowTabUITests {
         }
     }
 
-    private func waitForWorkflowAppOrder(
+    private func triggerAndWaitForWorkflowAppOrder(
         _ expectedAppIDs: [String],
         in app: XCUIApplication,
-        timeout: TimeInterval
+        timeout: TimeInterval,
+        traceLabel: String
     ) -> [String] {
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let expectedSet = Set(expectedAppIDs)
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestOrder: [String] = []
-
-        repeat {
-            if diagnosticsSummary.exists {
-                latestOrder = switcherPanelDiagnosticsValue(
-                    diagnosticsSummary,
-                    key: "apps"
+        let owner = FlowTabUITestConditionObservationOwner(
+            observationRegistration:
+                FlowTabUITestConditionReadbackScheduler
+                    .mainRunLoopRegistration(
+                        cadence:
+                            FlowTabUITestConditionObservationPolicy
+                                .xcuiReadbackCadence
+                    ),
+            readback: {
+                FlowTabUITestWorkflowAppOrderEvidence(
+                    diagnosticsValue: diagnosticsSummary.exists
+                        ? self.switcherPanelDiagnosticsValue(
+                            diagnosticsSummary,
+                            key: "apps"
+                        )
+                        : nil,
+                    expectedAppIdentifiers: expectedSet
                 )
-                .split(separator: "|")
-                .compactMap { entry in
-                    entry.split(separator: ":", maxSplits: 1).first.map(String.init)
-                }
-                .filter(expectedSet.contains)
-                if latestOrder.count == expectedAppIDs.count
-                    && Set(latestOrder) == expectedSet {
-                    return latestOrder
-                }
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
+            },
+            isSatisfied: { evidence in
+                evidence.matches(expectedAppIDs)
+            },
+            describe: \.diagnosticSummary
+        )
+        owner.start()
+        defer { owner.cancel() }
+
+        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+            .global,
+            traceLabel: traceLabel
+        )
+        if let evidence = owner.waitForResolution(timeout: timeout) {
+            return evidence.value.order
+        }
 
         XCTFail(
-            "Expected workflow app order \(expectedAppIDs), observed \(latestOrder). "
+            "Expected workflow app order \(expectedAppIDs). "
+                + "\(owner.diagnosticSummary). "
                 + switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary)
         )
-        return latestOrder
+        return owner.latestEvidence?.value.order ?? []
     }
 
     private func waitForFlowTabUITestApplicationToTerminate(
