@@ -500,15 +500,28 @@ extension FlowTabUITests {
             )
         }
 
-        logWorkflowSpaceObservation("\(traceLabel).beforeEnterWindowState", app: workflowApp)
-        postFlowTabUITestSwitcherCommandAndWaitForDelivery(.advanceDown, traceLabel: "\(traceLabel).enterWindowState")
-        logWorkflowSpaceObservation("\(traceLabel).afterEnterWindowState", app: workflowApp)
         XCTAssertTrue(
-            waitForSwitcherDiagnosticsValue(
+            performAndWaitForSwitcherDiagnostics(
                 diagnosticsSummary,
                 key: "mode",
-                toHavePrefix: "windowCycle",
-                timeout: 4
+                hasPrefix: "windowCycle",
+                timeout: 4,
+                trigger: {
+                    self.logWorkflowSpaceObservation(
+                        "\(traceLabel).beforeEnterWindowState",
+                        app: workflowApp
+                    )
+                    self
+                        .postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                            .advanceDown,
+                            traceLabel:
+                                "\(traceLabel).enterWindowState"
+                        )
+                    self.logWorkflowSpaceObservation(
+                        "\(traceLabel).afterEnterWindowState",
+                        app: workflowApp
+                    )
+                }
             ),
             """
             Option+Tab switcher did not enter app window state.
@@ -559,10 +572,10 @@ extension FlowTabUITests {
         stage: String
     ) {
         XCTAssertTrue(
-            waitForSwitcherDiagnosticsValue(
+            waitForSwitcherDiagnostics(
                 diagnosticsSummary,
                 key: "selected",
-                toEqual: workflowApp.identity.bundleIdentifier,
+                equals: workflowApp.identity.bundleIdentifier,
                 timeout: 4
             ),
             """
@@ -833,38 +846,6 @@ extension FlowTabUITests {
         XCTAssertTrue(searchInput.waitForExistence(timeout: 12))
         XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 12))
         return searchInput
-    }
-
-    private func waitForSwitcherDiagnosticsValue(
-        _ diagnosticsSummary: XCUIElement,
-        key: String,
-        toHavePrefix expectedValuePrefix: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if switcherPanelDiagnosticsValue(diagnosticsSummary, key: key).hasPrefix(expectedValuePrefix) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-
-    private func waitForSwitcherDiagnosticsValue(
-        _ diagnosticsSummary: XCUIElement,
-        key: String,
-        toEqual expectedValue: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if switcherPanelDiagnosticsValue(diagnosticsSummary, key: key) == expectedValue {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
     }
 
     private func waitForSwitcherPreviewTitles(

@@ -95,6 +95,37 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherDiagnosticsObserverMatchesPrefixProjection() {
+        let owner =
+            FlowTabUITestSwitcherDiagnosticsObservationOwner(
+                expectations: [
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "mode",
+                        expectedPrefix: "windowCycle"
+                    )
+                ],
+                observationRegistration: nil,
+                readback: {
+                    FlowTabUITestSwitcherDiagnosticsSnapshot(
+                        identifier: "switcher-summary",
+                        exists: true,
+                        rawValue:
+                            "mode=windowCycleForward",
+                        values: [
+                            "mode": "windowCycleForward"
+                        ]
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .initialReadback
+        )
+    }
+
     func testSwitcherDiagnosticsObserverRequiresPostTriggerProjection() {
         var acceptsEvidence = false
         var cancellationCount = 0

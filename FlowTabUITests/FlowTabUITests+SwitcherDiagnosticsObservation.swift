@@ -1,10 +1,56 @@
 import Foundation
 import XCTest
 
+enum FlowTabUITestSwitcherDiagnosticsValueMatch: Equatable {
+    case equals(String)
+    case hasPrefix(String)
+
+    func isSatisfied(by value: String) -> Bool {
+        switch self {
+        case let .equals(expectedValue):
+            return value == expectedValue
+        case let .hasPrefix(expectedPrefix):
+            return value.hasPrefix(expectedPrefix)
+        }
+    }
+
+    var diagnosticSummary: String {
+        switch self {
+        case let .equals(expectedValue):
+            return "equals \(expectedValue)"
+        case let .hasPrefix(expectedPrefix):
+            return "hasPrefix \(expectedPrefix)"
+        }
+    }
+}
+
 struct FlowTabUITestSwitcherDiagnosticsExpectation: Equatable {
     let key: String
-    let expectedValue: String
-    var decodesPercentEncoding = false
+    let valueMatch:
+        FlowTabUITestSwitcherDiagnosticsValueMatch
+    let decodesPercentEncoding: Bool
+
+    init(
+        key: String,
+        expectedValue: String,
+        decodesPercentEncoding: Bool = false
+    ) {
+        self.key = key
+        valueMatch = .equals(expectedValue)
+        self.decodesPercentEncoding =
+            decodesPercentEncoding
+    }
+
+    init(
+        key: String,
+        expectedPrefix: String,
+        decodesPercentEncoding: Bool = false
+    ) {
+        self.key = key
+        valueMatch = .hasPrefix(expectedPrefix)
+        self.decodesPercentEncoding =
+            decodesPercentEncoding
+    }
 
     func observedValue(
         in snapshot: FlowTabUITestSwitcherDiagnosticsSnapshot
@@ -21,11 +67,13 @@ struct FlowTabUITestSwitcherDiagnosticsExpectation: Equatable {
     func isSatisfied(
         by snapshot: FlowTabUITestSwitcherDiagnosticsSnapshot
     ) -> Bool {
-        observedValue(in: snapshot) == expectedValue
+        observedValue(in: snapshot).map {
+            valueMatch.isSatisfied(by: $0)
+        } == true
     }
 
     var diagnosticSummary: String {
-        "\(key)=\(expectedValue)"
+        "\(key){\(valueMatch.diagnosticSummary)}"
             + (decodesPercentEncoding ? "[percentDecoded]" : "")
     }
 }
@@ -148,6 +196,24 @@ extension FlowTabUITests {
     }
 
     func waitForSwitcherDiagnostics(
+        _ diagnosticsSummary: XCUIElement,
+        key: String,
+        hasPrefix expectedPrefix: String,
+        timeout: TimeInterval
+    ) -> Bool {
+        waitForSwitcherDiagnostics(
+            [
+                FlowTabUITestSwitcherDiagnosticsExpectation(
+                    key: key,
+                    expectedPrefix: expectedPrefix
+                )
+            ],
+            in: diagnosticsSummary,
+            timeout: timeout
+        )
+    }
+
+    func waitForSwitcherDiagnostics(
         _ expectations: [
             FlowTabUITestSwitcherDiagnosticsExpectation
         ],
@@ -195,6 +261,26 @@ extension FlowTabUITests {
                     expectedValue: expectedValue,
                     decodesPercentEncoding:
                         decodesPercentEncoding
+                )
+            ],
+            in: diagnosticsSummary,
+            timeout: timeout,
+            trigger: trigger
+        )
+    }
+
+    func performAndWaitForSwitcherDiagnostics(
+        _ diagnosticsSummary: XCUIElement,
+        key: String,
+        hasPrefix expectedPrefix: String,
+        timeout: TimeInterval,
+        trigger: () -> Void
+    ) -> Bool {
+        performAndWaitForSwitcherDiagnostics(
+            [
+                FlowTabUITestSwitcherDiagnosticsExpectation(
+                    key: key,
+                    expectedPrefix: expectedPrefix
                 )
             ],
             in: diagnosticsSummary,
