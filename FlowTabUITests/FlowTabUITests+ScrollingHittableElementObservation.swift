@@ -87,70 +87,6 @@ private final class FlowTabUITestScrollingHittableElementObservationState<
     var lastScrollDeltaY: CGFloat?
 }
 
-private final class FlowTabUITestScrollingHittableElementReadbackSchedule {
-    private let oneShotRegistration:
-        FlowTabUITestOneShotReadbackRegistration
-    private let readback:
-        (FlowTabUITestConditionObservationSource) -> Void
-    private let scrollIfNeeded: () -> Void
-
-    private var scheduledCancellation:
-        FlowTabUITestObservationCancellation?
-    private var isCancelled = false
-
-    init(
-        oneShotRegistration:
-            @escaping FlowTabUITestOneShotReadbackRegistration,
-        readback: @escaping (
-            FlowTabUITestConditionObservationSource
-        ) -> Void,
-        scrollIfNeeded: @escaping () -> Void
-    ) {
-        self.oneShotRegistration = oneShotRegistration
-        self.readback = readback
-        self.scrollIfNeeded = scrollIfNeeded
-    }
-
-    func start() {
-        scheduleNextReadback()
-    }
-
-    func cancel() {
-        guard !isCancelled else { return }
-        isCancelled = true
-        scheduledCancellation?.cancel()
-        scheduledCancellation = nil
-    }
-
-    deinit {
-        cancel()
-    }
-
-    private func scheduleNextReadback() {
-        guard !isCancelled,
-              scheduledCancellation == nil
-        else {
-            return
-        }
-        scheduledCancellation = oneShotRegistration {
-            [weak self] in
-            self?.fire()
-        }
-    }
-
-    private func fire() {
-        guard !isCancelled else { return }
-        scheduledCancellation = nil
-        readback(.scheduledReadback)
-        guard !isCancelled else { return }
-        scrollIfNeeded()
-        guard !isCancelled else { return }
-        // XCUI scrolling pumps the RunLoop. Registering after it returns
-        // prevents a subsequent scroll step from reentering this one.
-        scheduleNextReadback()
-    }
-}
-
 final class FlowTabUITestScrollingHittableElementObservationOwner<
     Element
 > {
@@ -172,19 +108,22 @@ final class FlowTabUITestScrollingHittableElementObservationOwner<
             >()
         let registerOneShot =
             oneShotRegistration
-            ?? Self.mainRunLoopOneShotRegistration
+            ?? FlowTabUITestConditionReadbackScheduler
+                .mainRunLoopOneShotRegistration(
+                    cadence:
+                        FlowTabUITestConditionObservationPolicy
+                            .xcuiReadbackCadence
+                )
         let observationRegistration:
-            FlowTabUITestConditionObservationRegistration = {
-                scheduledReadback in
-                let schedule =
-                    FlowTabUITestScrollingHittableElementReadbackSchedule(
+            FlowTabUITestConditionObservationRegistration =
+                FlowTabUITestConditionReadbackScheduler
+                    .serialRegistration(
                         oneShotRegistration: registerOneShot,
-                        readback: scheduledReadback,
-                        scrollIfNeeded: {
+                        afterReadback: {
                             if
                                 let snapshot =
                                     state.latestSnapshot,
-                            snapshot.firstHittableElement
+                                snapshot.firstHittableElement
                                     == nil,
                                 let deltaY =
                                     snapshot.nextScrollDeltaY
@@ -195,11 +134,6 @@ final class FlowTabUITestScrollingHittableElementObservationOwner<
                             }
                         }
                     )
-                schedule.start()
-                return FlowTabUITestObservationCancellation {
-                    schedule.cancel()
-                }
-            }
         conditionOwner = FlowTabUITestConditionObservationOwner(
             observationRegistration:
                 observationRegistration,
@@ -245,22 +179,5 @@ final class FlowTabUITestScrollingHittableElementObservationOwner<
 
     func cancel() {
         conditionOwner.cancel()
-    }
-
-    private static func mainRunLoopOneShotRegistration(
-        _ readback: @escaping () -> Void
-    ) -> FlowTabUITestObservationCancellation {
-        let timer = Timer(
-            timeInterval:
-                FlowTabUITestConditionObservationPolicy
-                    .xcuiReadbackCadence,
-            repeats: false
-        ) { _ in
-            readback()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        return FlowTabUITestObservationCancellation {
-            timer.invalidate()
-        }
     }
 }

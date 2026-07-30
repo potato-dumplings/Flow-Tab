@@ -10,6 +10,7 @@ private final class FlowTabUITestSerialConditionReadbackSchedule {
         FlowTabUITestOneShotReadbackRegistration
     private let readback:
         (FlowTabUITestConditionObservationSource) -> Void
+    private let afterReadback: () -> Void
 
     private var scheduledCancellation:
         FlowTabUITestObservationCancellation?
@@ -20,10 +21,12 @@ private final class FlowTabUITestSerialConditionReadbackSchedule {
             @escaping FlowTabUITestOneShotReadbackRegistration,
         readback: @escaping (
             FlowTabUITestConditionObservationSource
-        ) -> Void
+        ) -> Void,
+        afterReadback: @escaping () -> Void
     ) {
         self.oneShotRegistration = oneShotRegistration
         self.readback = readback
+        self.afterReadback = afterReadback
     }
 
     func start() {
@@ -57,6 +60,9 @@ private final class FlowTabUITestSerialConditionReadbackSchedule {
         guard !isCancelled else { return }
         scheduledCancellation = nil
         readback(.scheduledReadback)
+        guard !isCancelled else { return }
+        afterReadback()
+        guard !isCancelled else { return }
         scheduleNext()
     }
 }
@@ -64,14 +70,16 @@ private final class FlowTabUITestSerialConditionReadbackSchedule {
 enum FlowTabUITestConditionReadbackScheduler {
     static func serialRegistration(
         oneShotRegistration:
-            @escaping FlowTabUITestOneShotReadbackRegistration
+            @escaping FlowTabUITestOneShotReadbackRegistration,
+        afterReadback: @escaping () -> Void = {}
     ) -> FlowTabUITestConditionObservationRegistration {
         { readback in
             let schedule =
                 FlowTabUITestSerialConditionReadbackSchedule(
                     oneShotRegistration:
                         oneShotRegistration,
-                    readback: readback
+                    readback: readback,
+                    afterReadback: afterReadback
                 )
             schedule.start()
             return FlowTabUITestObservationCancellation {
@@ -81,9 +89,22 @@ enum FlowTabUITestConditionReadbackScheduler {
     }
 
     static func mainRunLoopRegistration(
-        cadence: TimeInterval
+        cadence: TimeInterval,
+        afterReadback: @escaping () -> Void = {}
     ) -> FlowTabUITestConditionObservationRegistration {
-        serialRegistration { readback in
+        serialRegistration(
+            oneShotRegistration:
+                mainRunLoopOneShotRegistration(
+                    cadence: cadence
+                ),
+            afterReadback: afterReadback
+        )
+    }
+
+    static func mainRunLoopOneShotRegistration(
+        cadence: TimeInterval
+    ) -> FlowTabUITestOneShotReadbackRegistration {
+        { readback in
             let timer = Timer(
                 timeInterval: cadence,
                 repeats: false
