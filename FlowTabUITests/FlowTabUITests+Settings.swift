@@ -95,20 +95,66 @@ extension FlowTabUITests {
         XCTAssertTrue(settingsContent.waitForExistence(timeout: 6))
         XCTAssertTrue(app.staticTexts["外观"].waitForExistence(timeout: 5))
 
-        selectOption(in: app, controlIdentifier: Identifier.settingsAppearanceThemeMode, optionIdentifier: "light")
-        assertValue(of: element(in: app, identifier: Identifier.settingsAppearanceThemeMode), equals: "light")
         let lightLuminance = try XCTUnwrap(
-            waitForAverageLuminance(of: settingsContent, timeout: 5) { $0 > 0.45 },
+            performAndWaitForAverageLuminance(
+                of: settingsContent,
+                expectedDescription: "greater than 0.45",
+                timeout: 5,
+                trigger: {
+                    self.selectOption(
+                        in: app,
+                        controlIdentifier:
+                            Identifier.settingsAppearanceThemeMode,
+                        optionIdentifier: "light"
+                    )
+                },
+                matching: { $0 > 0.45 }
+            ),
             "Settings content did not become visibly light"
         )
+        assertValue(
+            of: element(
+                in: app,
+                identifier:
+                    Identifier.settingsAppearanceThemeMode
+            ),
+            equals: "light"
+        )
 
-        selectOption(in: app, controlIdentifier: Identifier.settingsAppearanceThemeMode, optionIdentifier: "dark")
-        assertValue(of: element(in: app, identifier: Identifier.settingsAppearanceThemeMode), equals: "dark")
+        let maximumDarkLuminance =
+            lightLuminance - 0.18
         let darkLuminance = try XCTUnwrap(
-            waitForAverageLuminance(of: settingsContent, timeout: 5) { $0 < lightLuminance - 0.18 },
+            performAndWaitForAverageLuminance(
+                of: settingsContent,
+                expectedDescription:
+                    "less than \(maximumDarkLuminance)",
+                timeout: 5,
+                trigger: {
+                    self.selectOption(
+                        in: app,
+                        controlIdentifier:
+                            Identifier.settingsAppearanceThemeMode,
+                        optionIdentifier: "dark"
+                    )
+                },
+                matching: {
+                    $0 < maximumDarkLuminance
+                }
+            ),
             "Settings content did not become visibly darker after selecting dark theme"
         )
-        XCTAssertLessThan(darkLuminance, lightLuminance - 0.18)
+        assertValue(
+            of: element(
+                in: app,
+                identifier:
+                    Identifier.settingsAppearanceThemeMode
+            ),
+            equals: "dark"
+        )
+        XCTAssertLessThan(
+            darkLuminance,
+            maximumDarkLuminance
+        )
 
         selectOption(in: app, controlIdentifier: Identifier.settingsAppearanceAppLanguage, optionIdentifier: "en")
         assertValue(of: element(in: app, identifier: Identifier.settingsAppearanceAppLanguage), equals: "en")
@@ -722,45 +768,6 @@ extension FlowTabUITests {
 
         XCTAssertFalse(inAppModifier.isEnabled)
         XCTAssertFalse(inAppKey.isEnabled)
-    }
-
-    private func waitForAverageLuminance(
-        of element: XCUIElement,
-        timeout: TimeInterval,
-        matching predicate: (CGFloat) -> Bool
-    ) -> CGFloat? {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if let luminance = averageLuminance(of: element), predicate(luminance) {
-                return luminance
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return nil
-    }
-
-    private func averageLuminance(of element: XCUIElement) -> CGFloat? {
-        guard element.exists,
-              let bitmap = NSBitmapImageRep(data: element.screenshot().pngRepresentation),
-              bitmap.pixelsWide > 0,
-              bitmap.pixelsHigh > 0
-        else {
-            return nil
-        }
-
-        let sampleStep = max(1, min(bitmap.pixelsWide, bitmap.pixelsHigh) / 80)
-        var total: CGFloat = 0
-        var samples = 0
-        for y in stride(from: 0, to: bitmap.pixelsHigh, by: sampleStep) {
-            for x in stride(from: 0, to: bitmap.pixelsWide, by: sampleStep) {
-                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
-                total += color.redComponent * 0.2126
-                    + color.greenComponent * 0.7152
-                    + color.blueComponent * 0.0722
-                samples += 1
-            }
-        }
-        return samples > 0 ? total / CGFloat(samples) : nil
     }
 
     private func assertSettingsPageSubtitleIsVisible(
