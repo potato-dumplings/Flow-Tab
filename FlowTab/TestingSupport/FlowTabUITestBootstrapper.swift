@@ -70,6 +70,8 @@ enum FlowTabUITestBootstrapper {
             .prepareIfNeeded(
                 service: resolvedRuntimeProjectionService
             )
+        FlowTabUITestAXSuppressionReadbackBootstrap
+            .prepareIfNeeded()
 
         if FlowTabTestLaunchOptions.resetsUserDefaultsOnLaunch {
             AppPreferenceKeys.allKeys.forEach { userDefaults.removeObject(forKey: $0) }

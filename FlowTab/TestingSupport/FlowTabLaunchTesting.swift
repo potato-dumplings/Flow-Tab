@@ -7,6 +7,8 @@ enum FlowTabTestLaunchOptions {
     static let unitTestingBundlePathEnvironmentKey = "XCTestBundlePath"
     static let projectionAcknowledgementRouteArgument =
         "--flowtab-ui-projection-acknowledgement-route"
+    static let axSuppressionReadbackRouteArgument =
+        "--flowtab-ui-ax-suppression-readback-route"
     static let tabSwitchStressEvidenceNotificationArgument =
         "--flowtab-tab-stress-evidence-notification-name"
 
@@ -29,6 +31,7 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-open-switcher",
         "--flowtab-ui-open-switcher-search",
         "--flowtab-ui-permission-state-path",
+        axSuppressionReadbackRouteArgument,
         projectionAcknowledgementRouteArgument,
         "--flowtab-ui-record-hotkey-reload-diagnostics",
         "--flowtab-ui-redacted-runtime-logs",
@@ -138,6 +141,68 @@ enum FlowTabTestLaunchOptions {
                         Notification.Name(notificationName),
                     bundleIdentifier: bundleIdentifier,
                     expectedWindowCount: expectedWindowCount
+                )
+            )
+        }
+        return routes
+    }
+
+    static var axSuppressionReadbackRoutes:
+        [FlowTabUITestAXSuppressionReadbackRoute]
+    {
+        guard isRunningUITests else { return [] }
+        var routes:
+            [FlowTabUITestAXSuppressionReadbackRoute] = []
+        var completionNames: Set<String> = []
+        var verificationNames: Set<String> = []
+        for index in arguments.indices
+        where arguments[index]
+            == axSuppressionReadbackRouteArgument
+        {
+            guard index + 4 < arguments.count else {
+                continue
+            }
+            let completionName = arguments[index + 1]
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+            let verificationName = arguments[index + 2]
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+            let bundleIdentifier = arguments[index + 3]
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+            guard !completionName.isEmpty,
+                  !verificationName.isEmpty,
+                  !bundleIdentifier.isEmpty,
+                  let expectedWindowCount =
+                    Int(arguments[index + 4]),
+                  expectedWindowCount > 0,
+                  completionNames.insert(
+                    completionName
+                  ).inserted,
+                  verificationNames.insert(
+                    verificationName
+                  ).inserted
+            else {
+                continue
+            }
+            routes.append(
+                FlowTabUITestAXSuppressionReadbackRoute(
+                    completionNotificationName:
+                        Notification.Name(
+                            completionName
+                        ),
+                    verificationNotificationName:
+                        Notification.Name(
+                            verificationName
+                        ),
+                    bundleIdentifier:
+                        bundleIdentifier,
+                    expectedWindowCount:
+                        expectedWindowCount
                 )
             )
         }

@@ -118,6 +118,7 @@ and Process/Tooling.
 | SYNC-026C | Composite application AX-suppression routing boundary | The producer-side projection acknowledgement and fixture-side suppression lifecycle belong to different process and resource owners. Migration routing. | Close producer publication through SYNC-026C1 and fixture suppression through SYNC-026C2. | H aggregate; child rows define required validation. | completed |
 | SYNC-026C1 | `FlowTabUITestProjectionAcknowledgementOwner`, `FlowTabUITestBootstrapper`, `FlowTabTestLaunchOptions`; FlowTab TestingSupport projection acknowledgement | A fixture cannot infer when prelaunched FlowTab has committed the exact fixture process and window topology. Evidence migration. | Parse explicit test-only routes, install the runtime projection observer before initial readback, and publish a distributed acknowledgement only for a complete, clean projection matching bundle ID, positive PID, and exact window count. Include monotonic acknowledgement and source generations. The app TestingSupport bootstrap owns observation and termination cleanup. | H cross-process fixture evidence; Unit, Behavior, deterministic Pressure, Process/Tooling; end-to-end UI transport joins SYNC-026C2. | completed |
 | SYNC-026C2 | `SpaceFixtureApplicationAXSuppressionOwner`, `SpaceFixtureWindowCoordinator`; fixture application AX suppression | Fixed 5s and post-fullscreen 8s delays assume workflow consumers have captured the application AX window list. Evidence migration. | Install the route observer before fixture window publication, then suppress only after the exact local topology stage, exact published application AX readback, and a matching acknowledgement for the fixture PID and window count. Preserve the route-less fixture flag through the local-topology plus exact-readback contract. Require exact zero readback, publish a monotonic suppression generation for every resolved owner, and report routed terminal evidence. The coordinator owns cancellation and cleanup. | H fixture topology; Unit, Behavior, AX-suppressed real fixture UI, runtime-topology Pressure. | completed |
+| SYNC-026C2R | `FlowTabUITestAXSuppressionReadbackOwner`, `SpaceFixtureAXSuppressionObservationOwner`; authorized exact application AX readback | After terminal fixture suppression evidence, `XCUIApplication.windows.count` could report “application is not running” for the still-frontmost exact PID whose root AX window collection had intentionally become empty. A direct UI-runner AX readback returned `apiDisabled`, and the surrounding raw 100ms RunLoop loop made the result depend on XCUI session timing while owning no cancellable work. Evidence-Oracle repair. | Prelaunch the authorized fixed-path FlowTab test process with explicit completion and verification routes. FlowTab installs the completion observer before fixture launch, accepts only a later monotonic exact identity/generation, then immediately reads `kAXChildrenAttribute` and `kAXWindowsAttribute` from `AXUIElementCreateApplication(PID)` and requires the exact bundle/PID to remain running. Because external AX propagation exposes no callback, an unmet readback uses one named serial cancellable 100ms condition schedule. The UI consumer installs both completion and verification observers before fixture launch and resolves only after matching independent exact evidence. FlowTab bootstrap, workflow observation, and test-case cleanup own every observer, generation, schedule, replacement, and cancellation; the 20-second UI watchdog performs a final state readback and reports the unmet evidence. | H cross-process AX topology; deterministic initial/event/cancel/stale/duplicate/watchdog owner coverage, AX-suppressed noisy real fixture UI, lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-027 | Composite fixture fault-latency baseline | Semantic owner review found two independent fault-injection contracts: delayed process termination and delayed exact-window close. Domain duration routing record. | Preserve the CLI compatibility boundary and route implementation, lifecycle, evidence, and validation through SYNC-027A and SYNC-027B. | M; child-slice validation. | completed: SYNC-027A and SYNC-027B closed independently |
 | SYNC-027A | `SpaceFixtureAppDelegate`, `SpaceFixtureLaunchConfiguration`, `SpaceFixtureTerminationFaultOwner`; delayed process termination | `--terminate-delay-ms` intentionally keeps the fixture process alive after an application or SIGTERM request. The raw `asyncAfter` work had no cancellation owner and exposed no scheduled/applied evidence. Domain duration. | Retain the positive delay as `SpaceFixtureTerminationFaultPolicy`. A single AppDelegate-owned generation schedules through the injectable fixture scheduler, preserves the first request across duplicate sources, publishes exact scheduled/applied evidence with bundle ID and PID, and cancels the task and signal source at app termination. The optional notification route preserves existing launch configurations while enabling an observer to be established before the termination request. | M repeated async work; Unit, Behavior, representative termination UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-027B | `SpaceFixtureWindowCloseFaultOwner`, `SpaceFixtureWindowCoordinator`, `SpaceFixtureLaunchConfiguration`; delayed exact-window close | `--close-window-delay-ms` intentionally delays fixture window removal, while the former coordinator token exposed no scheduled/applied acknowledgement and fixture launch time could race the consumer's initial topology observation. Domain duration plus evidence-driven orchestration. | Retain the named fault duration behind an exact generation, bundle/PID, plan-index, and stable-window-number contract. Install the optional trigger observer before the initial readback and scheduled evidence; begin the delay from a matching trigger, then resolve only from AppKit visibility, exact CG-window, and coordinator-topology readback. Use an immediate first readback, named cancellable 50ms retry where WindowServer exposes no close-completion event, and a diagnostic 10s watchdog. The coordinator-owned fault owner cancels every observer and token. | M repeated async work; Unit, Behavior, representative window-removal UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
@@ -2385,6 +2386,84 @@ polling cadence, deadline, or timeout in the scoped paths.
   commit. Startup `prompts.zip` remains unchanged and outside the slice.
 - Commit: `4d3a6222de4c38034625f5a62ca4efc23fb67375`
   (`refactor(sync): migrate SYNC-026C2 AX suppression`).
+
+### SYNC-026C2R Closure Record
+
+- Design and Oracle: every suppression route now contains a producer
+  completion notification and a distinct authorized-readback verification
+  notification. The fixed-path FlowTab test process installs its completion
+  observer at bootstrap before fixture launch. For each later monotonic
+  suppression generation, it first reads the exact bundle/PID process state,
+  `kAXChildrenAttribute`, and `kAXWindowsAttribute`; it publishes verification
+  only when that exact process remains running and both authorized AX
+  readbacks succeed with zero elements. The UI workflow installs both route
+  observers before launching any fixture and resolves only when the producer
+  completion and independent FlowTab verification match suppression,
+  acknowledgement, source, bundle, PID, configured window count, and both
+  producer-side and external zero counts.
+- Failure evidence and boundary correction: the initial real UI attempt
+  received exact terminal producer evidence for the still-running fixture
+  PID, while direct UI-runner reads of both AX attributes returned
+  `AXError.apiDisabled` (`-25211`). That concrete identity-boundary evidence
+  moved the independent readback into FlowTab TestingSupport, whose stable
+  signed application identity already owns the repository's Accessibility
+  permission. The final real regression launches the four-window noisy
+  fixture directly after both observers are installed, then closes only from
+  producer completion plus the authorized verification route.
+- Lifecycle: `FlowTabUITestAXSuppressionReadbackBootstrap` owns one route
+  owner for the launched FlowTab process. Each start replaces the prior
+  observation generation and cancels every completion observer and pending
+  readback token; application termination calls `stop`. Each UI route owner
+  owns both distributed observers, its condition expectation, monotonic
+  completion and verification state, replacement generation, watchdog
+  readback, and cleanup. Wrong identity/count, malformed, stale, duplicate,
+  regressed, canceled, and out-of-order evidence cannot close the contract.
+- Retained time policy: AppKit exposes no notification for external
+  application-root AX propagation after the fixture removes its attributes.
+  FlowTab therefore performs an immediate readback for every accepted
+  completion and retains a named, serial, cancellable 100ms propagation
+  cadence only while the exact condition remains unmet. Time never establishes
+  success. The workflow's named 20-second watchdog is terminal failure only;
+  its final state readback reports the last producer completion and authorized
+  verification, including exact AX errors and counts.
+- Unit and Behavior: the canonical FlowTabTests wrapper rebuilt all six
+  targets and passed 4/4 focused tests with zero failures in 0.003 seconds
+  under `.build-local/app-tests`. Coverage verifies complete unique route
+  parsing, observer registration before synchronously delivered completion,
+  immediate authorized success, retry only until exact convergence, full
+  cancellation, and 100 stale/duplicate/regressed replacement generations.
+- UI-test infrastructure regression and Pressure: the canonical UI wrapper's
+  final pure-slice run passed all four focused consumer tests as part of the
+  5/5 zero-failure run under
+  `.build-local/evidence-driven-sync/SYNC-026C2R/pure-ui-attempt-003`.
+  Coverage includes synchronous dual-observer registration, both event
+  orderings, exact external evidence gating, 100 canceled/replaced generations
+  with stale and duplicate delivery, and watchdog diagnostics carrying
+  `apiDisabled` plus the last exact counts.
+- UI: the install wrapper rebuilt, Apple Development-signed, and verified
+  `/Users/lk/Applications/Flow Tab UITest.app` from the current production
+  source under
+  `.build-local/evidence-driven-sync/SYNC-026C2R/pure-app-001`.
+  The dedicated noisy real-fixture regression passed with zero failures in
+  18.990 seconds; the combined final run passed 5/5 in 19.955 seconds under
+  `.build-local/evidence-driven-sync/SYNC-026C2R/pure-ui-attempt-003`.
+  It exercised the true fixture topology, projection acknowledgement,
+  producer suppression completion, authorized exact-PID AX readback, and UI
+  consumer closure. A broader diagnostic Control+Tab run also crossed the
+  repaired AX boundary, then exposed the separately owned remaining
+  SYNC-035C reopen synchronization path.
+- Process/Tooling: the complete UI build compiled all six targets and the
+  fixed-path install verified the stable Team ID and designated requirement.
+  Swift parsing, project plist validation, unique project references,
+  source-size checks, and `git diff --check` pass. The production
+  TestingSupport implementation is split by evidence/transport, scheduling,
+  and observation/bootstrap ownership at 227, 110, and 371 lines. The UI
+  consumer and regression files remain below 400 lines. Startup
+  `prompts.zip` remains unchanged and outside the slice.
+- FlowTabCore: not relevant because the repair belongs to application
+  TestingSupport and UI orchestration boundaries and adds no core-domain API.
+- Commit: pending current-slice local commit
+  (`fix(sync): repair SYNC-026C2R AX readback`).
 
 ### SYNC-027A Closure Record
 

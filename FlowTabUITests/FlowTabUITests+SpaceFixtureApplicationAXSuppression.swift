@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import XCTest
+
 struct SpaceFixtureAXSuppressionUITestRoute:
     Equatable
 {
@@ -11,13 +12,20 @@ struct SpaceFixtureAXSuppressionUITestRoute:
         Notification.Name
     let suppressionCompletionNotificationName:
         Notification.Name
+    let externalReadbackNotificationName:
+        Notification.Name
 
     var flowTabLaunchArguments: [String] {
         [
             "--flowtab-ui-projection-acknowledgement-route",
             projectionAcknowledgementNotificationName.rawValue,
             bundleIdentifier,
-            String(expectedWindowCount)
+            String(expectedWindowCount),
+            "--flowtab-ui-ax-suppression-readback-route",
+            suppressionCompletionNotificationName.rawValue,
+            externalReadbackNotificationName.rawValue,
+            bundleIdentifier,
+            String(expectedWindowCount),
         ]
     }
 
@@ -30,7 +38,7 @@ struct SpaceFixtureAXSuppressionUITestRoute:
         ]
     }
 }
-private struct SpaceFixtureAXSuppressionCompletion:
+struct SpaceFixtureAXSuppressionCompletion:
     Equatable
 {
     let suppressionGeneration: UInt64
@@ -41,18 +49,19 @@ private struct SpaceFixtureAXSuppressionCompletion:
     let sourceGeneration: String
     let childWindowCount: Int
     let windowsAttributeCount: Int
-}
-private struct SpaceFixtureApplicationXCUIWindowEvidence {
-    let windowCount: Int
-
-    var isSuppressed: Bool {
-        windowCount == 0
-    }
 
     var diagnosticSummary: String {
-        "windows=\(windowCount)"
+        "generation=\(suppressionGeneration) "
+            + "ackGeneration=\(acknowledgementGeneration) "
+            + "bundleID=\(bundleIdentifier) "
+            + "pid=\(processIdentifier) "
+            + "windows=\(windowCount) "
+            + "sourceGeneration=\(sourceGeneration) "
+            + "childWindows=\(childWindowCount) "
+            + "windowsAttribute=\(windowsAttributeCount)"
     }
 }
+
 final class SpaceFixtureAXSuppressionObservationOwner {
     private enum UserInfoKey {
         static let suppressionGeneration =
@@ -67,16 +76,15 @@ final class SpaceFixtureAXSuppressionObservationOwner {
         static let windowsAttributeCount =
             "windowsAttributeCount"
     }
-    private static let applicationAXReadbackInterval:
-        TimeInterval = 0.1
-
     private let routes:
         [SpaceFixtureAXSuppressionUITestRoute]
     private let center:
         DistributedNotificationCenter
-    private var observationTokens: [NSObjectProtocol] = []
-    private var latestCompletionByNotificationName:
-        [String: SpaceFixtureAXSuppressionCompletion] = [:]
+    private var routeOwners:
+        [
+            String:
+                SpaceFixtureAXSuppressionRouteObservationOwner
+        ] = [:]
 
     init(
         routes: [SpaceFixtureAXSuppressionUITestRoute],
@@ -85,128 +93,84 @@ final class SpaceFixtureAXSuppressionObservationOwner {
         self.routes = routes
         self.center = center
     }
+
     func start() {
         cancel()
-        latestCompletionByNotificationName.removeAll()
         for route in routes {
-            let notificationName =
-                route.suppressionCompletionNotificationName
-            let token = center.addObserver(
-                forName: notificationName,
-                object: nil,
-                queue: .main
-            ) { [weak self] notification in
-                self?.observe(
-                    notification,
-                    for: route
+            let owner =
+                SpaceFixtureAXSuppressionRouteObservationOwner(
+                    route: route,
+                    completionRegistration:
+                        completionRegistration(for: route)
                 )
-            }
-            observationTokens.append(token)
+            routeOwners[route.key] = owner
+            owner.start()
         }
     }
 
     func cancel() {
-        for token in observationTokens {
-            center.removeObserver(token)
+        for owner in routeOwners.values {
+            owner.cancel()
         }
-        observationTokens.removeAll()
+        routeOwners.removeAll()
     }
 
     deinit {
-        for token in observationTokens {
-            center.removeObserver(token)
-        }
+        cancel()
     }
 
     func waitForSuppression(
         route: SpaceFixtureAXSuppressionUITestRoute,
         timeout: TimeInterval
     ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestExternalEvidence:
-            SpaceFixtureApplicationXCUIWindowEvidence?
-        repeat {
-            if let completion = matchingCompletion(
-                for: route
-            ) {
-                latestExternalEvidence =
-                    applicationXCUIWindowEvidence(
-                        bundleIdentifier:
-                            route.bundleIdentifier
-                    )
-                if latestExternalEvidence?
-                    .isSuppressed == true,
-                   isExactRunningApplication(
-                    bundleIdentifier:
-                        route.bundleIdentifier,
-                    processIdentifier:
-                        completion.processIdentifier
-                )
-                {
-                    return true
-                }
-            }
-            let nextReadback = min(
-                deadline,
-                Date().addingTimeInterval(
-                    Self.applicationAXReadbackInterval
-                )
+        guard let owner = routeOwners[route.key] else {
+            XCTFail(
+                "Application AX suppression route was not "
+                    + "started for \(route.bundleIdentifier)."
             )
-            RunLoop.current.run(until: nextReadback)
-        } while Date() < deadline
-
-        let completion = latestCompletionByNotificationName[
-            route.suppressionCompletionNotificationName.rawValue
-        ]
-        XCTFail(
-            "Application AX suppression evidence timed out "
-                + "bundleID=\(route.bundleIdentifier) "
-                + "expectedWindows=\(route.expectedWindowCount) "
-                + "completion=\(completionDiagnostic(completion)) "
-                + "externalXCUI={"
-                + (latestExternalEvidence?.diagnosticSummary
-                    ?? "unobserved")
-                + "}."
-        )
-        return false
-    }
-
-    private func observe(
-        _ notification: Notification,
-        for route: SpaceFixtureAXSuppressionUITestRoute
-    ) {
-        guard let completion = parse(notification),
-              completion.bundleIdentifier
-                == route.bundleIdentifier,
-              completion.windowCount
-                == route.expectedWindowCount,
-              completion.childWindowCount == 0,
-              completion.windowsAttributeCount == 0
-        else {
-            return
+            return false
         }
-        let key =
-            route.suppressionCompletionNotificationName.rawValue
-        guard completion.suppressionGeneration
-                > (
-                    latestCompletionByNotificationName[key]?
-                        .suppressionGeneration ?? 0
-                )
+        guard owner.waitForResolution(timeout: timeout)
+            != nil
         else {
-            return
+            XCTFail(
+                "Application AX suppression evidence timed "
+                    + "out bundleID="
+                    + route.bundleIdentifier
+                    + " expectedWindows="
+                    + "\(route.expectedWindowCount) "
+                    + owner.diagnosticSummary
+            )
+            return false
         }
-        latestCompletionByNotificationName[key] = completion
+        return true
     }
 
-    private func matchingCompletion(
+    private func completionRegistration(
         for route: SpaceFixtureAXSuppressionUITestRoute
-    ) -> SpaceFixtureAXSuppressionCompletion? {
-        latestCompletionByNotificationName[
-            route.suppressionCompletionNotificationName.rawValue
-        ]
+    ) -> SpaceFixtureAXSuppressionCompletionRegistration {
+        { [center] completion in
+            let token = center.addObserver(
+                forName:
+                    route
+                        .suppressionCompletionNotificationName,
+                object: nil,
+                queue: .main
+            ) { notification in
+                guard let parsedCompletion =
+                        Self.parse(notification)
+                else {
+                    return
+                }
+                completion(parsedCompletion)
+            }
+            return FlowTabUITestObservationCancellation {
+                center.removeObserver(token)
+            }
+        }
     }
 
-    private func parse(
+    private static func parse(
         _ notification: Notification
     ) -> SpaceFixtureAXSuppressionCompletion? {
         guard let userInfo = notification.userInfo,
@@ -269,46 +233,11 @@ final class SpaceFixtureAXSuppressionObservationOwner {
             windowsAttributeCount: windowsAttributeCount
         )
     }
+}
 
-    private func isExactRunningApplication(
-        bundleIdentifier: String,
-        processIdentifier: pid_t
-    ) -> Bool {
-        NSRunningApplication
-            .runningApplications(
-                withBundleIdentifier: bundleIdentifier
-            )
-            .contains {
-                !$0.isTerminated
-                    && $0.processIdentifier
-                        == processIdentifier
-            }
-    }
-
-    private func applicationXCUIWindowEvidence(
-        bundleIdentifier: String
-    ) -> SpaceFixtureApplicationXCUIWindowEvidence {
-        let application = XCUIApplication(
-            bundleIdentifier: bundleIdentifier
-        )
-        return SpaceFixtureApplicationXCUIWindowEvidence(
-            windowCount: application.windows.count
-        )
-    }
-
-    private func completionDiagnostic(
-        _ completion:
-            SpaceFixtureAXSuppressionCompletion?
-    ) -> String {
-        guard let completion else { return "unobserved" }
-        return "generation="
-            + "\(completion.suppressionGeneration) "
-            + "ackGeneration="
-            + "\(completion.acknowledgementGeneration) "
-            + "pid=\(completion.processIdentifier) "
-            + "windows=\(completion.windowCount) "
-            + "sourceGeneration="
-            + completion.sourceGeneration
+private extension SpaceFixtureAXSuppressionUITestRoute {
+    var key: String {
+        suppressionCompletionNotificationName.rawValue
     }
 }
 
@@ -332,6 +261,10 @@ extension FlowTabUITests {
                 suppressionCompletionNotificationName:
                     Notification.Name(
                         "\(routeRoot).\(index).suppressed"
+                    ),
+                externalReadbackNotificationName:
+                    Notification.Name(
+                        "\(routeRoot).\(index).external-readback"
                     )
             )
         }

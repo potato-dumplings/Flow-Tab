@@ -121,6 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         FlowTabUITestBootstrapper
             .stopInitialUIPresentationObservation()
         FlowTabUITestProjectionAcknowledgementBootstrap.stop()
+        FlowTabUITestAXSuppressionReadbackBootstrap.stop()
 #endif
         commandTabTakeoverController.restoreSystemShortcutsIfNeeded()
     }
