@@ -637,39 +637,37 @@ extension FlowTabUITests {
         diagnosticsSummary: XCUIElement,
         stage: String
     ) {
-        let deadline = Date().addingTimeInterval(4)
-        repeat {
-            let readiness = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "searchIndexReadiness"
-            )
-            let resultState = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "searchIndexResultState"
-            )
-            let degraded = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "searchIndexDegraded"
-            )
-            let coversCurrentGeneration = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "searchIndexCoversCurrentGeneration"
-            )
-            let barrierRequested = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "searchFreshnessBarrierRequested"
-            )
-            if readiness == "committedGenerationValidated",
-               resultState == "committedGenerationResult",
-               degraded == "0",
-               coversCurrentGeneration == "1",
-               barrierRequested == "0" {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
+        XCTAssertTrue(
+            waitForSwitcherDiagnostics(
+                [
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "searchIndexReadiness",
+                        expectedValue:
+                            "committedGenerationValidated"
+                    ),
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "searchIndexResultState",
+                        expectedValue:
+                            "committedGenerationResult"
+                    ),
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "searchIndexDegraded",
+                        expectedValue: "0"
+                    ),
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key:
+                            "searchIndexCoversCurrentGeneration",
+                        expectedValue: "1"
+                    ),
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key:
+                            "searchFreshnessBarrierRequested",
+                        expectedValue: "0"
+                    )
+                ],
+                in: diagnosticsSummary,
+                timeout: 4
+            ),
             """
             Window search did not read a committed-generation Search index \(stage).
 

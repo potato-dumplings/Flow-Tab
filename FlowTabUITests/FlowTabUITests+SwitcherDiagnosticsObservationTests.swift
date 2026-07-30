@@ -201,6 +201,76 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherDiagnosticsRequiresAtomicCommittedSearchIndexProjection() {
+        var readback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var readiness = "committedGenerationValidated"
+        var resultState = "building"
+        let owner =
+            FlowTabUITestSwitcherDiagnosticsObservationOwner(
+                expectations: [
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "searchIndexReadiness",
+                        expectedValue:
+                            "committedGenerationValidated"
+                    ),
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "searchIndexResultState",
+                        expectedValue:
+                            "committedGenerationResult"
+                    ),
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "searchIndexDegraded",
+                        expectedValue: "0"
+                    ),
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key:
+                            "searchIndexCoversCurrentGeneration",
+                        expectedValue: "1"
+                    ),
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key:
+                            "searchFreshnessBarrierRequested",
+                        expectedValue: "0"
+                    )
+                ],
+                observationRegistration: { callback in
+                    readback = callback
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: {
+                    FlowTabUITestSwitcherDiagnosticsSnapshot(
+                        identifier: "switcher-summary",
+                        exists: true,
+                        rawValue: nil,
+                        values: [
+                            "searchIndexReadiness": readiness,
+                            "searchIndexResultState": resultState,
+                            "searchIndexDegraded": "0",
+                            "searchIndexCoversCurrentGeneration":
+                                "1",
+                            "searchFreshnessBarrierRequested": "0"
+                        ]
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+        XCTAssertNil(owner.resolvedEvidence)
+
+        readiness = "building"
+        resultState = "committedGenerationResult"
+        readback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        readiness = "committedGenerationValidated"
+        readback?(.scheduledReadback)
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .scheduledReadback
+        )
+    }
+
     func testSwitcherDiagnosticsObserverRejectsStaleEventsUnderPressure() {
         for _ in 0..<FlowTabUITestSwitcherDiagnosticsTestPolicy
             .pressureIterations
