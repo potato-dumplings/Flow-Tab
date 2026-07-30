@@ -580,48 +580,6 @@ extension FlowTabUITests {
         return imagePrefix + windowIdentifier.dropFirst(windowPrefix.count)
     }
 
-    func waitForSwitcherWindowCards(
-        in app: XCUIApplication,
-        expectedTitles: [String],
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        let expectedTitleCounts = windowTitleCounts(expectedTitles)
-        let cardQuery = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "flowtab.switcher.window."))
-
-        repeat {
-            if cardQuery.count == expectedTitles.count,
-               expectedTitleCounts.allSatisfy({ title, count in
-                   cardQuery.matching(NSPredicate(format: "label == %@", title)).count == count
-               }) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        let latestTitleCounts = Dictionary(
-            uniqueKeysWithValues: expectedTitleCounts.keys.map { title in
-                (
-                    title,
-                    cardQuery.matching(NSPredicate(format: "label == %@", title)).count
-                )
-            }
-        )
-        XCTFail(
-            """
-            Expected switcher window cards to expose \(expectedTitles.sorted()), \
-            found cardCount=\(cardQuery.count) matchingTitleCounts=\(latestTitleCounts) \
-            expectedTitleCounts=\(expectedTitleCounts).
-            """
-        )
-        return false
-    }
-    private func windowTitleCounts(_ titles: [String]) -> [String: Int] {
-        titles.reduce(into: [:]) { counts, title in
-            counts[title, default: 0] += 1
-        }
-    }
     func waitForLogs(
         in app: XCUIApplication,
         containing markers: [String],
