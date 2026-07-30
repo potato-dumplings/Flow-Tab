@@ -114,6 +114,7 @@
 		A45A00023D62000100B0D737 /* FlowTabUITestAXSuppressionReadbackScheduling.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45A00013D62000100B0D737 /* FlowTabUITestAXSuppressionReadbackScheduling.swift */; };
 		A45A00043D62000100B0D737 /* FlowTabUITestAXSuppressionReadbackObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45A00033D62000100B0D737 /* FlowTabUITestAXSuppressionReadbackObservation.swift */; };
 		A45B00023D63000100B0D737 /* FlowTabUITests+SpaceFixtureAXSuppressionRealTopologyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45B00013D63000100B0D737 /* FlowTabUITests+SpaceFixtureAXSuppressionRealTopologyTests.swift */; };
+		A45C00023D64000100B0D737 /* FlowTabUITests+ApplicationTerminationObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45C00013D64000100B0D737 /* FlowTabUITests+ApplicationTerminationObservation.swift */; };
 		A44600023D4E000100B0D737 /* FlowTabUITests+ScrollingSupportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44600013D4E000100B0D737 /* FlowTabUITests+ScrollingSupportTests.swift */; };
 		A44600043D4E000100B0D737 /* FlowTabUITests+ScrollingHittableElementObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44600033D4E000100B0D737 /* FlowTabUITests+ScrollingHittableElementObservation.swift */; };
 		A44700023D4F000100B0D737 /* FlowTabUITests+ScrollingElementVisibilityObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44700013D4F000100B0D737 /* FlowTabUITests+ScrollingElementVisibilityObservation.swift */; };
@@ -913,6 +914,7 @@
 		A45A00013D62000100B0D737 /* FlowTabUITestAXSuppressionReadbackScheduling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestAXSuppressionReadbackScheduling.swift; sourceTree = "<group>"; };
 		A45A00033D62000100B0D737 /* FlowTabUITestAXSuppressionReadbackObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestAXSuppressionReadbackObservation.swift; sourceTree = "<group>"; };
 		A45B00013D63000100B0D737 /* FlowTabUITests+SpaceFixtureAXSuppressionRealTopologyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureAXSuppressionRealTopologyTests.swift"; sourceTree = "<group>"; };
+		A45C00013D64000100B0D737 /* FlowTabUITests+ApplicationTerminationObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ApplicationTerminationObservation.swift"; sourceTree = "<group>"; };
 		A44600013D4E000100B0D737 /* FlowTabUITests+ScrollingSupportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ScrollingSupportTests.swift"; sourceTree = "<group>"; };
 		A44600033D4E000100B0D737 /* FlowTabUITests+ScrollingHittableElementObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ScrollingHittableElementObservation.swift"; sourceTree = "<group>"; };
 		A44700013D4F000100B0D737 /* FlowTabUITests+ScrollingElementVisibilityObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ScrollingElementVisibilityObservation.swift"; sourceTree = "<group>"; };
@@ -1274,6 +1276,7 @@
 				A45800013D60000100B0D737 /* SpaceFixtureAXSuppressionExternalObservation.swift */,
 				A45800033D60000100B0D737 /* FlowTabUITests+SpaceFixtureAXSuppressionExternalObservationTests.swift */,
 				A45B00013D63000100B0D737 /* FlowTabUITests+SpaceFixtureAXSuppressionRealTopologyTests.swift */,
+				A45C00013D64000100B0D737 /* FlowTabUITests+ApplicationTerminationObservation.swift */,
 				F9A1000136C0000100B0D737 /* FlowTabUITests+ScrollingSupport.swift */,
 				A44600033D4E000100B0D737 /* FlowTabUITests+ScrollingHittableElementObservation.swift */,
 				A44600013D4E000100B0D737 /* FlowTabUITests+ScrollingSupportTests.swift */,
@@ -2281,6 +2284,7 @@
 				A45800023D60000100B0D737 /* SpaceFixtureAXSuppressionExternalObservation.swift in Sources */,
 				A45800043D60000100B0D737 /* FlowTabUITests+SpaceFixtureAXSuppressionExternalObservationTests.swift in Sources */,
 				A45B00023D63000100B0D737 /* FlowTabUITests+SpaceFixtureAXSuppressionRealTopologyTests.swift in Sources */,
+				A45C00023D64000100B0D737 /* FlowTabUITests+ApplicationTerminationObservation.swift in Sources */,
 				F9A1000236C0000100B0D737 /* FlowTabUITests+ScrollingSupport.swift in Sources */,
 				A44600043D4E000100B0D737 /* FlowTabUITests+ScrollingHittableElementObservation.swift in Sources */,
 				A44600023D4E000100B0D737 /* FlowTabUITests+ScrollingSupportTests.swift in Sources */,

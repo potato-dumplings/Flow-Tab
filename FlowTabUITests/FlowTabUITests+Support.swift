@@ -291,20 +291,24 @@ func postFlowTabUITestSwitcherCommand(
 
 func terminateFlowTabUITestApplicationIfRunning(
     environment: [String: String] = ProcessInfo.processInfo.environment
-) {
+) -> [FlowTabUITestApplicationTerminationEvidence] {
     let identity = FlowTabUITestAppIdentity.configured(environment: environment)
-    for target in identity.runningApplicationTargets {
+    return identity.runningApplicationTargets.map { target in
         let app: XCUIApplication
+        let targetDescription: String
         switch target {
         case .url(let appURL):
             app = XCUIApplication(url: appURL)
+            targetDescription = "url:\(appURL.standardizedFileURL.path)"
         case .bundleIdentifier(let bundleIdentifier):
             app = XCUIApplication(bundleIdentifier: bundleIdentifier)
+            targetDescription = "bundle:\(bundleIdentifier)"
         }
 
-        if app.state == .runningForeground || app.state == .runningBackground {
-            app.terminate()
-        }
+        return terminateFlowTabUITestApplication(
+            app,
+            targetDescription: targetDescription
+        )
     }
 }
 
@@ -573,8 +577,22 @@ extension FlowTabUITests {
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
-    func terminateAppIfRunning() {
-        terminateFlowTabUITestApplicationIfRunning()
+    func terminateAppIfRunning(
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let failures =
+            terminateFlowTabUITestApplicationIfRunning()
+                .filter { !$0.isSatisfied }
+        XCTAssertTrue(
+            failures.isEmpty,
+            "FlowTab UI test application termination did not reach "
+                + "the exact not-running state. "
+                + failures.map(\.diagnosticSummary)
+                    .joined(separator: " | "),
+            file: file,
+            line: line
+        )
     }
 
     func testFlowTabUITestAppIdentityUsesEnvironmentOverridePath() {
