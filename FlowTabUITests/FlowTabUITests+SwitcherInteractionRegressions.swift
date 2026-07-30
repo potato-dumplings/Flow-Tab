@@ -104,29 +104,33 @@ extension FlowTabUITests {
 
         app.activate()
         XCUIElement.perform(withKeyModifiers: .control) {
-            app.typeKey(.tab, modifierFlags: .control)
-
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 5))
             XCTAssertTrue(
-                waitForControlTabSelectedWindow(
-                    diagnosticsSummary,
-                    windowID: "mock-current-secondary",
-                    timeout: 5
+                performAndWaitForSwitcherDiagnostics(
+                    [
+                        FlowTabUITestSwitcherDiagnosticsExpectation(
+                            key: "selectedWindow",
+                            expectedValue:
+                                "mock-current-secondary"
+                        ),
+                        FlowTabUITestSwitcherDiagnosticsExpectation(
+                            key: "previewImages",
+                            expectedValue: "2"
+                        )
+                    ],
+                    in: diagnosticsSummary,
+                    timeout: 5,
+                    trigger: {
+                        app.typeKey(
+                            .tab,
+                            modifierFlags: .control
+                        )
+                    }
                 ),
-                "The first physical Control+Tab gesture should select the next current-app window."
+                "The first physical Control+Tab gesture should select the next current-app window with both previews."
             )
             XCTAssertTrue(
                 element(in: app, identifier: secondaryPreviewID).waitForExistence(timeout: 5),
                 "The selected window should expose a real preview marker while Control remains held."
-            )
-            XCTAssertTrue(
-                waitForSwitcherDiagnosticsValue(
-                    diagnosticsSummary,
-                    key: "previewImages",
-                    expectedValue: "2",
-                    timeout: 5
-                ),
-                "Control+Tab should reveal with both preview images ready."
             )
             XCTAssertTrue(
                 waitForSwitcherWindowCards(
@@ -287,37 +291,6 @@ extension FlowTabUITests {
                 "NO",
             ]
         )
-    }
-
-    private func waitForControlTabSelectedWindow(
-        _ diagnosticsSummary: XCUIElement,
-        windowID: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindow") == windowID {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-
-    private func waitForSwitcherDiagnosticsValue(
-        _ diagnosticsSummary: XCUIElement,
-        key: String,
-        expectedValue: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if switcherPanelDiagnosticsValue(diagnosticsSummary, key: key) == expectedValue {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
-        } while Date() < deadline
-        return false
     }
 
     private func waitForWindowLayerPreviewAtTransition(

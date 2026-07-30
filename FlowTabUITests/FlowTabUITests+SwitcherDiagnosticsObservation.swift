@@ -1,0 +1,229 @@
+import Foundation
+import XCTest
+
+struct FlowTabUITestSwitcherDiagnosticsExpectation: Equatable {
+    let key: String
+    let expectedValue: String
+    var decodesPercentEncoding = false
+
+    func observedValue(
+        in snapshot: FlowTabUITestSwitcherDiagnosticsSnapshot
+    ) -> String? {
+        guard let value = snapshot.values[key] else {
+            return nil
+        }
+        guard decodesPercentEncoding else {
+            return value
+        }
+        return value.removingPercentEncoding ?? value
+    }
+
+    func isSatisfied(
+        by snapshot: FlowTabUITestSwitcherDiagnosticsSnapshot
+    ) -> Bool {
+        observedValue(in: snapshot) == expectedValue
+    }
+
+    var diagnosticSummary: String {
+        "\(key)=\(expectedValue)"
+            + (decodesPercentEncoding ? "[percentDecoded]" : "")
+    }
+}
+
+struct FlowTabUITestSwitcherDiagnosticsSnapshot: Equatable {
+    let identifier: String
+    let exists: Bool
+    let rawValue: String?
+    let values: [String: String]
+
+    var diagnosticSummary: String {
+        let valueSummary = values.keys.sorted().map {
+            "\($0)=\(values[$0] ?? "")"
+        }.joined(separator: ",")
+        return "identifier=\(identifier) "
+            + "exists=\(exists) "
+            + "values=[\(valueSummary)] "
+            + "raw=\(rawValue ?? "nil")"
+    }
+}
+
+final class FlowTabUITestSwitcherDiagnosticsObservationOwner {
+    private let conditionOwner:
+        FlowTabUITestConditionObservationOwner<
+            FlowTabUITestSwitcherDiagnosticsSnapshot
+        >
+
+    init(
+        expectations: [
+            FlowTabUITestSwitcherDiagnosticsExpectation
+        ],
+        acceptsEvidence: @escaping () -> Bool = {
+            true
+        },
+        observationRegistration:
+            FlowTabUITestConditionObservationRegistration? =
+                FlowTabUITestConditionReadbackScheduler
+                    .mainRunLoopRegistration(
+                        cadence:
+                            FlowTabUITestConditionObservationPolicy
+                                .xcuiReadbackCadence
+                    ),
+        readback: @escaping () ->
+            FlowTabUITestSwitcherDiagnosticsSnapshot
+    ) {
+        let expectedDescription = expectations.map(
+            \.diagnosticSummary
+        ).joined(separator: ",")
+        conditionOwner = FlowTabUITestConditionObservationOwner(
+            observationRegistration: observationRegistration,
+            readback: readback,
+            isSatisfied: { snapshot in
+                acceptsEvidence()
+                    && snapshot.exists
+                    && expectations.allSatisfy {
+                        $0.isSatisfied(by: snapshot)
+                    }
+            },
+            describe: { snapshot in
+                "acceptanceEnabled=\(acceptsEvidence()) "
+                    + "expected=[\(expectedDescription)] "
+                    + snapshot.diagnosticSummary
+            }
+        )
+    }
+
+    func start() {
+        conditionOwner.start()
+    }
+
+    func requestReadback(
+        source: FlowTabUITestConditionObservationSource
+    ) {
+        conditionOwner.requestReadback(source: source)
+    }
+
+    func waitForResolution(
+        timeout: TimeInterval
+    ) -> FlowTabUITestConditionEvidence<
+        FlowTabUITestSwitcherDiagnosticsSnapshot
+    >? {
+        conditionOwner.waitForResolution(timeout: timeout)
+    }
+
+    var resolvedEvidence: FlowTabUITestConditionEvidence<
+        FlowTabUITestSwitcherDiagnosticsSnapshot
+    >? {
+        conditionOwner.resolvedEvidence
+    }
+
+    var diagnosticSummary: String {
+        conditionOwner.diagnosticSummary
+    }
+
+    func cancel() {
+        conditionOwner.cancel()
+    }
+}
+
+extension FlowTabUITests {
+    func performAndWaitForSwitcherDiagnostics(
+        _ expectations: [
+            FlowTabUITestSwitcherDiagnosticsExpectation
+        ],
+        in diagnosticsSummary: XCUIElement,
+        timeout: TimeInterval,
+        trigger: () -> Void
+    ) -> Bool {
+        var triggerCompleted = false
+        let owner =
+            FlowTabUITestSwitcherDiagnosticsObservationOwner(
+                expectations: expectations,
+                acceptsEvidence: {
+                    triggerCompleted
+                },
+                readback: {
+                    self.switcherDiagnosticsSnapshot(
+                        diagnosticsSummary,
+                        keys: expectations.map(\.key)
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        trigger()
+        triggerCompleted = true
+        owner.requestReadback(source: .triggerReadback)
+
+        guard
+            owner.waitForResolution(timeout: timeout) != nil
+        else {
+            XCTFail(
+                "Switcher diagnostics did not satisfy "
+                    + "the expected projection. "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+        return true
+    }
+
+    func switcherPanelDiagnosticsValue(
+        _ diagnosticsSummaryElement: XCUIElement,
+        key: String
+    ) -> String {
+        switcherPanelDiagnosticsValue(
+            in: elementStringValue(
+                diagnosticsSummaryElement
+            ),
+            key: key
+        )
+    }
+
+    func switcherPanelDiagnosticsValue(
+        in source: String,
+        key: String
+    ) -> String {
+        let prefix = "\(key)="
+        guard
+            let valueStart =
+                source.range(of: prefix)?.upperBound
+        else {
+            return ""
+        }
+        let remaining = source[valueStart...]
+        guard
+            let valueEnd = remaining.firstIndex(of: ";")
+        else {
+            return String(remaining)
+        }
+        return String(remaining[..<valueEnd])
+    }
+
+    private func switcherDiagnosticsSnapshot(
+        _ diagnosticsSummary: XCUIElement,
+        keys: [String]
+    ) -> FlowTabUITestSwitcherDiagnosticsSnapshot {
+        let exists = diagnosticsSummary.exists
+        let rawValue =
+            exists
+                ? elementStringValue(diagnosticsSummary)
+                : nil
+        var values: [String: String] = [:]
+        if let rawValue {
+            for key in Set(keys) {
+                values[key] =
+                    switcherPanelDiagnosticsValue(
+                        in: rawValue,
+                        key: key
+                    )
+            }
+        }
+        return FlowTabUITestSwitcherDiagnosticsSnapshot(
+            identifier: diagnosticsSummary.identifier,
+            exists: exists,
+            rawValue: rawValue,
+            values: values
+        )
+    }
+}

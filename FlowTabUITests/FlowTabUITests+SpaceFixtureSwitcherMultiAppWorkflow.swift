@@ -1227,18 +1227,6 @@ extension FlowTabUITests {
         return false
     }
 
-    func switcherPanelDiagnosticsValue(
-        _ diagnosticsSummaryElement: XCUIElement,
-        key: String
-    ) -> String {
-        let prefix = "\(key)="
-        let source = elementStringValue(diagnosticsSummaryElement)
-        guard let valueStart = source.range(of: prefix)?.upperBound else { return "" }
-        let remaining = source[valueStart...]
-        guard let valueEnd = remaining.firstIndex(of: ";") else { return String(remaining) }
-        return String(remaining[..<valueEnd])
-    }
-
     private func switcherPanelDiagnosticsDebugSummary(_ diagnosticsSummaryElement: XCUIElement) -> String {
         guard diagnosticsSummaryElement.exists else {
             return "diagnosticsSummary=<missing>"
