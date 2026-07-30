@@ -1,5 +1,16 @@
 import XCTest
 
+private enum FlowTabUITestDelayedWindowLayerEntryEvidence {
+    static let prewarmBeforeEntryPattern =
+        #"\[AutoEnter\] pending targetAppID="#
+        + #"com\.flowtab\.mock\.browser[^\n]*prewarmed=5"#
+        + #"[\s\S]*\[AutoEnter\] entered source=\S+[^\n]*"#
+        + #"mode=windowCycle\(com\.flowtab\.mock\.browser\)"#
+    static let prewarmBeforeEntryDescription =
+        "exact preview prewarm precedes target window-layer entry"
+    static let logWatchdog: TimeInterval = 8
+}
+
 extension FlowTabUITests {
     func testHomeAndFreshOptionTabUseSameRuntimeAppOrder() throws {
         let app = makeApp(
@@ -175,23 +186,27 @@ extension FlowTabUITests {
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let firstWindowID =
             "flowtab.switcher.window.\("mock-browser-normal-1".flowTabUITestAccessibilityIdentifierComponent)"
+        let firstPreviewID =
+            previewImageIdentifier(for: firstWindowID)
         let firstPreview = element(
             in: app,
-            identifier: previewImageIdentifier(for: firstWindowID)
+            identifier: firstPreviewID
         )
         let logSnapshot = makeRuntimeLogFileSnapshot()
 
         app.activate()
         XCUIElement.perform(withKeyModifiers: .option) {
-            app.typeKey(.tab, modifierFlags: .option)
-
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 5))
             XCTAssertTrue(
-                waitForWindowLayerPreviewAtTransition(
+                performAndWaitForWindowLayerPreviewTransition(
                     diagnosticsSummary: diagnosticsSummary,
                     previewElement: firstPreview,
-                    timeout: 5,
-                    previewGrace: 0.10
+                    expectedPreviewIdentifier: firstPreviewID,
+                    trigger: {
+                        app.typeKey(
+                            .tab,
+                            modifierFlags: .option
+                        )
+                    }
                 ),
                 "The delayed Option+Tab window layer should expose its prewarmed preview with the mode transition."
             )
@@ -203,12 +218,16 @@ extension FlowTabUITests {
         }
 
         waitForRuntimeLogFiles(
-            containing: [
-                "prewarmed=5",
-                "entered source=deadlineReadback",
-            ],
+            matching:
+                FlowTabUITestDelayedWindowLayerEntryEvidence
+                    .prewarmBeforeEntryPattern,
             since: logSnapshot,
-            timeout: 8
+            timeout:
+                FlowTabUITestDelayedWindowLayerEntryEvidence
+                    .logWatchdog,
+            description:
+                FlowTabUITestDelayedWindowLayerEntryEvidence
+                    .prewarmBeforeEntryDescription
         )
     }
 
@@ -220,9 +239,11 @@ extension FlowTabUITests {
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let firstWindowID =
             "flowtab.switcher.window.\("mock-browser-normal-1".flowTabUITestAccessibilityIdentifierComponent)"
+        let firstPreviewID =
+            previewImageIdentifier(for: firstWindowID)
         let firstPreview = element(
             in: app,
-            identifier: previewImageIdentifier(for: firstWindowID)
+            identifier: firstPreviewID
         )
         let presentationCount = 12
 
@@ -230,31 +251,31 @@ extension FlowTabUITests {
             let traceLabel = "delayed-entry-pressure.\(iteration)"
             let logSnapshot = makeRuntimeLogFileSnapshot()
             app.activate()
-            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
-                .global,
-                traceLabel: traceLabel
-            )
-
             XCTAssertTrue(
-                diagnosticsSummary.waitForExistence(timeout: 5),
-                "Delayed-entry pressure iteration \(iteration) must present the switcher."
-            )
-            XCTAssertTrue(
-                waitForWindowLayerPreviewAtTransition(
+                performAndWaitForWindowLayerPreviewTransition(
                     diagnosticsSummary: diagnosticsSummary,
                     previewElement: firstPreview,
-                    timeout: 5,
-                    previewGrace: 0.10
+                    expectedPreviewIdentifier: firstPreviewID,
+                    trigger: {
+                        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                            .global,
+                            traceLabel: traceLabel
+                        )
+                    }
                 ),
                 "Delayed-entry pressure iteration \(iteration) must expose the prewarmed preview."
             )
             waitForRuntimeLogFiles(
-                containing: [
-                    "prewarmed=5",
-                    "entered source=deadlineReadback",
-                ],
+                matching:
+                    FlowTabUITestDelayedWindowLayerEntryEvidence
+                        .prewarmBeforeEntryPattern,
                 since: logSnapshot,
-                timeout: 8
+                timeout:
+                    FlowTabUITestDelayedWindowLayerEntryEvidence
+                        .logWatchdog,
+                description:
+                    FlowTabUITestDelayedWindowLayerEntryEvidence
+                        .prewarmBeforeEntryDescription
             )
 
             postFlowTabUITestSwitcherCommandAndWaitForDelivery(
@@ -293,31 +314,4 @@ extension FlowTabUITests {
         )
     }
 
-    private func waitForWindowLayerPreviewAtTransition(
-        diagnosticsSummary: XCUIElement,
-        previewElement: XCUIElement,
-        timeout: TimeInterval,
-        previewGrace: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var windowLayerObservedAt: Date?
-        repeat {
-            let now = Date()
-            let mode = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "mode")
-            if mode.hasPrefix("windowCycle") {
-                if previewElement.exists {
-                    return true
-                }
-                if windowLayerObservedAt == nil {
-                    windowLayerObservedAt = now
-                }
-                if let windowLayerObservedAt,
-                   now.timeIntervalSince(windowLayerObservedAt) > previewGrace {
-                    return false
-                }
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
-        } while Date() < deadline
-        return false
-    }
 }

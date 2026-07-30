@@ -363,7 +363,7 @@ extension FlowTabUITests {
         return String(remaining[..<valueEnd])
     }
 
-    private func switcherDiagnosticsSnapshot(
+    func switcherDiagnosticsSnapshot(
         _ diagnosticsSummary: XCUIElement,
         keys: [String]
     ) -> FlowTabUITestSwitcherDiagnosticsSnapshot {
@@ -383,7 +383,10 @@ extension FlowTabUITests {
             }
         }
         return FlowTabUITestSwitcherDiagnosticsSnapshot(
-            identifier: diagnosticsSummary.identifier,
+            identifier:
+                exists
+                    ? diagnosticsSummary.identifier
+                    : "unavailable",
             exists: exists,
             rawValue: rawValue,
             values: values
