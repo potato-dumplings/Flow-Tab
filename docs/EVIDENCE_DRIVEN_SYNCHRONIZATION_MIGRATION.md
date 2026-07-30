@@ -162,7 +162,8 @@ and Process/Tooling.
 | SYNC-034B | `FlowTabUITests+ConditionObservation`, `waitForFrontmostBundleIdentifier`, status-item reopen and system-app MRU activation callers; exact frontmost application | A raw 100ms RunLoop loop begins after activation and infers that the expected application eventually became frontmost. | Start a generation-owned condition observer before activation. Register `NSWorkspace.didActivateApplicationNotification` before an initial `frontmostApplication` readback, accept only the exact bundle identifier, and use the caller timeout solely as a failure bound with last-readback diagnostics. Test scope cancels the notification token; stale, duplicate, replaced, and cancelled callbacks are rejected. | H shared UI observation; affected status-item/System MRU UI, deterministic owner Pressure, Process/Tooling. | completed |
 | SYNC-034C | `FlowTabUITests+ConditionObservation`, `FlowTabUITests+SystemAppMRU.triggerAndWaitForWorkflowAppOrder`; exact switcher application order | A raw 100ms RunLoop loop returns on any complete fixture-application permutation, so a stale order can fail the caller before the expected order is published. | Install the exact-order observer before an explicit post-baseline runtime-log-confirmed switcher trigger. Check immediately, then use a test-owned main-RunLoop timer at the named XCUI readback cadence because the accessibility summary exposes no publication callback. Accept only the expected complete ordered identifiers. The helper owns timer cancellation; the caller timeout is solely a failure bound with the last summary/order readback. | H shared UI conditional observation; System MRU UI, deterministic owner Pressure, Process/Tooling. | completed |
 | SYNC-034D | `FlowTabUITests+SystemAppMRU.terminateFlowTabUITestApplicationAndWait`; FlowTab process termination before MRU relaunch | A raw 100ms RunLoop loop polls `XCUIApplication.state` after termination. | Own the termination trigger and wait on XCTest's exact `.notRunning` application state. Treat the caller timeout only as a terminal failure bound and report the final application state. The helper invocation owns the wait. | M UI process lifecycle; System MRU UI, Process/Tooling. | completed |
-| SYNC-035 | Direct UI settle waits in Search, Settings, Home/Logs, MRU, Space fixture and switcher workflow tests; files enumerated in the UI audit scope below | Fixed 80ms–1.2s RunLoop advances occur between input/action and assertion, so assertion timing can change results. Evidence migration. | Remove each settle wait in favor of the affected visible element, log marker, fixture generation, process state, exact frontmost CG/AX window, or nonexistence Oracle. Observer/baseline setup precedes the action. | H; affected UI suites and matching Behavior coverage. | planned |
+| SYNC-035 | Direct UI settle waits in Search, Settings, Home/Logs, MRU, Space fixture and switcher workflow tests; files enumerated in the UI audit scope below | Fixed 80ms–1.2s RunLoop advances occur between input/action and assertion, so assertion timing can change results. Evidence migration. | Remove each settle wait in favor of the affected visible element, log marker, fixture generation, process state, exact frontmost CG/AX window, or nonexistence Oracle. Observer/baseline setup precedes the action. | H; affected UI suites and matching Behavior coverage. | in progress; SYNC-035A closed, remaining owners split into later slices |
+| SYNC-035A | `FlowTabUITests+SystemAppMRU.dismissSwitcherAndWait`; switcher dismissal between repeated MRU triggers | A fixed 300ms RunLoop advance after Escape assumes the previous panel has disappeared before the next trigger. | Establish an XCTest nonexistence expectation for the exact switcher summary before Escape, then require that persistent UI state to become absent. The named dismissal watchdog is only a failure bound and reports the final switcher hierarchy. The helper invocation owns the expectation. | H repeated UI presentation; System MRU UI and repeated-path Pressure, Process/Tooling. | completed |
 | SYNC-036 | All literal XCTest timeouts in `FlowTabTests` and `FlowTabUITests` | 606 literal durations are generally terminal bounds for an independent expectation or XCUI predicate, but policy ownership and diagnostic tiers are implicit. Watchdog. | Replace literals with named app-test and UI-test watchdog policies by operation class; preserve expectation/predicate success Oracles and include unmet condition plus last observation in custom waits. Test case/helper owner supplies cleanup. | M mechanical/test infra; Unit/Behavior/UI, Process/Tooling. | planned |
 | SYNC-037 | `scripts/perf/tab-switch-stress.sh`, `search-committed-index-pressure.sh`, `runtime-topology-pressure.sh`, `lib/runtime-topology-target.sh` | Sampling duration/cadence and identity stability windows are pressure/safety protocols; process termination loops use unnamed 100ms cadence and attempt bounds. Domain duration/conditional observation/watchdog. | Retain measurement durations and sample cadence as named protocol inputs. Name process polling cadence/watchdogs, check state immediately, terminate from PID/start-identity/readback, and report the final `ps`/identity/status evidence. Traps own cancellation and cleanup. | M tooling/hot path; Pressure and Process/Tooling. | verification-needed |
 | SYNC-038 | `scripts/release/release-install.sh`, `scripts/release/uninstall-flowtab.js` | A fixed one-second delay assumes FlowTab exited before replacement or deletion. Evidence migration. | Wait on exact process absence/identity readback immediately after quit/TERM, with a named watchdog and last PID/state diagnostic before mutating installed resources. The install/uninstall command owns cleanup. | M release tooling; Process/Tooling and release contract tests. | planned |
@@ -4013,4 +4014,34 @@ polling cadence, deadline, or timeout in the scoped paths.
 - Unit, Behavior, FlowTabCore, and Pressure: not relevant because this slice
   delegates one UI-test process-state wait to XCTest and creates no reusable
   state rule, observer, timer, or repeated asynchronous worker.
+- Commit: `f53afd3aa00fa895dbcef98ede4d626a8cbc9c16`
+  (`test(sync): migrate SYNC-034D process termination`).
+
+### SYNC-035A Closure Record
+
+- Design and Oracle: the System MRU path establishes an XCTest predicate
+  expectation for nonexistence of the exact switcher summary before sending
+  Escape. Dismissal succeeds only when that persistent accessibility element
+  is absent, including an initially absent readback. The next trigger begins
+  only after this evidence is observed.
+- Lifecycle and timeout policy: each helper invocation owns its expectation.
+  `FlowTabUITestSystemAppMRUPolicy.switcherDismissalWatchdog` is solely a
+  terminal failure bound; expiry reports the final switcher accessibility
+  hierarchy through `switcherDebugSummary`.
+- UI affected path and Pressure: the real eight-application System MRU
+  topology completed ten consecutive Escape dismissal and switcher reopen
+  iterations, while preserving the exact expected application order. The
+  test passed 1/1 in 42.311/42.313 seconds, with 43.655 seconds total test
+  operation time, at
+  `.build-local/evidence-driven-sync/SYNC-035A/system-mru-attempt-001`.
+- Process/Tooling: the changed Swift file parses, the Xcode project plist is
+  valid, compiler diagnostics contain no warning for the changed file, the
+  fixed 300ms RunLoop advance has no remaining reference in
+  `FlowTabUITests+SystemAppMRU`, the file is 264 lines, and
+  `git diff --check` passes. Final exact staged-content review is recorded
+  before commit. Startup `prompts.zip` remains unchanged and outside the
+  slice.
+- Unit, Behavior, and FlowTabCore: not relevant because this slice changes
+  only one UI-test presentation lifecycle and its existing real-topology
+  path.
 - Commit: pending.

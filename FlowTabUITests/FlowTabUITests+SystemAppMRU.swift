@@ -1,6 +1,10 @@
 import AppKit
 import XCTest
 
+private enum FlowTabUITestSystemAppMRUPolicy {
+    static let switcherDismissalWatchdog: TimeInterval = 4
+}
+
 struct FlowTabUITestWorkflowAppOrderEvidence: Equatable {
     let diagnosticsValue: String?
     let order: [String]
@@ -108,8 +112,12 @@ extension FlowTabUITests {
             )
 
             for iteration in 1...10 {
-                relaunchedApp.typeKey(.escape, modifierFlags: [])
-                RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+                dismissSwitcherAndWait(
+                    in: relaunchedApp,
+                    timeout:
+                        FlowTabUITestSystemAppMRUPolicy
+                            .switcherDismissalWatchdog
+                )
                 let reopenedOrder = triggerAndWaitForWorkflowAppOrder(
                     relaunchedExpectedOrder,
                     in: relaunchedApp,
@@ -209,6 +217,37 @@ extension FlowTabUITests {
                 + switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary)
         )
         return owner.latestEvidence?.value.order ?? []
+    }
+
+    private func dismissSwitcherAndWait(
+        in app: XCUIApplication,
+        timeout: TimeInterval
+    ) {
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: diagnosticsSummary
+        )
+        expectation.expectationDescription =
+            "System MRU switcher summary disappears after Escape"
+
+        app.typeKey(.escape, modifierFlags: [])
+
+        XCTAssertEqual(
+            XCTWaiter.wait(
+                for: [expectation],
+                timeout: timeout
+            ),
+            .completed,
+            "Switcher did not dismiss after Escape. "
+                + switcherDebugSummary(
+                    app,
+                    diagnosticsSummary: diagnosticsSummary
+                )
+        )
     }
 
     private func terminateFlowTabUITestApplicationAndWait(
