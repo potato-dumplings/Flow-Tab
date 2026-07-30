@@ -173,17 +173,6 @@ func logFlowTabUITestTrace(_ message: String) {
     }
 }
 
-func waitForFrontmostBundleIdentifier(_ bundleIdentifier: String, timeout: TimeInterval) -> Bool {
-    let deadline = Date().addingTimeInterval(timeout)
-    repeat {
-        if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundleIdentifier {
-            return true
-        }
-        RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-    } while Date() < deadline
-    return false
-}
-
 enum FlowTabUITestSwitcherTrigger {
     case global
     case inApp

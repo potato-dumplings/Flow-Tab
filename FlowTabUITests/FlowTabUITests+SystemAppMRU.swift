@@ -116,11 +116,15 @@ extension FlowTabUITests {
 
     private func establishSystemAppOrder(_ orderedAppIDs: [String]) {
         for bundleIdentifier in orderedAppIDs.reversed() {
-            XCUIApplication(bundleIdentifier: bundleIdentifier).activate()
-            XCTAssertTrue(
-                waitForFrontmostBundleIdentifier(bundleIdentifier, timeout: 5),
-                "Failed to establish the fixture application activation Oracle."
-            )
+            assertTriggerMakesApplicationFrontmost(
+                bundleIdentifier,
+                timeout: 5,
+                message: "Failed to establish the fixture application activation Oracle."
+            ) {
+                XCUIApplication(
+                    bundleIdentifier: bundleIdentifier
+                ).activate()
+            }
         }
     }
 

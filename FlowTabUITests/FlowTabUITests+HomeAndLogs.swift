@@ -65,15 +65,23 @@ extension FlowTabUITests {
 
         let flowTabBundleIdentifier = FlowTabUITestAppIdentity.configured().bundleIdentifier
         let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
-        finder.activate()
-        XCTAssertTrue(
-            waitForFrontmostBundleIdentifier("com.apple.finder", timeout: 5),
-            "Status item reopen should be exercised from another normal Space app."
-        )
+        assertTriggerMakesApplicationFrontmost(
+            "com.apple.finder",
+            timeout: 5,
+            message: "Status item reopen should be exercised from another normal Space app."
+        ) {
+            finder.activate()
+        }
         XCTAssertNotEqual(NSWorkspace.shared.frontmostApplication?.bundleIdentifier, flowTabBundleIdentifier)
 
         let logSnapshot = makeRuntimeLogFileSnapshot()
-        flowTabStatusItem(in: app).tap()
+        assertTriggerMakesApplicationFrontmost(
+            flowTabBundleIdentifier,
+            timeout: 5,
+            message: "FlowTab should stay foreground after restoring its hidden accessory policy."
+        ) {
+            flowTabStatusItem(in: app).tap()
+        }
 
         XCTAssertTrue(element(in: app, identifier: Identifier.logsTabContent).waitForExistence(timeout: 8))
         waitForRuntimeLogFiles(
@@ -84,9 +92,11 @@ extension FlowTabUITests {
             since: logSnapshot,
             timeout: 8
         )
-        XCTAssertTrue(
-            waitForFrontmostBundleIdentifier(flowTabBundleIdentifier, timeout: 5),
-            "FlowTab should stay foreground after restoring its hidden accessory policy."
+        XCTAssertEqual(
+            NSWorkspace.shared.frontmostApplication?
+                .bundleIdentifier,
+            flowTabBundleIdentifier,
+            "FlowTab should remain foreground after the reopen evidence is visible."
         )
     }
 

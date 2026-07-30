@@ -157,8 +157,9 @@ and Process/Tooling.
 | SYNC-033C | `FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication`; background notification publication while MainActor is unavailable | A 500ms blocking wait proves publishers return, then a raw 10ms RunLoop loop assumes cleanup eventually completes. Evidence migration plus watchdog. | Enter all publishers and register DispatchGroup completion before dispatch. Keep a named blocking watchdog solely as the nonblocking failure bound, then wait for exact publisher-return completion through XCTest to release MainActor and clean up. Test scope owns the group expectation and controller lifetime; failure reports completed notification names. | M runtime-notification delivery; affected Behavior, Process/Tooling. | completed |
 | SYNC-033D | `FlowTabPriorityCoverageTests+RuntimeAXBackgroundResolution`; background remote AX resolution | A 250ms main-thread sleep is treated as proof that remote AX resolution can proceed without MainActor availability. Evidence migration plus watchdog. | Establish worker-start, resolver-invoked, and fetch-completed evidence before dispatch. Block MainActor only on a named resolver-invocation watchdog, then require exact off-main-thread readback and terminal worker completion. Test scope owns semaphores and override cleanup. | M AX runtime behavior; affected Behavior, runtime-topology Pressure, Process/Tooling. | completed |
 | SYNC-033E | `FlowTabPriorityCoverageTests+RuntimeSnapshotPressure`; bounded AX collection workload | Per-item thread sleep simulates I/O latency and elapsed-time comparison is treated as concurrency success. Deterministic pressure workload migration. | Replace sleep with a named, test-owned blocking workload gate. Require the configured number of workers to enter concurrently, release work from explicit evidence, and verify bounded maximum concurrency plus ordered results independently of elapsed wall time. | M runtime hot path; affected Behavior, deterministic Pressure, Process/Tooling. | completed |
-| SYNC-034 | `FlowTabUITests+Support.swift`, `+WorkflowWindowObservation.swift`, `+SpaceFixtureApp.swift`, `+ScrollingSupport.swift`, `+StatusItem.swift`, and fixture assertion helpers; shared UI condition loops | RunLoop cadence advances drive XCUI/CG/AX/process predicate observation. Conditional observation. | Centralize named UI observation cadence and watchdog diagnostics, check immediately, use `waitForExistence`/predicate expectations where possible, and keep exact CG/AX/window/process readback as the sole Oracle. XCTest case lifetime owns the wait. | H test infrastructure; affected UI suites, Process/Tooling. | planned; SYNC-026C2 pressure attempt 002 captured a repeated Darwin-trigger delivery without a fresh matching acknowledgement |
+| SYNC-034 | `FlowTabUITests+Support.swift`, `+WorkflowWindowObservation.swift`, `+SpaceFixtureApp.swift`, `+ScrollingSupport.swift`, `+StatusItem.swift`, and fixture assertion helpers; shared UI condition loops | RunLoop cadence advances drive XCUI/CG/AX/process predicate observation. Conditional observation. | Centralize named UI observation cadence and watchdog diagnostics, check immediately, use `waitForExistence`/predicate expectations where possible, and keep exact CG/AX/window/process readback as the sole Oracle. XCTest case lifetime owns the wait. | H test infrastructure; affected UI suites, Process/Tooling. | in progress; SYNC-034A and SYNC-034B closed, with remaining owners split into later slices |
 | SYNC-034A | `FlowTabUITests+WorkflowWindowObservation.waitForExactFrontmostSpaceFixtureWindow`; exact frontmost fixture-window observation | Optional AX and CG window numbers can both be absent and compare equal, allowing the condition loop to return without observing an exact window. Evidence-Oracle defect discovered by the SYNC-028B2 diagnostic run. | Reuse the generation-owned desktop-anchor observer and require the exact PID to be running, active, frontmost, and XCUI-foreground; join the exact title/identifier XCUI window to a present PID-scoped topmost CG window by valid matching frames and require desktop-Space readback. Install workspace observers before initial readback, treat XCUI attachment as an observed condition, retain only the named cancellable 100ms condition cadence where no exact attachment/window callback exists, and use the caller's named watchdog as a diagnostic failure bound. The helper invocation owns cancellation and cleanup. | H test Oracle; desktop-refocus UI, runtime-topology Pressure, Process/Tooling. | completed |
+| SYNC-034B | `FlowTabUITests+ConditionObservation`, `waitForFrontmostBundleIdentifier`, status-item reopen and system-app MRU activation callers; exact frontmost application | A raw 100ms RunLoop loop begins after activation and infers that the expected application eventually became frontmost. | Start a generation-owned condition observer before activation. Register `NSWorkspace.didActivateApplicationNotification` before an initial `frontmostApplication` readback, accept only the exact bundle identifier, and use the caller timeout solely as a failure bound with last-readback diagnostics. Test scope cancels the notification token; stale, duplicate, replaced, and cancelled callbacks are rejected. | H shared UI observation; affected status-item/System MRU UI, deterministic owner Pressure, Process/Tooling. | completed |
 | SYNC-035 | Direct UI settle waits in Search, Settings, Home/Logs, MRU, Space fixture and switcher workflow tests; files enumerated in the UI audit scope below | Fixed 80ms–1.2s RunLoop advances occur between input/action and assertion, so assertion timing can change results. Evidence migration. | Remove each settle wait in favor of the affected visible element, log marker, fixture generation, process state, exact frontmost CG/AX window, or nonexistence Oracle. Observer/baseline setup precedes the action. | H; affected UI suites and matching Behavior coverage. | planned |
 | SYNC-036 | All literal XCTest timeouts in `FlowTabTests` and `FlowTabUITests` | 606 literal durations are generally terminal bounds for an independent expectation or XCUI predicate, but policy ownership and diagnostic tiers are implicit. Watchdog. | Replace literals with named app-test and UI-test watchdog policies by operation class; preserve expectation/predicate success Oracles and include unmet condition plus last observation in custom waits. Test case/helper owner supplies cleanup. | M mechanical/test infra; Unit/Behavior/UI, Process/Tooling. | planned |
 | SYNC-037 | `scripts/perf/tab-switch-stress.sh`, `search-committed-index-pressure.sh`, `runtime-topology-pressure.sh`, `lib/runtime-topology-target.sh` | Sampling duration/cadence and identity stability windows are pressure/safety protocols; process termination loops use unnamed 100ms cadence and attempt bounds. Domain duration/conditional observation/watchdog. | Retain measurement durations and sample cadence as named protocol inputs. Name process polling cadence/watchdogs, check state immediately, terminate from PID/start-identity/readback, and report the final `ps`/identity/status evidence. Traps own cancellation and cleanup. | M tooling/hot path; Pressure and Process/Tooling. | verification-needed |
@@ -3898,5 +3899,49 @@ polling cadence, deadline, or timeout in the scoped paths.
 - UI and FlowTabCore: not relevant because this slice changes app-test
   synchronization around the existing permission observation and Settings
   presentation path.
-- Commit: pending
+- Commit: `413038061ae0e6eaa8808405e4dc75676bfa8b4e`
   (`test(sync): migrate SYNC-033B3 permission readback`).
+
+### SYNC-034B Closure Record
+
+- Design and Oracle: a generation-owned UI condition observer registers
+  `NSWorkspace.didActivateApplicationNotification` before its initial exact
+  `frontmostApplication.bundleIdentifier` readback. Status-item reopen and
+  system-app MRU activation establish the observer before their trigger.
+  Resolution cancels the notification token; replacement, cancellation,
+  stale generation, duplicate delivery, and watchdog termination retain
+  explicit ownership. A watchdog expiry records one final readback for
+  diagnostics and remains a terminal failure. The status-item path also
+  performs an independent exact foreground readback after its visible and
+  runtime-log evidence.
+- UI owner and Pressure: UI-target tests cover an initially satisfied
+  readback, exact activation-notification delivery, an unmatched event,
+  500 iterations of replacement/cancellation/stale/duplicate delivery, and a
+  watchdog whose final readback becomes satisfied only after expiry. All 4/4
+  passed in 0.990/0.992 seconds at
+  `.build-local/evidence-driven-sync/SYNC-034B/owner-targeted-attempt-005`.
+- UI affected paths: status-item reopen passed 1/1 in 15.235/15.238 seconds
+  at `.build-local/evidence-driven-sync/SYNC-034B/status-item-attempt-001`.
+  The real eight-application System MRU topology, FlowTab process relaunch,
+  and ten switcher reopen iterations passed 1/1 in 43.948/43.951 seconds at
+  `.build-local/evidence-driven-sync/SYNC-034B/system-mru-attempt-002`.
+- Automation recovery evidence: after local Automation Mode authentication,
+  the identity probe passed 1/1 in 1.570 seconds at
+  `.build-local/evidence-driven-sync/SYNC-034B/automation-probe-attempt-001`.
+  Earlier attempts retain the LocalAuthentication and Automation Mode timeout
+  diagnostics that preceded authentication. The first System MRU attempt
+  also records the custom-build-root fixture-path fallback; the passing run
+  uses the wrapper's canonical default build root and a fresh evidence output
+  root.
+- Process/Tooling: the changed Swift files parse, the Xcode project plist is
+  valid, `git diff --check` passes, the two new files are 277 and 149 lines,
+  the removed raw helper has no remaining references, and UI compilation has
+  no diagnostics for the new files. The fixed-path app exists at
+  `{user-home}/Applications/Flow Tab UITest.app`; it and
+  `/Applications/Flow Tab.app` have the same
+  `io.github.potato-dumplings.flowtab` Apple Development designated
+  requirement and Team identifier.
+- Unit, Behavior, and FlowTabCore: not relevant because this slice changes
+  only UI-test observation infrastructure and its two existing UI call
+  paths.
+- Commit: pending.
