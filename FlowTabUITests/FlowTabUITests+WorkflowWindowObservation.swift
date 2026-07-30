@@ -364,44 +364,6 @@ extension FlowTabUITests {
         return false
     }
 
-    func waitForTopmostWorkflowCGWindow(
-        title: String,
-        app workflowApp: SpaceFixtureResolvedWorkflow.App,
-        timeout: TimeInterval
-    ) -> WorkflowCGWindowObservation? {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestFrontmostBundleIdentifier: String?
-        var latestWindowNumber: CGWindowID?
-        var latestTitle: String?
-        repeat {
-            latestFrontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            let latestCGWindow = topmostOnScreenCGWindow(
-                forBundleIdentifier: workflowApp.identity.bundleIdentifier
-            )
-            latestWindowNumber = latestCGWindow?.number
-            latestTitle = latestCGWindow?.title
-            if latestFrontmostBundleIdentifier == workflowApp.identity.bundleIdentifier,
-               latestCGWindow != nil,
-               (
-                   latestCGWindow?.title == title
-                       || workflowWindowTitleIsObservable(title, app: workflowApp)
-               ) {
-                return latestCGWindow
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected topmost CG window \(workflowApp.appName) / \(title), \
-            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil") \
-            with CG title \(latestTitle ?? "nil") \
-            and window number \(latestWindowNumber.map(String.init) ?? "nil").
-            """
-        )
-        return nil
-    }
-
     func logWorkflowSpaceObservation(
         _ stage: String,
         app workflowApp: SpaceFixtureResolvedWorkflow.App
