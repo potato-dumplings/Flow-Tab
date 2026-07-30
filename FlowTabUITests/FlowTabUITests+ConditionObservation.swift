@@ -160,15 +160,27 @@ final class FlowTabUITestConditionObservationOwner<Value> {
         else {
             return
         }
+        let value = readback()
+        // Client closures can pump the RunLoop and reenter this owner.
+        guard currentGeneration == generation,
+              resolvedEvidence == nil
+        else {
+            return
+        }
+        let satisfiesCondition =
+            allowsResolution && isSatisfied(value)
+        guard currentGeneration == generation,
+              resolvedEvidence == nil
+        else {
+            return
+        }
         let evidence = FlowTabUITestConditionEvidence(
             generation: generation,
             source: source,
-            value: readback()
+            value: value
         )
         latestEvidence = evidence
-        guard allowsResolution,
-              isSatisfied(evidence.value)
-        else {
+        guard satisfiesCondition else {
             return
         }
         resolvedEvidence = evidence

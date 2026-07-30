@@ -90,6 +90,42 @@ extension FlowTabUITests {
         )
     }
 
+    func testUIConditionObserverDiscardsReentrantOuterReadbackAfterResolution() {
+        var eventHandler: (() -> Void)?
+        var readbackCount = 0
+        var cancellationCount = 0
+        let owner = FlowTabUITestConditionObservationOwner(
+            observationRegistration: { callback in
+                eventHandler = {
+                    callback(.notificationReadback)
+                }
+                return FlowTabUITestObservationCancellation {
+                    cancellationCount += 1
+                }
+            },
+            readback: {
+                readbackCount += 1
+                if readbackCount == 1 {
+                    eventHandler?()
+                }
+                return true
+            },
+            isSatisfied: { $0 },
+            describe: { "satisfied=\($0)" }
+        )
+
+        owner.start()
+        defer { owner.cancel() }
+
+        let evidence = owner.waitForResolution(
+            timeout: FlowTabUITestConditionObservationTestPolicy.watchdog
+        )
+
+        XCTAssertEqual(readbackCount, 2)
+        XCTAssertEqual(evidence?.source, .notificationReadback)
+        XCTAssertEqual(cancellationCount, 1)
+    }
+
     func testUIConditionObserverRejectsCancelledAndReplacedEventsUnderPressure() {
         for _ in 0..<FlowTabUITestConditionObservationTestPolicy.pressureIterations {
             var isSatisfied = false

@@ -114,11 +114,10 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
 
-        let statusItem = flowTabStatusItem(in: app)
-        XCUIElement.perform(withKeyModifiers: .control) {
-            statusItem.tap()
-        }
-        flowTabStatusMenuQuitItem(in: app).tap()
+        flowTabStatusMenuQuitItem(
+            in: app,
+            openingWith: flowTabStatusItem(in: app)
+        ).tap()
 
         XCTAssertTrue(app.wait(for: .notRunning, timeout: 8))
     }
