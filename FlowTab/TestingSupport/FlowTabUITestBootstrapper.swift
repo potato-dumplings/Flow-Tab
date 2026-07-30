@@ -17,6 +17,8 @@ enum FlowTabUITestBootstrapper {
         (() -> Void)?
     static var initialPresentationObservationOwner:
         FlowTabUITestInitialPresentationObservationOwner?
+    static var initialSearchActivationObservationOwner:
+        FlowTabUITestInitialSearchActivationObservationOwner?
 
     private enum SwitcherTriggerNotification {
         static let global = Notification.Name("io.github.potato-dumplings.flowtab.ui-test.open-global-switcher")

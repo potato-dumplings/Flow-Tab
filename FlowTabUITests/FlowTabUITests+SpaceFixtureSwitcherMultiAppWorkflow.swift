@@ -461,7 +461,7 @@ extension FlowTabUITests {
             ]
         ) { _, app in
             let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-            XCTAssertTrue(searchInput.waitForExistence(timeout: 8))
+            XCTAssertTrue(waitForInitialFlowTabSearchReadiness(searchInput))
 
             RunLoop.current.run(until: Date().addingTimeInterval(0.4))
             app.typeText(targetWindowTitle)
@@ -511,7 +511,7 @@ extension FlowTabUITests {
             ]
         ) { _, app in
             let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-            XCTAssertTrue(searchInput.waitForExistence(timeout: 8))
+            XCTAssertTrue(waitForInitialFlowTabSearchReadiness(searchInput))
             XCTAssertNotEqual(
                 NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
                 targetApp.identity.bundleIdentifier,
@@ -559,7 +559,7 @@ extension FlowTabUITests {
         ) { _, app in
             let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(searchInput.waitForExistence(timeout: 8))
+            XCTAssertTrue(waitForInitialFlowTabSearchReadiness(searchInput))
             XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
             XCTAssertNotEqual(
                 NSWorkspace.shared.frontmostApplication?.bundleIdentifier,

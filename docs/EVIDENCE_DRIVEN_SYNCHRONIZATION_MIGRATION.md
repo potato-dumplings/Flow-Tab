@@ -126,7 +126,8 @@ and Process/Tooling.
 | SYNC-028B | Composite multi-application workflow-readiness routing boundary | Semantic owner review separated readiness evidence emitted independently by every fixture process from the final desktop-anchor activation and Space readback. Migration routing. | Aggregate every configured fixture process through SYNC-028B1, then establish the final anchor through SYNC-028B2. | H aggregate; child rows define required validation. | completed |
 | SYNC-028B1 | `SpaceFixtureWorkflowReadinessAggregateOwner`, `launchResolvedSpaceFixtureWorkflow`, `launchResolvedEdgeInputsWorkflow`; all-process readiness aggregation | A workflow-wide `settleTimeout` and fixed RunLoop advancement inferred when independently launched fixture processes and their Space topology were ready. Evidence migration plus watchdog. | Install a unique distributed observer for every workflow app before launching any process. Capture each exact configured baseline and accept its later ready evidence only for the configured workflow app ID, bundle ID, PID, observation generation, window plan, fullscreen plan, and titles. Complete after every app has terminal evidence. The workflow invocation owns all observers and aggregate-generation cancellation; one named watchdog reports every unmet app and last observation. | H multi-process fixture topology; Unit, Behavior, standard and edge multi-application UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-028B2 | `SpaceFixtureWorkflowDesktopAnchorObservationOwner`, `launchResolvedSpaceFixtureWorkflow`, `launchResolvedEdgeInputsWorkflow`; final desktop-anchor activation | After aggregate readiness, the launchers call `activate()` and use generic foreground state as the final desktop-anchor result. Evidence migration with exact readback. | Establish workspace observers and initial readback before activation. Resolve only when the exact readiness PID is active and frontmost, XCUI reports it foreground, the exact plan-identified XCUI window frame matches the PID-scoped topmost on-screen CG window, and that CG frame satisfies the desktop-Space non-fullscreen-size readback. The workflow invocation owns generation cancellation, observers, polling, and a diagnostic terminal watchdog. | H desktop/Space topology; Unit, Behavior, affected standard and edge UI, runtime-topology Pressure, Process/Tooling. | completed |
-| SYNC-029 | `FlowTabUITestInitialPresentationObservationOwner`, `FlowTabUITestBootstrapper.presentInitialUIIfNeeded`; initial UI-test Search/switcher presentation | Twenty 150ms retries and two equal snapshots infer runtime projection stability before opening Search/switcher. Evidence migration. | Install exact projection observers before the baseline readback and readiness request. Resolve from an initially complete projection, a monotonic later generation, or a same-generation completeness transition; require the exact filtered projection/session item signature and a compatible post-presentation readback. A complete empty projection is authoritative no-content. The bootstrapper owns replacement, prepare, termination, resolution, observer, generation, task, and watchdog cleanup. | H test orchestration; Behavior, UI, runtime-topology/Search Pressure. | completed |
+| SYNC-029 | `FlowTabUITestInitialPresentationObservationOwner`, `FlowTabUITestBootstrapper.presentInitialUIIfNeeded`; initial UI-test Search/switcher presentation | Twenty 150ms retries and two equal snapshots infer runtime projection stability before opening Search/switcher. Evidence migration. | Install exact projection observers before the baseline readback and readiness request. Resolve from an initially complete projection, a monotonic later generation, or a same-generation completeness transition; require the exact filtered projection/session item signature and a compatible post-presentation readback. A complete empty projection is authoritative no-content. The bootstrapper owns replacement, prepare, termination, resolution, observer, generation, task, and watchdog cleanup. | H test orchestration; Behavior, UI, runtime-topology/Search Pressure. | completed; Search activation terminal evidence follows in SYNC-029A |
+| SYNC-029A | `FlowTabUITestInitialSearchActivationObservationOwner`, `FlowTabUITestBootstrapper.resolveInitialPresentation`; initial Search activation terminal state | Initial presentation publishes `.presented` when the panel/session projection matches even if `searchIsActiveOrPending` is false. A real fixture run retained `mode=appCycle` and never exposed the Search input. | Install the exact committed-Search-index observer, perform the initial readback, and request Search freshness before initial panel presentation can enqueue session maintenance. After the exact panel/session is presented, perform an immediate Search-state readback and activate Search. A matching committed-index notification may retry activation. Resolve only while the panel remains presented with the exact ordered session IDs and Search is active. Bootstrapper preparation, replacement, termination, resolution, the runtime-aligned diagnostic watchdog, and the UI-test terminal bound own cancellation and cleanup. | H TestingSupport presentation Oracle; deterministic initial/pre-presentation-event/delayed/cancel/duplicate/watchdog tests, Behavior integration, affected real Search UI, lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-030 | Composite TestingSupport fault-injection timing boundary | Semantic owner review separated mock preview-capture latency from initial panel-occlusion staleness. Domain fixture duration routing. | Close preview-capture latency through SYNC-030A and panel-occlusion staleness through SYNC-030B. | M aggregate; child rows define required validation. | completed |
 | SYNC-030A | `FlowTabUITestMockWindowPreviewLatencyOwner`, `FlowTabUITestBootstrapper.installMockWindowPreviewsIfNeeded`; mock preview I/O latency | A blocking thread sleep intentionally delays preview capture, has no cancellation owner, and exposes no TestingSupport completion evidence. Domain fixture duration. | Retain the compatible millisecond launch option as a bounded named latency policy. A TestingSupport generation owner performs a cancellable monotonic deadline wait and publishes exact owner/batch/request/outcome evidence. Preview result identity remains the success Oracle. Bootstrap preparation, replacement, termination, and deinitialization own cancellation. | M asynchronous preview path; Unit, Behavior, affected UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-030B | Initial panel-occlusion stale hook in `FlowTabUITestBootstrapper` | A task sleep intentionally holds stale occlusion state before releasing visibility, while generation equality informally rejects replacement. Domain fixture duration. | Retain the compatible millisecond launch option as a bounded named staleness policy; inject a cancellable scheduler, publish installed/released/cancelled evidence, and make bootstrap preparation, replacement, termination, and deinitialization own cleanup. The panel visibility/recovery state remains the success Oracle. | M presentation lifecycle; Unit, Behavior, affected UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
@@ -1324,6 +1325,11 @@ polling cadence, deadline, or timeout in the scoped paths.
   The startup `prompts.zip` remains unchanged and outside the slice.
 - Commit: `7abc326`
   (`refactor(sync): migrate SYNC-017 modifier release observation`).
+- Validation repair: `42359d455771c2f431f160b5e4d32f7ce5b8ef06`
+  (`test(sync): stabilize SYNC-017 modifier event oracle`) constructs the
+  flags-changed event from the configured primary modifier. Its isolated
+  canonical rerun passed 1/1 under
+  `.build-local/evidence-driven-sync/SYNC-017/modifier-event-oracle-attempt-001`.
 
 ### SYNC-018 Closure Record
 
@@ -2893,6 +2899,98 @@ polling cadence, deadline, or timeout in the scoped paths.
   `prompts.zip` remains unchanged and outside the slice.
 - Commit: `1c4dae662a0a9179b8edde21fb9ce8adc34e4385`
   (`refactor(sync): migrate SYNC-029 initial UI readiness`).
+
+### SYNC-029A Closure Record
+
+- Design and ordering:
+  `FlowTabUITestInitialSearchActivationObservationOwner` installs the exact
+  `.runtimeCommittedSearchIndexDidUpdate` observer and performs an initial
+  Search-state readback before invoking its readiness trigger. Bootstrap
+  preparation uses that trigger to request the Search freshness barrier before
+  panel presentation can enqueue switcher-session maintenance on the runtime
+  owner queue. A synchronous committed-index notification is retained through
+  the observation generation even when it arrives before presentation.
+- Terminal Oracle: after SYNC-029 presents the exact projection, the Search
+  owner captures the ordered session app IDs, performs a presentation readback,
+  invokes `enterSearchModeIfPossible`, and reads back again. A matching
+  committed-index notification performs a full readback and may retry
+  activation. Resolution requires the panel to remain presented, the current
+  session IDs to equal the accepted ordered IDs, and `isSearchActive` to be
+  true. Pending activation is diagnostic state only.
+- Lifecycle: `FlowTabUITestBootstrapper` owns the one active Search observation.
+  Preparation replaces it; presentation resolution transfers the accepted
+  session signature; success, watchdog failure, explicit stop, replacement,
+  AppDelegate termination, and deinitialization remove the notification route
+  and cancel pending watchdog work. Observation generations reject delayed,
+  duplicate, and out-of-order callbacks.
+- Retained time policy: the named
+  `searchIndexReadinessWatchdog` reuses the runtime transient-repair
+  observation's 30-second terminal bound. It performs a final readback that can
+  still resolve success, then reports the unmet exact session/Search condition
+  and distinct last/final evidence. The affected real Search UI paths use the
+  named 35-second `watchdogFailureObservationTimeout`, leaving five seconds for
+  the application watchdog diagnostic and process cleanup. Elapsed time cannot
+  satisfy either owner.
+- Failure evidence: the first real app-Search run reproduced a three-second
+  application watchdog with `committedIndexGeneration=0`, the exact presented
+  session, `searchActive=0`, and `searchPending=1`. A diagnostic run showed the
+  freshness request queued behind real-app switcher-session maintenance. The
+  first window-Search run reproduced the same three-second cancellation. After
+  the application watchdog was aligned with runtime readiness, the eight-second
+  UI bound terminated the still-observing application before its terminal
+  event. These observations produced the final observer-before-request ordering
+  and named UI terminal policy.
+- Unit and Behavior: the final focused canonical wrapper passed 8/8 with zero
+  failures in 0.356 seconds (0.359 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-029A/targeted-attempt-004`.
+  Coverage includes an initially satisfied readback, a delayed committed-index
+  event, a synchronous pre-presentation event, explicit cancellation,
+  replacement and stale-generation rejection across 100 iterations, duplicate
+  delivery, final-readback success, watchdog last/final diagnostics, and
+  bootstrap integration that verifies the first freshness request occurs while
+  the observation is active and before panel presentation.
+- Full FlowTabTests: the final canonical wrapper passed 1032/1032 with zero
+  failures in 51.667 seconds (51.844 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-029A/full-attempt-005`.
+  Full attempt 003 exposed one suite-order failure in the existing Search wrap
+  publication test. Its exact isolated rerun passed 1/1, and a repeated
+  test-without-building run passed 20/20 under
+  `.build-local/evidence-driven-sync/SYNC-029A/search-wrap-pressure-attempt-001`
+  before the final full pass.
+- FlowTabCore: not relevant because the implementation is confined to the app
+  `FLOWTAB_TESTING` and UI-test boundaries and adds no core-domain API or
+  dependency.
+- UI: the canonical install wrapper rebuilt, signed, and verified the fixed-path
+  Apple Development app for the final source state under
+  `.build-local/evidence-driven-sync/SYNC-029A/ui-install-final-001`. The real
+  window-Search workflow passed 1/1 in 32.133 seconds under
+  `.build-local/evidence-driven-sync/SYNC-029A/ui-window-search-attempt-004`;
+  its independent Oracles were the accessible Search input, exact `Docs`
+  fixture result, exact CG window number, frontmost fixture identity, and panel
+  dismissal. The real app-Search workflow passed 1/1 in 29.394 seconds under
+  `.build-local/evidence-driven-sync/SYNC-029A/ui-app-search-attempt-005`;
+  its independent Oracles were the accessible Search input, exact Chrome
+  fixture app result, frontmost bundle identity, and panel dismissal.
+- Pressure: the owner regression replaces and cancels 100 generations, delivers
+  stale committed-index callbacks, and resolves only the final generation.
+  The Search wrap publication path also passed 20 consecutive XCTest
+  iterations with identical result and scroll-revision Oracles.
+- Process/Tooling: the canonical wrappers compile the TestingSupport,
+  FlowTabTests, and FlowTabUITests sources in their intended targets. Project
+  plist validation, unique project references, Swift parse checks, scoped
+  obsolete-path review, source-size checks, `git diff --check`, and exact
+  staged-content review are recorded before commit. A final-source compiler
+  pass exposed actor isolation at destructor cancellation; the owner now
+  transfers its watchdog token to a main-actor cancellation task while removing
+  its notification observer synchronously. The two new production sources are
+  381 and 202 lines, and the new test source is 396 lines. The controller
+  behavior source is 350 lines, and the shared test-double source is 799 lines
+  with one test-support responsibility. The UI support source is 638 lines and
+  owns the named terminal policy; the oversized multi-app workflow remains at
+  its 966-line slice baseline. Startup `prompts.zip` remains unchanged and
+  outside the slice.
+- Commit: pending current-slice local commit
+  (`fix(sync): require SYNC-029A initial search activation`).
 
 ### SYNC-030A Closure Record
 
@@ -5520,7 +5618,7 @@ polling cadence, deadline, or timeout in the scoped paths.
   the slice.
 - Unit, Behavior, and FlowTabCore: not relevant because this slice changes
   only one UI-test multi-key Oracle and test-owned observation infrastructure.
-- Commit: pending
+- Commit: `87dee36e054510aa17762686d115cbbeb5c6e9b1`
   (`test(sync): migrate SYNC-034AK selected app preview`).
 
 ### SYNC-035A Closure Record

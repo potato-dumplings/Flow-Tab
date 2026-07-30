@@ -11,6 +11,10 @@ private enum FlowTabUITestOptionSelectionPolicy {
     static let scrollingWatchdog: TimeInterval = 30
 }
 
+private enum FlowTabUITestInitialSearchReadinessPolicy {
+    static let watchdogFailureObservationTimeout: TimeInterval = 35
+}
+
 private enum FlowTabUITestAppDefaults {
     static let defaultBundleIdentifier = "io.github.potato-dumplings.flowtab"
 
@@ -307,6 +311,11 @@ func terminateFlowTabUITestApplicationIfRunning(
 extension FlowTabUITests {
     func makeApp(additionalArguments: [String] = []) -> XCUIApplication {
         makeFlowTabUITestApplication(additionalArguments: additionalArguments)
+    }
+    func waitForInitialFlowTabSearchReadiness(_ searchInput: XCUIElement) -> Bool {
+        searchInput.waitForExistence(
+            timeout: FlowTabUITestInitialSearchReadinessPolicy.watchdogFailureObservationTimeout
+        )
     }
     func postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
         _ trigger: FlowTabUITestSwitcherTrigger,

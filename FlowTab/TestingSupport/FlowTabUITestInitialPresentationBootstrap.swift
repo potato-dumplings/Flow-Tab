@@ -12,6 +12,8 @@ extension FlowTabUITestBootstrapper {
     {
         initialPresentationObservationOwner?
             .isObserving == true
+            || initialSearchActivationObservationOwner?
+                .isObserving == true
     }
 
     static func presentInitialUIIfNeeded(
@@ -33,6 +35,11 @@ extension FlowTabUITestBootstrapper {
         let runtimeProjectionService =
             panelController.modelForTesting
                 .runtimeProjectionService
+        prepareInitialSearchActivationIfNeeded(
+            panelController: panelController,
+            runtimeProjectionService:
+                runtimeProjectionService
+        )
         let observationOwner =
             FlowTabUITestInitialPresentationObservationOwner(
                 notificationRoutes:
@@ -80,13 +87,6 @@ extension FlowTabUITestBootstrapper {
                     panelController,
                 mode: mode
             )
-            if didPresent
-                && FlowTabTestLaunchOptions
-                    .entersSearchOnLaunch
-            {
-                _ = panelController
-                    .enterSearchModeIfPossible()
-            }
             return FlowTabUITestInitialPresentationAttempt(
                 didPresent: didPresent,
                 sessionItemIDs:
@@ -108,23 +108,14 @@ extension FlowTabUITestBootstrapper {
         } onResolved: {
             [weak observationOwner, weak panelController] evidence in
             guard let observationOwner,
-                  let panelController,
-                  initialPresentationObservationOwner
-                    === observationOwner
+                  let panelController
             else {
                 return
             }
-            initialPresentationObservationOwner = nil
-            NotificationCenter.default.post(
-                name:
-                    .flowTabUITestInitialPresentationDidResolve,
-                object: panelController,
-                userInfo: evidence.notificationUserInfo
-            )
-            RuntimeLog.info(
-                "UITest",
-                "initial presentation resolved "
-                    + evidence.logFields
+            resolveInitialPresentation(
+                evidence,
+                observationOwner: observationOwner,
+                panelController: panelController
             )
         } onWatchdog: {
             [weak observationOwner] failure in
@@ -135,6 +126,7 @@ extension FlowTabUITestBootstrapper {
                 return
             }
             initialPresentationObservationOwner = nil
+            stopInitialSearchActivationObservation()
             RuntimeLog.error(
                 "UITest",
                 "initial presentation watchdog "
@@ -147,6 +139,7 @@ extension FlowTabUITestBootstrapper {
         initialPresentationObservationOwner?
             .cancel()
         initialPresentationObservationOwner = nil
+        stopInitialSearchActivationObservation()
     }
 
     private static var initialPresentationMode:

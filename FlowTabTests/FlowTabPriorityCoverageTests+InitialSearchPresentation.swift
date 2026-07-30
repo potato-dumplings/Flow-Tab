@@ -189,4 +189,162 @@ extension FlowTabPriorityCoverageTests {
             )
         }
     }
+
+    @MainActor
+    func testUITestSearchLaunchWaitsForCommittedIndexEvidence()
+        async
+    {
+        await withTemporarySearchPreferences(
+            enabled: true,
+            defaultScope: .app
+        ) {
+            let previousLaunchArguments =
+                FlowTabTestLaunchOptions
+                    .argumentsOverrideForTesting
+            let previousLaunchEnvironment =
+                FlowTabTestLaunchOptions
+                    .environmentOverrideForTesting
+            FlowTabTestLaunchOptions
+                .argumentsOverrideForTesting = [
+                    "--flowtab-ui-open-switcher-search"
+                ]
+            FlowTabTestLaunchOptions
+                .environmentOverrideForTesting = [
+                    FlowTabTestLaunchOptions
+                        .uiTestingEnvironmentKey:
+                        FlowTabTestLaunchOptions
+                            .uiTestingEnvironmentValue
+                ]
+
+            let apps = searchScenarioApps()
+            let expectedAppIDs = apps.map(\.id)
+            let runtimeProjectionService =
+                RecordingRuntimeProjectionService(
+                    appSwitcherApps: apps,
+                    committedSearchReadiness:
+                        .missingCommittedIndex
+                )
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(
+                    runtimeProjectionService:
+                        runtimeProjectionService
+                )
+            )
+            var firstSearchReadinessRequestObservedBeforePresentation:
+                Bool?
+            runtimeProjectionService
+                .setSearchIndexFreshnessBarrierRequestHandler {
+                    _ in
+                    MainActor.assumeIsolated {
+                        guard firstSearchReadinessRequestObservedBeforePresentation
+                                == nil
+                        else {
+                            return
+                        }
+                        firstSearchReadinessRequestObservedBeforePresentation =
+                            FlowTabUITestBootstrapper
+                                .isObservingInitialPresentationForTesting
+                            && !controller.isPanelPresented
+                    }
+                }
+            let model = controller.modelForTesting
+            let presentationResolved = expectation(
+                description:
+                    "initial Search waits for committed index"
+            )
+            presentationResolved
+                .assertForOverFulfill = true
+            var resolvedEvidence:
+                FlowTabUITestInitialPresentationEvidence?
+            let observer =
+                NotificationCenter.default.addObserver(
+                    forName:
+                        .flowTabUITestInitialPresentationDidResolve,
+                    object: controller,
+                    queue: .main
+                ) { notification in
+                    MainActor.assumeIsolated {
+                        guard let evidence =
+                                FlowTabUITestInitialPresentationEvidence(
+                                    notification: notification
+                                )
+                        else {
+                            return
+                        }
+                        resolvedEvidence = evidence
+                        presentationResolved.fulfill()
+                    }
+                }
+            defer {
+                NotificationCenter.default
+                    .removeObserver(observer)
+                FlowTabUITestBootstrapper
+                    .stopInitialUIPresentationObservation()
+                controller.cancelSelectionForTesting()
+                FlowTabTestLaunchOptions
+                    .argumentsOverrideForTesting =
+                        previousLaunchArguments
+                FlowTabTestLaunchOptions
+                    .environmentOverrideForTesting =
+                        previousLaunchEnvironment
+            }
+
+            FlowTabUITestBootstrapper
+                .presentInitialUIIfNeeded(
+                    panelController: controller
+                )
+
+            XCTAssertTrue(controller.isPanelPresented)
+            XCTAssertEqual(
+                firstSearchReadinessRequestObservedBeforePresentation,
+                true
+            )
+            XCTAssertEqual(
+                runtimeProjectionService
+                    .searchIndexFreshnessBarrierRequestsRecorded(),
+                [
+                    .searchFreshnessBarrier,
+                    .searchFreshnessBarrier
+                ]
+            )
+            XCTAssertEqual(
+                model.session?.apps.map(\.id),
+                expectedAppIDs
+            )
+            XCTAssertFalse(model.isSearchActive)
+            XCTAssertNil(resolvedEvidence)
+            XCTAssertTrue(
+                FlowTabUITestBootstrapper
+                    .isObservingInitialPresentationForTesting
+            )
+
+            runtimeProjectionService
+                .installCommittedSearchIndex(for: apps)
+            NotificationCenter.default.post(
+                name:
+                    .runtimeCommittedSearchIndexDidUpdate,
+                object: runtimeProjectionService
+            )
+
+            await fulfillment(
+                of: [presentationResolved],
+                timeout: 1
+            )
+
+            XCTAssertTrue(model.isSearchActive)
+            XCTAssertEqual(
+                resolvedEvidence?.candidate.itemIDs,
+                expectedAppIDs
+            )
+            XCTAssertEqual(
+                resolvedEvidence?.attempt?
+                    .searchIsActiveOrPending,
+                true
+            )
+            XCTAssertFalse(
+                FlowTabUITestBootstrapper
+                    .isObservingInitialPresentationForTesting
+            )
+        }
+    }
 }

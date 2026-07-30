@@ -166,6 +166,8 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private var appSwitcherMaintenanceRequestHandler:
         ((RuntimeProjectionMaintenanceReason) -> Void)?
     private var searchIndexFreshnessBarrierRequests: [RuntimeProjectionMaintenanceReason] = []
+    private var searchIndexFreshnessBarrierRequestHandler:
+        ((RuntimeProjectionMaintenanceReason) -> Void)?
     private var spaceTopologyChangeSignals = 0
     private var appLaunchSignals: [
         (appID: String, pid: pid_t, appDirectoryEntry: RuntimeAppDirectoryEntry?)
@@ -366,6 +368,15 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.lock()
         defer { lock.unlock() }
         return searchIndexFreshnessBarrierRequests
+    }
+
+    func setSearchIndexFreshnessBarrierRequestHandler(
+        _ handler:
+            ((RuntimeProjectionMaintenanceReason) -> Void)?
+    ) {
+        lock.lock()
+        searchIndexFreshnessBarrierRequestHandler = handler
+        lock.unlock()
     }
 
     func spaceTopologyChangeSignalCount() -> Int {
@@ -571,7 +582,10 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     func requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason) {
         lock.lock()
         searchIndexFreshnessBarrierRequests.append(reason)
+        let handler =
+            searchIndexFreshnessBarrierRequestHandler
         lock.unlock()
+        handler?(reason)
     }
 
     func signalSpaceTopologyChanged() {
