@@ -247,8 +247,10 @@ extension FlowTabUITests {
         guard let evidence =
                 owner.waitForResolution(timeout: timeout),
               let window = evidence.value.matchingWindow(
-                bundleIdentifier:
-                    workflowApp.identity.bundleIdentifier,
+                scope: .frontmost(
+                    bundleIdentifier:
+                        workflowApp.identity.bundleIdentifier
+                ),
                 title: title
               )
         else {
@@ -267,34 +269,23 @@ extension FlowTabUITests {
         app workflowApp: SpaceFixtureResolvedWorkflow.App,
         timeout: TimeInterval
     ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestWindowNumber: CGWindowID?
-        var latestTitle: String?
-        var latestFrame: CGRect?
-        repeat {
-            let latestCGWindow = topmostOnScreenCGWindow(
-                forBundleIdentifier: workflowApp.identity.bundleIdentifier
+        let owner =
+            makeActiveSpaceWorkflowWindowObservationOwner(
+                title: title,
+                app: workflowApp
             )
-            latestWindowNumber = latestCGWindow?.number
-            latestTitle = latestCGWindow?.title
-            latestFrame = latestCGWindow?.frame
-            if let latestCGWindow,
-               latestCGWindow.matchesWorkflowSpaceWindow(title: title) {
-                return true
-            }
+        owner.start()
+        defer { owner.cancel() }
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected active-space CG window \(workflowApp.appName) / \(title), \
-            found CG title \(latestTitle ?? "nil") \
-            window number \(latestWindowNumber.map(String.init) ?? "nil") \
-            and frame \(workflowCGFrameDescription(latestFrame)).
-            """
-        )
-        return false
+        guard owner.waitForResolution(timeout: timeout) != nil else {
+            XCTFail(
+                "Expected active-space CG window "
+                    + "\(workflowApp.appName) / \(title). "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+        return true
     }
 
     func waitForWorkflowSpaceContainingCGWindow(

@@ -2,15 +2,45 @@ import AppKit
 import Foundation
 import XCTest
 
+enum FlowTabUITestWorkflowSpaceWindowScope: Equatable {
+    case frontmost(bundleIdentifier: String)
+    case activeSpace
+
+    func accepts(
+        frontmostBundleIdentifier: String?
+    ) -> Bool {
+        switch self {
+        case let .frontmost(bundleIdentifier):
+            return frontmostBundleIdentifier
+                == bundleIdentifier
+        case .activeSpace:
+            return true
+        }
+    }
+
+    var diagnosticSummary: String {
+        switch self {
+        case let .frontmost(bundleIdentifier):
+            return "scope=frontmost "
+                + "expectedBundle=\(bundleIdentifier)"
+        case .activeSpace:
+            return "scope=activeSpace"
+        }
+    }
+}
+
 struct FlowTabUITestWorkflowSpaceWindowSnapshot: Equatable {
     let frontmostBundleIdentifier: String?
     let topmostCGWindow: WorkflowCGWindowObservation?
 
     func matchingWindow(
-        bundleIdentifier: String,
+        scope: FlowTabUITestWorkflowSpaceWindowScope,
         title: String
     ) -> WorkflowCGWindowObservation? {
-        guard frontmostBundleIdentifier == bundleIdentifier,
+        guard scope.accepts(
+                frontmostBundleIdentifier:
+                    frontmostBundleIdentifier
+              ),
               let topmostCGWindow,
               topmostCGWindow.matchesWorkflowSpaceWindow(
                 title: title
@@ -39,7 +69,7 @@ final class FlowTabUITestWorkflowSpaceWindowObservationOwner {
         >
 
     init(
-        expectedBundleIdentifier: String,
+        scope: FlowTabUITestWorkflowSpaceWindowScope,
         expectedTitle: String,
         observationRegistration:
             FlowTabUITestConditionObservationRegistration?,
@@ -51,12 +81,12 @@ final class FlowTabUITestWorkflowSpaceWindowObservationOwner {
             readback: readback,
             isSatisfied: { snapshot in
                 snapshot.matchingWindow(
-                    bundleIdentifier: expectedBundleIdentifier,
+                    scope: scope,
                     title: expectedTitle
                 ) != nil
             },
             describe: { snapshot in
-                "expectedBundle=\(expectedBundleIdentifier) "
+                "\(scope.diagnosticSummary) "
                     + "expectedTitle=\(expectedTitle) "
                     + snapshot.diagnosticSummary
             }
@@ -97,8 +127,35 @@ extension FlowTabUITests {
     ) -> FlowTabUITestWorkflowSpaceWindowObservationOwner {
         let bundleIdentifier =
             workflowApp.identity.bundleIdentifier
+        return makeWorkflowSpaceWindowObservationOwner(
+            scope: .frontmost(
+                bundleIdentifier: bundleIdentifier
+            ),
+            title: title,
+            app: workflowApp
+        )
+    }
+
+    func makeActiveSpaceWorkflowWindowObservationOwner(
+        title: String,
+        app workflowApp: SpaceFixtureResolvedWorkflow.App
+    ) -> FlowTabUITestWorkflowSpaceWindowObservationOwner {
+        makeWorkflowSpaceWindowObservationOwner(
+            scope: .activeSpace,
+            title: title,
+            app: workflowApp
+        )
+    }
+
+    private func makeWorkflowSpaceWindowObservationOwner(
+        scope: FlowTabUITestWorkflowSpaceWindowScope,
+        title: String,
+        app workflowApp: SpaceFixtureResolvedWorkflow.App
+    ) -> FlowTabUITestWorkflowSpaceWindowObservationOwner {
+        let bundleIdentifier =
+            workflowApp.identity.bundleIdentifier
         return FlowTabUITestWorkflowSpaceWindowObservationOwner(
-            expectedBundleIdentifier: bundleIdentifier,
+            scope: scope,
             expectedTitle: title,
             observationRegistration:
                 FlowTabUITestWorkflowWindowActivationObservation

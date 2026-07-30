@@ -16,8 +16,9 @@ extension FlowTabUITests {
         )
         let owner =
             FlowTabUITestWorkflowSpaceWindowObservationOwner(
-                expectedBundleIdentifier:
-                    "com.example.target",
+                scope: .frontmost(
+                    bundleIdentifier: "com.example.target"
+                ),
                 expectedTitle: "Fullscreen",
                 observationRegistration: { _ in
                     order.append("register")
@@ -58,8 +59,9 @@ extension FlowTabUITests {
         )
         let owner =
             FlowTabUITestWorkflowSpaceWindowObservationOwner(
-                expectedBundleIdentifier:
-                    "com.example.target",
+                scope: .frontmost(
+                    bundleIdentifier: "com.example.target"
+                ),
                 expectedTitle: "Fullscreen",
                 observationRegistration: { callback in
                     readback = callback
@@ -111,9 +113,38 @@ extension FlowTabUITests {
 
         XCTAssertEqual(
             snapshot.matchingWindow(
-                bundleIdentifier: "com.example.target",
+                scope: .frontmost(
+                    bundleIdentifier: "com.example.target"
+                ),
                 title: "Fullscreen"
             )?.number,
+            42
+        )
+    }
+
+    func testWorkflowSpaceWindowObserverAcceptsActiveSpaceWhileFlowTabIsFrontmost() {
+        let snapshot = workflowSpaceWindowTestSnapshot(
+            bundleIdentifier: "io.flowtab.FlowTab",
+            windowNumber: 42,
+            title: "Fullscreen"
+        )
+        let owner =
+            FlowTabUITestWorkflowSpaceWindowObservationOwner(
+                scope: .activeSpace,
+                expectedTitle: "Fullscreen",
+                observationRegistration: nil,
+                readback: { snapshot }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .initialReadback
+        )
+        XCTAssertEqual(
+            owner.resolvedEvidence?.value.topmostCGWindow?
+                .number,
             42
         )
     }
@@ -128,8 +159,9 @@ extension FlowTabUITests {
         )
         let owner =
             FlowTabUITestWorkflowSpaceWindowObservationOwner(
-                expectedBundleIdentifier:
-                    "com.example.target",
+                scope: .frontmost(
+                    bundleIdentifier: "com.example.target"
+                ),
                 expectedTitle: "Fullscreen",
                 observationRegistration: { callback in
                     readback = callback
@@ -175,8 +207,10 @@ extension FlowTabUITests {
             )
             let owner =
                 FlowTabUITestWorkflowSpaceWindowObservationOwner(
-                    expectedBundleIdentifier:
-                        "com.example.target",
+                    scope: .frontmost(
+                        bundleIdentifier:
+                            "com.example.target"
+                    ),
                     expectedTitle: "Fullscreen",
                     observationRegistration: { callback in
                         readbacks.append(callback)
@@ -211,8 +245,9 @@ extension FlowTabUITests {
         var readbackCount = 0
         let owner =
             FlowTabUITestWorkflowSpaceWindowObservationOwner(
-                expectedBundleIdentifier:
-                    "com.example.target",
+                scope: .frontmost(
+                    bundleIdentifier: "com.example.target"
+                ),
                 expectedTitle: "Fullscreen",
                 observationRegistration: nil,
                 readback: {
