@@ -246,11 +246,15 @@ extension FlowTabUITests {
         traceLabel: String
     ) throws -> RuntimeTruthWindowSelection {
         var observedPrefix = [currentSelection.title]
-        let attempts = max(1, switcherPreviewTitles(from: diagnosticsSummary).count + 3)
-        var latestTitle = currentSelection.title
-        var latestWindowID = "cg:\(currentSelection.windowNumber)"
+        let maximumSelectionAdvances = max(
+            1,
+            switcherPreviewTitles(
+                from: diagnosticsSummary
+            ).count + 3
+        )
+        var latestSelection = currentSelection
 
-        if latestTitle == title {
+        if latestSelection.title == title {
             assertNoisyOptionTabObservedPrefix(
                 observedPrefix,
                 expectedPrefix: expectedPrefix,
@@ -259,31 +263,37 @@ extension FlowTabUITests {
             return currentSelection
         }
 
-        for attempt in 0..<attempts {
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
-                .advanceRight,
-                traceLabel: "\(traceLabel).selectWindow"
-            )
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-            latestTitle = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "selectedWindowTitle"
-            )
-            latestWindowID = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "selectedWindow"
-            )
-            observedPrefix.append(latestTitle)
+        for attempt in 0..<maximumSelectionAdvances {
+            latestSelection =
+                try performAndWaitForSwitcherWindowSelectionTransition(
+                    from: latestSelection,
+                    in: app,
+                    diagnosticsSummary: diagnosticsSummary,
+                    traceLabel:
+                        "\(traceLabel).selectAttempt.\(attempt + 1)",
+                    trigger: {
+                        postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                            .advanceRight,
+                            traceLabel:
+                                "\(traceLabel).selectWindow"
+                        )
+                    }
+                )
+            observedPrefix.append(latestSelection.title)
             logFlowTabUITestTrace(
-                "[\(traceLabel).selectAttempt.\(attempt + 1)] target=\(title) selected=\(latestTitle) windowID=\(latestWindowID)"
+                "[\(traceLabel).selectAttempt.\(attempt + 1)] "
+                    + "target=\(title) "
+                    + "selected=\(latestSelection.title) "
+                    + "windowNumber="
+                    + "\(latestSelection.windowNumber)"
             )
             assertNoisyOptionTabObservedPrefix(
                 observedPrefix,
                 expectedPrefix: expectedPrefix,
                 traceLabel: traceLabel
             )
-            if latestTitle == title {
-                return try runtimeTruthWindowSelection(title: latestTitle, windowID: latestWindowID)
+            if latestSelection.title == title {
+                return latestSelection
             }
         }
 
@@ -294,7 +304,7 @@ extension FlowTabUITests {
             \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
             """
         )
-        return try runtimeTruthWindowSelection(title: latestTitle, windowID: latestWindowID)
+        return latestSelection
     }
 
     private func assertNoisyOptionTabObservedPrefix(

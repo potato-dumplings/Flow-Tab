@@ -203,9 +203,10 @@ and Process/Tooling.
 | SYNC-034AJ | `FlowTabUITests+SwitcherPreviewProjectionObservation`; duplicated preview waits in multi-app, RuntimeTruth, in-app window switching, and noisy Option+Tab workflows | Five used raw 100ms RunLoop loops repeatedly parse `preview`, while one subset helper has no caller. Callers require exact title-set equality, duplicate-sensitive title count plus set equality, or all standard windows plus at least one real fullscreen sibling. | Start a generation-owned preview projection owner before an immediate full diagnostics readback. Parse `preview` once and accept only the exact title set, exact count plus set, or standard/fullscreen subset-and-intersection contract requested by the caller. Remove the unused subset helper. Retain the shared named serial cadence because diagnostics publication exposes no callback. Each invocation owns generation, scheduling, cancellation, and a watchdog with the final raw preview projection and parsed titles. | H real-fixture preview Oracle; deterministic parsing/exact/count/noisy/initial/delayed/cancel/watchdog tests, 100 lifecycle Pressure, affected multi-app, Control+Tab, and Option+Tab clean/noisy fullscreen UI, Process/Tooling. | blocked: implementation, initial six-test owner/Pressure execution, and final complete UI-test target build passed; active system authentication prevents final seven-test owner/Pressure and affected UI execution |
 | SYNC-034AK | `FlowTabUITests+SwitcherSelectedAppPreviewObservation` and `matchedWorkflowAppForVisibleSwitcherPreview`; atomic selected-app preview resolution | A raw 100ms RunLoop loop reads `selected` and `preview` separately, then infers which unvisited workflow app owns the currently visible title set. Scheduling between reads can combine different published projections. | Read both keys from one diagnostics accessibility value in a generation-owned multi-key owner. Accept only one eligible candidate whose exact bundle identity and expected title set match the same snapshot. Check immediately; retain the shared named serial cadence because diagnostics publication exposes no callback. The invocation owns generation, scheduling, cancellation, and a watchdog with the final selected bundle, titles, raw projection, and eligible candidates. | H real-fixture app/window identity Oracle; deterministic atomic/initial/delayed/exclusion/cancel/watchdog tests, 100 lifecycle Pressure, affected multi-app window-card isolation UI, Process/Tooling. | blocked: implementation and complete UI-test target build passed; active system authentication prevents owner, Pressure, and affected UI execution |
 | SYNC-034AL | `FlowTabUITestWindowLayerPreviewTransitionObservationOwner`, `performAndWaitForWindowLayerPreviewTransition`, and delayed window-layer entry UI regressions | A raw 20ms RunLoop loop starts after the trigger and fails when the exact preview marker does not appear within a 100ms grace after observing `windowCycle`, allowing scheduler load to change the result. | Start a generation-owned observer before the trigger, capture an initial readback, gate acceptance until the trigger returns, and accept only a complete readback whose diagnostics value atomically reports `windowCycle` and an active preview projection while the exact expected preview marker exists. The marker is rendered only for a nonnil preview image; keep the adjacent image count as final diagnostics because its accessibility value can publish after the marker. Preserve the prewarm-before-entry contract through an ordered runtime-log Oracle established before the trigger. XCUI exposes no projection callback, so retain the shared named serial cadence. The helper owns cancellation; its named watchdog is solely a failure bound with the final diagnostics and exact-marker evidence. | H delayed presentation and preview Oracle; deterministic initial/gated/delayed/cancel/watchdog tests, 100 lifecycle Pressure, focused and repeated delayed-entry UI, Process/Tooling. | completed |
-| SYNC-035 | Direct UI settle waits in Search, Settings, Home/Logs, MRU, Space fixture and switcher workflow tests; files enumerated in the UI audit scope below | Fixed 80ms–1.2s RunLoop advances occur between input/action and assertion, so assertion timing can change results. Evidence migration. | Remove each settle wait in favor of the affected visible element, log marker, fixture generation, process state, exact frontmost CG/AX window, or nonexistence Oracle. Observer/baseline setup precedes the action. | H; affected UI suites and matching Behavior coverage. | in progress; SYNC-035A, SYNC-035B, and the Logs projection settle path are completed, with remaining owners split into later slices |
+| SYNC-035 | Direct UI settle waits in Search, Settings, Home/Logs, MRU, Space fixture and switcher workflow tests; files enumerated in the UI audit scope below | Fixed 80ms–1.2s RunLoop advances occur between input/action and assertion, so assertion timing can change results. Evidence migration. | Remove each settle wait in favor of the affected visible element, log marker, fixture generation, process state, exact frontmost CG/AX window, or nonexistence Oracle. Observer/baseline setup precedes the action. | H; affected UI suites and matching Behavior coverage. | in progress; SYNC-035A–SYNC-035C and the Logs projection settle path are completed, with remaining owners split into later slices |
 | SYNC-035A | `FlowTabUITests+SystemAppMRU.dismissSwitcherAndWait`; switcher dismissal between repeated MRU triggers | A fixed 300ms RunLoop advance after Escape assumes the previous panel has disappeared before the next trigger. | Establish an XCTest nonexistence expectation for the exact switcher summary before Escape, then require that persistent UI state to become absent. The named dismissal watchdog is only a failure bound and reports the final switcher hierarchy. The helper invocation owns the expectation. | H repeated UI presentation; System MRU UI and repeated-path Pressure, Process/Tooling. | completed |
 | SYNC-035B | `FlowTabUITests+Support.commitEditing`, `+ElementValueObservation.assertTriggerMakesValue`, and `testSettingsWindowBehaviorDelayAndTogglesPersistAcrossRelaunch`; delay-input commit | A fixed 200ms RunLoop advance after Tab assumes AppKit ended editing, normalized the value, and republished its accessibility value. | Start the generation-owned element-value observer before Tab, reject a matching baseline until the trigger returns, and accept only the exact normalized `1.23` accessibility readback. XCUI exposes no value-publication callback, so retain the shared serial named cadence. The helper invocation owns cancellation; its watchdog is solely a failure bound with acceptance state and last exact value. | H Settings UI commit Oracle; deterministic owner regression, affected Settings UI, Process/Tooling. | completed |
+| SYNC-035C | `FlowTabUITests+SpaceFixtureOptionTabNoisyRoundTrip.selectNoisyOptionTabWindow`; noisy Option-Tab selected-window advance | A fixed 250ms RunLoop advance after each delivered `.advanceRight` command assumes the switcher has published the next selected window before reading its title and ID. | Establish a generation-owned diagnostics observer before each command, retain the current exact CG window number as the baseline, gate acceptance until command delivery returns, and close the synchronous race with an immediate readback. Accept only one atomic diagnostics value containing window-cycle mode, a nonempty title, the canonical `cg:<pid>:<windowNumber>` stable identity, and a CG window number different from the baseline. XCUI exposes no diagnostics-publication callback, so retain the shared named serial cadence. The helper owns cancellation; its watchdog is solely a failure bound with the final atomic readback. | H noisy fullscreen/off-Space UI Oracle; deterministic identity/gating/cancel/watchdog tests, lifecycle Pressure, affected real-topology UI, Process/Tooling. | completed |
 | SYNC-036 | All literal XCTest timeouts in `FlowTabTests` and `FlowTabUITests` | 606 literal durations are generally terminal bounds for an independent expectation or XCUI predicate, but policy ownership and diagnostic tiers are implicit. Watchdog. | Replace literals with named app-test and UI-test watchdog policies by operation class; preserve expectation/predicate success Oracles and include unmet condition plus last observation in custom waits. Test case/helper owner supplies cleanup. | M mechanical/test infra; Unit/Behavior/UI, Process/Tooling. | planned |
 | SYNC-037 | `scripts/perf/tab-switch-stress.sh`, `search-committed-index-pressure.sh`, `runtime-topology-pressure.sh`, `lib/runtime-topology-target.sh` | Sampling duration/cadence and identity stability windows are pressure/safety protocols; process termination loops use unnamed 100ms cadence and attempt bounds. Domain duration/conditional observation/watchdog. | Retain measurement durations and sample cadence as named protocol inputs. Name process polling cadence/watchdogs, check state immediately, terminate from PID/start-identity/readback, and report the final `ps`/identity/status evidence. Traps own cancellation and cleanup. | M tooling/hot path; Pressure and Process/Tooling. | verification-needed |
 | SYNC-038 | `scripts/release/release-install.sh`, `scripts/release/uninstall-flowtab.js` | A fixed one-second delay assumes FlowTab exited before replacement or deletion. Evidence migration. | Wait on exact process absence/identity readback immediately after quit/TERM, with a named watchdog and last PID/state diagnostic before mutating installed resources. The install/uninstall command owns cleanup. | M release tooling; Process/Tooling and release contract tests. | planned |
@@ -6194,3 +6195,65 @@ polling cadence, deadline, or timeout in the scoped paths.
   serial scheduler, and does not change application runtime behavior.
 - Commit: `881cca7be035f367bf8f72cae23bf32d37c70ed1`
   (`test(sync): migrate SYNC-035B settings commit`).
+
+### SYNC-035C Closure Record
+
+- Design and Oracle: every noisy Option-Tab `.advanceRight` now establishes a
+  generation-owned diagnostics observer before command delivery. The current
+  exact CG window number is the baseline and acceptance remains gated until
+  delivery returns. An immediate trigger readback closes the synchronous
+  completion race. Success requires one atomic diagnostics value with
+  window-cycle mode, a nonempty title, the canonical
+  `cg:<pid>:<windowNumber>` identity with positive components, and a window
+  number different from the baseline. The existing ordered-prefix and exact
+  activation assertions remain the independent product Oracle.
+- Lifecycle and retained cadence: each helper invocation owns registration,
+  generation, waiting, cancellation, and cleanup. XCUI exposes no publication
+  callback for the diagnostics accessibility value, so the shared named 100ms
+  serial readback cadence remains the conditional-observation policy. The
+  named four-second watchdog is solely a terminal failure bound and reports
+  acceptance state, baseline identity, mode, selected identity/title/number,
+  completeness, generation, source, and the final raw diagnostics value.
+- Deterministic regression and lifecycle Pressure: the canonical owner run
+  passed 5/5 with zero failures in 1.030 seconds under
+  `.build-local/evidence-driven-sync/SYNC-035C/owner-current-attempt-001`.
+  Coverage includes observer registration before the initial readback,
+  pre-trigger evidence gating, the synchronous trigger race, complete and
+  malformed CG identities, same-title identity transitions, 100
+  cancel/restart generations with stale and duplicate callbacks, and watchdog
+  final-evidence diagnostics.
+- UI affected path: the current-source fixed-path app was rebuilt, signed, and
+  verified with Team `96PUA726W9` under
+  `.build-local/evidence-driven-sync/SYNC-035C/app-build-current-001`.
+  The four-window noisy fullscreen/off-Space round trip passed 1/1 in 58.704
+  seconds under
+  `.build-local/evidence-driven-sync/SYNC-035C/affected-ui-current-attempt-001`.
+  It selected and confirmed both normal windows and both fullscreen siblings,
+  preserving the exact app-local order and activation result across repeated
+  switcher presentations.
+- Real-topology Pressure: the same four-window scenario passed 1/1 in 59.254
+  seconds with a 500ms sampling cadence under
+  `.build-local/evidence-driven-sync/SYNC-035C/runtime-topology-pressure-current-attempt-001`.
+  All 83 PID identity checks matched the frozen fixed-App contract across
+  5,232.261ms, with 22 candidate observations and zero rejected transient
+  identities. CPU average/p95/max was 93.02/141.20/152.70 percent and RSS
+  average/p95/max was 167.72/226.27/279.09 MiB. These values remain within the
+  recent same-machine SYNC-040 range for the same topology path; scheduling
+  pressure changed elapsed work and sampling density while preserving every
+  exact selection and activation result. The private identity-manifest
+  SHA-256 is
+  `a1884a7130536a45a2febfce94089a57423abc62a7163c40f9c93d52b04a8808`.
+- Process/Tooling: all three canonical wrapper status files and the nested
+  Pressure UI status report `stage=completed`, zero final/build/signing/test
+  exit codes, valid result bundles, successful sampling, and exact identity
+  matching. The three changed Swift files parse, the Xcode project plist is
+  valid, each new source has one file/build reference and one group/Sources
+  membership, and the raw 250ms RunLoop advance is absent. The owner,
+  regression, and migrated caller files are 243, 287, and 323 lines.
+  `git diff --check` passes. Startup `prompts.zip` remains unchanged and
+  outside the slice.
+- Unit, Behavior, and FlowTabCore: not relevant because this slice changes one
+  UI-test Oracle and its test-owned observation infrastructure, with no
+  application or core-domain runtime behavior change.
+- Commit: pending current-slice local commit
+  (`test(sync): migrate SYNC-035C window selection`).
