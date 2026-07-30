@@ -84,14 +84,6 @@ private extension FlowTabUITestAppIdentity {
     }
 }
 
-struct SwitcherWindowCardObservation: Equatable {
-    let identifier: String
-    let title: String
-    let value: String
-    let frame: CGRect
-    let hasImage: Bool
-}
-
 private extension String {
     var trimmedFlowTabUITestValue: String {
         trimmingCharacters(in: .whitespacesAndNewlines)
@@ -544,42 +536,6 @@ extension FlowTabUITests {
         }
         return element.label
     }
-    func switcherWindowCardObservations(in app: XCUIApplication) -> [SwitcherWindowCardObservation] {
-        var seenIdentifiers: Set<String> = []
-        return app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "flowtab.switcher.window."))
-            .allElementsBoundByAccessibilityElement
-            .compactMap { element -> SwitcherWindowCardObservation? in
-                guard element.exists else { return nil }
-                let identifier = element.identifier
-                guard seenIdentifiers.insert(identifier).inserted else { return nil }
-                let title = element.label.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !title.isEmpty else { return nil }
-                let value = elementStringValue(element)
-                let frame = element.frame
-                let imageMarker = self.element(
-                    in: app,
-                    identifier: previewImageIdentifier(for: identifier)
-                )
-                return SwitcherWindowCardObservation(
-                    identifier: identifier,
-                    title: title,
-                    value: value,
-                    frame: frame,
-                    hasImage: value.contains("preview=image") || imageMarker.exists
-                )
-            }
-    }
-
-    func previewImageIdentifier(for windowIdentifier: String) -> String {
-        let windowPrefix = "flowtab.switcher.window."
-        let imagePrefix = "flowtab.switcher.window-preview-image."
-        guard windowIdentifier.hasPrefix(windowPrefix) else {
-            return "\(imagePrefix)\(windowIdentifier)"
-        }
-        return imagePrefix + windowIdentifier.dropFirst(windowPrefix.count)
-    }
-
     func waitForLogs(
         in app: XCUIApplication,
         containing markers: [String],

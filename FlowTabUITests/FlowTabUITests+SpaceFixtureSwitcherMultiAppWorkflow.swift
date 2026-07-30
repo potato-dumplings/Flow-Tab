@@ -183,7 +183,22 @@ extension FlowTabUITests {
             var previousWindowCardIdentifiers: Set<String> = []
             for workflowApp in workflow.apps {
                 selectSwitcherWorkflowApp(workflowApp, in: app, diagnosticsSummary: diagnosticsSummary)
-                app.typeKey(.downArrow, modifierFlags: [])
+                let windowCards = try assertSwitcherPreviewWindowCards(
+                    in: app,
+                    diagnosticsSummary: diagnosticsSummary,
+                    selectedApp: workflowApp,
+                    excludedTitles: workflow.otherExpectedWindowTitles(
+                        excluding: workflowApp.appID
+                    ),
+                    previousWindowCardIdentifiers:
+                        previousWindowCardIdentifiers,
+                    trigger: {
+                        app.typeKey(
+                            .downArrow,
+                            modifierFlags: []
+                        )
+                    }
+                )
                 let selectedApp = try XCTUnwrap(
                     matchedWorkflowAppForVisibleSwitcherPreview(
                         workflow,
@@ -201,19 +216,17 @@ extension FlowTabUITests {
                     ))
                     """
                 )
+                XCTAssertEqual(
+                    selectedApp.appID,
+                    workflowApp.appID,
+                    "Switcher cards should belong to the explicitly selected workflow app"
+                )
                 XCTAssertFalse(
                     observedAppIDs.contains(selectedApp.appID),
                     "Switcher app cycle repeated \(selectedApp.appName) before visiting every workflow app"
                 )
                 observedAppIDs.append(selectedApp.appID)
 
-                let windowCards = try assertSwitcherPreviewWindowCards(
-                    in: app,
-                    diagnosticsSummary: diagnosticsSummary,
-                    selectedApp: selectedApp,
-                    excludedTitles: workflow.otherExpectedWindowTitles(excluding: selectedApp.appID),
-                    previousWindowCardIdentifiers: previousWindowCardIdentifiers
-                )
                 previousWindowCardIdentifiers = Set(windowCards.map(\.identifier))
 
                 app.typeKey(.upArrow, modifierFlags: [])
@@ -872,58 +885,54 @@ extension FlowTabUITests {
         selectedApp: SpaceFixtureResolvedWorkflow.App,
         excludedTitles: [String],
         previousWindowCardIdentifiers: Set<String>,
-        timeout: TimeInterval = 8
+        timeout: TimeInterval = 8,
+        trigger: () -> Void
     ) throws -> [SwitcherWindowCardObservation] {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestCards: [SwitcherWindowCardObservation] = []
-        repeat {
-            latestCards = switcherWindowCardObservations(in: app)
-            let latestTitles = Set(latestCards.map(\.title))
-            let expectedTitles = Set(selectedApp.expectedWindowTitles)
-            let currentCardIdentifiers = Set(latestCards.map(\.identifier))
-            let oldCardsWereRemoved = previousWindowCardIdentifiers.isEmpty
-                || currentCardIdentifiers.isDisjoint(with: previousWindowCardIdentifiers)
-            let excludedTitlesAreAbsent = latestTitles.isDisjoint(with: Set(excludedTitles))
+        let expectation =
+            FlowTabUITestSwitcherWindowCardExpectation(
+                expectedTitles: selectedApp.expectedWindowTitles,
+                excludedTitles: excludedTitles,
+                previousWindowCardIdentifiers:
+                    previousWindowCardIdentifiers
+            )
+        var triggerDidComplete = false
+        let owner =
+            FlowTabUITestSwitcherWindowCardObservationOwner(
+                expectation: expectation,
+                acceptsResolution: {
+                    triggerDidComplete
+                },
+                readback: {
+                    FlowTabUITestSwitcherWindowCardSnapshot(
+                        cards:
+                            self.switcherWindowCardObservations(
+                                in: app
+                            )
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+        trigger()
+        triggerDidComplete = true
 
-            if latestTitles == expectedTitles,
-               latestCards.count == selectedApp.expectedWindowTitles.count,
-               excludedTitlesAreAbsent,
-               oldCardsWereRemoved {
-                return latestCards
-            }
+        if let evidence = owner.waitForResolution(
+            timeout: timeout
+        ) {
+            return evidence.value.cards
+        }
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTAssertEqual(
-            Set(latestCards.map(\.title)),
-            Set(selectedApp.expectedWindowTitles),
+        XCTFail(
             """
-            Expected real switcher window card anchors for \(selectedApp.appName) to expose \
-            \(selectedApp.expectedWindowTitles.sorted()), found \(latestCards.map(\.title).sorted()).
+            Switcher window-card identity watchdog expired for \
+            \(selectedApp.appName).
+
+            \(owner.diagnosticSummary)
 
             \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
             """
         )
-        XCTAssertTrue(
-            Set(latestCards.map(\.title)).isDisjoint(with: Set(excludedTitles)),
-            """
-            Switcher preview kept window card anchors from another workflow app.
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-        XCTAssertTrue(
-            previousWindowCardIdentifiers.isEmpty
-                || Set(latestCards.map(\.identifier)).isDisjoint(with: previousWindowCardIdentifiers),
-            """
-            Switcher preview kept stale window card anchors after switching apps.
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-
-        return latestCards
+        return owner.latestSnapshot?.cards ?? []
     }
 
     func waitForSearchWindowResult(
