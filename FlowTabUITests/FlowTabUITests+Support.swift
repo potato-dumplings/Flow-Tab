@@ -536,29 +536,6 @@ extension FlowTabUITests {
         }
         return element.label
     }
-    func waitForLogs(
-        in app: XCUIApplication,
-        containing markers: [String],
-        timeout: TimeInterval = 8
-    ) {
-        let logsLines = app.descendants(matching: .any)
-            .matching(identifier: Identifier.logsLines)
-            .firstMatch
-        XCTAssertTrue(logsLines.waitForExistence(timeout: timeout), "Missing logs container")
-
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestValue = ""
-        repeat {
-            latestValue = elementStringValue(logsLines)
-            if markers.allSatisfy({ latestValue.contains($0) }) {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        } while Date() < deadline
-
-        let missingMarkers = markers.filter { !latestValue.contains($0) }
-        XCTFail("Missing log markers \(missingMarkers). Latest logs: \(latestValue)")
-    }
     func makeRuntimeLogFileSnapshot() -> [String: UInt64] {
         runtimeLogFiles().reduce(into: [:]) { result, url in
             guard let size = runtimeLogFileSize(url) else { return }
@@ -700,66 +677,6 @@ extension FlowTabUITests {
             return
         }
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-    }
-    func assertLogVisibility(
-        at logLevel: String,
-        visibleIdentifiers: [String],
-        hiddenIdentifiers: [String]
-    ) {
-        let app = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-seed-logs",
-                "4",
-                "--flowtab-ui-runtime-log-level",
-                logLevel,
-                "-showPermissionReminder",
-                "NO"
-            ]
-        )
-        launchFlowTabUITestApplication(app)
-        defer {
-            if app.state == .runningForeground || app.state == .runningBackground {
-                app.terminate()
-            }
-        }
-
-        XCTAssertTrue(
-            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsTabButton), timeout: 5),
-            "Failed to open logs tab at level \(logLevel)"
-        )
-
-        let logsTabContent = app.descendants(matching: .any)
-            .matching(identifier: Identifier.logsTabContent)
-            .firstMatch
-        XCTAssertTrue(logsTabContent.waitForExistence(timeout: 5), "Missing logs tab content at level \(logLevel)")
-
-        let logsLines = app.descendants(matching: .any)
-            .matching(identifier: Identifier.logsLines)
-            .firstMatch
-        XCTAssertTrue(logsLines.waitForExistence(timeout: 8), "Missing logs container at level \(logLevel)")
-
-        for identifier in visibleIdentifiers {
-            let line = app.descendants(matching: .any)
-                .matching(identifier: identifier)
-                .firstMatch
-            XCTAssertTrue(
-                line.waitForExistence(timeout: 8),
-                "Expected visible log row \(identifier) at level \(logLevel)"
-            )
-        }
-
-        RunLoop.current.run(until: Date().addingTimeInterval(1.2))
-
-        for identifier in hiddenIdentifiers {
-            let line = app.descendants(matching: .any)
-                .matching(identifier: identifier)
-                .firstMatch
-            XCTAssertFalse(
-                line.exists,
-                "Expected hidden log row \(identifier) at level \(logLevel)"
-            )
-        }
     }
     func waitForNonExistence(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
         let predicate = NSPredicate(format: "exists == false")
