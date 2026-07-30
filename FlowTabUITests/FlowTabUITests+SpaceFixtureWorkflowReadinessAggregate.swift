@@ -34,7 +34,8 @@ final class SpaceFixtureWorkflowReadinessAggregateObservationOwner {
         self.center = center
     }
 
-    func start() {
+    @discardableResult
+    func start() -> Int {
         cancel()
         readySnapshot = nil
         let expectation = XCTestExpectation(
@@ -58,21 +59,19 @@ final class SpaceFixtureWorkflowReadinessAggregateObservationOwner {
                 object: nil,
                 queue: .main
             ) { [weak self] notification in
-                guard let evidence =
+                self?.observeNotificationEvent(
                     SpaceFixtureWorkflowReadinessTransport
-                        .evidence(from: notification)
-                else {
-                    return
-                }
-                self?.aggregateOwner.observe(
-                    evidence,
-                    for:
-                        entry.expectation.workflowAppID,
+                        .evidence(from: notification),
+                    for: entry,
                     observationGeneration:
                         aggregateGeneration
                 )
             }
         }
+        observeReadbackEvidence(
+            observationGeneration: aggregateGeneration
+        )
+        return aggregateGeneration
     }
 
     func fixtureLaunchArguments(
@@ -111,21 +110,57 @@ final class SpaceFixtureWorkflowReadinessAggregateObservationOwner {
         guard let aggregateGeneration else {
             return
         }
+        observeReadbackEvidence(
+            observationGeneration: aggregateGeneration
+        )
+    }
+
+    func observeNotificationEvent(
+        _ evidence: SpaceFixtureWorkflowReadinessEvidence?,
+        for entry:
+            SpaceFixtureWorkflowReadinessAggregateUITestEntry,
+        observationGeneration: Int
+    ) {
+        observeReadbackEvidence(
+            for: entry,
+            observationGeneration: observationGeneration
+        )
+        guard let evidence else { return }
+        aggregateOwner.observe(
+            evidence,
+            for: entry.expectation.workflowAppID,
+            observationGeneration: observationGeneration
+        )
+    }
+
+    private func observeReadbackEvidence(
+        observationGeneration: Int
+    ) {
         for entry in entries {
-            for evidence in
-                SpaceFixtureWorkflowReadinessTransport
-                    .readbackEvidence(
-                        route: entry.route.evidenceRoute
-                    )
-            {
-                aggregateOwner.observe(
-                    evidence,
-                    for:
-                        entry.expectation.workflowAppID,
-                    observationGeneration:
-                        aggregateGeneration
+            observeReadbackEvidence(
+                for: entry,
+                observationGeneration: observationGeneration
+            )
+        }
+    }
+
+    private func observeReadbackEvidence(
+        for entry:
+            SpaceFixtureWorkflowReadinessAggregateUITestEntry,
+        observationGeneration: Int
+    ) {
+        for evidence in
+            SpaceFixtureWorkflowReadinessTransport
+                .readbackEvidence(
+                    route: entry.route.evidenceRoute
                 )
-            }
+        {
+            aggregateOwner.observe(
+                evidence,
+                for: entry.expectation.workflowAppID,
+                observationGeneration:
+                    observationGeneration
+            )
         }
     }
 
@@ -274,120 +309,5 @@ extension FlowTabUITests {
                 }
             )
         }
-    }
-}
-
-extension FlowTabUITests {
-    func testSpaceFixtureWorkflowReadinessAggregateInitialReadbackRecoversPreForegroundEvidence() {
-        let routeToken = UUID().uuidString
-        let notificationName = Notification.Name(
-            "io.github.potato-dumplings.flowtab."
-                + "ui-test.fixture-workflow-readiness."
-                + routeToken
-        )
-        let readbackURL =
-            FileManager.default.temporaryDirectory
-                .appendingPathComponent(
-                    "flowtab-workflow-readiness-"
-                        + routeToken
-                        + ".plist"
-                )
-        let route =
-            SpaceFixtureWorkflowReadinessUITestRoute(
-                notificationName: notificationName,
-                readbackURL: readbackURL
-            )
-        let aggregateExpectation =
-            SpaceFixtureWorkflowReadinessAggregateExpectation(
-                workflowAppID: "readback",
-                bundleIdentifier: "fixture.readback",
-                windowPlanIndices: [1],
-                fullscreenWindowPlanIndices: [],
-                windowTitles: ["Readback"]
-            )
-        let owner =
-            SpaceFixtureWorkflowReadinessAggregateObservationOwner(
-                entries: [
-                    SpaceFixtureWorkflowReadinessAggregateUITestEntry(
-                        expectation: aggregateExpectation,
-                        route: route
-                    )
-                ]
-            )
-        defer { owner.cancel() }
-
-        owner.start()
-        SpaceFixtureWorkflowReadinessTransport
-            .recordReadbackEvidence(
-                Self.readbackAggregateEvidence(
-                    stage: .configured,
-                    transitionGeneration: 1
-                ),
-                route: route.evidenceRoute
-            )
-        SpaceFixtureWorkflowReadinessTransport
-            .recordReadbackEvidence(
-                Self.readbackAggregateEvidence(
-                    stage: .ready,
-                    transitionGeneration: 2
-                ),
-                route: route.evidenceRoute
-            )
-        XCTAssertTrue(
-            owner.diagnosticSummary.contains(
-                "unmet=[readback.configured]"
-            )
-        )
-
-        let snapshot = owner.waitForReady(timeout: 2)
-
-        XCTAssertEqual(
-            snapshot?
-                .configuredEvidenceByWorkflowAppID[
-                    "readback"
-                ]?.stage,
-            .configured
-        )
-        XCTAssertEqual(
-            snapshot?
-                .readyEvidenceByWorkflowAppID[
-                    "readback"
-                ]?.stage,
-            .ready
-        )
-        XCTAssertTrue(snapshot?.isReady == true)
-    }
-
-    private static func readbackAggregateEvidence(
-        stage: SpaceFixtureWorkflowReadinessStage,
-        transitionGeneration: UInt64
-    ) -> SpaceFixtureWorkflowReadinessEvidence {
-        let isReady = stage == .ready
-        return SpaceFixtureWorkflowReadinessEvidence(
-            observationGeneration: 1,
-            transitionGeneration: transitionGeneration,
-            stage: stage,
-            identity:
-                SpaceFixtureWorkflowReadinessIdentity(
-                    bundleIdentifier: "fixture.readback",
-                    processIdentifier: 4_321
-                ),
-            snapshot:
-                SpaceFixtureWorkflowReadinessSnapshot(
-                    expectedWindowPlanIndices: [1],
-                    observedWindowPlanIndices:
-                        isReady ? [1] : [],
-                    expectedFullscreenWindowPlanIndices:
-                        [],
-                    completedFullscreenWindowPlanIndices:
-                        [],
-                    desktopAnchorWindowPlanIndex: nil,
-                    desktopPresentationResolved: true,
-                    applicationAXSuppressionRequired:
-                        false,
-                    applicationAXExposureResolved: true,
-                    windowTitles: ["Readback"]
-                )
-        )
     }
 }
