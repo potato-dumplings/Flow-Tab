@@ -129,6 +129,100 @@ final class FlowTabUITestRuntimeLogObservationOwner {
     }
 }
 
+final class FlowTabUITestSwitcherTriggerDeliveryObservationOwner {
+    private let receiptOwner:
+        FlowTabUITestRuntimeLogObservationOwner
+    private let completionOwner:
+        FlowTabUITestRuntimeLogObservationOwner
+
+    convenience init(
+        notificationName: String,
+        baseline:
+            FlowTabUITestRuntimeLogObservationBaseline
+    ) {
+        self.init(
+            notificationName: notificationName,
+            observationRegistration:
+                baseline.observationRegistration(),
+            readback: baseline.makeReadback
+        )
+    }
+
+    init(
+        notificationName: String,
+        observationRegistration:
+            FlowTabUITestConditionObservationRegistration?,
+        readback: @escaping () ->
+            FlowTabUITestRuntimeLogSnapshot
+    ) {
+        receiptOwner =
+            FlowTabUITestRuntimeLogObservationOwner(
+                expectation: .allMarkers([
+                    "received switcher trigger notification "
+                        + "name=\(notificationName)"
+                ]),
+                observationRegistration:
+                    observationRegistration,
+                readback: readback
+            )
+        completionOwner =
+            FlowTabUITestRuntimeLogObservationOwner(
+                expectation: .allMarkers([
+                    "completed switcher trigger notification "
+                        + "name=\(notificationName) "
+                        + "presented=1 syntheticModifierHeld=1"
+                ]),
+                observationRegistration:
+                    observationRegistration,
+                readback: readback
+            )
+    }
+
+    func start() {
+        receiptOwner.start()
+        completionOwner.start()
+    }
+
+    func waitForReceipt(timeout: TimeInterval) -> Bool {
+        receiptOwner.waitForResolution(timeout: timeout)
+            != nil
+    }
+
+    func waitForCompletion(timeout: TimeInterval) -> Bool {
+        completionOwner.waitForResolution(timeout: timeout)
+            != nil
+    }
+
+    var receiptResolvedEvidence:
+        FlowTabUITestConditionEvidence<
+            FlowTabUITestRuntimeLogSnapshot
+        >?
+    {
+        receiptOwner.resolvedEvidence
+    }
+
+    var completionResolvedEvidence:
+        FlowTabUITestConditionEvidence<
+            FlowTabUITestRuntimeLogSnapshot
+        >?
+    {
+        completionOwner.resolvedEvidence
+    }
+
+    var receiptDiagnosticSummary: String {
+        receiptOwner.diagnosticSummary
+    }
+
+    var completionDiagnosticSummary: String {
+        completionOwner.diagnosticSummary
+    }
+
+    func cancel() {
+        receiptOwner.cancel()
+        completionOwner.cancel()
+    }
+}
+
 extension FlowTabUITestRuntimeLogObservationBaseline {
     func observationRegistration()
         -> FlowTabUITestConditionObservationRegistration

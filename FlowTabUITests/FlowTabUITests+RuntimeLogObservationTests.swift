@@ -5,6 +5,20 @@ private enum FlowTabUITestRuntimeLogObservationTestPolicy {
     static let watchdog: TimeInterval = 0.01
     static let fileEventWatchdog: TimeInterval = 2
     static let pressureIterations = 100
+    static let triggerNotificationName =
+        "io.github.potato-dumplings.flowtab.ui-test."
+        + "open-in-app-window-switcher"
+
+    static var triggerReceiptMarker: String {
+        "received switcher trigger notification name="
+            + triggerNotificationName
+    }
+
+    static var triggerCompletionMarker: String {
+        "completed switcher trigger notification name="
+            + triggerNotificationName
+            + " presented=1 syntheticModifierHeld=1"
+    }
 }
 
 extension FlowTabUITests {
@@ -391,5 +405,267 @@ extension FlowTabUITests {
             )
         )
         watchdogOwner.cancel()
+    }
+
+    func testSwitcherTriggerDeliveryObservationSeparatesReceiptAndCompletion() {
+        var contents = ""
+        var callbacks: [
+            (FlowTabUITestConditionObservationSource) -> Void
+        ] = []
+        var cancellationCount = 0
+        let owner =
+            FlowTabUITestSwitcherTriggerDeliveryObservationOwner(
+                notificationName:
+                    FlowTabUITestRuntimeLogObservationTestPolicy
+                        .triggerNotificationName,
+                observationRegistration: { callback in
+                    callbacks.append(callback)
+                    return FlowTabUITestObservationCancellation {
+                        cancellationCount += 1
+                    }
+                },
+                readback: {
+                    FlowTabUITestRuntimeLogSnapshot(
+                        baselineFileEventGeneration: 1,
+                        fileEventGeneration: 2,
+                        contents: contents
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertEqual(callbacks.count, 2)
+        for _ in 0..<5 {
+            callbacks[1](.scheduledReadback)
+            XCTAssertNil(
+                owner.completionResolvedEvidence
+            )
+        }
+
+        contents =
+            FlowTabUITestRuntimeLogObservationTestPolicy
+                .triggerCompletionMarker
+        callbacks[1](.notificationReadback)
+        XCTAssertNil(owner.receiptResolvedEvidence)
+        XCTAssertEqual(
+            owner.completionResolvedEvidence?.source,
+            .notificationReadback
+        )
+
+        contents =
+            FlowTabUITestRuntimeLogObservationTestPolicy
+                .triggerReceiptMarker
+            + "\n"
+            + FlowTabUITestRuntimeLogObservationTestPolicy
+                .triggerCompletionMarker
+        callbacks[0](.notificationReadback)
+        XCTAssertTrue(
+            owner.waitForReceipt(
+                timeout:
+                    FlowTabUITestRuntimeLogObservationTestPolicy
+                        .watchdog
+            )
+        )
+
+        XCTAssertTrue(
+            owner.waitForCompletion(
+                timeout:
+                    FlowTabUITestRuntimeLogObservationTestPolicy
+                        .watchdog
+            )
+        )
+        XCTAssertEqual(
+            owner.receiptResolvedEvidence?.source,
+            .notificationReadback
+        )
+        XCTAssertEqual(
+            owner.completionResolvedEvidence?.source,
+            .notificationReadback
+        )
+        XCTAssertEqual(cancellationCount, 2)
+    }
+
+    func testSwitcherTriggerDeliveryObservationAcceptsInitialCompletedProjection() {
+        var cancellationCount = 0
+        let contents =
+            FlowTabUITestRuntimeLogObservationTestPolicy
+                .triggerReceiptMarker
+            + "\n"
+            + FlowTabUITestRuntimeLogObservationTestPolicy
+                .triggerCompletionMarker
+        let owner =
+            FlowTabUITestSwitcherTriggerDeliveryObservationOwner(
+                notificationName:
+                    FlowTabUITestRuntimeLogObservationTestPolicy
+                        .triggerNotificationName,
+                observationRegistration: { _ in
+                    FlowTabUITestObservationCancellation {
+                        cancellationCount += 1
+                    }
+                },
+                readback: {
+                    FlowTabUITestRuntimeLogSnapshot(
+                        baselineFileEventGeneration: 4,
+                        fileEventGeneration: 5,
+                        contents: contents
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertEqual(
+            owner.receiptResolvedEvidence?.source,
+            .initialReadback
+        )
+        XCTAssertEqual(
+            owner.completionResolvedEvidence?.source,
+            .initialReadback
+        )
+        XCTAssertEqual(cancellationCount, 2)
+    }
+
+    func testSwitcherTriggerDeliveryObservationRejectsStaleCallbacksUnderPressure() {
+        for iteration in
+            0..<FlowTabUITestRuntimeLogObservationTestPolicy
+                .pressureIterations
+        {
+            var contents = ""
+            var callbacks: [
+                (FlowTabUITestConditionObservationSource) -> Void
+            ] = []
+            var cancellationCount = 0
+            var readbackCount = 0
+            let owner =
+                FlowTabUITestSwitcherTriggerDeliveryObservationOwner(
+                    notificationName:
+                        FlowTabUITestRuntimeLogObservationTestPolicy
+                            .triggerNotificationName,
+                    observationRegistration: { callback in
+                        callbacks.append(callback)
+                        return FlowTabUITestObservationCancellation {
+                            cancellationCount += 1
+                        }
+                    },
+                    readback: {
+                        readbackCount += 1
+                        return FlowTabUITestRuntimeLogSnapshot(
+                            baselineFileEventGeneration: 7,
+                            fileEventGeneration: 8,
+                            contents: contents
+                        )
+                    }
+                )
+            owner.start()
+            let staleCallbacks = callbacks
+            owner.cancel()
+            owner.start()
+            XCTAssertEqual(callbacks.count, 4)
+
+            contents =
+                FlowTabUITestRuntimeLogObservationTestPolicy
+                    .triggerReceiptMarker
+                + "\n"
+                + FlowTabUITestRuntimeLogObservationTestPolicy
+                    .triggerCompletionMarker
+            let readbackCountBeforeStaleCallbacks =
+                readbackCount
+            staleCallbacks.forEach {
+                $0(.notificationReadback)
+            }
+            XCTAssertEqual(
+                readbackCount,
+                readbackCountBeforeStaleCallbacks,
+                "iteration=\(iteration)"
+            )
+            XCTAssertNil(owner.receiptResolvedEvidence)
+            XCTAssertNil(
+                owner.completionResolvedEvidence
+            )
+
+            callbacks[2](.notificationReadback)
+            callbacks[3](.notificationReadback)
+            XCTAssertTrue(
+                owner.waitForReceipt(
+                    timeout:
+                        FlowTabUITestRuntimeLogObservationTestPolicy
+                            .watchdog
+                )
+            )
+            XCTAssertTrue(
+                owner.waitForCompletion(
+                    timeout:
+                        FlowTabUITestRuntimeLogObservationTestPolicy
+                            .watchdog
+                )
+            )
+            let resolvedReadbackCount = readbackCount
+            callbacks[2](.notificationReadback)
+            callbacks[3](.notificationReadback)
+            XCTAssertEqual(
+                readbackCount,
+                resolvedReadbackCount,
+                "iteration=\(iteration)"
+            )
+            XCTAssertEqual(
+                cancellationCount,
+                4,
+                "iteration=\(iteration)"
+            )
+            owner.cancel()
+        }
+    }
+
+    func testSwitcherTriggerDeliveryObservationWatchdogReportsMissingCompletion() {
+        let owner =
+            FlowTabUITestSwitcherTriggerDeliveryObservationOwner(
+                notificationName:
+                    FlowTabUITestRuntimeLogObservationTestPolicy
+                        .triggerNotificationName,
+                observationRegistration: nil,
+                readback: {
+                    FlowTabUITestRuntimeLogSnapshot(
+                        baselineFileEventGeneration: 10,
+                        fileEventGeneration: 12,
+                        contents:
+                            FlowTabUITestRuntimeLogObservationTestPolicy
+                                .triggerReceiptMarker
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertTrue(
+            owner.waitForReceipt(
+                timeout:
+                    FlowTabUITestRuntimeLogObservationTestPolicy
+                        .watchdog
+            )
+        )
+        XCTAssertFalse(
+            owner.waitForCompletion(
+                timeout:
+                    FlowTabUITestRuntimeLogObservationTestPolicy
+                        .watchdog
+            )
+        )
+        XCTAssertTrue(
+            owner.completionDiagnosticSummary.contains(
+                "source=watchdogReadback"
+            )
+        )
+        XCTAssertTrue(
+            owner.completionDiagnosticSummary.contains(
+                "presented=1 syntheticModifierHeld=1"
+            )
+        )
+        XCTAssertTrue(
+            owner.completionDiagnosticSummary.contains(
+                FlowTabUITestRuntimeLogObservationTestPolicy
+                    .triggerReceiptMarker
+            )
+        )
     }
 }

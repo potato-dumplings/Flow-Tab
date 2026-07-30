@@ -15,6 +15,13 @@ private enum FlowTabUITestInitialSearchReadinessPolicy {
     static let watchdogFailureObservationTimeout: TimeInterval = 35
 }
 
+private enum FlowTabUITestSwitcherTriggerDeliveryPolicy {
+    static let receiptWatchdogFailureObservationTimeout:
+        TimeInterval = 4
+    static let presentationCompletionWatchdogFailureObservationTimeout:
+        TimeInterval = 12
+}
+
 private enum FlowTabUITestAppDefaults {
     static let defaultBundleIdentifier = "io.github.potato-dumplings.flowtab"
 
@@ -324,17 +331,46 @@ extension FlowTabUITests {
     func postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
         _ trigger: FlowTabUITestSwitcherTrigger,
         traceLabel: String,
-        timeout: TimeInterval = 4
+        receiptTimeout: TimeInterval =
+            FlowTabUITestSwitcherTriggerDeliveryPolicy
+                .receiptWatchdogFailureObservationTimeout,
+        completionTimeout: TimeInterval =
+            FlowTabUITestSwitcherTriggerDeliveryPolicy
+                .presentationCompletionWatchdogFailureObservationTimeout
     ) {
         let logSnapshot = makeRuntimeLogFileSnapshot()
+        let owner =
+            FlowTabUITestSwitcherTriggerDeliveryObservationOwner(
+                notificationName:
+                    trigger.notificationName.rawValue,
+                baseline: logSnapshot
+            )
+        owner.start()
+        defer { owner.cancel() }
+
         postFlowTabUITestSwitcherTrigger(trigger, traceLabel: traceLabel)
-        waitForRuntimeLogFiles(
-            containing: [
-                "completed switcher trigger notification name=\(trigger.notificationName.rawValue) presented=1 syntheticModifierHeld=1"
-            ],
-            since: logSnapshot,
-            timeout: timeout
-        )
+        guard owner.waitForReceipt(timeout: receiptTimeout)
+        else {
+            XCTFail(
+                "Switcher trigger receipt watchdog expired "
+                    + "in \(logSnapshot.logsDirectoryURL.path). "
+                    + owner.receiptDiagnosticSummary
+            )
+            return
+        }
+        guard
+            owner.waitForCompletion(
+                timeout: completionTimeout
+            )
+        else {
+            XCTFail(
+                "Switcher presentation completion watchdog "
+                    + "expired in "
+                    + "\(logSnapshot.logsDirectoryURL.path). "
+                    + owner.completionDiagnosticSummary
+            )
+            return
+        }
     }
 
     func postFlowTabUITestSwitcherCommandAndWaitForDelivery(

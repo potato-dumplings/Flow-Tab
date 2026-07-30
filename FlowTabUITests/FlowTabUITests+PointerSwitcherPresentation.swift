@@ -80,7 +80,10 @@ extension FlowTabUITests {
         postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
             trigger,
             traceLabel: traceLabel,
-            timeout:
+            receiptTimeout:
+                FlowTabUITestPointerSwitcherPresentationPolicy
+                    .triggerDeliveryWatchdog,
+            completionTimeout:
                 FlowTabUITestPointerSwitcherPresentationPolicy
                     .triggerDeliveryWatchdog
         )
