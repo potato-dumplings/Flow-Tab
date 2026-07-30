@@ -554,37 +554,6 @@ extension FlowTabUITests {
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
-    func waitForFocusedWorkflowWindow(
-        title: String,
-        app workflowApp: SpaceFixtureResolvedWorkflow.App,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestFrontmostBundleIdentifier: String?
-        var latestFocusedTitle: String?
-        repeat {
-            latestFrontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            latestFocusedTitle = activeWindowTitle(forBundleIdentifier: workflowApp.identity.bundleIdentifier)
-            if latestFrontmostBundleIdentifier == workflowApp.identity.bundleIdentifier,
-               (
-                   latestFocusedTitle == title
-                       || workflowWindowTitleIsObservable(title, app: workflowApp)
-               ) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected frontmost window \(workflowApp.appName) / \(title), \
-            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil") \
-            with active window title \(latestFocusedTitle ?? "nil").
-            """
-        )
-        return false
-    }
-
     func waitForFrontmostWorkflowWindow(
         windowNumber: CGWindowID,
         title: String,
