@@ -718,32 +718,10 @@ extension FlowTabUITests {
         )
         return false
     }
-    func assertValue(of element: XCUIElement, equals expectedValue: String, timeout: TimeInterval = 5) {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if element.exists && elementStringValue(element) == expectedValue {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        XCTFail("Expected value '\(expectedValue)' for \(element.identifier), actual: '\(elementStringValue(element))'")
-    }
     private func windowTitleCounts(_ titles: [String]) -> [String: Int] {
         titles.reduce(into: [:]) { counts, title in
             counts[title, default: 0] += 1
         }
-    }
-    func assertValuePrefix(of element: XCUIElement, expectedPrefix: String, timeout: TimeInterval = 5) {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if element.exists && elementStringValue(element).hasPrefix(expectedPrefix) {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        XCTFail(
-            "Expected prefix '\(expectedPrefix)' for \(element.identifier), actual: '\(elementStringValue(element))'"
-        )
     }
     func waitForLogs(
         in app: XCUIApplication,
