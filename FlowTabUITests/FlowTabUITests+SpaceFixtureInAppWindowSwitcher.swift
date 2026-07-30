@@ -41,7 +41,7 @@ extension FlowTabUITests {
         )
         let fullscreenTitle = try XCTUnwrap(fullscreenWindowTitle(in: targetApp))
         let standardTitle = try XCTUnwrap(firstStandardWindowTitle(in: targetApp))
-        var runtimeLogSnapshot = makeRuntimeLogFileSnapshot()
+        let runtimeLogSnapshot = makeRuntimeLogFileSnapshot()
 
         try runRealSpaceFixtureWorkflow(
             workflow,
@@ -217,7 +217,8 @@ extension FlowTabUITests {
         diagnosticsSummary initialDiagnosticsSummary: XCUIElement,
         primaryFullscreenTitle: String,
         traceLabel: String,
-        runtimeLogSnapshot: [String: UInt64]
+        runtimeLogSnapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) throws {
         let standardTitles = standardWindowTitles(in: targetApp)
         let normalOneTitle = try XCTUnwrap(
@@ -383,7 +384,8 @@ extension FlowTabUITests {
     }
 
     private func assertNoisyInAppFilteredCGOnlyArtifactSource(
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         waitForRuntimeLogFiles(
             matching: #"Chrome Fixture (filtered-fullscreen-((sibling|host)-artifacts stage=(pre-dedupe|presentation|window-record-projection|read-model-current-app-normalization)|duplicate-surfaces stage=(presentation-final|window-record-projection|read-model-current-app-normalization))|filtered-cg-only-covered-by-activation stage=read-model-current-app-normalization) dropped=[1-9][0-9]*"#,
@@ -396,7 +398,8 @@ extension FlowTabUITests {
     private func assertNoisyInAppWindowLayerSource(
         _ selection: InAppWindowSelection,
         phaseTrace: String,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
         waitForRuntimeLogFiles(
@@ -411,7 +414,8 @@ extension FlowTabUITests {
         _ selection: InAppWindowSelection,
         appID: String,
         phaseTrace: String,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         let escapedAppID = NSRegularExpression.escapedPattern(for: appID)
         let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
@@ -426,7 +430,8 @@ extension FlowTabUITests {
     private func assertNoisyInAppVerifiedFocusReadback(
         _ selection: InAppWindowSelection,
         phaseTrace: String,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         waitForRuntimeLogFiles(
             matching: "binding-confidence-change windowID=cg:[0-9]+:\(selection.windowNumber) cg=\(selection.windowNumber) .* source=.*->verifiedFocusReadback",

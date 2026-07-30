@@ -39,7 +39,8 @@ struct FlowTabUITestWorkflowAppOrderEvidence: Equatable {
 extension FlowTabUITests {
     func testSystemAppMRURebuildsForEveryFlowTabProcessSession() throws {
         let workflow = try configuredSystemAppMRUFixtureWorkflow()
-        var initialLaunchLogSnapshot: [String: UInt64] = [:]
+        var initialLaunchLogSnapshot =
+            makeRuntimeLogFileSnapshot()
         let launchArguments = [
             "--flowtab-ui-listen-switcher-trigger",
             "--flowtab-ui-runtime-log-level", "DEBUG",

@@ -7,7 +7,8 @@ extension FlowTabUITests {
         initialDiagnosticsSummary: XCUIElement,
         primaryFullscreenTitle: String,
         traceLabel: String,
-        runtimeLogSnapshot: [String: UInt64]
+        runtimeLogSnapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) throws {
         let standardTitles = standardWorkflowWindowTitles(in: targetApp)
         let normalOneTitle = try XCTUnwrap(
@@ -147,7 +148,8 @@ extension FlowTabUITests {
     }
 
     private func assertNoisyOptionTabFilteredCGOnlyArtifactSource(
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         waitForRuntimeLogFiles(
             matching: #"Chrome Fixture filtered-fullscreen-((sibling|host)-artifacts stage=(pre-dedupe|presentation)|duplicate-surfaces stage=presentation-final) dropped=[1-9][0-9]*"#,
@@ -160,7 +162,8 @@ extension FlowTabUITests {
     private func assertNoisyOptionTabWindowLayerSource(
         _ selection: RuntimeTruthWindowSelection,
         phaseTrace: String,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
         waitForRuntimeLogFiles(
@@ -175,7 +178,8 @@ extension FlowTabUITests {
         _ selection: RuntimeTruthWindowSelection,
         appID: String,
         phaseTrace: String,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         let escapedAppID = NSRegularExpression.escapedPattern(for: appID)
         let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)

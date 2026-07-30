@@ -188,7 +188,8 @@ extension FlowTabUITests {
     private func waitForSpaceBackedWindowLayerProjection(
         title: String,
         appName: String,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         let escapedAppName = NSRegularExpression.escapedPattern(for: appName)
         let escapedTitle = NSRegularExpression.escapedPattern(for: title)
@@ -203,7 +204,8 @@ extension FlowTabUITests {
     private func assertSpaceBackedWindowLayerSource(
         _ selection: RuntimeTruthWindowSelection,
         appName: String,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         let escapedAppName = NSRegularExpression.escapedPattern(for: appName)
         let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
@@ -218,7 +220,8 @@ extension FlowTabUITests {
     private func assertSpaceBackedWindowRequestSource(
         _ selection: RuntimeTruthWindowSelection,
         appID: String,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         let escapedAppID = NSRegularExpression.escapedPattern(for: appID)
         let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
@@ -232,7 +235,8 @@ extension FlowTabUITests {
 
     private func assertSpaceBackedCGActivationRoute(
         _ selection: RuntimeTruthWindowSelection,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         waitForRuntimeLogFiles(
             matching: #"focus-attempt route=cg result=[a-zA-Z]+ pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) targetCG=\#(selection.windowNumber)"#,
@@ -244,7 +248,8 @@ extension FlowTabUITests {
 
     private func assertSpaceBackedCGActivationReadbackFailure(
         _ selection: RuntimeTruthWindowSelection,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         waitForRuntimeLogFiles(
             matching: #"binding-readback-mismatch route=cg pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) reason=targetCGNotVisible targetCG=\#(selection.windowNumber)"#,
@@ -262,7 +267,8 @@ extension FlowTabUITests {
 
     private func assertHiddenProvisionalCGOnlyRuntimeLog(
         appName: String,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         let escapedAppName = NSRegularExpression.escapedPattern(for: appName)
         waitForRuntimeLogFiles(

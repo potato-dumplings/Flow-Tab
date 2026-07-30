@@ -526,7 +526,7 @@ extension FlowTabUITests {
             let fingerprint = fingerprintSuffix?.split(separator: " ").first.map(String.init)
             persistedFingerprints.append(try XCTUnwrap(fingerprint))
         }
-        let diskContentsBeforeClear = runtimeLogContentsSinceSnapshot([:])
+        let diskContentsBeforeClear = runtimeLogContents()
         XCTAssertTrue(persistedFingerprints.allSatisfy { diskContentsBeforeClear.contains($0) })
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: Identifier.logsEmptyHint).firstMatch.exists)
 
@@ -580,7 +580,7 @@ extension FlowTabUITests {
             .firstMatch
         XCTAssertTrue(logsEmptyHint.waitForExistence(timeout: 5))
 
-        let clearedDiskContents = runtimeLogContentsSinceSnapshot([:])
+        let clearedDiskContents = runtimeLogContents()
         XCTAssertTrue(persistedFingerprints.allSatisfy { !clearedDiskContents.contains($0) })
 
         app.terminate()
@@ -605,7 +605,7 @@ extension FlowTabUITests {
                 )
             )
         }
-        let relaunchedDiskContents = runtimeLogContentsSinceSnapshot([:])
+        let relaunchedDiskContents = runtimeLogContents()
         XCTAssertTrue(persistedFingerprints.allSatisfy { !relaunchedDiskContents.contains($0) })
     }
 
