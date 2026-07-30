@@ -434,7 +434,7 @@ extension FlowTabUITests {
         frontmostCGWindow(forPID: pid)?.title
     }
 
-    private func topmostOnScreenCGWindow(
+    func topmostOnScreenCGWindow(
         forBundleIdentifier bundleIdentifier: String
     ) -> WorkflowCGWindowObservation? {
         guard let runningApp = NSRunningApplication

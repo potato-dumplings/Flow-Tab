@@ -554,46 +554,6 @@ extension FlowTabUITests {
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
-    func waitForFrontmostWorkflowWindow(
-        windowNumber: CGWindowID,
-        title: String,
-        app workflowApp: SpaceFixtureResolvedWorkflow.App,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestFrontmostBundleIdentifier: String?
-        var latestWindowNumber: CGWindowID?
-        var latestFocusedTitle: String?
-        repeat {
-            latestFrontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            let latestCGWindow = frontmostCGWindow(
-                forBundleIdentifier: workflowApp.identity.bundleIdentifier,
-                expectedTitle: title,
-                expectedWindowNumber: windowNumber
-            )
-            latestWindowNumber = latestCGWindow?.number
-            latestFocusedTitle = activeWindowTitle(forBundleIdentifier: workflowApp.identity.bundleIdentifier)
-            if latestFrontmostBundleIdentifier == workflowApp.identity.bundleIdentifier,
-               (
-                   latestCGWindow?.matches(number: windowNumber, title: title) == true
-                       || workflowWindowTitleIsObservable(title, app: workflowApp)
-               ) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected frontmost window \(workflowApp.appName) / \(title) / \(windowNumber), \
-            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil") \
-            with active window title \(latestFocusedTitle ?? "nil") \
-            and window number \(latestWindowNumber.map(String.init) ?? "nil").
-            """
-        )
-        return false
-    }
-
     func tapFirstHittableAfterScrolling(
         in query: XCUIElementQuery,
         scrollContainer: XCUIElement,

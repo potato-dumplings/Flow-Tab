@@ -213,13 +213,18 @@ extension FlowTabUITests {
                 "Edge-title search result did not include a recoverable CG window id."
             )
 
-            confirmEdgeSwitcherSearchSelection(in: app, searchInput: searchInput)
             XCTAssertTrue(
-                waitForFrontmostWorkflowWindow(
+                triggerAndWaitForFrontmostWorkflowWindow(
                     windowNumber: targetWindowNumber,
                     title: edgeTitle,
                     app: targetApp,
-                    timeout: 10
+                    timeout: 10,
+                    trigger: {
+                        confirmEdgeSwitcherSearchSelection(
+                            in: app,
+                            searchInput: searchInput
+                        )
+                    }
                 ),
                 "Search confirmation did not activate the edge-title fixture window id."
             )

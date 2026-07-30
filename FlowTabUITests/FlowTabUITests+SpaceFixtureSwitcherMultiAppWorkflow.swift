@@ -522,13 +522,18 @@ extension FlowTabUITests {
                 "Search result \(result.identifier) did not expose a CG window number."
             )
 
-            confirmSwitcherSearchSelection(in: app, searchInput: searchInput)
             XCTAssertTrue(
-                waitForFrontmostWorkflowWindow(
+                triggerAndWaitForFrontmostWorkflowWindow(
                     windowNumber: targetWindowNumber,
                     title: targetWindowTitle,
                     app: targetApp,
-                    timeout: 10
+                    timeout: 10,
+                    trigger: {
+                        confirmSwitcherSearchSelection(
+                            in: app,
+                            searchInput: searchInput
+                        )
+                    }
                 ),
                 "Search confirmation did not activate the \(targetWindowTitle) fixture window."
             )
@@ -621,19 +626,24 @@ extension FlowTabUITests {
                 "Search result \(result.identifier) did not expose a CG window number."
             )
 
-            confirmSwitcherSearchSelection(in: app, searchInput: searchInput)
             XCTAssertTrue(
-                waitForNonExistence(diagnosticsSummary, timeout: 4),
-                "FlowTab panel remained visible after confirming the fullscreen window target."
-            )
-            XCTAssertTrue(
-                waitForFrontmostWorkflowWindow(
+                triggerAndWaitForFrontmostWorkflowWindow(
                     windowNumber: targetWindowNumber,
                     title: targetWindowTitle,
                     app: targetApp,
-                    timeout: 12
+                    timeout: 12,
+                    trigger: {
+                        confirmSwitcherSearchSelection(
+                            in: app,
+                            searchInput: searchInput
+                        )
+                    }
                 ),
                 "Search confirmation did not activate the fullscreen \(targetWindowTitle) fixture window."
+            )
+            XCTAssertTrue(
+                waitForNonExistence(diagnosticsSummary, timeout: 4),
+                "FlowTab panel remained visible after confirming the fullscreen window target."
             )
         }
     }

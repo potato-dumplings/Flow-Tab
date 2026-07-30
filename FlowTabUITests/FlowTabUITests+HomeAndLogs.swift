@@ -274,14 +274,18 @@ extension FlowTabUITests {
                 cgWindowNumber(fromHomeWindowRowIdentifier: targetWindowRow.identifier),
                 "Home window row did not expose a CG window identifier: \(targetWindowRow.identifier)"
             )
-            targetWindowRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-
             XCTAssertTrue(
-                waitForFrontmostWorkflowWindow(
+                triggerAndWaitForFrontmostWorkflowWindow(
                     windowNumber: targetWindowNumber,
                     title: targetWindowTitle,
                     app: targetApp,
-                    timeout: 10
+                    timeout: 10,
+                    trigger: {
+                        targetWindowRow.coordinate(
+                            withNormalizedOffset:
+                                CGVector(dx: 0.5, dy: 0.5)
+                        ).tap()
+                    }
                 ),
                 "Clicking the Home window row did not activate the real \(targetWindowTitle) fixture window."
             )
