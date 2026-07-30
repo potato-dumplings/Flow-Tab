@@ -3,51 +3,6 @@ import CoreGraphics
 import Foundation
 import XCTest
 
-struct SwitcherSearchWindowResultObservation: Equatable {
-    let identifier: String
-    let searchableText: String
-    let resultID: String?
-    let title: String?
-    let appName: String?
-    let appID: String?
-    let windowID: String?
-
-    init(
-        identifier: String,
-        searchableText: String,
-        resultID: String? = nil,
-        title: String? = nil,
-        appName: String? = nil,
-        appID: String? = nil,
-        windowID: String? = nil
-    ) {
-        self.identifier = identifier
-        self.searchableText = searchableText
-        self.resultID = resultID
-        self.title = title
-        self.appName = appName
-        self.appID = appID
-        self.windowID = windowID
-    }
-
-    var windowNumber: CGWindowID? {
-        if let windowID, let rawWindowID = windowID.split(separator: ":").last, let parsed = UInt32(rawWindowID) {
-            return CGWindowID(parsed)
-        }
-        guard let rawWindowID = identifier.split(separator: "-").last else { return nil }
-        guard let parsed = UInt32(rawWindowID) else { return nil }
-        return CGWindowID(parsed)
-    }
-
-    func matches(title: String, appName: String) -> Bool {
-        if let observedTitle = self.title, let observedAppName = self.appName {
-            return observedTitle == title && observedAppName == appName
-        }
-        return searchableText.localizedCaseInsensitiveContains(title)
-            && searchableText.localizedCaseInsensitiveContains(appName)
-    }
-}
-
 extension FlowTabUITests {
     func testSwitcherPanelShowsAllWorkflowAppsInMultiAppFixtureStrip() throws {
         let workflow = try configuredSwitcherSpaceFixtureWorkflow()
@@ -945,32 +900,9 @@ extension FlowTabUITests {
         return owner.latestSnapshot?.cards ?? []
     }
 
-    func waitForSearchWindowResult(
-        in app: XCUIApplication,
-        title: String,
-        appName: String,
-        timeout: TimeInterval
-    ) -> SwitcherSearchWindowResultObservation? {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestResults: [SwitcherSearchWindowResultObservation] = []
-        repeat {
-            latestResults = searchWindowResultObservations(in: app)
-            if let result = latestResults.first(where: { $0.matches(title: title, appName: appName) }) {
-                return result
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected a window-scope search result for \(appName) / \(title), \
-            found \(latestResults.map(\.identifier).sorted()).
-            """
-        )
-        return nil
-    }
-
-    private func searchWindowResultObservations(in app: XCUIApplication) -> [SwitcherSearchWindowResultObservation] {
+    func searchWindowResultObservations(
+        in app: XCUIApplication
+    ) -> [SwitcherSearchWindowResultObservation] {
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let diagnosticResults = searchWindowResultObservations(from: diagnosticsSummary)
         if !diagnosticResults.isEmpty {

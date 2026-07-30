@@ -595,10 +595,16 @@ extension FlowTabUITests {
         allowsNoisyCGSiblings: Bool = false
     ) {
         XCTAssertTrue(
-            waitForWindowSearchResults(
+            waitForSwitcherSearchResultSet(
                 diagnosticsSummary,
-                matching: workflowApp,
-                requiresExactCount: !allowsNoisyCGSiblings,
+                appID:
+                    workflowApp.identity.bundleIdentifier,
+                expectedTitles:
+                    Set(workflowApp.expectedWindowTitles),
+                expectedCount:
+                    allowsNoisyCGSiblings
+                        ? nil
+                        : workflowApp.windowCount,
                 timeout: 4
             ),
             """
@@ -609,27 +615,6 @@ extension FlowTabUITests {
             \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
             """
         )
-    }
-
-    private func waitForWindowSearchResults(
-        _ diagnosticsSummary: XCUIElement,
-        matching workflowApp: SpaceFixtureResolvedWorkflow.App,
-        requiresExactCount: Bool,
-        timeout: TimeInterval
-    ) -> Bool {
-        let expectedTitles = Set(workflowApp.expectedWindowTitles)
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let rows = searchWindowResultObservations(from: diagnosticsSummary)
-                .filter { $0.appID == workflowApp.identity.bundleIdentifier }
-            let titles = Set(rows.compactMap(\.title))
-            let countMatches = !requiresExactCount || rows.count == workflowApp.windowCount
-            if expectedTitles.isSubset(of: titles), countMatches {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
     }
 
     private func assertWindowSearchUsesCommittedGenerationIndex(
