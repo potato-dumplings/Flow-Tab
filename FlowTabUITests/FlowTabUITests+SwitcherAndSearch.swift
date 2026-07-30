@@ -219,7 +219,7 @@ extension FlowTabUITests {
         XCTAssertTrue(browserTile.waitForExistence(timeout: 5))
         XCTAssertTrue(mailTile.waitForExistence(timeout: 5))
         XCTAssertTrue(
-            waitForSwitcherDiagnosticsValue(
+            waitForSwitcherDiagnostics(
                 diagnosticsSummary,
                 key: "selected",
                 equals: "com.flowtab.mock.browser",
@@ -227,15 +227,22 @@ extension FlowTabUITests {
             )
         )
 
-        browserTile.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
-        mailTile.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
-
         XCTAssertTrue(
-            waitForSwitcherDiagnosticsValue(
+            performAndWaitForSwitcherDiagnostics(
                 diagnosticsSummary,
                 key: "selected",
                 equals: "com.flowtab.mock.mail",
-                timeout: 3
+                timeout: 3,
+                trigger: {
+                    browserTile.coordinate(
+                        withNormalizedOffset:
+                            CGVector(dx: 0.5, dy: 0.5)
+                    ).hover()
+                    mailTile.coordinate(
+                        withNormalizedOffset:
+                            CGVector(dx: 0.5, dy: 0.5)
+                    ).hover()
+                }
             ),
             "Hovering a switcher app tile after pointer movement should update the selected app. browserFrame=\(browserTile.frame) mailFrame=\(mailTile.frame) summary=\(diagnosticsSummary.value ?? "")"
         )
@@ -302,15 +309,22 @@ extension FlowTabUITests {
         XCTAssertTrue(primaryWindow.waitForExistence(timeout: 5))
         XCTAssertTrue(secondaryWindow.waitForExistence(timeout: 5))
 
-        primaryWindow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
-        secondaryWindow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
-
         XCTAssertTrue(
-            waitForSwitcherDiagnosticsValue(
+            performAndWaitForSwitcherDiagnostics(
                 diagnosticsSummary,
                 key: "selectedWindow",
                 equals: "mock-current-secondary",
-                timeout: 3
+                timeout: 3,
+                trigger: {
+                    primaryWindow.coordinate(
+                        withNormalizedOffset:
+                            CGVector(dx: 0.5, dy: 0.5)
+                    ).hover()
+                    secondaryWindow.coordinate(
+                        withNormalizedOffset:
+                            CGVector(dx: 0.5, dy: 0.5)
+                    ).hover()
+                }
             ),
             "Hovering a Control+Tab window card after pointer movement should update the selected window."
         )
@@ -390,16 +404,23 @@ extension FlowTabUITests {
         assertSearchResultUsesRowSizedFrame(mailResult)
         assertSearchResultUsesRowSizedFrame(browserResult)
 
-        mailResult.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
-        browserResult.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
-
         XCTAssertTrue(
-            waitForSwitcherDiagnosticsValue(
+            performAndWaitForSwitcherDiagnostics(
                 diagnosticsSummary,
                 key: "searchSelectedResult",
                 equals: "app:com.flowtab.mock.browser",
                 decodesPercentEncoding: true,
-                timeout: 3
+                timeout: 3,
+                trigger: {
+                    mailResult.coordinate(
+                        withNormalizedOffset:
+                            CGVector(dx: 0.5, dy: 0.5)
+                    ).hover()
+                    browserResult.coordinate(
+                        withNormalizedOffset:
+                            CGVector(dx: 0.5, dy: 0.5)
+                    ).hover()
+                }
             ),
             "Hovering a search result after pointer movement should update the selected search result."
         )
@@ -705,27 +726,6 @@ extension FlowTabUITests {
                 timeout: 5
             )
         )
-    }
-
-    private func waitForSwitcherDiagnosticsValue(
-        _ diagnosticsSummary: XCUIElement,
-        key: String,
-        equals expectedValue: String,
-        decodesPercentEncoding: Bool = false,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            var value = switcherPanelDiagnosticsValue(diagnosticsSummary, key: key)
-            if decodesPercentEncoding {
-                value = value.removingPercentEncoding ?? value
-            }
-            if value == expectedValue {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
     }
 
     private func assertSwitcherDiagnosticsValueRemains(

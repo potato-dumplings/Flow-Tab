@@ -126,6 +126,83 @@ final class FlowTabUITestSwitcherDiagnosticsObservationOwner {
 }
 
 extension FlowTabUITests {
+    func waitForSwitcherDiagnostics(
+        _ diagnosticsSummary: XCUIElement,
+        key: String,
+        equals expectedValue: String,
+        decodesPercentEncoding: Bool = false,
+        timeout: TimeInterval
+    ) -> Bool {
+        waitForSwitcherDiagnostics(
+            [
+                FlowTabUITestSwitcherDiagnosticsExpectation(
+                    key: key,
+                    expectedValue: expectedValue,
+                    decodesPercentEncoding:
+                        decodesPercentEncoding
+                )
+            ],
+            in: diagnosticsSummary,
+            timeout: timeout
+        )
+    }
+
+    func waitForSwitcherDiagnostics(
+        _ expectations: [
+            FlowTabUITestSwitcherDiagnosticsExpectation
+        ],
+        in diagnosticsSummary: XCUIElement,
+        timeout: TimeInterval
+    ) -> Bool {
+        let owner =
+            FlowTabUITestSwitcherDiagnosticsObservationOwner(
+                expectations: expectations,
+                readback: {
+                    self.switcherDiagnosticsSnapshot(
+                        diagnosticsSummary,
+                        keys: expectations.map(\.key)
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        guard
+            owner.waitForResolution(timeout: timeout) != nil
+        else {
+            XCTFail(
+                "Switcher diagnostics did not satisfy "
+                    + "the expected projection. "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+        return true
+    }
+
+    func performAndWaitForSwitcherDiagnostics(
+        _ diagnosticsSummary: XCUIElement,
+        key: String,
+        equals expectedValue: String,
+        decodesPercentEncoding: Bool = false,
+        timeout: TimeInterval,
+        trigger: () -> Void
+    ) -> Bool {
+        performAndWaitForSwitcherDiagnostics(
+            [
+                FlowTabUITestSwitcherDiagnosticsExpectation(
+                    key: key,
+                    expectedValue: expectedValue,
+                    decodesPercentEncoding:
+                        decodesPercentEncoding
+                )
+            ],
+            in: diagnosticsSummary,
+            timeout: timeout,
+            trigger: trigger
+        )
+    }
+
     func performAndWaitForSwitcherDiagnostics(
         _ expectations: [
             FlowTabUITestSwitcherDiagnosticsExpectation

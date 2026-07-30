@@ -61,6 +61,40 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherDiagnosticsObserverMatchesPercentDecodedProjection() {
+        let owner =
+            FlowTabUITestSwitcherDiagnosticsObservationOwner(
+                expectations: [
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "searchSelectedResult",
+                        expectedValue: "app:com.example.browser",
+                        decodesPercentEncoding: true
+                    )
+                ],
+                observationRegistration: nil,
+                readback: {
+                    FlowTabUITestSwitcherDiagnosticsSnapshot(
+                        identifier: "switcher-summary",
+                        exists: true,
+                        rawValue:
+                            "searchSelectedResult="
+                            + "app%3Acom.example.browser",
+                        values: [
+                            "searchSelectedResult":
+                                "app%3Acom.example.browser"
+                        ]
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .initialReadback
+        )
+    }
+
     func testSwitcherDiagnosticsObserverRequiresPostTriggerProjection() {
         var acceptsEvidence = false
         var cancellationCount = 0
