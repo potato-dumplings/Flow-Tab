@@ -7,6 +7,44 @@ private enum FlowTabUITestWorkflowWindowActivationTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testWorkflowWindowActivationObserverAcceptsExactInitialState() {
+        var registrationOrder: [String] = []
+        let owner =
+            FlowTabUITestWorkflowWindowActivationObservationOwner(
+                expectedBundleIdentifier:
+                    "com.example.target",
+                expectedWindowNumber: 42,
+                expectedTitle: "Draft",
+                observationRegistration: { _ in
+                    registrationOrder.append("register")
+                    return FlowTabUITestObservationCancellation {
+                        registrationOrder.append("cancel")
+                    }
+                },
+                readback: {
+                    registrationOrder.append("readback")
+                    return self
+                        .workflowWindowActivationTestSnapshot(
+                            bundleIdentifier:
+                                "com.example.target",
+                            windowNumber: 42,
+                            title: "Draft"
+                        )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .initialReadback
+        )
+        XCTAssertEqual(
+            registrationOrder,
+            ["register", "readback", "cancel"]
+        )
+    }
+
     func testWorkflowWindowActivationObserverInstallsBeforeReadbackAndGatesBaseline() {
         var order: [String] = []
         var eventHandler:

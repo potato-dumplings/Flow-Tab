@@ -317,26 +317,9 @@ extension FlowTabUITests {
                             bundleIdentifier: bundleIdentifier
                         ),
                 readback: {
-                    FlowTabUITestWorkflowWindowActivationSnapshot(
-                        frontmostBundleIdentifier:
-                            NSWorkspace.shared
-                                .frontmostApplication?
-                                .bundleIdentifier,
-                        topmostCGWindow:
-                            self.topmostOnScreenCGWindow(
-                                forBundleIdentifier:
-                                    bundleIdentifier
-                            ),
-                        activeWindowTitle:
-                            self.activeWindowTitle(
-                                forBundleIdentifier:
-                                    bundleIdentifier
-                            ),
-                        expectedTitleIsObservable:
-                            self.workflowWindowTitleIsObservable(
-                                title,
-                                app: workflowApp
-                            )
+                    self.workflowWindowActivationSnapshot(
+                        title: title,
+                        app: workflowApp
                     )
                 }
             )
@@ -358,5 +341,34 @@ extension FlowTabUITests {
             return false
         }
         return true
+    }
+
+    func workflowWindowActivationSnapshot(
+        title: String,
+        app workflowApp: SpaceFixtureResolvedWorkflow.App
+    ) -> FlowTabUITestWorkflowWindowActivationSnapshot {
+        let bundleIdentifier =
+            workflowApp.identity.bundleIdentifier
+        return FlowTabUITestWorkflowWindowActivationSnapshot(
+            frontmostBundleIdentifier:
+                NSWorkspace.shared
+                    .frontmostApplication?
+                    .bundleIdentifier,
+            topmostCGWindow:
+                topmostOnScreenCGWindow(
+                    forBundleIdentifier:
+                        bundleIdentifier
+                ),
+            activeWindowTitle:
+                activeWindowTitle(
+                    forBundleIdentifier:
+                        bundleIdentifier
+                ),
+            expectedTitleIsObservable:
+                workflowWindowTitleIsObservable(
+                    title,
+                    app: workflowApp
+                )
+        )
     }
 }
