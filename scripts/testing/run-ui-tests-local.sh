@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+INVOCATION_DIRECTORY="$(pwd -P)"
 DEFAULT_BUILD_ROOT="${ROOT_DIR}/.build-local/ui-tests"
 DEFAULT_SPACE_FIXTURE_BUILD_ROOT="${ROOT_DIR}/.build-local/space-fixture-workflow"
 BUILD_ROOT="${DEFAULT_BUILD_ROOT}"
@@ -46,6 +47,15 @@ expand_path() {
     return
   fi
   printf '%s' "${path}"
+}
+
+resolve_invocation_path() {
+  local path="$1"
+  if [[ "${path}" == /* ]]; then
+    printf '%s' "${path}"
+    return
+  fi
+  printf '%s/%s' "${INVOCATION_DIRECTORY}" "${path#./}"
 }
 
 print_help() {
@@ -361,6 +371,7 @@ HOME_ROOT="${BUILD_ROOT}/home"
 MODULE_CACHE_ROOT="${BUILD_ROOT}/module-cache"
 PACKAGE_CACHE_PATH="${BUILD_ROOT}/source-packages"
 UI_TEST_RUNNER_PATH="${DERIVED_DATA_PATH}/Build/Products/Testing/FlowTabUITests-Runner.app"
+UI_TEST_XCTESTRUN_PATH=""
 if [[ "${HAS_CUSTOM_BUILD_ROOT}" == true ]]; then
   SPACE_FIXTURE_BUILD_ROOT="${BUILD_ROOT}/space-fixture-workflow"
 else
@@ -368,6 +379,12 @@ else
 fi
 SPACE_FIXTURE_BASELINE_RESOLVED_PATH="${SPACE_FIXTURE_BUILD_ROOT}/variants/resolved-workflow.json"
 SYSTEM_APP_MRU_FIXTURE_RESOLVED_PATH="${SPACE_FIXTURE_BUILD_ROOT}/system-app-mru-variants/resolved-workflow.json"
+SPACE_FIXTURE_BASELINE_ACCESSIBLE_PATH="$(
+  resolve_invocation_path "${SPACE_FIXTURE_BASELINE_RESOLVED_PATH}"
+)"
+SYSTEM_APP_MRU_FIXTURE_ACCESSIBLE_PATH="$(
+  resolve_invocation_path "${SYSTEM_APP_MRU_FIXTURE_RESOLVED_PATH}"
+)"
 if [[ "${HAS_CUSTOM_OUTPUT_ROOT}" == false ]]; then
   OUTPUT_ROOT="${BUILD_ROOT}"
 fi
@@ -452,7 +469,8 @@ export CFFIXED_USER_HOME="${HOME_ROOT}"
 export CLANG_MODULE_CACHE_PATH="${MODULE_CACHE_ROOT}/clang"
 export SWIFT_MODULECACHE_PATH="${MODULE_CACHE_ROOT}/swift"
 export SWIFTPM_PACKAGECACHE="${PACKAGE_CACHE_PATH}"
-export FLOWTAB_SYSTEM_APP_MRU_FIXTURE_WORKFLOW_PATH="${SYSTEM_APP_MRU_FIXTURE_RESOLVED_PATH}"
+export FLOWTAB_SPACE_FIXTURE_WORKFLOW_PATH="${SPACE_FIXTURE_BASELINE_ACCESSIBLE_PATH}"
+export FLOWTAB_SYSTEM_APP_MRU_FIXTURE_WORKFLOW_PATH="${SYSTEM_APP_MRU_FIXTURE_ACCESSIBLE_PATH}"
 
 if [[ "${USE_STABLE_UI_TEST_APP}" == true && -d "${UI_TEST_APP_PATH}" ]]; then
   export FLOWTAB_UI_TEST_APP_PATH="${UI_TEST_APP_PATH}"
@@ -478,6 +496,7 @@ echo "DerivedData: ${DERIVED_DATA_PATH}"
 echo "TMPDIR: ${TMPDIR}"
 echo "Module cache: ${MODULE_CACHE_ROOT}"
 echo "Source packages: ${PACKAGE_CACHE_PATH}"
+echo "Space fixture workflow: ${FLOWTAB_SPACE_FIXTURE_WORKFLOW_PATH}"
 echo "Action: ${ACTION}"
 if [[ -n "${FLOWTAB_UI_TEST_APP_PATH:-}" ]]; then
   echo "UI test app: ${FLOWTAB_UI_TEST_APP_PATH}"
@@ -501,14 +520,26 @@ build_xcodebuild_cmd() {
   local action="$1"
   local include_result_bundle="$2"
 
-  XCODEBUILD_CMD=(
-    xcodebuild
-    -project "${ROOT_DIR}/FlowTab.xcodeproj"
-    -scheme FlowTab
-    -destination "platform=macOS"
-    -derivedDataPath "${DERIVED_DATA_PATH}"
-    -clonedSourcePackagesDirPath "${PACKAGE_CACHE_PATH}"
-  )
+  if [[ "${action}" == "test-without-building" ]]; then
+    if [[ -z "${UI_TEST_XCTESTRUN_PATH}" ]]; then
+      echo "The UI test .xctestrun path is not configured." >&2
+      return 1
+    fi
+    XCODEBUILD_CMD=(
+      xcodebuild
+      -xctestrun "${UI_TEST_XCTESTRUN_PATH}"
+      -destination "platform=macOS"
+    )
+  else
+    XCODEBUILD_CMD=(
+      xcodebuild
+      -project "${ROOT_DIR}/FlowTab.xcodeproj"
+      -scheme FlowTab
+      -destination "platform=macOS"
+      -derivedDataPath "${DERIVED_DATA_PATH}"
+      -clonedSourcePackagesDirPath "${PACKAGE_CACHE_PATH}"
+    )
+  fi
 
   if [[ "${include_result_bundle}" == true ]]; then
     XCODEBUILD_CMD+=(-resultBundlePath "${RESULT_BUNDLE_PATH}")
@@ -516,11 +547,69 @@ build_xcodebuild_cmd() {
 
   # Local UI test builds do not use Xcode automatic signing. The wrapper signs
   # the generated XCTest runner after build-for-testing with the local identity.
-  if [[ "${HAS_CODE_SIGNING_OVERRIDE}" == false ]]; then
+  if [[ "${action}" != "test-without-building" && "${HAS_CODE_SIGNING_OVERRIDE}" == false ]]; then
     XCODEBUILD_CMD+=("CODE_SIGNING_ALLOWED=NO")
   fi
 
   XCODEBUILD_CMD+=("${action}")
+}
+
+set_xctestrun_environment_value() {
+  local xctestrun_path="$1"
+  local key_path="$2"
+  local value="$3"
+
+  if plutil -type "${key_path}" "${xctestrun_path}" >/dev/null 2>&1; then
+    plutil -replace "${key_path}" -string "${value}" "${xctestrun_path}"
+  else
+    plutil -insert "${key_path}" -string "${value}" "${xctestrun_path}"
+  fi
+}
+
+configure_ui_test_runner_environment() {
+  local products_root
+  local xctestrun_path
+  local -a xctestrun_paths=()
+
+  CURRENT_STAGE="configure_ui_test_runner_environment"
+  products_root="$(
+    resolve_invocation_path \
+      "${DERIVED_DATA_PATH}/Build/Products"
+  )"
+  while IFS= read -r -d '' xctestrun_path; do
+    xctestrun_paths+=("${xctestrun_path}")
+  done < <(
+    find "${products_root}" \
+      -maxdepth 1 \
+      -type f \
+      -name '*.xctestrun' \
+      -print0
+  )
+
+  if [[ "${#xctestrun_paths[@]}" -ne 1 ]]; then
+    echo "Expected one FlowTab .xctestrun file below ${products_root}; found ${#xctestrun_paths[@]}." >&2
+    return 1
+  fi
+
+  UI_TEST_XCTESTRUN_PATH="${xctestrun_paths[0]}"
+  if ! plutil -extract FlowTabUITests raw \
+    -expect dictionary \
+    -o /dev/null \
+    "${UI_TEST_XCTESTRUN_PATH}" 2>/dev/null
+  then
+    echo "The generated .xctestrun file has no FlowTabUITests entry: ${UI_TEST_XCTESTRUN_PATH}" >&2
+    return 1
+  fi
+
+  set_xctestrun_environment_value \
+    "${UI_TEST_XCTESTRUN_PATH}" \
+    "FlowTabUITests.EnvironmentVariables.FLOWTAB_SPACE_FIXTURE_WORKFLOW_PATH" \
+    "${SPACE_FIXTURE_BASELINE_ACCESSIBLE_PATH}"
+  set_xctestrun_environment_value \
+    "${UI_TEST_XCTESTRUN_PATH}" \
+    "FlowTabUITests.EnvironmentVariables.FLOWTAB_SYSTEM_APP_MRU_FIXTURE_WORKFLOW_PATH" \
+    "${SYSTEM_APP_MRU_FIXTURE_ACCESSIBLE_PATH}"
+  echo "Configured UI test runner environment: ${UI_TEST_XCTESTRUN_PATH}"
 }
 
 run_logged_stage() {
@@ -633,6 +722,7 @@ fi
 case "${ACTION}" in
   test)
     run_xcodebuild "build-for-testing" false
+    configure_ui_test_runner_environment
     run_logged_stage "signing" "${LOG_ROOT}/sign-ui-test-runner.log" sign_ui_test_runner
     if ((${#EXTRA_ARGS[@]} > 0)); then
       run_xcodebuild "test-without-building" true "${EXTRA_ARGS[@]}"
@@ -646,9 +736,11 @@ case "${ACTION}" in
     else
       run_xcodebuild "build-for-testing" false
     fi
+    configure_ui_test_runner_environment
     run_logged_stage "signing" "${LOG_ROOT}/sign-ui-test-runner.log" sign_ui_test_runner
     ;;
   test-without-building)
+    configure_ui_test_runner_environment
     run_logged_stage "signing" "${LOG_ROOT}/sign-ui-test-runner.log" sign_ui_test_runner
     if ((${#EXTRA_ARGS[@]} > 0)); then
       run_xcodebuild "test-without-building" true "${EXTRA_ARGS[@]}"

@@ -195,6 +195,22 @@ final class SpaceFixtureWorkflowReadinessObservationOwner {
 }
 
 extension FlowTabUITests {
+    func testSystemAppMRUAndBaselineFixturePathsRouteFromCustomBuildRoot()
+        throws
+    {
+        let environment = ProcessInfo.processInfo.environment
+        try assertPreparedSpaceFixtureWorkflowRoute(
+            environmentKey:
+                "FLOWTAB_SPACE_FIXTURE_WORKFLOW_PATH",
+            environment: environment
+        )
+        try assertPreparedSpaceFixtureWorkflowRoute(
+            environmentKey:
+                "FLOWTAB_SYSTEM_APP_MRU_FIXTURE_WORKFLOW_PATH",
+            environment: environment
+        )
+    }
+
     func makeSpaceFixtureWorkflowReadinessRoute()
         -> SpaceFixtureWorkflowReadinessUITestRoute
     {
@@ -280,5 +296,38 @@ extension FlowTabUITests {
         )
         XCTAssertTrue(readyEvidence.snapshot.isReady)
         return readyEvidence
+    }
+
+    private func assertPreparedSpaceFixtureWorkflowRoute(
+        environmentKey: String,
+        environment: [String: String]
+    ) throws {
+        let routedPath = try XCTUnwrap(
+            environment[environmentKey],
+            "Missing UI wrapper environment route: \(environmentKey)"
+        )
+        XCTAssertTrue((routedPath as NSString).isAbsolutePath)
+
+        let routedURL =
+            URL(fileURLWithPath: routedPath)
+                .standardizedFileURL
+        let workflow =
+            try SpaceFixtureResolvedWorkflow.load(
+                from: routedURL
+            )
+        XCTAssertEqual(workflow.workflowURL, routedURL)
+        XCTAssertFalse(workflow.apps.isEmpty)
+
+        let variantsURL =
+            routedURL.deletingLastPathComponent()
+                .standardizedFileURL
+        for app in workflow.apps {
+            let appURL = try XCTUnwrap(app.identity.appURL)
+            XCTAssertEqual(
+                appURL.deletingLastPathComponent()
+                    .standardizedFileURL,
+                variantsURL
+            )
+        }
     }
 }
