@@ -236,39 +236,30 @@ extension FlowTabUITests {
         app workflowApp: SpaceFixtureResolvedWorkflow.App,
         timeout: TimeInterval
     ) -> WorkflowCGWindowObservation? {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestFrontmostBundleIdentifier: String?
-        var latestWindowNumber: CGWindowID?
-        var latestTitle: String?
-        var latestFrame: CGRect?
-        repeat {
-            latestFrontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            let latestCGWindow = topmostOnScreenCGWindow(
-                forBundleIdentifier: workflowApp.identity.bundleIdentifier
+        let owner =
+            makeWorkflowSpaceWindowObservationOwner(
+                title: title,
+                app: workflowApp
             )
-            latestWindowNumber = latestCGWindow?.number
-            latestTitle = latestCGWindow?.title
-            latestFrame = latestCGWindow?.frame
+        owner.start()
+        defer { owner.cancel() }
 
-            if latestFrontmostBundleIdentifier == workflowApp.identity.bundleIdentifier,
-               let latestCGWindow,
-               latestCGWindow.matchesWorkflowSpaceWindow(title: title) {
-                return latestCGWindow
-            }
-
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected frontmost workflow Space window \(workflowApp.appName) / \(title), \
-            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil") \
-            with CG title \(latestTitle ?? "nil") \
-            window number \(latestWindowNumber.map(String.init) ?? "nil") \
-            and frame \(workflowCGFrameDescription(latestFrame)).
-            """
-        )
-        return nil
+        guard let evidence =
+                owner.waitForResolution(timeout: timeout),
+              let window = evidence.value.matchingWindow(
+                bundleIdentifier:
+                    workflowApp.identity.bundleIdentifier,
+                title: title
+              )
+        else {
+            XCTFail(
+                "Expected frontmost workflow Space window "
+                    + "\(workflowApp.appName) / \(title). "
+                    + owner.diagnosticSummary
+            )
+            return nil
+        }
+        return window
     }
 
     func waitForActiveSpaceWorkflowCGWindow(
