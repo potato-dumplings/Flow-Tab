@@ -156,7 +156,7 @@ extension FlowTabUITests {
             diagnosticsSummary = relaunchInAppWindowSwitcher(
                 app,
                 for: targetApp,
-                allowsNoisyCGSiblings: allowsNoisyCGSiblings
+                focusedWindow: standardSelection
             )
             logWorkflowSpaceObservation("\(traceLabel).afterSecondPanelReady", app: targetApp)
             XCTAssertTrue(
@@ -296,6 +296,7 @@ extension FlowTabUITests {
                 diagnosticsSummary = relaunchInAppWindowSwitcher(
                     app,
                     for: targetApp,
+                    focusedWindow: currentSelection,
                     allowsNoisyCGSiblings: true
                 )
                 XCTAssertTrue(
@@ -681,11 +682,25 @@ extension FlowTabUITests {
     private func relaunchInAppWindowSwitcher(
         _ app: XCUIApplication,
         for workflowApp: SpaceFixtureResolvedWorkflow.App,
+        focusedWindow: InAppWindowSelection,
         allowsNoisyCGSiblings: Bool = false
     ) -> XCUIElement {
         XCTAssertTrue(app.state == .runningForeground || app.state == .runningBackground)
-        XCUIApplication(bundleIdentifier: workflowApp.identity.bundleIdentifier).activate()
-        RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+        let fixtureApplication =
+            makeSpaceFixtureWorkflowApplication(
+                for: workflowApp.identity
+            )
+        XCTAssertTrue(
+            triggerAndWaitForFrontmostWorkflowWindow(
+                windowNumber: focusedWindow.windowNumber,
+                title: focusedWindow.title,
+                app: workflowApp,
+                timeout: 12,
+                trigger: {
+                    fixtureApplication.activate()
+                }
+            )
+        )
         postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.inApp, traceLabel: "control.reopen")
         return assertInAppWindowSwitcherReady(
             for: workflowApp,
