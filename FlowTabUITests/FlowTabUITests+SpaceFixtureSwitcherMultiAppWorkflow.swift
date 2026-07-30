@@ -749,36 +749,6 @@ extension FlowTabUITests {
         }
     }
 
-    private func matchedWorkflowAppForVisibleSwitcherPreview(
-        _ workflow: SpaceFixtureResolvedWorkflow,
-        diagnosticsSummaryElement: XCUIElement,
-        excludingAppIDs: Set<String> = []
-    ) -> SpaceFixtureResolvedWorkflow.App? {
-        let deadline = Date().addingTimeInterval(12)
-        repeat {
-            let selectedBundleIdentifier = switcherPanelDiagnosticsValue(
-                diagnosticsSummaryElement,
-                key: "selected"
-            )
-            let visibleTitles = switcherPreviewTitles(from: diagnosticsSummaryElement)
-            for workflowApp in workflow.apps {
-                guard !excludingAppIDs.contains(workflowApp.appID) else {
-                    continue
-                }
-                guard selectedBundleIdentifier == workflowApp.identity.bundleIdentifier else {
-                    continue
-                }
-                if Set(visibleTitles) == Set(workflowApp.expectedWindowTitles) {
-                    return workflowApp
-                }
-            }
-
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        return nil
-    }
-
     private func waitForFrontmostWorkflowApp(
         _ workflowApp: SpaceFixtureResolvedWorkflow.App,
         timeout: TimeInterval

@@ -6,24 +6,30 @@ struct FlowTabUITestSwitcherPreviewProjectionSnapshot: Equatable {
     let exists: Bool
     let rawValue: String?
     let previewValue: String?
+    let selectedBundleIdentifier: String?
     let titles: [String]
 
     init(
         identifier: String,
         exists: Bool,
         rawValue: String?,
-        previewValue: String?
+        previewValue: String?,
+        selectedBundleIdentifier: String? = nil
     ) {
         self.identifier = identifier
         self.exists = exists
         self.rawValue = rawValue
         self.previewValue = previewValue
+        self.selectedBundleIdentifier =
+            selectedBundleIdentifier
         titles = Self.parseTitles(from: previewValue)
     }
 
     var diagnosticSummary: String {
         "identifier=\(identifier) "
             + "exists=\(exists) "
+            + "selectedBundleID="
+            + "\(selectedBundleIdentifier ?? "nil") "
             + "titles=\(titles.sorted()) "
             + "preview=\(previewValue ?? "nil") "
             + "raw=\(rawValue ?? "nil")"
@@ -266,7 +272,7 @@ extension FlowTabUITests {
         return true
     }
 
-    private func switcherPreviewProjectionSnapshot(
+    func switcherPreviewProjectionSnapshot(
         _ diagnosticsSummary: XCUIElement
     ) -> FlowTabUITestSwitcherPreviewProjectionSnapshot {
         let exists = diagnosticsSummary.exists
@@ -281,11 +287,20 @@ extension FlowTabUITests {
                     key: "preview"
                 )
             }
+        let selectedBundleIdentifier =
+            rawValue.map {
+                switcherPanelDiagnosticsValue(
+                    in: $0,
+                    key: "selected"
+                )
+            }
         return FlowTabUITestSwitcherPreviewProjectionSnapshot(
             identifier: diagnosticsSummary.identifier,
             exists: exists,
             rawValue: rawValue,
-            previewValue: previewValue
+            previewValue: previewValue,
+            selectedBundleIdentifier:
+                selectedBundleIdentifier
         )
     }
 }
