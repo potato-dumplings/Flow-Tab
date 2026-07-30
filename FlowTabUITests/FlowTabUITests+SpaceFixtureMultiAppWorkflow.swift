@@ -137,53 +137,6 @@ enum SpaceFixtureMultiAppWorkflowError: LocalizedError, Equatable {
 }
 
 struct SpaceFixtureResolvedWorkflow: Equatable {
-    struct App: Equatable {
-        let appID: String
-        let appName: String
-        let identity: SpaceFixtureAppIdentity
-        let launchOrder: Int
-        let windowCount: Int
-        let expectedWindowTitles: [String]
-        var expectedHomeWindowTitles: [String] = []
-        let fullscreenWindowIndex: Int?
-        let fullscreenWindowTitles: [String]
-
-        init(
-            appID: String,
-            appName: String,
-            identity: SpaceFixtureAppIdentity,
-            launchOrder: Int,
-            windowCount: Int,
-            expectedWindowTitles: [String],
-            expectedHomeWindowTitles: [String] = [],
-            fullscreenWindowIndex: Int?,
-            fullscreenWindowTitles: [String]? = nil
-        ) {
-            self.appID = appID
-            self.appName = appName
-            self.identity = identity
-            self.launchOrder = launchOrder
-            self.windowCount = windowCount
-            self.expectedWindowTitles = expectedWindowTitles
-            self.expectedHomeWindowTitles = expectedHomeWindowTitles
-            self.fullscreenWindowIndex = fullscreenWindowIndex
-            if let fullscreenWindowTitles {
-                self.fullscreenWindowTitles = fullscreenWindowTitles
-            } else if let fullscreenWindowIndex {
-                let titleIndex = fullscreenWindowIndex - 1
-                self.fullscreenWindowTitles = expectedWindowTitles.indices.contains(titleIndex)
-                    ? [expectedWindowTitles[titleIndex]]
-                    : []
-            } else {
-                self.fullscreenWindowTitles = []
-            }
-        }
-
-        var isFullscreenOnlyInHome: Bool {
-            fullscreenWindowIndex != nil && expectedHomeWindowTitles.isEmpty
-        }
-    }
-
     let workflowName: String
     let workflowURL: URL
     let readinessWatchdog: TimeInterval
@@ -236,6 +189,13 @@ struct SpaceFixtureResolvedWorkflow: Equatable {
                     throw SpaceFixtureMultiAppWorkflowError.workflowAppPathNotFound(app.appID, appURL.path)
                 }
 
+                let fullscreenWindowIndices =
+                    app.windows.enumerated().compactMap {
+                        index, window in
+                        window.mode == .fullscreen
+                            ? index + 1
+                            : nil
+                    }
                 return App(
                     appID: app.appID,
                     appName: app.appName.isEmpty ? bundleIdentifier : app.appName,
@@ -247,7 +207,10 @@ struct SpaceFixtureResolvedWorkflow: Equatable {
                     windowCount: app.windows.count,
                     expectedWindowTitles: app.windows.map(\.resolvedTitle),
                     expectedHomeWindowTitles: app.windows.compactMap(\.homeResolvedTitle),
-                    fullscreenWindowIndex: app.windows.firstIndex(where: { $0.mode == .fullscreen }).map { $0 + 1 },
+                    fullscreenWindowIndex:
+                        fullscreenWindowIndices.first,
+                    fullscreenWindowIndices:
+                        fullscreenWindowIndices,
                     fullscreenWindowTitles: app.windows
                         .filter { $0.mode == .fullscreen }
                         .map(\.resolvedTitle)

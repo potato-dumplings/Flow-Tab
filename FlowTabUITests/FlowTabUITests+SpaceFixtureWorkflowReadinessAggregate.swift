@@ -198,6 +198,21 @@ final class SpaceFixtureWorkflowReadinessAggregateObservationOwner {
 }
 
 extension FlowTabUITests {
+    func spaceFixtureWorkflowReadinessAggregateExpectation(
+        for workflowApp: SpaceFixtureResolvedWorkflow.App
+    ) -> SpaceFixtureWorkflowReadinessAggregateExpectation {
+        SpaceFixtureWorkflowReadinessAggregateExpectation(
+            workflowAppID: workflowApp.appID,
+            bundleIdentifier:
+                workflowApp.identity.bundleIdentifier,
+            windowPlanIndices:
+                Array(1...workflowApp.windowCount),
+            fullscreenWindowPlanIndices:
+                workflowApp.fullscreenWindowIndices,
+            windowTitles: workflowApp.expectedWindowTitles
+        )
+    }
+
     func makeSpaceFixtureWorkflowReadinessAggregateOwner(
         for workflow: SpaceFixtureResolvedWorkflow
     ) -> SpaceFixtureWorkflowReadinessAggregateObservationOwner {
@@ -206,18 +221,8 @@ extension FlowTabUITests {
                 workflowApp in
                 SpaceFixtureWorkflowReadinessAggregateUITestEntry(
                     expectation:
-                        SpaceFixtureWorkflowReadinessAggregateExpectation(
-                            workflowAppID: workflowApp.appID,
-                            bundleIdentifier:
-                                workflowApp.identity
-                                    .bundleIdentifier,
-                            windowPlanIndices:
-                                Array(1...workflowApp.windowCount),
-                            fullscreenWindowPlanIndices:
-                                workflowApp.fullscreenWindowIndex
-                                    .map { [$0] } ?? [],
-                            windowTitles:
-                                workflowApp.expectedWindowTitles
+                        spaceFixtureWorkflowReadinessAggregateExpectation(
+                            for: workflowApp
                         ),
                     route:
                         makeSpaceFixtureWorkflowReadinessRoute()
@@ -278,14 +283,12 @@ extension FlowTabUITests {
             XCTAssertEqual(
                 readyEvidence.snapshot
                     .expectedFullscreenWindowPlanIndices,
-                workflowApp.fullscreenWindowIndex
-                    .map { [$0] } ?? []
+                workflowApp.fullscreenWindowIndices
             )
             XCTAssertEqual(
                 readyEvidence.snapshot
                     .completedFullscreenWindowPlanIndices,
-                workflowApp.fullscreenWindowIndex
-                    .map { [$0] } ?? []
+                workflowApp.fullscreenWindowIndices
             )
             XCTAssertEqual(
                 readyEvidence.snapshot.windowTitles,

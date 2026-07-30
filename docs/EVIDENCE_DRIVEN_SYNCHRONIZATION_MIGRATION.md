@@ -125,6 +125,7 @@ and Process/Tooling.
 | SYNC-028A | `SpaceFixtureWorkflowReadinessOwner`, `SpaceFixtureWindowCoordinator`, `SpaceFixtureWindowContentView`, `launchSpaceFixtureWorkflow`; one fixture process readiness | The visible “Ready” state and shared single-process UI launcher previously advanced before fullscreen and desktop-refocus completion, then used a fixed settle duration to infer usable topology. Evidence migration. | Start a coordinator-owned readiness generation before window publication and emit exact configured, planned-window, fullscreen-completion, desktop-presentation, application-AX-exposure, and terminal-ready evidence. Update the visible state only from terminal evidence. The UI installs a unique observer before launch, captures the configured baseline, and accepts the later ready stage only for the same generation, bundle ID, PID, window plan, and fullscreen plan. Coordinator and XCTest-case lifecycles own cancellation and observer cleanup. | H fixture topology; Unit, Behavior, representative real fullscreen UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-028B | Composite multi-application workflow-readiness routing boundary | Semantic owner review separated readiness evidence emitted independently by every fixture process from the final desktop-anchor activation and Space readback. Migration routing. | Aggregate every configured fixture process through SYNC-028B1, then establish the final anchor through SYNC-028B2. | H aggregate; child rows define required validation. | completed |
 | SYNC-028B1 | `SpaceFixtureWorkflowReadinessAggregateOwner`, `launchResolvedSpaceFixtureWorkflow`, `launchResolvedEdgeInputsWorkflow`; all-process readiness aggregation | A workflow-wide `settleTimeout` and fixed RunLoop advancement inferred when independently launched fixture processes and their Space topology were ready. Evidence migration plus watchdog. | Install a unique distributed observer for every workflow app before launching any process. Capture each exact configured baseline and accept its later ready evidence only for the configured workflow app ID, bundle ID, PID, observation generation, window plan, fullscreen plan, and titles. Complete after every app has terminal evidence. The workflow invocation owns all observers and aggregate-generation cancellation; one named watchdog reports every unmet app and last observation. | H multi-process fixture topology; Unit, Behavior, standard and edge multi-application UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
+| SYNC-028B1F | `SpaceFixtureResolvedWorkflow.App`, `SpaceFixtureWorkflowReadinessAggregateObservationOwner`; complete fullscreen-plan identity | The resolved UI-test workflow kept only the first fullscreen window index while the fixture producer retained every fullscreen plan entry. Aggregate static matching therefore rejected both configured and ready evidence for noisy workflows containing multiple fullscreen windows, leaving only the last raw observation visible in watchdog diagnostics. Exact topology repair. | Preserve the ordered, unique fullscreen plan indices at workflow decoding and scenario-resolution boundaries while retaining the first-index compatibility accessor. Build aggregate expectations and assertions from the complete plan. Continue accepting readiness only when configured and later ready evidence match the exact full plan, process identity, generations, window indices, and titles. | H exact fixture topology; deterministic decode/compatibility/aggregate UI-owner coverage, canonical aggregate Behavior and lifecycle Pressure, dependent multi-fullscreen real fixture UI in SYNC-028B1M, Process/Tooling. | completed |
 | SYNC-028B1R | `SpaceFixtureWorkflowReadinessTransport`, `SpaceFixtureWorkflowReadinessAggregateObservationOwner`, `SpaceFixtureLaunchConfiguration`; cross-process configured-evidence readback repair | Establishing the distributed observer before a synchronous `XCUIApplication.launch()` assumed the fixture could not publish configured evidence before the observer became deliverable on the UI-test main queue. A real AX-suppressed workflow missed that baseline and exhausted the aggregate watchdog even though the same fixture later published terminal readiness. Evidence-race repair. | Keep the unique distributed notification route and add a unique atomic property-list readback containing the exact configured baseline plus latest evidence. Persist before notification publication; perform one immediate readback before aggregate evaluation and feed both records through the existing generation and exact-identity state machine. Resolve path intent at the fixture resource boundary. The fixture coordinator and workflow aggregate invocation both own cleanup. | H cross-process fixture topology; Unit, Behavior, missed-notification UI Oracle, standard and edge real fixture UI, lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-028B1R2 | `SpaceFixtureWorkflowReadinessAggregateObservationOwner`; notification-triggered envelope refresh | A single readback before aggregate waiting assumed any configured evidence already persisted by a synchronously launched fixture would be visible at that exact consumer turn. A delivered later ready notification could therefore leave its missed configured baseline unobserved until the watchdog. Evidence-race repair. | Install every exact-route observer before an immediate initial readback. On each delivered route notification, read that route's atomic configured/latest envelope first, then feed the notification through the same aggregate generation and exact process/topology state machine. The aggregate invocation owns observers, generation replacement, cancellation, and readback cleanup; the existing watchdog remains only the diagnostic failure bound. | H cross-process fixture topology; deterministic initial/event/stale/duplicate UI-owner coverage, AX-suppressed real fixture UI, lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-028B1T | `scripts/testing/run-ui-tests-local.sh`, `SpaceFixtureResolvedWorkflow.configured`; prepared fixture workflow routing into the UI-test process | Rebuilding fixture variants below a custom `--build-root` was assumed to make that workflow available to the UI test. The wrapper exported only one route, and scheme-driven `test-without-building` did not transfer later shell exports or consume a patched `.xctestrun`; the UI test therefore fell back to a stale default workflow while current source was built elsewhere. Process/Tooling evidence repair. | Resolve both workflow path intents against the wrapper invocation directory, require one generated `.xctestrun` containing `FlowTabUITests`, write both absolute routes into its test-host environment, and execute that exact file. The wrapper invocation owns the generated file and custom build root. A UI-runner Oracle loads both routed workflows and requires every app bundle to share its resolved variants directory. | H shared UI validation infrastructure; targeted routing UI, representative real fixture UI, Process/Tooling. | completed |
@@ -2657,6 +2658,65 @@ polling cadence, deadline, or timeout in the scoped paths.
 - Commit: `025ef62938cc3b930b520722e66a7a6a929eba76`
   (`refactor(sync): migrate SYNC-028B1 workflow readiness`).
 
+### SYNC-028B1F Closure Record
+
+- Failure evidence: the AX-suppressed noisy workflow reached the aggregate
+  watchdog with `configuredApps=[] readyApps=[]` while its last raw Chrome
+  evidence was terminal ready with expected and completed fullscreen plan
+  indices `[2, 3]` under
+  `.build-local/evidence-driven-sync/SYNC-028B1M/noisy-ui-attempt-006`.
+  Semantic tracing from the workflow source through fixture launch and
+  readiness publication confirmed that the producer preserved `[2, 3]`.
+  `SpaceFixtureResolvedWorkflow.App` exposed only its first index, so the
+  consumer built static aggregate expectations for `[2]`; both configured and
+  ready evidence failed exact topology matching.
+- Design and Oracle: workflow decoding and scenario resolution now preserve the
+  complete ordered, unique fullscreen plan. Aggregate expectations and final
+  assertions use that complete plan together with workflow app ID, bundle ID,
+  positive PID, observation and transition generations, all window indices,
+  and ordered titles. The pure aggregate still completes only after configured
+  and later terminal evidence from the same exact process and topology.
+- Compatibility and lifecycle: the existing `fullscreenWindowIndex` accessor
+  returns the first preserved index for callers that model one fullscreen
+  window. Construction from the legacy single-index initializer derives the
+  equivalent one-element plan. This slice adds no observer or asynchronous
+  resource; the workflow aggregate invocation continues to own generation,
+  observer, readback, expectation, and cancellation cleanup.
+- Unit and Behavior: the canonical aggregate run rebuilt all six targets and
+  passed 4/4 with zero failures in 0.005 seconds under
+  `.build-local/evidence-driven-sync/SYNC-028B1F/app-tests-attempt-001`.
+  It verifies exact all-process completion, canceled and stale generation
+  rejection, synchronous replacement, and 500-generation lifecycle pressure.
+- Deterministic UI-owner coverage: the configured noisy source resolves to
+  fullscreen indices `[2, 3]` and both ordered titles; the compatibility
+  initializer preserves a single index; and configured plus ready evidence for
+  the complete two-index plan resolves the aggregate exactly once. These three
+  tests passed 3/3 with zero failures in 0.785 seconds under
+  `.build-local/evidence-driven-sync/SYNC-028B1F/targeted-ui-attempt-001`.
+- Dependent real fixture UI: the current noisy workflow performs the separately
+  owned fixture-metadata Oracle before aggregate waiting. SYNC-028B1M moves
+  that Oracle behind terminal readiness and owns the final real
+  multi-fullscreen Option+Tab validation with this exact-plan repair present.
+- Pressure and retained time policy: the canonical aggregate workload replaces
+  its owner 500 times and accepts only the current exact generation. This slice
+  introduces no duration, timer, retry, polling cadence, or watchdog; process
+  scheduling changes evidence arrival time while the complete topology remains
+  the success condition.
+- FlowTabCore: not relevant because the repaired identity belongs to UI-test
+  workflow resolution and fixture-readiness orchestration and adds no
+  core-domain API.
+- Process/Tooling: final source rebuilt all six targets successfully under
+  `.build-local/evidence-driven-sync/SYNC-028B1F/process-build-001`; the
+  generated UI runner was signed and verified with the configured Apple
+  Development identity. Swift parse, project property-list validation,
+  source-size checks, canonical FlowTabTests and UI-wrapper execution,
+  `git diff --check`, and exact staged-content review passed. Extracting the
+  87-line workflow-app model reduced the existing oversized workflow source.
+  The 165-line focused test source remains below 400 lines. Startup
+  `prompts.zip` remains unchanged and outside the slice.
+- Commit: local slice commit
+  (`fix(sync): preserve SYNC-028B1F fullscreen plan`).
+
 ### SYNC-028B1R Closure Record
 
 - Failure evidence: the AX-suppressed real workflow reached the aggregate
@@ -2757,8 +2817,10 @@ polling cadence, deadline, or timeout in the scoped paths.
   configured transition 1 and ready transition 5 for the same bundle ID, PID,
   observation generation, window plan, fullscreen plan, and titles. Unified
   logging independently recorded configured, window-topology, fullscreen,
-  application-AX, and ready publication. This isolated the remaining race to
-  the consumer's one-shot envelope read.
+  application-AX, and ready publication. These observations proved that the
+  producer and readback transport carried both generations. Subsequent
+  sequencing past the metadata Oracle exposed the independent complete
+  fullscreen-plan identity mismatch assigned to SYNC-028B1F.
 - Design and Oracle: `start()` installs every exact distributed-notification
   observer and then performs an immediate initial readback. Each delivered
   notification refreshes only its entry's atomic configured/latest envelope
@@ -2790,13 +2852,14 @@ polling cadence, deadline, or timeout in the scoped paths.
   2/2 with zero failures in 43.435 seconds under
   `.build-local/evidence-driven-sync/SYNC-028B1R2/representative-ui-attempt-001`.
   The edge Oracle preserved the two exact CG-backed window identities.
-- Dependent AX-suppressed path: after this repair, the original noisy
-  Option+Tab reproduction completed aggregate workflow readiness and advanced
-  to the separately owned fixture-metadata Oracle under
+- Dependent AX-suppressed path: the original noisy Option+Tab reproduction
+  reached the separately owned fixture-metadata Oracle under
   `.build-local/evidence-driven-sync/SYNC-028B1R2/noisy-ui-attempt-001`.
-  That next Oracle recorded its existing metadata-visibility failure at
-  `FlowTabUITests+SpaceFixtureApp.swift:308`; its evidence migration and final
-  end-to-end pass remain assigned to SYNC-028B1M.
+  The launcher evaluated that Oracle before aggregate waiting and recorded its
+  metadata-visibility failure at
+  `FlowTabUITests+SpaceFixtureApp.swift:308`. SYNC-028B1M owns the corrected
+  sequencing and final end-to-end validation with the SYNC-028B1F complete-plan
+  identity repair present.
 - Pressure: the UI-owner workload performs event-triggered file readback under
   stale and duplicate callback pressure, while the pure aggregate workload
   replaces its owner 500 times. Delayed callback delivery changes elapsed time;
