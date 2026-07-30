@@ -802,31 +802,6 @@ extension FlowTabUITests {
         return false
     }
 
-    private func assertSwitcherPreviewShowsOnlyExpectedTitles(
-        _ expectedTitles: [String],
-        in diagnosticsSummaryElement: XCUIElement,
-        timeout: TimeInterval
-    ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        var visibleTitles: [String] = []
-        repeat {
-            visibleTitles = switcherPreviewTitles(from: diagnosticsSummaryElement)
-            if Set(visibleTitles) == Set(expectedTitles) {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTAssertEqual(
-            Set(visibleTitles),
-            Set(expectedTitles),
-            """
-            Expected switcher preview titles \(expectedTitles.sorted()), \
-            found \(visibleTitles.sorted())
-            """
-        )
-    }
-
     private func waitForSwitcherMode(
         _ diagnosticsSummaryElement: XCUIElement,
         modePrefix: String,
@@ -983,44 +958,6 @@ extension FlowTabUITests {
         for workflowApp: SpaceFixtureResolvedWorkflow.App
     ) -> String {
         "\(workflowApp.identity.bundleIdentifier):\(workflowApp.windowCount)"
-    }
-
-    func switcherPreviewTitles(from diagnosticsSummaryElement: XCUIElement) -> [String] {
-        let rawValue = switcherPanelDiagnosticsValue(diagnosticsSummaryElement, key: "preview")
-        guard rawValue != "inactive" else { return [] }
-        guard let separatorRange = rawValue.range(of: "::") else { return [] }
-        let titles = rawValue[separatorRange.upperBound...]
-        guard !titles.isEmpty else { return [] }
-        return titles.split(separator: "|").map(String.init)
-    }
-
-    func noisyFullscreenWorkflowPreviewContainsRequiredRealWindows(
-        _ diagnosticsSummary: XCUIElement,
-        for workflowApp: SpaceFixtureResolvedWorkflow.App
-    ) -> Bool {
-        let previewTitles = Set(switcherPreviewTitles(from: diagnosticsSummary))
-        let fullscreenTitles = Set(workflowApp.fullscreenWindowTitles)
-        let standardTitles = Set(workflowApp.expectedWindowTitles).subtracting(fullscreenTitles)
-        guard !fullscreenTitles.isEmpty else {
-            return Set(workflowApp.expectedWindowTitles).isSubset(of: previewTitles)
-        }
-        return standardTitles.isSubset(of: previewTitles)
-            && !previewTitles.isDisjoint(with: fullscreenTitles)
-    }
-
-    func waitForNoisyFullscreenWorkflowPreviewTitles(
-        _ diagnosticsSummary: XCUIElement,
-        for workflowApp: SpaceFixtureResolvedWorkflow.App,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if noisyFullscreenWorkflowPreviewContainsRequiredRealWindows(diagnosticsSummary, for: workflowApp) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
     }
 
     func visibleFullscreenWindowTitle(

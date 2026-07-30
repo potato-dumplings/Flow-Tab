@@ -235,9 +235,9 @@ extension FlowTabUITests {
         )
 
         XCTAssertTrue(
-            waitForExactNoisyWorkflowPreviewTitles(
+            waitForSwitcherPreviewTitles(
                 initialDiagnosticsSummary,
-                for: targetApp,
+                toExactlyMatch: targetApp.expectedWindowTitles,
                 timeout: 4
             ),
             """
@@ -299,9 +299,9 @@ extension FlowTabUITests {
                     allowsNoisyCGSiblings: true
                 )
                 XCTAssertTrue(
-                    waitForExactNoisyWorkflowPreviewTitles(
+                    waitForSwitcherPreviewTitles(
                         diagnosticsSummary,
-                        for: targetApp,
+                        toExactlyMatch: targetApp.expectedWindowTitles,
                         timeout: 4
                     ),
                     """
@@ -467,24 +467,6 @@ extension FlowTabUITests {
         return workflowApp.expectedWindowTitles.filter { !fullscreenTitles.contains($0) }
     }
 
-    private func waitForExactNoisyWorkflowPreviewTitles(
-        _ diagnosticsSummary: XCUIElement,
-        for workflowApp: SpaceFixtureResolvedWorkflow.App,
-        timeout: TimeInterval
-    ) -> Bool {
-        let expectedTitles = Set(workflowApp.expectedWindowTitles)
-        let expectedCount = workflowApp.expectedWindowTitles.count
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let previewTitles = switcherPreviewTitles(from: diagnosticsSummary)
-            if previewTitles.count == expectedCount && Set(previewTitles) == expectedTitles {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-
     private func assertInAppWindowSwitcherReady(
         for workflowApp: SpaceFixtureResolvedWorkflow.App,
         in app: XCUIApplication,
@@ -516,9 +498,9 @@ extension FlowTabUITests {
         )
         if allowsNoisyCGSiblings {
             XCTAssertTrue(
-                waitForExactNoisyWorkflowPreviewTitles(
+                waitForSwitcherPreviewTitles(
                     diagnosticsSummary,
-                    for: workflowApp,
+                    toExactlyMatch: workflowApp.expectedWindowTitles,
                     timeout: 8
                 ),
                 """

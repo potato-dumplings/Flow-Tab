@@ -74,9 +74,9 @@ extension FlowTabUITests {
                 since: runtimeLogSnapshot
             )
             XCTAssertTrue(
-                waitForExactNoisyOptionTabPreviewTitles(
+                waitForSwitcherPreviewTitles(
                     diagnosticsSummary,
-                    for: targetApp,
+                    toExactlyMatch: targetApp.expectedWindowTitles,
                     timeout: 8
                 ),
                 """
@@ -310,21 +310,4 @@ extension FlowTabUITests {
         )
     }
 
-    private func waitForExactNoisyOptionTabPreviewTitles(
-        _ diagnosticsSummary: XCUIElement,
-        for workflowApp: SpaceFixtureResolvedWorkflow.App,
-        timeout: TimeInterval
-    ) -> Bool {
-        let expectedTitles = Set(workflowApp.expectedWindowTitles)
-        let expectedCount = workflowApp.expectedWindowTitles.count
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let previewTitles = switcherPreviewTitles(from: diagnosticsSummary)
-            if previewTitles.count == expectedCount && Set(previewTitles) == expectedTitles {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
 }

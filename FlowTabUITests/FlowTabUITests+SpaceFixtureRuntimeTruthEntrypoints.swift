@@ -831,33 +831,4 @@ extension FlowTabUITests {
         return searchInput
     }
 
-    private func waitForSwitcherPreviewTitles(
-        _ diagnosticsSummary: XCUIElement,
-        toEqual expectedTitles: Set<String>,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if Set(switcherPreviewTitles(from: diagnosticsSummary)) == expectedTitles {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-
-    private func waitForSwitcherPreviewTitles(
-        _ diagnosticsSummary: XCUIElement,
-        toContain expectedTitles: Set<String>,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if expectedTitles.isSubset(of: Set(switcherPreviewTitles(from: diagnosticsSummary))) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
 }
