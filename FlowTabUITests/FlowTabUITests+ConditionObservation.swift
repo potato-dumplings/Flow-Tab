@@ -47,6 +47,7 @@ final class FlowTabUITestConditionObservationOwner<Value> {
 
     private var nextGeneration: UInt64 = 1
     private var currentGeneration: UInt64?
+    private var activeReadbackGeneration: UInt64?
     private var eventCancellation: FlowTabUITestObservationCancellation?
     private var resolvedExpectation: XCTestExpectation?
     private var lastWaitResult: XCTWaiter.Result?
@@ -160,6 +161,22 @@ final class FlowTabUITestConditionObservationOwner<Value> {
         else {
             return
         }
+        // XCUI readbacks can pump the RunLoop. Timer callbacks wait for the
+        // active readback, while notifications may still close synchronous races.
+        if source == .scheduledReadback,
+           activeReadbackGeneration == generation
+        {
+            return
+        }
+        let previousReadbackGeneration =
+            activeReadbackGeneration
+        activeReadbackGeneration = generation
+        defer {
+            if activeReadbackGeneration == generation {
+                activeReadbackGeneration =
+                    previousReadbackGeneration
+            }
+        }
         let value = readback()
         // Client closures can pump the RunLoop and reenter this owner.
         guard currentGeneration == generation,
@@ -196,25 +213,6 @@ final class FlowTabUITestConditionObservationOwner<Value> {
 
 enum FlowTabUITestConditionObservationPolicy {
     static let xcuiReadbackCadence: TimeInterval = 0.1
-}
-
-enum FlowTabUITestConditionReadbackScheduler {
-    static func mainRunLoopRegistration(
-        cadence: TimeInterval
-    ) -> FlowTabUITestConditionObservationRegistration {
-        { readback in
-            let timer = Timer(
-                timeInterval: cadence,
-                repeats: true
-            ) { _ in
-                readback(.scheduledReadback)
-            }
-            RunLoop.main.add(timer, forMode: .common)
-            return FlowTabUITestObservationCancellation {
-                timer.invalidate()
-            }
-        }
-    }
 }
 
 struct FlowTabUITestFrontmostApplicationSnapshot: Equatable {
