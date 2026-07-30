@@ -30,10 +30,7 @@ extension FlowTabUITests {
         owner.start()
         defer { owner.cancel() }
 
-        XCTAssertEqual(
-            owner.resolvedEvidence?.source,
-            .initialReadback
-        )
+        XCTAssertEqual(owner.resolvedEvidence?.source, .initialReadback)
         XCTAssertEqual(
             order,
             ["register", "readback", "cancel"]
@@ -89,9 +86,11 @@ extension FlowTabUITests {
         owner.start()
         defer { owner.cancel() }
 
-        XCTAssertEqual(
-            owner.resolvedEvidence?.source,
-            .initialReadback
+        XCTAssertEqual(owner.resolvedEvidence?.source, .initialReadback)
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "[percentDecoded]"
+            )
         )
     }
 

@@ -1139,26 +1139,6 @@ extension FlowTabUITests {
         return workflowApp.fullscreenWindowTitles.first { previewTitles.contains($0) }
     }
 
-    func waitForSwitcherSearchSelectedResult(
-        _ expectedResultID: String,
-        diagnosticsSummary: XCUIElement,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let latestValue = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "searchSelectedResult"
-            )
-            let decoded = latestValue.removingPercentEncoding ?? latestValue
-            if decoded == expectedResultID {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-
     private func switcherPanelDiagnosticsDebugSummary(_ diagnosticsSummaryElement: XCUIElement) -> String {
         guard diagnosticsSummaryElement.exists else {
             return "diagnosticsSummary=<missing>"

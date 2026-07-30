@@ -742,10 +742,10 @@ extension FlowTabUITests {
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         XCTAssertTrue(
-            waitForSwitcherSearchSelectedResult(
-                resultID,
-                diagnosticsSummary: diagnosticsSummary,
-                timeout: 2
+            waitForSwitcherDiagnostics(
+                diagnosticsSummary,
+                key: "searchSelectedResult", equals: resultID,
+                decodesPercentEncoding: true, timeout: 2
             ),
             """
             Search result command did not select \(resultID).
