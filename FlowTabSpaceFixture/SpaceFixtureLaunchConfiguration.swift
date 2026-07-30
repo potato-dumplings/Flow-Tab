@@ -518,11 +518,42 @@ extension SpaceFixtureLaunchConfiguration {
         else {
             return nil
         }
+        let readbackURL: URL? =
+            stringValue(
+                after:
+                    SpaceFixtureWorkflowReadinessRoute
+                        .readbackPathArgument,
+                in: arguments
+            ).flatMap { value -> URL? in
+                let pathIntent =
+                    value.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                guard !pathIntent.isEmpty else {
+                    return nil
+                }
+                return resolveWorkflowReadinessReadbackURL(
+                    pathIntent
+                )
+            }
         return SpaceFixtureWorkflowReadinessRoute(
             notificationName: Notification.Name(
                 notificationName
-            )
+            ),
+            readbackURL: readbackURL
         )
+    }
+
+    private static func resolveWorkflowReadinessReadbackURL(
+        _ pathIntent: String
+    ) -> URL {
+        if (pathIntent as NSString).isAbsolutePath {
+            return URL(fileURLWithPath: pathIntent)
+                .standardizedFileURL
+        }
+        return FileManager.default.temporaryDirectory
+            .appendingPathComponent(pathIntent)
+            .standardizedFileURL
     }
 
     fileprivate static func stringValue(after flag: String, in arguments: [String]) -> String? {

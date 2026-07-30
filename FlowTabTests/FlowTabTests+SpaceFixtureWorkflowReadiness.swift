@@ -326,6 +326,87 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testSpaceFixtureWorkflowReadinessReadbackPersistsBaselineAndLatestEvidence() {
+        var published:
+            [SpaceFixtureWorkflowReadinessEvidence] = []
+        var readyCount = 0
+        let owner =
+            SpaceFixtureWorkflowReadinessOwner {
+                published.append($0)
+            }
+        let generation = owner.start(
+            expectation:
+                workflowReadinessExpectation(
+                    fullscreenWindowPlanIndices: [],
+                    desktopAnchorWindowPlanIndex: nil,
+                    requiresAXSuppression: false
+                ),
+            onReady: { _ in readyCount += 1 }
+        )
+        let configuredEvidence = published[0]
+        owner.windowTopologyDidResolve(
+            planIndices: [1, 2],
+            observationGeneration: generation
+        )
+        let readyEvidence = published.last!
+        let readbackURL =
+            FileManager.default.temporaryDirectory
+                .appendingPathComponent(
+                    "flowtab-workflow-readiness-unit-"
+                        + UUID().uuidString
+                        + ".plist"
+                )
+        let route =
+            SpaceFixtureWorkflowReadinessRoute(
+                notificationName: Notification.Name(
+                    "workflow-readiness-unit"
+                ),
+                readbackURL: readbackURL
+            )
+        defer {
+            SpaceFixtureWorkflowReadinessTransport
+                .removeReadbackEvidence(route: route)
+        }
+
+        SpaceFixtureWorkflowReadinessTransport
+            .recordReadbackEvidence(
+                configuredEvidence,
+                route: route
+            )
+        SpaceFixtureWorkflowReadinessTransport
+            .recordReadbackEvidence(
+                readyEvidence,
+                route: route
+            )
+        XCTAssertEqual(
+            SpaceFixtureWorkflowReadinessTransport
+                .readbackEvidence(route: route),
+            [
+                configuredEvidence,
+                readyEvidence
+            ]
+        )
+        XCTAssertEqual(readyCount, 1)
+        XCTAssertEqual(
+            owner.transitionGeneration,
+            readyEvidence.transitionGeneration
+        )
+
+        SpaceFixtureWorkflowReadinessTransport
+            .removeReadbackEvidence(route: route)
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: readbackURL.path
+            )
+        )
+        XCTAssertTrue(
+            SpaceFixtureWorkflowReadinessTransport
+                .readbackEvidence(route: route)
+                .isEmpty
+        )
+    }
+
+    @MainActor
     func testSpaceFixtureWorkflowReadinessLifecyclePressure() {
         var readyGenerations: [Int] = []
         let owner =

@@ -125,6 +125,7 @@ and Process/Tooling.
 | SYNC-028A | `SpaceFixtureWorkflowReadinessOwner`, `SpaceFixtureWindowCoordinator`, `SpaceFixtureWindowContentView`, `launchSpaceFixtureWorkflow`; one fixture process readiness | The visible “Ready” state and shared single-process UI launcher previously advanced before fullscreen and desktop-refocus completion, then used a fixed settle duration to infer usable topology. Evidence migration. | Start a coordinator-owned readiness generation before window publication and emit exact configured, planned-window, fullscreen-completion, desktop-presentation, application-AX-exposure, and terminal-ready evidence. Update the visible state only from terminal evidence. The UI installs a unique observer before launch, captures the configured baseline, and accepts the later ready stage only for the same generation, bundle ID, PID, window plan, and fullscreen plan. Coordinator and XCTest-case lifecycles own cancellation and observer cleanup. | H fixture topology; Unit, Behavior, representative real fullscreen UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-028B | Composite multi-application workflow-readiness routing boundary | Semantic owner review separated readiness evidence emitted independently by every fixture process from the final desktop-anchor activation and Space readback. Migration routing. | Aggregate every configured fixture process through SYNC-028B1, then establish the final anchor through SYNC-028B2. | H aggregate; child rows define required validation. | completed |
 | SYNC-028B1 | `SpaceFixtureWorkflowReadinessAggregateOwner`, `launchResolvedSpaceFixtureWorkflow`, `launchResolvedEdgeInputsWorkflow`; all-process readiness aggregation | A workflow-wide `settleTimeout` and fixed RunLoop advancement inferred when independently launched fixture processes and their Space topology were ready. Evidence migration plus watchdog. | Install a unique distributed observer for every workflow app before launching any process. Capture each exact configured baseline and accept its later ready evidence only for the configured workflow app ID, bundle ID, PID, observation generation, window plan, fullscreen plan, and titles. Complete after every app has terminal evidence. The workflow invocation owns all observers and aggregate-generation cancellation; one named watchdog reports every unmet app and last observation. | H multi-process fixture topology; Unit, Behavior, standard and edge multi-application UI, deterministic lifecycle Pressure, Process/Tooling. | completed |
+| SYNC-028B1R | `SpaceFixtureWorkflowReadinessTransport`, `SpaceFixtureWorkflowReadinessAggregateObservationOwner`, `SpaceFixtureLaunchConfiguration`; cross-process configured-evidence readback repair | Establishing the distributed observer before a synchronous `XCUIApplication.launch()` assumed the fixture could not publish configured evidence before the observer became deliverable on the UI-test main queue. A real AX-suppressed workflow missed that baseline and exhausted the aggregate watchdog even though the same fixture later published terminal readiness. Evidence-race repair. | Keep the unique distributed notification route and add a unique atomic property-list readback containing the exact configured baseline plus latest evidence. Persist before notification publication; perform one immediate readback before aggregate evaluation and feed both records through the existing generation and exact-identity state machine. Resolve path intent at the fixture resource boundary. The fixture coordinator and workflow aggregate invocation both own cleanup. | H cross-process fixture topology; Unit, Behavior, missed-notification UI Oracle, standard and edge real fixture UI, lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-028B2 | `SpaceFixtureWorkflowDesktopAnchorObservationOwner`, `launchResolvedSpaceFixtureWorkflow`, `launchResolvedEdgeInputsWorkflow`; final desktop-anchor activation | After aggregate readiness, the launchers call `activate()` and use generic foreground state as the final desktop-anchor result. Evidence migration with exact readback. | Establish workspace observers and initial readback before activation. Resolve only when the exact readiness PID is active and frontmost, XCUI reports it foreground, the exact plan-identified XCUI window frame matches the PID-scoped topmost on-screen CG window, and that CG frame satisfies the desktop-Space non-fullscreen-size readback. The workflow invocation owns generation cancellation, observers, polling, and a diagnostic terminal watchdog. | H desktop/Space topology; Unit, Behavior, affected standard and edge UI, runtime-topology Pressure, Process/Tooling. | completed |
 | SYNC-029 | `FlowTabUITestInitialPresentationObservationOwner`, `FlowTabUITestBootstrapper.presentInitialUIIfNeeded`; initial UI-test Search/switcher presentation | Twenty 150ms retries and two equal snapshots infer runtime projection stability before opening Search/switcher. Evidence migration. | Install exact projection observers before the baseline readback and readiness request. Resolve from an initially complete projection, a monotonic later generation, or a same-generation completeness transition; require the exact filtered projection/session item signature and a compatible post-presentation readback. A complete empty projection is authoritative no-content. The bootstrapper owns replacement, prepare, termination, resolution, observer, generation, task, and watchdog cleanup. | H test orchestration; Behavior, UI, runtime-topology/Search Pressure. | completed; Search activation terminal evidence follows in SYNC-029A |
 | SYNC-029A | `FlowTabUITestInitialSearchActivationObservationOwner`, `FlowTabUITestBootstrapper.resolveInitialPresentation`; initial Search activation terminal state | Initial presentation publishes `.presented` when the panel/session projection matches even if `searchIsActiveOrPending` is false. A real fixture run retained `mode=appCycle` and never exposed the Search input. | Install the exact committed-Search-index observer, perform the initial readback, and request Search freshness before initial panel presentation can enqueue session maintenance. After the exact panel/session is presented, perform an immediate Search-state readback and activate Search. A matching committed-index notification may retry activation. Resolve only while the panel remains presented with the exact ordered session IDs and Search is active. Bootstrapper preparation, replacement, termination, resolution, the runtime-aligned diagnostic watchdog, and the UI-test terminal bound own cancellation and cleanup. | H TestingSupport presentation Oracle; deterministic initial/pre-presentation-event/delayed/cancel/duplicate/watchdog tests, Behavior integration, affected real Search UI, lifecycle Pressure, Process/Tooling. | completed |
@@ -2653,6 +2654,94 @@ polling cadence, deadline, or timeout in the scoped paths.
   remains unchanged and outside the slice.
 - Commit: `025ef62938cc3b930b520722e66a7a6a929eba76`
   (`refactor(sync): migrate SYNC-028B1 workflow readiness`).
+
+### SYNC-028B1R Closure Record
+
+- Failure evidence: the AX-suppressed real workflow reached the aggregate
+  watchdog with `configuredApps=[] readyApps=[]` while its final Chrome
+  observation was already `stage=ready`. Unified process logs recorded
+  configured publication at 21:24:05.400, the synchronous launch returning
+  about 57 milliseconds later, and terminal readiness at 21:24:12.876 under
+  `.build-local/evidence-driven-sync/SYNC-028B1R/noisy-ui-attempt-001`.
+  The producer therefore emitted during `XCUIApplication.launch()` while the
+  UI-test main queue could not deliver its already-installed distributed
+  observer.
+- Design and Oracle: each workflow app retains its unique notification route
+  and now receives a unique readback file. Before publishing a notification,
+  `SpaceFixtureWorkflowReadinessTransport` atomically writes a binary property
+  list containing the exact configured baseline and latest evidence. A new
+  configured stage resets the envelope; every later stage preserves that
+  baseline and replaces only the latest record. Immediately before aggregate
+  evaluation, the UI owner reads both records once and supplies them to the
+  existing pure aggregate owner under the active aggregate generation.
+  Completion still requires the exact workflow app ID, bundle ID, positive
+  PID, fixture observation generation, later transition generation, window
+  plan, fullscreen plan, titles, and terminal readiness.
+- Path and compatibility boundary: the optional readback route preserves
+  notification-only launch configurations. Absolute path intents are
+  standardized; relative intents are resolved beneath the fixture process
+  temporary directory where the resource becomes accessible. UI workflow
+  routes pass an absolute standardized path, preserving the repository's path
+  intent boundary.
+- Lifecycle: the fixture coordinator removes its readback on launch
+  replacement and cancellation. The aggregate observation owner removes every
+  app's readback on cancellation and deinitialization, clears the active
+  generation, and continues to reject stale or duplicate evidence through the
+  existing generation owner. Atomic replacement prevents a reader from
+  observing a partially written envelope.
+- Retained time policy: this repair adds no duration, retry, polling cadence,
+  or success deadline. The SYNC-028B1 readiness watchdog remains solely the
+  diagnostic failure upper bound. Success comes from notification delivery or
+  the immediate exact readback through the same aggregate state machine.
+- Unit and Behavior: the final focused canonical run passed 6/6 with zero
+  failures in 0.004 seconds (0.005 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-028B1R/targeted-attempt-004`.
+  Coverage includes relative-path resolution, exact configured/latest
+  persistence, transition-generation preservation, file cleanup, missing-file
+  readback, aggregate completion, cancellation, stale generations, readiness
+  replacement, and exact topology rules.
+- Expanded FlowTabTests: the final source rebuilt all six targets and passed
+  1032 test cases; one unrelated AppDelegate launch-Search test produced two
+  duplicate hotkey-registration assertions during the ordered full run under
+  `.build-local/evidence-driven-sync/SYNC-028B1R/full-attempt-001`. Its isolated
+  canonical rerun passed 1/1 in 0.745 seconds under
+  `.build-local/evidence-driven-sync/SYNC-028B1R/full-failure-retry-attempt-001`.
+  The focused readiness tests, all 446 `FlowTabTests`, and every other priority
+  coverage test passed in the expanded run. The failure path executes before
+  and has no dependency on the fixture-readiness sources changed by this
+  slice.
+- FlowTabCore: not relevant because the readback transport belongs to the
+  fixture and UI-test orchestration boundary and adds no core-domain API.
+- UI: the deterministic missed-notification Oracle wrote configured and ready
+  evidence without publishing either notification, then passed 1/1 in 0.365
+  seconds under
+  `.build-local/evidence-driven-sync/SYNC-028B1R/readback-owner-ui-attempt-002`.
+  The standard three-application workflow passed
+  `testHomePageShowsMultipleRealSpaceFixtureWorkflowAppsAndWindowCounts` 1/1
+  in 26.855 seconds under
+  `.build-local/evidence-driven-sync/SYNC-028B1R/standard-ui-attempt-004`.
+  The duplicate-title workflow passed
+  `testSwitcherPanelPreviewKeepsIdenticalRealWorkflowWindowsDistinct` 1/1 in
+  18.270 seconds under
+  `.build-local/evidence-driven-sync/SYNC-028B1R/edge-ui-attempt-002`,
+  preserving distinct CG window identities.
+- Pressure: the two focused lifecycle workloads passed 2/2 with zero failures
+  in 0.008 seconds (0.009 seconds total) under
+  `.build-local/evidence-driven-sync/SYNC-028B1R/pressure-attempt-001`.
+  Repeated replacement and cancellation leave only the final generation able
+  to complete; slower scheduling changes elapsed time while the exact result
+  remains stable.
+- Dependent validation: the original AX-suppressed reproduction also traverses
+  the separately owned metadata-readiness sequencing contract. Its complete
+  end-to-end rerun is assigned to SYNC-028B1M after that dependent slice is
+  restored.
+- Process/Tooling: the canonical install wrapper produced and verified the
+  fixed-path Apple Development-signed UI app. The UI build-for-testing,
+  fixture variant rebuilds, Swift parse checks, source-size checks,
+  `git diff --check`, and exact staged-content review are recorded for this
+  slice. Startup `prompts.zip` remains unchanged and outside the slice.
+- Commit: local slice commit
+  (`refactor(sync): repair SYNC-028B1R readiness readback`).
 
 ### SYNC-028B2 Closure Record
 

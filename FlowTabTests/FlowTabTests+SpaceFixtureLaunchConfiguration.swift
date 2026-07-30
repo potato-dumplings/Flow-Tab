@@ -137,6 +137,8 @@ extension FlowTabTests {
                 "test.fixture.window-close.trigger",
                 "--workflow-readiness-notification-name",
                 "test.fixture.workflow-readiness",
+                "--workflow-readiness-readback-path",
+                "workflow-readiness-test.plist",
                 "--close-window-index", "2",
                 "--close-window-delay-ms", "1800"
             ]
@@ -174,7 +176,13 @@ extension FlowTabTests {
             SpaceFixtureWorkflowReadinessRoute(
                 notificationName: Notification.Name(
                     "test.fixture.workflow-readiness"
-                )
+                ),
+                readbackURL:
+                    FileManager.default.temporaryDirectory
+                        .appendingPathComponent(
+                            "workflow-readiness-test.plist"
+                        )
+                        .standardizedFileURL
             )
         )
     }

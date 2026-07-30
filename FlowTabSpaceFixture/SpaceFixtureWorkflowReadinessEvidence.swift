@@ -4,8 +4,19 @@ import Foundation
 struct SpaceFixtureWorkflowReadinessRoute: Equatable {
     static let notificationArgument =
         "--workflow-readiness-notification-name"
+    static let readbackPathArgument =
+        "--workflow-readiness-readback-path"
 
     let notificationName: Notification.Name
+    let readbackURL: URL?
+
+    init(
+        notificationName: Notification.Name,
+        readbackURL: URL? = nil
+    ) {
+        self.notificationName = notificationName
+        self.readbackURL = readbackURL
+    }
 }
 
 struct SpaceFixtureWorkflowReadinessIdentity: Equatable {
@@ -120,6 +131,11 @@ struct SpaceFixtureWorkflowReadinessEvidence:
 }
 
 enum SpaceFixtureWorkflowReadinessTransport {
+    private enum ReadbackKey {
+        static let configured = "configured"
+        static let latest = "latest"
+    }
+
     private enum UserInfoKey {
         static let observationGeneration =
             "observationGeneration"
@@ -152,6 +168,10 @@ enum SpaceFixtureWorkflowReadinessTransport {
         route: SpaceFixtureWorkflowReadinessRoute?
     ) {
         if let route {
+            recordReadbackEvidence(
+                evidence,
+                route: route
+            )
             DistributedNotificationCenter.default()
                 .postNotificationName(
                     route.notificationName,
@@ -163,6 +183,103 @@ enum SpaceFixtureWorkflowReadinessTransport {
         NSLog(
             "SpaceFixture workflow readiness %@",
             evidence.logFields
+        )
+    }
+
+    static func recordReadbackEvidence(
+        _ evidence: SpaceFixtureWorkflowReadinessEvidence,
+        route: SpaceFixtureWorkflowReadinessRoute
+    ) {
+        guard let readbackURL = route.readbackURL
+        else {
+            return
+        }
+        do {
+            var envelope =
+                evidence.stage == .configured
+                ? [:]
+                : try readbackEnvelope(
+                    from: readbackURL
+                ) ?? [:]
+            let fields = userInfo(for: evidence)
+            if evidence.stage == .configured {
+                envelope[ReadbackKey.configured] = fields
+            }
+            envelope[ReadbackKey.latest] = fields
+            let data =
+                try PropertyListSerialization.data(
+                    fromPropertyList: envelope,
+                    format: .binary,
+                    options: 0
+                )
+            try data.write(
+                to: readbackURL,
+                options: .atomic
+            )
+        } catch {
+            NSLog(
+                "SpaceFixture workflow readiness readback write failed path=%@ error=%@",
+                readbackURL.path,
+                error.localizedDescription
+            )
+        }
+    }
+
+    static func readbackEvidence(
+        route: SpaceFixtureWorkflowReadinessRoute
+    ) -> [SpaceFixtureWorkflowReadinessEvidence] {
+        guard let readbackURL = route.readbackURL,
+              let envelope =
+                try? readbackEnvelope(
+                    from: readbackURL
+                )
+        else {
+            return []
+        }
+        let configured =
+            (envelope[ReadbackKey.configured]
+                as? [String: Any]).flatMap {
+                    evidence(
+                        from: Notification(
+                            name: route.notificationName,
+                            userInfo: $0
+                        )
+                    )
+                }
+        let latest =
+            (envelope[ReadbackKey.latest]
+                as? [String: Any]).flatMap {
+                    evidence(
+                        from: Notification(
+                            name: route.notificationName,
+                            userInfo: $0
+                        )
+                    )
+                }
+        var result:
+            [SpaceFixtureWorkflowReadinessEvidence] = []
+        if configured?.stage == .configured,
+           let configured
+        {
+            result.append(configured)
+        }
+        if let latest,
+           latest != configured
+        {
+            result.append(latest)
+        }
+        return result
+    }
+
+    static func removeReadbackEvidence(
+        route: SpaceFixtureWorkflowReadinessRoute?
+    ) {
+        guard let readbackURL = route?.readbackURL
+        else {
+            return
+        }
+        try? FileManager.default.removeItem(
+            at: readbackURL
         )
     }
 
@@ -418,5 +535,22 @@ enum SpaceFixtureWorkflowReadinessTransport {
 
     private static func bool(_ value: Any?) -> Bool? {
         (value as? NSNumber)?.boolValue
+    }
+
+    private static func readbackEnvelope(
+        from url: URL
+    ) throws -> [String: Any]? {
+        guard FileManager.default.fileExists(
+            atPath: url.path
+        ) else {
+            return nil
+        }
+        let data = try Data(contentsOf: url)
+        return try PropertyListSerialization
+            .propertyList(
+                from: data,
+                options: [],
+                format: nil
+            ) as? [String: Any]
     }
 }

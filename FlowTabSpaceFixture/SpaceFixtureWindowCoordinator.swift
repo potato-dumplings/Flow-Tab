@@ -544,6 +544,11 @@ final class SpaceFixtureWindowCoordinator {
         applicationAXSuppressionOwner.cancel()
         windowCloseFaultOwner.cancel()
         workflowReadinessOwner.cancel()
+        SpaceFixtureWorkflowReadinessTransport
+            .removeReadbackEvidence(
+                route:
+                    configuration.workflowReadinessRoute
+            )
     }
 
     private static func applicationAccessibilityExposure()

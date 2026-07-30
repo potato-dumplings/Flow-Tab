@@ -22,13 +22,26 @@ enum SpaceFixtureWorkflowReadinessUITestPolicy {
 
 struct SpaceFixtureWorkflowReadinessUITestRoute {
     let notificationName: Notification.Name
+    let readbackURL: URL
 
     var fixtureLaunchArguments: [String] {
         [
             SpaceFixtureWorkflowReadinessRoute
                 .notificationArgument,
-            notificationName.rawValue
+            notificationName.rawValue,
+            SpaceFixtureWorkflowReadinessRoute
+                .readbackPathArgument,
+            readbackURL.path
         ]
+    }
+
+    var evidenceRoute:
+        SpaceFixtureWorkflowReadinessRoute
+    {
+        SpaceFixtureWorkflowReadinessRoute(
+            notificationName: notificationName,
+            readbackURL: readbackURL
+        )
     }
 }
 
@@ -185,12 +198,21 @@ extension FlowTabUITests {
     func makeSpaceFixtureWorkflowReadinessRoute()
         -> SpaceFixtureWorkflowReadinessUITestRoute
     {
-        SpaceFixtureWorkflowReadinessUITestRoute(
+        let routeToken = UUID().uuidString
+        return SpaceFixtureWorkflowReadinessUITestRoute(
             notificationName: Notification.Name(
                 "io.github.potato-dumplings.flowtab."
                     + "ui-test.fixture-workflow-readiness."
-                    + UUID().uuidString
-            )
+                    + routeToken
+            ),
+            readbackURL:
+                FileManager.default.temporaryDirectory
+                    .appendingPathComponent(
+                        "flowtab-workflow-readiness-"
+                            + routeToken
+                            + ".plist"
+                    )
+                    .standardizedFileURL
         )
     }
 

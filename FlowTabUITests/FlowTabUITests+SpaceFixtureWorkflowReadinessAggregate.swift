@@ -18,6 +18,7 @@ final class SpaceFixtureWorkflowReadinessAggregateObservationOwner {
     private var readyExpectation: XCTestExpectation?
     private var readySnapshot:
         SpaceFixtureWorkflowReadinessAggregateSnapshot?
+    private var aggregateGeneration: Int?
 
     init(
         entries:
@@ -49,6 +50,7 @@ final class SpaceFixtureWorkflowReadinessAggregateObservationOwner {
             readySnapshot = snapshot
             readyExpectation?.fulfill()
         }
+        self.aggregateGeneration = aggregateGeneration
 
         observationTokens = entries.map { entry in
             center.addObserver(
@@ -90,6 +92,7 @@ final class SpaceFixtureWorkflowReadinessAggregateObservationOwner {
     func waitForReady(
         timeout: TimeInterval
     ) -> SpaceFixtureWorkflowReadinessAggregateSnapshot? {
+        observeReadbackEvidence()
         if let readySnapshot {
             return readySnapshot
         }
@@ -104,6 +107,28 @@ final class SpaceFixtureWorkflowReadinessAggregateObservationOwner {
         return readySnapshot
     }
 
+    func observeReadbackEvidence() {
+        guard let aggregateGeneration else {
+            return
+        }
+        for entry in entries {
+            for evidence in
+                SpaceFixtureWorkflowReadinessTransport
+                    .readbackEvidence(
+                        route: entry.route.evidenceRoute
+                    )
+            {
+                aggregateOwner.observe(
+                    evidence,
+                    for:
+                        entry.expectation.workflowAppID,
+                    observationGeneration:
+                        aggregateGeneration
+                )
+            }
+        }
+    }
+
     var diagnosticSummary: String {
         aggregateOwner.lastSnapshot?.logFields
             ?? "unobserved"
@@ -115,12 +140,24 @@ final class SpaceFixtureWorkflowReadinessAggregateObservationOwner {
         }
         observationTokens.removeAll()
         aggregateOwner.cancel()
+        aggregateGeneration = nil
         readyExpectation = nil
+        removeReadbackEvidence()
     }
 
     deinit {
         for token in observationTokens {
             center.removeObserver(token)
+        }
+        removeReadbackEvidence()
+    }
+
+    private func removeReadbackEvidence() {
+        for entry in entries {
+            SpaceFixtureWorkflowReadinessTransport
+                .removeReadbackEvidence(
+                    route: entry.route.evidenceRoute
+                )
         }
     }
 }
@@ -237,5 +274,120 @@ extension FlowTabUITests {
                 }
             )
         }
+    }
+}
+
+extension FlowTabUITests {
+    func testSpaceFixtureWorkflowReadinessAggregateInitialReadbackRecoversPreForegroundEvidence() {
+        let routeToken = UUID().uuidString
+        let notificationName = Notification.Name(
+            "io.github.potato-dumplings.flowtab."
+                + "ui-test.fixture-workflow-readiness."
+                + routeToken
+        )
+        let readbackURL =
+            FileManager.default.temporaryDirectory
+                .appendingPathComponent(
+                    "flowtab-workflow-readiness-"
+                        + routeToken
+                        + ".plist"
+                )
+        let route =
+            SpaceFixtureWorkflowReadinessUITestRoute(
+                notificationName: notificationName,
+                readbackURL: readbackURL
+            )
+        let aggregateExpectation =
+            SpaceFixtureWorkflowReadinessAggregateExpectation(
+                workflowAppID: "readback",
+                bundleIdentifier: "fixture.readback",
+                windowPlanIndices: [1],
+                fullscreenWindowPlanIndices: [],
+                windowTitles: ["Readback"]
+            )
+        let owner =
+            SpaceFixtureWorkflowReadinessAggregateObservationOwner(
+                entries: [
+                    SpaceFixtureWorkflowReadinessAggregateUITestEntry(
+                        expectation: aggregateExpectation,
+                        route: route
+                    )
+                ]
+            )
+        defer { owner.cancel() }
+
+        owner.start()
+        SpaceFixtureWorkflowReadinessTransport
+            .recordReadbackEvidence(
+                Self.readbackAggregateEvidence(
+                    stage: .configured,
+                    transitionGeneration: 1
+                ),
+                route: route.evidenceRoute
+            )
+        SpaceFixtureWorkflowReadinessTransport
+            .recordReadbackEvidence(
+                Self.readbackAggregateEvidence(
+                    stage: .ready,
+                    transitionGeneration: 2
+                ),
+                route: route.evidenceRoute
+            )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "unmet=[readback.configured]"
+            )
+        )
+
+        let snapshot = owner.waitForReady(timeout: 2)
+
+        XCTAssertEqual(
+            snapshot?
+                .configuredEvidenceByWorkflowAppID[
+                    "readback"
+                ]?.stage,
+            .configured
+        )
+        XCTAssertEqual(
+            snapshot?
+                .readyEvidenceByWorkflowAppID[
+                    "readback"
+                ]?.stage,
+            .ready
+        )
+        XCTAssertTrue(snapshot?.isReady == true)
+    }
+
+    private static func readbackAggregateEvidence(
+        stage: SpaceFixtureWorkflowReadinessStage,
+        transitionGeneration: UInt64
+    ) -> SpaceFixtureWorkflowReadinessEvidence {
+        let isReady = stage == .ready
+        return SpaceFixtureWorkflowReadinessEvidence(
+            observationGeneration: 1,
+            transitionGeneration: transitionGeneration,
+            stage: stage,
+            identity:
+                SpaceFixtureWorkflowReadinessIdentity(
+                    bundleIdentifier: "fixture.readback",
+                    processIdentifier: 4_321
+                ),
+            snapshot:
+                SpaceFixtureWorkflowReadinessSnapshot(
+                    expectedWindowPlanIndices: [1],
+                    observedWindowPlanIndices:
+                        isReady ? [1] : [],
+                    expectedFullscreenWindowPlanIndices:
+                        [],
+                    completedFullscreenWindowPlanIndices:
+                        [],
+                    desktopAnchorWindowPlanIndex: nil,
+                    desktopPresentationResolved: true,
+                    applicationAXSuppressionRequired:
+                        false,
+                    applicationAXExposureResolved: true,
+                    windowTitles: ["Readback"]
+                )
+        )
     }
 }
