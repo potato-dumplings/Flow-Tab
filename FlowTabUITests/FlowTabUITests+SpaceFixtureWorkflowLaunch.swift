@@ -83,22 +83,6 @@ extension FlowTabUITests {
                     app: workflowApp
                 )
             }
-            waitForSpaceFixtureWorkflowMetadata(
-                in: app,
-                expectedWindowTitles:
-                    workflowApp.expectedWindowTitles,
-                fullscreenWindowIndex:
-                    waitsForFullscreenMarkers
-                    ? workflowApp.fullscreenWindowIndex
-                    : nil
-            )
-            if workflowApp.fullscreenWindowIndex != nil {
-                logWorkflowSpaceObservation(
-                    "workflow.afterStabilize."
-                        + workflowApp.appID,
-                    app: workflowApp
-                )
-            }
             launchedApps.append(app)
         }
 
@@ -118,6 +102,23 @@ extension FlowTabUITests {
             workflow: workflow,
             launchedApps: launchedApps
         )
+        validateResolvedSpaceFixtureWorkflowMetadata(
+            after: readinessSnapshot,
+            workflow: workflow,
+            applications: launchedApps,
+            waitsForFullscreenMarkers:
+                waitsForFullscreenMarkers,
+            suppressesApplicationAccessibilityChildren:
+                suppressesAppAccessibilityChildren
+        )
+        for workflowApp in workflow.apps
+        where workflowApp.fullscreenWindowIndex != nil {
+            logWorkflowSpaceObservation(
+                "workflow.afterStabilize."
+                    + workflowApp.appID,
+                app: workflowApp
+            )
+        }
         logFullscreenWorkflowSpaceObservations(
             "workflow.afterReadiness",
             workflow: workflow

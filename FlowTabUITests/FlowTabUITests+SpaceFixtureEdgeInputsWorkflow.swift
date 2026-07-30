@@ -353,11 +353,6 @@ extension FlowTabUITests {
                     for: workflowApp.appID
                 )
             launchSpaceFixtureApplicationAndWaitForForeground(app)
-            waitForSpaceFixtureWorkflowMetadata(
-                in: app,
-                expectedWindowTitles: workflowApp.expectedWindowTitles,
-                fullscreenWindowIndex: nil
-            )
             launchedApps.append(app)
         }
 
@@ -376,6 +371,14 @@ extension FlowTabUITests {
             readinessSnapshot,
             workflow: workflow,
             launchedApps: launchedApps
+        )
+        validateResolvedSpaceFixtureWorkflowMetadata(
+            after: readinessSnapshot,
+            workflow: workflow,
+            applications: launchedApps,
+            waitsForFullscreenMarkers: false,
+            suppressesApplicationAccessibilityChildren:
+                false
         )
         if let desktopAnchorWorkflowApp =
                 workflow.apps.first,

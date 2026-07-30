@@ -77,14 +77,6 @@ extension FlowTabUITests {
         SpaceFixtureAppIdentity.configured()
     }
 
-    private var spaceFixtureWorkflowReadyAccessibilityIdentifier: String {
-        "flowtab.spacefixture.workflow.ready"
-    }
-
-    private var spaceFixtureWorkflowSummaryAccessibilityIdentifier: String {
-        "flowtab.spacefixture.workflow.summary"
-    }
-
     private func makeSpaceFixtureApplication(for identity: SpaceFixtureAppIdentity) -> XCUIApplication {
         if let appURL = identity.appURL {
             return XCUIApplication(url: appURL)
@@ -199,113 +191,6 @@ extension FlowTabUITests {
         )
 
         return app
-    }
-
-    func waitForSpaceFixtureWorkflowReadiness(
-        in app: XCUIApplication,
-        windowCount: Int,
-        titlePrefix: String,
-        fullscreenWindowIndex: Int?,
-        readinessTimeout: TimeInterval
-    ) {
-        waitForSpaceFixtureWorkflowReadiness(
-            in: app,
-            expectedWindowTitles: expectedSpaceFixtureWorkflowWindowTitles(
-                titlePrefix: titlePrefix,
-                windowCount: windowCount
-            ),
-            fullscreenWindowIndex: fullscreenWindowIndex,
-            readinessTimeout: readinessTimeout
-        )
-    }
-
-    func waitForSpaceFixtureWorkflowReadiness(
-        in app: XCUIApplication,
-        expectedWindowTitles: [String],
-        fullscreenWindowIndex: Int?,
-        readinessTimeout: TimeInterval,
-        readinessEvidence:
-            SpaceFixtureWorkflowReadinessEvidence? = nil
-    ) {
-        let readyLabel = element(in: app, identifier: spaceFixtureWorkflowReadyAccessibilityIdentifier)
-        let readyExpectation =
-            XCTNSPredicateExpectation(
-                predicate: NSPredicate(
-                    format:
-                        "exists == true AND label == %@",
-                    "Ready"
-                ),
-                object: readyLabel
-            )
-        let waitResult = XCTWaiter.wait(
-            for: [readyExpectation],
-            timeout: readinessTimeout
-        )
-        XCTAssertEqual(
-            waitResult,
-            .completed,
-            "Fixture visible-readiness watchdog expired; "
-                + "lastLabel="
-                + (
-                    readyLabel.exists
-                    ? readyLabel.label
-                    : "<missing>"
-                )
-                + " evidence={"
-                + (
-                    readinessEvidence?.logFields
-                    ?? "unavailable"
-                )
-                + "}"
-        )
-
-        waitForSpaceFixtureWorkflowMetadata(
-            in: app,
-            expectedWindowTitles: expectedWindowTitles,
-            fullscreenWindowIndex: fullscreenWindowIndex
-        )
-    }
-
-    func waitForSpaceFixtureWorkflowMetadata(
-        in app: XCUIApplication,
-        expectedWindowTitles: [String],
-        fullscreenWindowIndex: Int?
-    ) {
-        assertAnySpaceFixtureWorkflowLabel(
-            withIdentifier: spaceFixtureWorkflowSummaryAccessibilityIdentifier,
-            equals: expectedSpaceFixtureWorkflowSummary(windowTitles: expectedWindowTitles),
-            in: app,
-            timeout: 8
-        )
-
-        if let fullscreenWindowIndex {
-            let fullscreenMarker = element(
-                in: app,
-                identifier: "flowtab.spacefixture.window.mode.\(fullscreenWindowIndex)"
-            )
-            XCTAssertTrue(fullscreenMarker.waitForExistence(timeout: 8))
-            XCTAssertEqual(fullscreenMarker.label, "Fullscreen Target")
-        }
-    }
-
-    private func assertAnySpaceFixtureWorkflowLabel(
-        withIdentifier identifier: String,
-        equals expectedValue: String,
-        in app: XCUIApplication,
-        timeout: TimeInterval
-    ) {
-        let labels = app.descendants(matching: .any).matching(identifier: identifier)
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            for label in labels.allElementsBoundByIndex {
-                if label.exists && elementStringValue(label) == expectedValue {
-                    return
-                }
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail("Expected a visible \(identifier) label with value '\(expectedValue)'")
     }
 
     func waitForSpaceFixtureApplicationToTerminate(
