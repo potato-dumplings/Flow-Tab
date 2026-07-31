@@ -85,6 +85,83 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherPreviewExitRequiresExactSelectedWindowCycleBaseline() {
+        let expectedBundleIdentifier =
+            "com.example.notes"
+        let exactSnapshot =
+            switcherSelectionTestSnapshot(
+                selected: expectedBundleIdentifier,
+                mode:
+                    "windowCycle("
+                    + expectedBundleIdentifier
+                    + ")"
+            )
+        let expectedState =
+            FlowTabUITestSwitcherSelectionState(
+                selectedBundleIdentifier:
+                    expectedBundleIdentifier,
+                mode:
+                    "windowCycle("
+                    + expectedBundleIdentifier
+                    + ")"
+            )
+
+        XCTAssertEqual(
+            FlowTabUITestSwitcherSelectionTransition
+                .previewExit(
+                    expectedBundleIdentifier:
+                        expectedBundleIdentifier,
+                    from: exactSnapshot
+                ),
+            .exitWindowCycle(from: expectedState)
+        )
+        XCTAssertNil(
+            FlowTabUITestSwitcherSelectionTransition
+                .previewExit(
+                    expectedBundleIdentifier:
+                        expectedBundleIdentifier,
+                    from:
+                        switcherSelectionTestSnapshot(
+                            selected:
+                                "com.example.browser",
+                            mode:
+                                "windowCycle("
+                                + "com.example.browser"
+                                + ")"
+                        )
+                )
+        )
+        XCTAssertNil(
+            FlowTabUITestSwitcherSelectionTransition
+                .previewExit(
+                    expectedBundleIdentifier:
+                        expectedBundleIdentifier,
+                    from:
+                        switcherSelectionTestSnapshot(
+                            selected:
+                                expectedBundleIdentifier,
+                            mode:
+                                "windowCycle("
+                                + "com.example.browser"
+                                + ")"
+                        )
+                )
+        )
+        XCTAssertNil(
+            FlowTabUITestSwitcherSelectionTransition
+                .previewExit(
+                    expectedBundleIdentifier:
+                        expectedBundleIdentifier,
+                    from:
+                        switcherSelectionTestSnapshot(
+                            selected:
+                                expectedBundleIdentifier,
+                            mode: "appCycle"
+                        )
+                )
+        )
+    }
+
     func testSwitcherSelectionTransitionRequiresPostTriggerEvidence() {
         let baseline =
             FlowTabUITestSwitcherSelectionState(

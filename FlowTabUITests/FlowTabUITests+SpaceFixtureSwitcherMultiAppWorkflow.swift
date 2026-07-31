@@ -184,8 +184,7 @@ extension FlowTabUITests {
 
                 previousWindowCardIdentifiers = Set(windowCards.map(\.identifier))
 
-                app.typeKey(.upArrow, modifierFlags: [])
-                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+                guard exitSwitcherPreview(selectedApp, in: app, diagnostics: diagnosticsSummary) else { return }
             }
 
             XCTAssertEqual(Set(observedAppIDs), Set(workflow.apps.map(\.appID)))
