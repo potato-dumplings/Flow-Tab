@@ -5,7 +5,7 @@ extension FlowTabUITests {
         searchMockRuntimeArguments()
     }
 
-    private var searchPointerHoverTriggerArguments: [String] {
+    var searchPointerHoverTriggerArguments: [String] {
         searchMockRuntimeArguments(opensSearchOnLaunch: false, listensForTrigger: true)
     }
 
@@ -247,50 +247,6 @@ extension FlowTabUITests {
         )
     }
 
-    func testOptionTabSwitcherStationaryPointerOverAppTileDoesNotSelectOnPresentation() throws {
-        let placementApp = makeApp(additionalArguments: optionTabPointerHoverArguments)
-        launchFlowTabUITestApplication(placementApp)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(placementApp, timeout: 10))
-
-        let placementSummary = element(
-            in: placementApp,
-            identifier: Identifier.switcherSummary
-        )
-        XCTAssertTrue(
-            openGlobalSwitcherForPointerHover(
-                placementSummary,
-                traceLabel: "pointer.app.stationary-placement"
-            )
-        )
-        let placementMailTile = element(in: placementApp, identifier: Identifier.switcherAppMockMail)
-        XCTAssertTrue(placementMailTile.waitForExistence(timeout: 5))
-        let stationaryPoint = CGPoint(x: placementMailTile.frame.midX, y: placementMailTile.frame.midY)
-        placementMailTile.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
-        terminateAndWaitForNotRunning(placementApp)
-
-        let app = makeApp(additionalArguments: optionTabPointerHoverArguments)
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        let mailTile = element(in: app, identifier: Identifier.switcherAppMockMail)
-        XCTAssertTrue(
-            openGlobalSwitcherForPointerHover(
-                diagnosticsSummary,
-                traceLabel: "pointer.app.stationary-validation"
-            )
-        )
-        XCTAssertTrue(mailTile.waitForExistence(timeout: 5))
-        assertFrame(mailTile.frame, contains: stationaryPoint)
-        assertSwitcherDiagnosticsValueRemains(
-            diagnosticsSummary,
-            key: "selected",
-            equals: "com.flowtab.mock.browser",
-            duration: 1,
-            message: "A stationary pointer already over the mail app tile must not select it on presentation."
-        )
-    }
-
     func testOptionTabSwitcherClickCommitsAppAndClosesPanel() throws {
         let app = makeApp(additionalArguments: optionTabPointerHoverArguments)
         launchFlowTabUITestApplication(app)
@@ -351,51 +307,6 @@ extension FlowTabUITests {
                 }
             ),
             "Hovering a Control+Tab window card after pointer movement should update the selected window."
-        )
-    }
-
-    func testControlTabSwitcherStationaryPointerOverWindowCardDoesNotSelectOnPresentation() throws {
-        let placementApp = makeApp(additionalArguments: controlTabPointerHoverArguments)
-        launchFlowTabUITestApplication(placementApp)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(placementApp, timeout: 10))
-
-        let placementSummary = element(in: placementApp, identifier: Identifier.switcherSummary)
-        XCTAssertTrue(
-            openInAppSwitcherForPointerHover(
-                placementSummary,
-                traceLabel: "pointer.window.stationary-placement"
-            )
-        )
-        let secondaryWindowID = "flowtab.switcher.window.\("mock-current-secondary".flowTabUITestAccessibilityIdentifierComponent)"
-        let placementSecondaryWindow = element(in: placementApp, identifier: secondaryWindowID)
-        XCTAssertTrue(placementSecondaryWindow.waitForExistence(timeout: 5))
-        let stationaryPoint = CGPoint(
-            x: placementSecondaryWindow.frame.midX,
-            y: placementSecondaryWindow.frame.midY
-        )
-        placementSecondaryWindow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
-        terminateAndWaitForNotRunning(placementApp)
-
-        let app = makeApp(additionalArguments: controlTabPointerHoverArguments)
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        XCTAssertTrue(
-            openInAppSwitcherForPointerHover(
-                diagnosticsSummary,
-                traceLabel: "pointer.window.stationary-validation"
-            )
-        )
-        let secondaryWindow = element(in: app, identifier: secondaryWindowID)
-        XCTAssertTrue(secondaryWindow.waitForExistence(timeout: 5))
-        assertFrame(secondaryWindow.frame, contains: stationaryPoint)
-        assertSwitcherDiagnosticsValueRemains(
-            diagnosticsSummary,
-            key: "selectedWindow",
-            equals: "mock-current-primary",
-            duration: 1,
-            message: "A stationary pointer already over the secondary window card must not select it on presentation."
         )
     }
 
@@ -462,72 +373,6 @@ extension FlowTabUITests {
                 }
             ),
             "Hovering a search result after pointer movement should update the selected search result."
-        )
-    }
-
-    func testSearchPanelStationaryPointerOverResultDoesNotSelectOnPresentation() throws {
-        let browserResultID = "flowtab.switcher.search.app.\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
-        let app = makeApp(additionalArguments: searchPointerHoverTriggerArguments)
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        XCTAssertTrue(
-            openSearchSwitcherForPointerHover(
-                diagnosticsSummary,
-                traceLabel: "pointer.search.prime"
-            )
-        )
-
-        let primingBrowserResult = app.descendants(matching: .any)
-            .matching(identifier: browserResultID)
-            .firstMatch
-        XCTAssertTrue(primingBrowserResult.waitForExistence(timeout: 5))
-        app.typeKey(.escape, modifierFlags: [])
-        app.typeKey(.escape, modifierFlags: [])
-        XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 3))
-        XCTAssertTrue(
-            openSearchSwitcherForPointerHover(
-                diagnosticsSummary,
-                traceLabel: "pointer.search.placement"
-            )
-        )
-
-        let placementBrowserResult = app.descendants(matching: .any)
-            .matching(identifier: browserResultID)
-            .firstMatch
-        XCTAssertTrue(placementBrowserResult.waitForExistence(timeout: 5))
-        assertSearchResultUsesRowSizedFrame(placementBrowserResult)
-        let stationaryPoint = CGPoint(
-            x: placementBrowserResult.frame.midX,
-            y: placementBrowserResult.frame.midY
-        )
-        app.typeKey(.escape, modifierFlags: [])
-        app.typeKey(.escape, modifierFlags: [])
-        XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 3))
-        let homeContent = element(in: app, identifier: Identifier.homeTabContent)
-        XCTAssertTrue(homeContent.waitForExistence(timeout: 3))
-        hoverScreenPoint(stationaryPoint, relativeTo: homeContent)
-        XCTAssertTrue(
-            openSearchSwitcherForPointerHover(
-                diagnosticsSummary,
-                traceLabel: "pointer.search.stationary-validation"
-            )
-        )
-
-        let browserResult = app.descendants(matching: .any)
-            .matching(identifier: browserResultID)
-            .firstMatch
-        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 5))
-        XCTAssertTrue(browserResult.waitForExistence(timeout: 5))
-        assertSearchResultUsesRowSizedFrame(browserResult)
-        assertFrame(browserResult.frame, contains: stationaryPoint)
-        assertSwitcherDiagnosticsValueRemains(
-            diagnosticsSummary,
-            key: "searchSelectedResult",
-            equals: "app%3Acom.flowtab.mock.mail",
-            duration: 1,
-            message: "A stationary pointer already over the browser search result must not select it on presentation."
         )
     }
 
@@ -744,47 +589,7 @@ extension FlowTabUITests {
         )
     }
 
-    private func assertSwitcherDiagnosticsValueRemains(
-        _ diagnosticsSummary: XCUIElement,
-        key: String,
-        equals expectedValue: String,
-        duration: TimeInterval,
-        message: String,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        let deadline = Date().addingTimeInterval(duration)
-        repeat {
-            let value = switcherPanelDiagnosticsValue(diagnosticsSummary, key: key)
-            if value != expectedValue {
-                XCTFail(
-                    "\(message) Expected \(key)=\(expectedValue), found \(value). summary=\(diagnosticsSummary.value ?? "")",
-                    file: file,
-                    line: line
-                )
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-    }
-
-    private func assertFrame(
-        _ frame: CGRect,
-        contains point: CGPoint,
-        tolerance: CGFloat = 2,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        let expandedFrame = frame.insetBy(dx: -tolerance, dy: -tolerance)
-        XCTAssertTrue(
-            expandedFrame.contains(point),
-            "Expected stationary pointer point \(point) to remain inside target frame \(frame).",
-            file: file,
-            line: line
-        )
-    }
-
-    private func assertSearchResultUsesRowSizedFrame(
+    func assertSearchResultUsesRowSizedFrame(
         _ result: XCUIElement,
         file: StaticString = #filePath,
         line: UInt = #line
@@ -796,26 +601,6 @@ extension FlowTabUITests {
             file: file,
             line: line
         )
-    }
-
-    private func hoverScreenPoint(_ point: CGPoint, relativeTo element: XCUIElement) {
-        element.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-            .withOffset(
-                CGVector(
-                    dx: point.x - element.frame.minX,
-                    dy: point.y - element.frame.minY
-                )
-            )
-            .hover()
-    }
-
-    private func terminateAndWaitForNotRunning(
-        _ app: XCUIApplication,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        app.terminate()
-        XCTAssertTrue(app.wait(for: .notRunning, timeout: 5), file: file, line: line)
     }
 
 }

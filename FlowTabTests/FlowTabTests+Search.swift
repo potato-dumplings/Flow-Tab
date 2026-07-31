@@ -6,33 +6,6 @@ import FlowTabCore
 import Carbon
 
 extension FlowTabTests {
-    func testSwitcherPointerSelectionGateIgnoresInitialHoverUntilPointerMoves() {
-        var gate = SwitcherPointerSelectionGate(movementThreshold: 1)
-
-        gate.reset(currentLocation: CGPoint(x: 10, y: 10))
-
-        XCTAssertFalse(gate.isArmed)
-        XCTAssertFalse(gate.recordPointerMoved(to: CGPoint(x: 10.5, y: 10.5)))
-        XCTAssertFalse(gate.isArmed)
-
-        XCTAssertTrue(gate.recordPointerMoved(to: CGPoint(x: 11, y: 10)))
-        XCTAssertTrue(gate.isArmed)
-    }
-
-    func testSwitcherPointerSelectionGateResetRequiresFreshMovement() {
-        var gate = SwitcherPointerSelectionGate(movementThreshold: 1)
-
-        gate.reset(currentLocation: CGPoint(x: 0, y: 0))
-        XCTAssertTrue(gate.recordPointerMoved(to: CGPoint(x: 2, y: 0)))
-        XCTAssertTrue(gate.isArmed)
-
-        gate.reset(currentLocation: CGPoint(x: 2, y: 0))
-
-        XCTAssertFalse(gate.isArmed)
-        XCTAssertFalse(gate.recordPointerMoved(to: CGPoint(x: 2.5, y: 0)))
-        XCTAssertTrue(gate.recordPointerMoved(to: CGPoint(x: 3.1, y: 0)))
-    }
-
     func testSwitcherPointerAppStripHitTestMapsGlobalHoverToTile() {
         let appIDs = ["browser", "mail", "notes"]
         let frame = CGRect(x: 100, y: 200, width: 300, height: 72)

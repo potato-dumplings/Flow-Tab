@@ -146,25 +146,67 @@ extension SwitcherPanelController {
     }
 
     func selectSwitcherAppByPointer(appID: String, currentLocation: CGPoint? = nil) {
-        pointerSelectionGate.recordPointerMoved(to: currentLocation ?? NSEvent.mouseLocation)
-        guard pointerSelectionGate.isArmed else { return }
+        guard allowsPointerSelection(
+            of: .application(appID: appID),
+            currentLocation: currentLocation
+        ) else { return }
         guard model.selectAppFromPointer(appID: appID) else { return }
         updatePanelSize()
         scheduleDelayedWindowLayerEntryIfNeeded()
     }
 
     func selectSwitcherWindowByPointer(appID: String, windowID: String, currentLocation: CGPoint? = nil) {
-        pointerSelectionGate.recordPointerMoved(to: currentLocation ?? NSEvent.mouseLocation)
-        guard pointerSelectionGate.isArmed else { return }
+        guard allowsPointerSelection(
+            of: .window(appID: appID, windowID: windowID),
+            currentLocation: currentLocation
+        ) else { return }
         guard model.selectWindowFromPointer(appID: appID, windowID: windowID) else { return }
         updatePanelSize()
     }
 
     func selectSwitcherSearchResultByPointer(resultID: String, currentLocation: CGPoint? = nil) {
-        pointerSelectionGate.recordPointerMoved(to: currentLocation ?? NSEvent.mouseLocation)
-        guard pointerSelectionGate.isArmed else { return }
+        guard allowsPointerSelection(
+            of: .searchResult(resultID: resultID),
+            currentLocation: currentLocation
+        ) else { return }
         guard model.selectSearchResult(withID: resultID) else { return }
         updatePanelSize()
+    }
+
+    private func allowsPointerSelection(
+        of target: SwitcherPointerSelectionTarget,
+        currentLocation: CGPoint?
+    ) -> Bool {
+        let decision = pointerSelectionGate.evaluateSelection(
+            of: target,
+            at: currentLocation ?? NSEvent.mouseLocation
+        )
+        guard !decision.allowsSelection else {
+            return true
+        }
+        if let evidence = decision.newBlockedEvidence {
+            logInputTrace(
+                "pointerSelectionGate outcome=blocked "
+                    + "\(evidence.target.diagnosticSummary) "
+                    + "preservedSelection="
+                    + "\(SwitcherPointerSelectionTarget.escaped(pointerSelectionIdentity(for: target))) "
+                    + "generation=\(evidence.generation)"
+            )
+        }
+        return false
+    }
+
+    private func pointerSelectionIdentity(
+        for target: SwitcherPointerSelectionTarget
+    ) -> String {
+        switch target {
+        case .application:
+            return model.session?.selectedApp.id ?? "none"
+        case .window:
+            return model.session?.selectedWindow?.id ?? "none"
+        case .searchResult:
+            return model.searchViewState.selectedResult?.id ?? "none"
+        }
     }
 
     func commitSwitcherAppByPointerClick(appID: String) {
