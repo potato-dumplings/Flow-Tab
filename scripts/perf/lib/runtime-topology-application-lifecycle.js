@@ -107,6 +107,20 @@ function formatApplicationExitEvidence(evidence) {
   return `activeApplications=${JSON.stringify(evidence.activeApplications)}`;
 }
 
+function requireApplicationExit(waitFailure, evidence, lastNotification) {
+  if (waitFailure) {
+    throw waitFailure;
+  }
+  if (!applicationExitIsSatisfied(evidence)) {
+    throw new Error([
+      "Independent application cleanup did not reach exact absence.",
+      "unmetCondition=postRequestApplicationsAbsent",
+      `lastObservation=${formatApplicationExitEvidence(evidence)}`,
+      `lastNotification=${lastNotification}`,
+    ].join("\n"));
+  }
+}
+
 function waitForApplicationExit(observation, dependencies) {
   if (observation.state.cancelled) {
     throw new Error("Application-exit observation was cancelled.");
@@ -149,6 +163,7 @@ if (typeof module !== "undefined" && module.exports) {
     formatApplicationExitEvidence,
     makeApplicationExitObservationState,
     recordApplicationTermination,
+    requireApplicationExit,
     selectPostBaselineApplications,
     waitForApplicationExit,
   };
@@ -171,6 +186,74 @@ function objectiveCString(value, label) {
   return String(unwrapped);
 }
 
+function runTool(executablePath, arguments) {
+  const task = $.NSTask.alloc.init;
+  const outputPipe = $.NSPipe.pipe;
+  task.executableURL = $.NSURL.fileURLWithPath(executablePath);
+  task.arguments = arguments;
+  task.standardOutput = outputPipe;
+  task.standardError = outputPipe;
+  const error = $();
+  if (!task.launchAndReturnError(error)) {
+    throw new Error(
+      `Unable to launch ${executablePath}: ${error.localizedDescription.js}`
+    );
+  }
+  task.waitUntilExit;
+  const data = outputPipe.fileHandleForReading.readDataToEndOfFile;
+  const value = $.NSString.alloc.initWithDataEncoding(
+    data,
+    $.NSUTF8StringEncoding
+  );
+  return {
+    output: value.isNil() ? "" : String(ObjC.unwrap(value)),
+    status: Number(task.terminationStatus),
+  };
+}
+
+function exactProcessReadback(processIdentifier, expectedStartIdentity) {
+  const result = runTool("/bin/ps", [
+    "-p",
+    String(processIdentifier),
+    "-o",
+    "pid=,ppid=,state=,lstart=,command=",
+  ]);
+  const output = result.output.trim().replace(/\s+/g, " ");
+  if (result.status !== 0 || output === "") {
+    const existence = runTool("/bin/kill", ["-0", String(processIdentifier)]);
+    if (existence.status === 0) {
+      return {
+        condition: "readback_error",
+        record: `pid=${processIdentifier} readbackError=ps status=${result.status}`,
+        startIdentity: "",
+      };
+    }
+    return {
+      condition: "exited",
+      record: `pid=${processIdentifier} state=absent`,
+      startIdentity: "",
+    };
+  }
+
+  const fields = output.split(" ");
+  if (fields.length < 9 || Number(fields[0]) !== Number(processIdentifier)) {
+    return {
+      condition: "readback_error",
+      record: `pid=${processIdentifier} readbackError=unexpectedRecord output=${output}`,
+      startIdentity: "",
+    };
+  }
+  const state = fields[2];
+  const startIdentity = fields.slice(3, 8).join(" ");
+  let condition = "running";
+  if (state.startsWith("Z")) {
+    condition = "exited";
+  } else if (expectedStartIdentity && startIdentity !== expectedStartIdentity) {
+    condition = "identity_changed";
+  }
+  return { condition, record: output, startIdentity };
+}
+
 function standardizedPath(path) {
   const resolvedURL = $.NSURL.fileURLWithPath(String(path))
     .standardizedURL
@@ -181,7 +264,7 @@ function standardizedPath(path) {
   );
 }
 
-function runningApplicationRecord(application) {
+function applicationMetadataRecord(application) {
   const launchDate = application.launchDate;
   if (!launchDate || launchDate.isNil()) {
     throw new Error("Missing launch date for running application.");
@@ -202,6 +285,33 @@ function runningApplicationRecord(application) {
   };
 }
 
+function runningApplicationRecord(application) {
+  const processIdentifier = Number(application.processIdentifier);
+  let record;
+  try {
+    record = applicationMetadataRecord(application);
+  } catch (error) {
+    const finalObservation = exactProcessReadback(processIdentifier, "");
+    if (finalObservation.condition === "exited") {
+      return null;
+    }
+    throw error;
+  }
+  const processObservation = exactProcessReadback(processIdentifier, "");
+  if (processObservation.condition === "exited" || Boolean(application.terminated)) {
+    return null;
+  }
+  if (processObservation.condition === "readback_error") {
+    throw new Error(
+      `Could not capture exact process identity: ${processObservation.record}`
+    );
+  }
+  return {
+    ...record,
+    processStartIdentity: processObservation.startIdentity,
+  };
+}
+
 function runningApplicationEntries(bundleIdentifiers) {
   const entries = [];
   const seen = Object.create(null);
@@ -214,6 +324,9 @@ function runningApplicationEntries(bundleIdentifiers) {
         continue;
       }
       const record = runningApplicationRecord(application);
+      if (!record) {
+        continue;
+      }
       const key = applicationIdentityKey(record);
       if (!seen[key]) {
         seen[key] = true;
@@ -340,7 +453,7 @@ function recordWorkspaceTerminationNotification(notification) {
     );
     if (!application.isNil() && recordApplicationTermination(
       observation.state,
-      runningApplicationRecord(application)
+      applicationMetadataRecord(application)
     )) {
       $.CFRunLoopStop($.CFRunLoopGetMain());
       $.CFRunLoopWakeUp($.CFRunLoopGetMain());
@@ -529,6 +642,7 @@ function terminatePostRequestApplications(
       observation.state,
       expectedApplications
     );
+    let forceWaitFailure = null;
     if (!applicationExitIsSatisfied(finalEvidence)) {
       evidence.forceRequests = requestApplicationExit(
         finalEvidence.activeApplications,
@@ -545,6 +659,7 @@ function terminatePostRequestApplications(
           watchdogSeconds: applicationForceTerminationWatchdogSeconds,
         });
       } catch (error) {
+        forceWaitFailure = error;
         evidence.forceWaitError = String(error.message || error);
       }
       finalEvidence = readPostBaselineEvidence(
@@ -554,14 +669,11 @@ function terminatePostRequestApplications(
     }
     evidence.finalActiveApplications = finalEvidence.activeApplications;
     evidence.finalReadbackError = finalEvidence.readbackError;
-    if (!applicationExitIsSatisfied(finalEvidence)) {
-      throw new Error([
-        "Independent application cleanup did not reach exact absence.",
-        "unmetCondition=postRequestApplicationsAbsent",
-        `lastObservation=${formatApplicationExitEvidence(finalEvidence)}`,
-        `lastNotification=${observation.state.lastNotification}`,
-      ].join("\n"));
-    }
+    requireApplicationExit(
+      forceWaitFailure,
+      finalEvidence,
+      observation.state.lastNotification
+    );
     evidence.verdict = "absent";
   } catch (error) {
     failure = error;

@@ -9,6 +9,7 @@ MONOTONIC_CLOCK="${ROOT_DIR}/scripts/perf/lib/monotonic-clock.sh"
 TARGET_TOOL="${ROOT_DIR}/scripts/perf/lib/runtime-topology-target.sh"
 PROCESS_EXIT_OBSERVATION_PATH="${ROOT_DIR}/scripts/perf/lib/process-exit-observation.sh"
 APPLICATION_LIFECYCLE_TOOL="${ROOT_DIR}/scripts/perf/lib/runtime-topology-application-lifecycle.js"
+APPLICATION_PROCESS_CLEANUP_TOOL="${ROOT_DIR}/scripts/perf/lib/runtime-topology-application-process-cleanup.js"
 SPACE_FIXTURE_WORKFLOW_CONFIG="${ROOT_DIR}/docs/fixtures/space-fixture-home-multi-app-workflow.json"
 SYSTEM_APP_MRU_FIXTURE_WORKFLOW_CONFIG="${ROOT_DIR}/docs/fixtures/space-fixture-system-app-mru-workflow.json"
 DEFAULT_TEST="FlowTabUITests/FlowTabUITests/testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows"
@@ -447,8 +448,15 @@ cleanup_independent_applications() {
     "$EXPECTED_APP_PATH" \
     "$SPACE_FIXTURE_RESOLVED_WORKFLOW" \
     "$SYSTEM_APP_MRU_RESOLVED_WORKFLOW"; then
-    APPLICATION_CLEANUP_STATUS=0
-    return 0
+    if /usr/bin/osascript -l JavaScript \
+      "$APPLICATION_PROCESS_CLEANUP_TOOL" \
+      cleanup \
+      "$APPLICATION_CLEANUP_EVIDENCE_FILE"; then
+      APPLICATION_CLEANUP_STATUS=0
+      return 0
+    else
+      cleanup_status=$?
+    fi
   else
     cleanup_status=$?
   fi
