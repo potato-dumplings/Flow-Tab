@@ -377,7 +377,7 @@ swift test
 
 - `scripts/release/release-install.sh`：Release 构建并安装到 `/Applications/Flow Tab.app`。
 - `scripts/release/release-dmg.sh`：构建并打包 DMG 到 `release/flowtab-v<version>/`。
-- `scripts/release/uninstall-flowtab.js`：生成 DMG 内可双击的一键卸载器。
+- `scripts/release/uninstall-flowtab.js`：生成 DMG 内可双击的一键卸载器；删除应用前通过 Workspace 终止通知、精确 bundle ID 读回和提权命令内的最终进程读回确认 FlowTab 已退出。
 - `scripts/perf/tab-switch-stress.sh`：tab 高频切换性能压测。
 
 ## 本地签名配置

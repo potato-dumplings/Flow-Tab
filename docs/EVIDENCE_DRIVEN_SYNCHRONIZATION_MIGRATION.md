@@ -258,8 +258,9 @@ and Process/Tooling.
 | SYNC-035K | `SwitcherPointerSelectionGate`, `SwitcherPanelController` pointer-selection entry points, and the stationary-pointer Option+Tab, Control+Tab, and Search UI paths; suppression of presentation-time hover | Each UI path advances the RunLoop for one second in 100ms increments and treats an unchanged selection throughout that interval as proof that the stationary-pointer gate handled presentation. This is an absence-over-time inference rather than completion evidence. | Give each gate reset a monotonic generation and emit one blocked decision for each exact application, window, or Search-result target in that generation. The controller records a structured marker containing the exact target identity, preserved selection, and generation only for the first blocked callback. The UI test captures the post-baseline runtime log and starts its observer before launch or trigger, performs the shared immediate readback, requires that exact blocked marker, then independently reads back the unchanged selected identity and target frame. Duplicate callbacks are suppressed, reset releases prior-generation target storage, and movement reaching the existing threshold remains the sole transition to selection-enabled state. The test invocation owns observation cancellation and process cleanup. Because XCUI exposes no hover-gate callback, the shared named cancellable 200ms runtime-log cadence remains the fallback; the five-second gate watchdog is solely a failure bound with final log evidence. | H repeated pointer-input path; deterministic generation/target/dedup/reset/escaping rules, controller Behavior, shared observer event/cancel/watchdog and lifecycle Pressure, 2,000-generation gate Pressure, stationary and moved-pointer UI, Process/Tooling. | completed |
 | SYNC-036 | All literal XCTest timeouts in `FlowTabTests` and `FlowTabUITests` | 606 literal durations are generally terminal bounds for an independent expectation or XCUI predicate, but policy ownership and diagnostic tiers are implicit. Watchdog. | Replace literals with named app-test and UI-test watchdog policies by operation class; preserve expectation/predicate success Oracles and include unmet condition plus last observation in custom waits. Test case/helper owner supplies cleanup. | M mechanical/test infra; Unit/Behavior/UI, Process/Tooling. | planned |
 | SYNC-037 | `scripts/perf/tab-switch-stress.sh`, `search-committed-index-pressure.sh`, `runtime-topology-pressure.sh`, `lib/runtime-topology-target.sh` | Sampling duration/cadence and identity stability windows are pressure/safety protocols; process termination loops use unnamed 100ms cadence and attempt bounds. Domain duration/conditional observation/watchdog. | Retain measurement durations and sample cadence as named protocol inputs. Name process polling cadence/watchdogs, check state immediately, terminate from PID/start-identity/readback, and report the final `ps`/identity/status evidence. Traps own cancellation and cleanup. | M tooling/hot path; Pressure and Process/Tooling. | verification-needed |
-| SYNC-038 | `scripts/release/release-install.sh`, `scripts/release/uninstall-flowtab.js` | A fixed one-second delay assumes FlowTab exited before replacement or deletion. Evidence migration. | Wait on exact process absence/identity readback immediately after quit/TERM, with a named watchdog and last PID/state diagnostic before mutating installed resources. The install/uninstall command owns cleanup. | M release tooling; Process/Tooling and release contract tests. | in progress; SYNC-038A release install completed, uninstaller remains |
+| SYNC-038 | `scripts/release/release-install.sh`, `scripts/release/uninstall-flowtab.js` | A fixed one-second delay assumes FlowTab exited before replacement or deletion. Evidence migration. | Wait on exact process absence/identity readback immediately after quit/TERM, with a named watchdog and last PID/state diagnostic before mutating installed resources. The install/uninstall command owns cleanup. | M release tooling; Process/Tooling and release contract tests. | completed through SYNC-038A installer and SYNC-038B uninstaller |
 | SYNC-038A | `release-install.sh`, `lib/process-exit-observation.sh`, and `test-process-exit-observation.sh`; installed-app replacement process boundary | A fixed one-second sleep after AppleScript quit and `pkill` assumes every `FlowTab` process has exited before permission reset, build, and eventual application replacement. | Read the exact process name immediately through `pgrep`, enrich every observed PID with `ps` PID/PPID/state/start/command identity, and treat readback errors as unmet evidence. Retain a named 100ms cancellable shell cadence only while records remain. Recheck immediately before removing the installed bundle. The release command owns the synchronous wait and interruption cleanup; its ten-second watchdog reports the unmet absence condition and final process records. | M release process/tooling; deterministic immediate/delayed/watchdog/readback-error contract tests, real process-list integration, static mutation-order contract, Process/Tooling. | completed |
+| SYNC-038B | `uninstall-flowtab.js`, `test-uninstall-flowtab-process-exit.js`, and `test-uninstall-flowtab-workspace-observer.jxa`; DMG uninstaller process and installed-app deletion boundary | The JXA applet advances a fixed one-second delay after quit and exact-name `pkill`, then treats elapsed time as proof that user data and the installed bundle can be removed. | Register `NSWorkspaceDidTerminateApplicationNotification` before the quit request, capture an initial exact bundle-ID readback, deduplicate exact PID/launch-date/executable identities into a monotonic generation, wake the owning RunLoop on the target event, and require a final `NSRunningApplication` absence readback. Keep the observer alive across cleanup and administrator authentication, then place an immediate exact-name `pgrep`/`ps` guard inside the privileged command before bundle removal. The applet invocation owns observer cancellation. A ten-second monotonic watchdog is only a failure bound and reports the unmet condition, final application records, and last notification. | M release process/tooling; deterministic initial/event/cancel/duplicate/out-of-order/readback-error/watchdog/slow-scheduling rules, real signed JXA fixture termination event, privileged guard present/absent integration, existing cleanup boundary, Process/Tooling. | completed |
 | SYNC-039 | `RuntimeWindowRecencyTracker`; semantic fallback age and generation age | A 300-second age is an explicit expiry rule for weak semantic identity; exact identity remains preferred. Domain duration. | Retain injected clock, maximum generation age, exact-window identity precedence, and deterministic expiry tests. Tracker owns records and pruning. | H identity semantics; Unit, Behavior, relevant UI only if implementation changes. | closed-retained |
 
 ## UI Fixed-Settle Audit Scope
@@ -7874,5 +7875,56 @@ polling cadence, deadline, or timeout in the scoped paths.
   application runtime code, a user journey, or a sustained hot path. Startup
   `prompts.zip` and the three pre-existing local Skill/reference edits remain
   unchanged and outside the slice.
-- Commit: pending current-slice local commit
+- Commit: `1c0d3d65f7bda18ce7cba71b44a655e3c4ec9f5d`
   (`refactor(sync): migrate SYNC-038A release process exit`).
+
+### SYNC-038B Closure Record
+
+- Design and Oracle: the DMG uninstaller now creates its
+  `NSWorkspaceDidTerminateApplicationNotification` observer before requesting
+  FlowTab exit. It captures an initial exact bundle-ID readback, records only
+  target termination notifications as PID/launch-date/executable identities,
+  deduplicates repeated identities into a monotonic generation, and stops and
+  wakes the owning RunLoop when that generation advances. Completion still
+  requires a fresh `NSRunningApplication` readback with no active target
+  records. A readback error remains unmet evidence.
+- Lifecycle and mutation boundary: the applet invocation owns the observer
+  from pre-trigger setup through user-data cleanup and administrator
+  authentication, and removes it in `finally` on success, failure, or
+  cancellation. The privileged command starts with an exact-name `pgrep`
+  readback immediately before installed-bundle removal. A present process
+  aborts with PID/PPID/state/start/command evidence; a process-list failure
+  aborts with the status and output. The ten-second monotonic watchdog is only
+  a terminal failure bound and reports `applicationAbsent`, the exact bundle
+  ID, the final application records, and the last notification. Normal
+  completion has no polling cadence or fixed RunLoop advance.
+- Deterministic regression: the Node contract covers initial satisfaction
+  without a clock or wait, target-event completion, slow scheduling that
+  overshoots the nominal deadline before a satisfied readback, cancellation,
+  duplicate and unrelated notifications, PID reuse with a distinct launch
+  identity, readback errors, watchdog evidence, pre-trigger observer ordering,
+  and cleanup on both success and failure. It also independently reads a
+  present Finder PID and an absent unique process name to verify the
+  privileged process guard and its mutation order.
+- JXA integration: the process test compiles the production uninstaller and a
+  temporary ad-hoc-signed applet, launches that fixture through
+  `NSWorkspace`, requires the initial readback to contain its exact PID,
+  establishes the production observer before force termination, and requires
+  one exact termination generation plus final absence. The event wakes the
+  wait owner inside the named five-second integration watchdog; the final run
+  completed in under one second. The fixture process and temporary bundles
+  are removed by the test owner.
+- Process/Tooling: Node syntax checks accept the production and Node test
+  files; the existing uninstaller path-boundary cleanup test passes; the new
+  process-exit test passes at the Terminal Workspace/process-list boundary;
+  production `osacompile` validation is part of that test; and
+  `git diff --check` passes. Running the destructive interactive uninstaller
+  is outside this slice because it removes `/Applications/Flow Tab.app`,
+  resets TCC records, and clears user data. Unit, Behavior, UI, and Pressure
+  are not relevant because this slice changes only the DMG release tool's
+  bounded process observation and does not change application runtime code, a
+  user journey inside FlowTab, or a sustained hot path. Startup `prompts.zip`
+  and the three pre-existing local Skill/reference edits remain unchanged and
+  outside the slice.
+- Commit: pending current-slice local commit
+  (`refactor(sync): migrate SYNC-038B uninstaller process exit`).
