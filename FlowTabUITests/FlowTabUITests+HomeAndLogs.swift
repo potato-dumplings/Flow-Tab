@@ -293,10 +293,16 @@ extension FlowTabUITests {
             app.activate()
             XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
             XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10))
-            tapElement(homeAppRow)
 
             XCTAssertTrue(
-                waitForHomeWindowTitleOrder([targetWindowTitle, fallbackWindowTitle], in: app, timeout: 12),
+                performAndWaitForHomeWindowTitlePrefix(
+                    [targetWindowTitle, fallbackWindowTitle],
+                    in: app,
+                    timeout: 12,
+                    trigger: {
+                        tapElement(homeAppRow)
+                    }
+                ),
                 "Home window candidates should use real app-local recency before fallback order."
             )
         }
@@ -760,25 +766,6 @@ extension FlowTabUITests {
             XCTFail(error.localizedDescription)
             throw error
         }
-    }
-
-    private func waitForHomeWindowTitleOrder(
-        _ expectedTitles: [String],
-        in app: XCUIApplication,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestWindowTitles: [String] = []
-        repeat {
-            latestWindowTitles = homeWindowRows(in: app).map(\.label)
-            if Array(latestWindowTitles.prefix(expectedTitles.count)) == expectedTitles {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail("Expected Home window order \(expectedTitles), found \(latestWindowTitles).")
-        return false
     }
 
     private func cgWindowNumber(fromHomeWindowRowIdentifier identifier: String) -> CGWindowID? {

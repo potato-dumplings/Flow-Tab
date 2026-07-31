@@ -38,7 +38,7 @@ extension FlowTabUITests {
             initialEvidence?.value.row(
                 containing: "primary"
             )?.element,
-            "row-element"
+            "row-element-0"
         )
         XCTAssertEqual(cancellationCount, 1)
 
@@ -78,6 +78,63 @@ extension FlowTabUITests {
         XCTAssertEqual(cancellationCount, 2)
         rowOwner.cancel()
         titleOwner.cancel()
+    }
+
+    func testHomeWindowProjectionObserverRequiresExactRowLabelPrefixAfterTrigger() {
+        var triggerCompleted = false
+        var snapshot = homeWindowProjectionTestSnapshot(
+            rowTitles: ["Inbox", "Draft", "Archive"],
+            staticTitles: []
+        )
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var cancellationCount = 0
+        let owner =
+            FlowTabUITestHomeWindowProjectionObservationOwner(
+                expectation:
+                    .rowLabelPrefix(["Draft", "Inbox"]),
+                acceptsEvidence: {
+                    triggerCompleted
+                },
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {
+                        cancellationCount += 1
+                    }
+                },
+                readback: { snapshot }
+            )
+        owner.start()
+        XCTAssertNil(owner.resolvedEvidence)
+
+        triggerCompleted = true
+        owner.requestReadback(source: .triggerReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = homeWindowProjectionTestSnapshot(
+            rowTitles: ["Draft", "Inbox", "Archive"],
+            staticTitles: []
+        )
+        scheduledReadback?(.scheduledReadback)
+        let evidence = owner.waitForResolution(
+            timeout:
+                FlowTabUITestHomeWindowProjectionTestPolicy
+                    .watchdog
+        )
+
+        XCTAssertEqual(evidence?.source, .scheduledReadback)
+        XCTAssertEqual(
+            evidence?.value.rows.map(\.label),
+            ["Draft", "Inbox", "Archive"]
+        )
+        XCTAssertEqual(cancellationCount, 1)
+        owner.cancel()
+
+        XCTAssertFalse(
+            FlowTabUITestHomeWindowProjectionExpectation
+                .rowLabelPrefix([])
+                .isSatisfied(by: snapshot)
+        )
     }
 
     func testHomeWindowProjectionObserverLifecycleUnderPressure() {
@@ -160,16 +217,24 @@ extension FlowTabUITests {
         rowTitle: String?,
         staticTitles: [String]
     ) -> FlowTabUITestHomeWindowProjectionSnapshot<String> {
-        let rows = rowTitle.map { title in
-            [
-                FlowTabUITestHomeWindowRowSnapshot(
-                    identifier: "flowtab.home.window.test",
-                    label: title,
-                    value: title,
-                    element: "row-element"
-                )
-            ]
-        } ?? []
+        homeWindowProjectionTestSnapshot(
+            rowTitles: rowTitle.map { [$0] } ?? [],
+            staticTitles: staticTitles
+        )
+    }
+
+    private func homeWindowProjectionTestSnapshot(
+        rowTitles: [String],
+        staticTitles: [String]
+    ) -> FlowTabUITestHomeWindowProjectionSnapshot<String> {
+        let rows = rowTitles.enumerated().map { index, title in
+            FlowTabUITestHomeWindowRowSnapshot(
+                identifier: "flowtab.home.window.test.\(index)",
+                label: title,
+                value: title,
+                element: "row-element-\(index)"
+            )
+        }
         return FlowTabUITestHomeWindowProjectionSnapshot(
             rows: rows,
             visibleStaticTextTitles: staticTitles
