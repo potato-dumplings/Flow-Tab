@@ -365,6 +365,7 @@
 		B10012022F76000100B0D737 /* FlowTabUITests+Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */; };
 		E12000033600000100B0D737 /* FlowTabUITests+EnglishLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = E12000023600000100B0D737 /* FlowTabUITests+EnglishLayout.swift */; };
 		B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */; };
+		A47A00023D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A47A00013D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift */; };
 		C1F100023A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F100013A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift */; };
 		F8A1000236B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A1000136B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift */; };
 		B10012042F76000100B0D737 /* FlowTabUITests+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */; };
@@ -724,6 +725,7 @@
 		B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+Settings.swift"; sourceTree = "<group>"; };
 		E12000023600000100B0D737 /* FlowTabUITests+EnglishLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+EnglishLayout.swift"; sourceTree = "<group>"; };
 		B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherAndSearch.swift"; sourceTree = "<group>"; };
+		A47A00013D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SearchSelectionWrap.swift"; sourceTree = "<group>"; };
 		C1F100013A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherInteractionRegressions.swift"; sourceTree = "<group>"; };
 		F8A1000136B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+RuntimeProjectionPublication.swift"; sourceTree = "<group>"; };
 		B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+Support.swift"; sourceTree = "<group>"; };
@@ -1225,6 +1227,7 @@
 				B10002052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift */,
 				F7B8C9D535B8000100B0D737 /* FlowTabUITests+LaunchAtLoginSettings.swift */,
 				B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */,
+				A47A00013D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift */,
 				FFFB00083D3A000100B0D737 /* FlowTabUITests+TabSwitchStressEvidence.swift */,
 				C1F100013A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift */,
 				A4D100053B20000100B0D737 /* FlowTabUITests+SystemAppMRU.swift */,
@@ -2236,6 +2239,7 @@
 				B10012052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift in Sources */,
 				F7B8C9D635B8000100B0D737 /* FlowTabUITests+LaunchAtLoginSettings.swift in Sources */,
 				B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */,
+				A47A00023D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift in Sources */,
 				FFFB01083D3A000100B0D737 /* FlowTabUITests+TabSwitchStressEvidence.swift in Sources */,
 				C1F100023A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift in Sources */,
 				A4D100063B20000100B0D737 /* FlowTabUITests+SystemAppMRU.swift in Sources */,

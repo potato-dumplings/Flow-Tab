@@ -42,7 +42,7 @@ extension FlowTabUITests {
         return arguments
     }
 
-    private func launchSearchMockApplication(
+    func launchSearchMockApplication(
         mockRuntimeVariant: String? = nil
     ) -> (
         app: XCUIApplication,
@@ -741,46 +741,6 @@ extension FlowTabUITests {
                 .matching(identifier: "flowtab.switcher.window.\("mock-many-window-25".flowTabUITestAccessibilityIdentifierComponent)")
                 .firstMatch
                 .exists
-        )
-    }
-
-    func testSearchPanelWrapFromLastResultScrollsBackToFirstResult() throws {
-        let launch =
-            launchSearchMockApplication(
-                mockRuntimeVariant: "search-wrap"
-            )
-        let app = launch.app
-
-        _ = requireInitialFlowTabSearchInput(
-            in: app,
-            observedBy: launch.readiness
-        )
-
-        let firstResultIdentifier = "flowtab.switcher.search.app.\("com.flowtab.mock.wrap.01".flowTabUITestAccessibilityIdentifierComponent)"
-        let lastResultIdentifier = "flowtab.switcher.search.app.\("com.flowtab.mock.wrap.10".flowTabUITestAccessibilityIdentifierComponent)"
-
-        app.typeKey(.downArrow, modifierFlags: [])
-        RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-
-        for _ in 0..<9 {
-            app.typeKey(.downArrow, modifierFlags: [])
-            RunLoop.current.run(until: Date().addingTimeInterval(0.08))
-        }
-
-        XCTAssertTrue(
-            hasHittableElement(
-                in: app.descendants(matching: .any).matching(identifier: lastResultIdentifier),
-                timeout: 2
-            )
-        )
-
-        app.typeKey(.downArrow, modifierFlags: [])
-
-        XCTAssertTrue(
-            hasHittableElement(
-                in: app.descendants(matching: .any).matching(identifier: firstResultIdentifier),
-                timeout: 5
-            )
         )
     }
 
