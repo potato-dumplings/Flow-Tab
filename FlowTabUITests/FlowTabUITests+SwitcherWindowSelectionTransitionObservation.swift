@@ -92,6 +92,14 @@ struct FlowTabUITestSwitcherWindowSelectionTransitionSnapshot:
     }
 }
 
+struct FlowTabUITestSwitcherWindowSelectionTransitionResult:
+    Equatable
+{
+    let title: String
+    let windowID: String
+    let windowNumber: UInt32
+}
+
 final class
     FlowTabUITestSwitcherWindowSelectionTransitionObservationOwner
 {
@@ -169,17 +177,19 @@ final class
 
 extension FlowTabUITests {
     func performAndWaitForSwitcherWindowSelectionTransition(
-        from baselineSelection: RuntimeTruthWindowSelection,
+        fromWindowNumber baselineWindowNumber: UInt32,
         in app: XCUIApplication,
         diagnosticsSummary: XCUIElement,
         traceLabel: String,
         trigger: () -> Void
-    ) throws -> RuntimeTruthWindowSelection {
+    ) throws
+        -> FlowTabUITestSwitcherWindowSelectionTransitionResult
+    {
         var triggerCompleted = false
         let owner =
             FlowTabUITestSwitcherWindowSelectionTransitionObservationOwner(
                 baselineWindowNumber:
-                    baselineSelection.windowNumber,
+                    baselineWindowNumber,
                 acceptsEvidence: {
                     triggerCompleted
                 },
@@ -228,6 +238,10 @@ extension FlowTabUITests {
             evidence.value.selectedWindowTitle,
             "Resolved selection evidence did not expose a window title."
         )
+        let selectedWindowNumber = try XCTUnwrap(
+            evidence.value.selectedWindowNumber,
+            "Resolved selection evidence did not expose a CG window number."
+        )
         logFlowTabUITestTrace(
             "[\(traceLabel)] resolved "
                 + "generation=\(evidence.generation) "
@@ -235,9 +249,96 @@ extension FlowTabUITests {
                 + "selected=\(selectedWindowTitle) "
                 + "windowID=\(selectedWindowID)"
         )
-        return try runtimeTruthWindowSelection(
+        return FlowTabUITestSwitcherWindowSelectionTransitionResult(
             title: selectedWindowTitle,
-            windowID: selectedWindowID
+            windowID: selectedWindowID,
+            windowNumber: selectedWindowNumber
         )
+    }
+
+    func performAndWaitForSwitcherWindowSelectionTransition(
+        from baselineSelection: RuntimeTruthWindowSelection,
+        in app: XCUIApplication,
+        diagnosticsSummary: XCUIElement,
+        traceLabel: String,
+        trigger: () -> Void
+    ) throws -> RuntimeTruthWindowSelection {
+        let result =
+            try performAndWaitForSwitcherWindowSelectionTransition(
+                fromWindowNumber:
+                    baselineSelection.windowNumber,
+                in: app,
+                diagnosticsSummary: diagnosticsSummary,
+                traceLabel: traceLabel,
+                trigger: trigger
+            )
+        return RuntimeTruthWindowSelection(
+            title: result.title,
+            windowNumber: result.windowNumber
+        )
+    }
+
+    func selectGlobalSwitcherWindow(
+        title: String,
+        in app: XCUIApplication,
+        diagnosticsSummary: XCUIElement,
+        traceLabel: String
+    ) throws -> RuntimeTruthWindowSelection {
+        let attempts = max(
+            1,
+            switcherPreviewTitles(
+                from: diagnosticsSummary
+            ).count + 3
+        )
+        var latestSelection =
+            try runtimeTruthWindowSelection(
+                title:
+                    switcherPanelDiagnosticsValue(
+                        diagnosticsSummary,
+                        key: "selectedWindowTitle"
+                    ),
+                windowID:
+                    switcherPanelDiagnosticsValue(
+                        diagnosticsSummary,
+                        key: "selectedWindow"
+                    )
+            )
+
+        if latestSelection.title == title {
+            return latestSelection
+        }
+
+        for attempt in 0..<attempts {
+            latestSelection =
+                try performAndWaitForSwitcherWindowSelectionTransition(
+                    from: latestSelection,
+                    in: app,
+                    diagnosticsSummary: diagnosticsSummary,
+                    traceLabel:
+                        "\(traceLabel).selectAttempt.\(attempt + 1)",
+                    trigger: {
+                        postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                            .advanceRight,
+                            traceLabel:
+                                "\(traceLabel).selectWindow"
+                        )
+                    }
+                )
+            if latestSelection.title == title {
+                return latestSelection
+            }
+        }
+
+        XCTFail(
+            """
+            Option+Tab window state did not select \(title).
+
+            \(switcherDebugSummary(
+                app,
+                diagnosticsSummary: diagnosticsSummary
+            ))
+            """
+        )
+        return latestSelection
     }
 }

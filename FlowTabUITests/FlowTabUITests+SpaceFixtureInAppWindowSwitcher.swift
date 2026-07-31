@@ -571,10 +571,9 @@ extension FlowTabUITests {
     ) throws -> InAppWindowSelection {
         var observedPrefix = [currentSelection.title]
         let attempts = workflowWindowCycleAttemptCount(diagnosticsSummary)
-        var latestTitle = currentSelection.title
-        var latestWindowID = currentSelection.windowID
+        var latestSelection = currentSelection
 
-        if latestTitle == title {
+        if latestSelection.title == title {
             assertNoisyInAppObservedPrefix(
                 observedPrefix,
                 expectedPrefix: expectedPrefix,
@@ -584,21 +583,34 @@ extension FlowTabUITests {
         }
 
         for attempt in 0..<attempts {
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.inAppForward, traceLabel: "control.select")
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-            latestTitle = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindowTitle")
-            latestWindowID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindow")
-            observedPrefix.append(latestTitle)
-            logFlowTabUITestTrace(
-                "[\(traceLabel).selectAttempt.\(attempt + 1)] target=\(title) selected=\(latestTitle) windowID=\(latestWindowID)"
+            let result =
+                try performAndWaitForSwitcherWindowSelectionTransition(
+                    fromWindowNumber:
+                        latestSelection.windowNumber,
+                    in: app,
+                    diagnosticsSummary: diagnosticsSummary,
+                    traceLabel:
+                        "\(traceLabel).selectAttempt.\(attempt + 1)",
+                    trigger: {
+                        postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                            .inAppForward,
+                            traceLabel: "control.select"
+                        )
+                    }
+                )
+            latestSelection = InAppWindowSelection(
+                title: result.title,
+                windowID: result.windowID,
+                windowNumber: result.windowNumber
             )
+            observedPrefix.append(latestSelection.title)
             assertNoisyInAppObservedPrefix(
                 observedPrefix,
                 expectedPrefix: expectedPrefix,
                 traceLabel: traceLabel
             )
-            if latestTitle == title {
-                return try inAppWindowSelection(title: latestTitle, windowID: latestWindowID)
+            if latestSelection.title == title {
+                return latestSelection
             }
         }
 
@@ -608,7 +620,7 @@ extension FlowTabUITests {
             \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
             """
         )
-        return try inAppWindowSelection(title: latestTitle, windowID: latestWindowID)
+        return latestSelection
     }
 
     private func assertNoisyInAppObservedPrefix(
@@ -631,23 +643,49 @@ extension FlowTabUITests {
         requiresControlTab: Bool
     ) throws -> InAppWindowSelection {
         let attempts = max(1, workflowWindowCycleAttemptCount(diagnosticsSummary))
-        var latestTitle = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindowTitle")
-        var latestWindowID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindow")
+        var latestSelection =
+            try inAppWindowSelection(
+                title:
+                    switcherPanelDiagnosticsValue(
+                        diagnosticsSummary,
+                        key: "selectedWindowTitle"
+                    ),
+                windowID:
+                    switcherPanelDiagnosticsValue(
+                        diagnosticsSummary,
+                        key: "selectedWindow"
+                    )
+            )
 
-        if !requiresControlTab, latestTitle == title {
-            return try inAppWindowSelection(title: latestTitle, windowID: latestWindowID)
+        if !requiresControlTab,
+           latestSelection.title == title
+        {
+            return latestSelection
         }
 
         for attempt in 0..<attempts {
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.inAppForward, traceLabel: "control.select")
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-            latestTitle = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindowTitle")
-            latestWindowID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindow")
-            logFlowTabUITestTrace(
-                "[control.selectAttempt.\(attempt + 1)] target=\(title) selected=\(latestTitle) windowID=\(latestWindowID)"
+            let result =
+                try performAndWaitForSwitcherWindowSelectionTransition(
+                    fromWindowNumber:
+                        latestSelection.windowNumber,
+                    in: app,
+                    diagnosticsSummary: diagnosticsSummary,
+                    traceLabel:
+                        "control.selectAttempt.\(attempt + 1)",
+                    trigger: {
+                        postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                            .inAppForward,
+                            traceLabel: "control.select"
+                        )
+                    }
+                )
+            latestSelection = InAppWindowSelection(
+                title: result.title,
+                windowID: result.windowID,
+                windowNumber: result.windowNumber
             )
-            if latestTitle == title {
-                return try inAppWindowSelection(title: latestTitle, windowID: latestWindowID)
+            if latestSelection.title == title {
+                return latestSelection
             }
         }
 
@@ -657,7 +695,7 @@ extension FlowTabUITests {
             \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
             """
         )
-        return try inAppWindowSelection(title: latestTitle, windowID: latestWindowID)
+        return latestSelection
     }
 
     private func workflowWindowCycleAttemptCount(_ diagnosticsSummary: XCUIElement) -> Int {

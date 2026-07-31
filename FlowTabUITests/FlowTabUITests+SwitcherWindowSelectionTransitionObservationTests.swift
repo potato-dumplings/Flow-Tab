@@ -166,6 +166,10 @@ extension FlowTabUITests {
             42
         )
         XCTAssertEqual(
+            owner.resolvedEvidence?.value.selectedWindowNumber,
+            202
+        )
+        XCTAssertEqual(
             owner.resolvedEvidence?.value.selectedWindowTitle,
             "Primary"
         )

@@ -666,43 +666,6 @@ extension FlowTabUITests {
         )
     }
 
-    func selectGlobalSwitcherWindow(
-        title: String,
-        in app: XCUIApplication,
-        diagnosticsSummary: XCUIElement,
-        traceLabel: String
-    ) throws -> RuntimeTruthWindowSelection {
-        let attempts = max(1, switcherPreviewTitles(from: diagnosticsSummary).count + 3)
-        var latestTitle = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindowTitle")
-        var latestWindowID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindow")
-
-        if latestTitle == title {
-            return try runtimeTruthWindowSelection(title: latestTitle, windowID: latestWindowID)
-        }
-
-        for attempt in 0..<attempts {
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.advanceRight, traceLabel: "\(traceLabel).selectWindow")
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-            latestTitle = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindowTitle")
-            latestWindowID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindow")
-            logFlowTabUITestTrace(
-                "[\(traceLabel).selectAttempt.\(attempt + 1)] target=\(title) selected=\(latestTitle) windowID=\(latestWindowID)"
-            )
-            if latestTitle == title {
-                return try runtimeTruthWindowSelection(title: latestTitle, windowID: latestWindowID)
-            }
-        }
-
-        XCTFail(
-            """
-            Option+Tab window state did not select \(title).
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-        return try runtimeTruthWindowSelection(title: latestTitle, windowID: latestWindowID)
-    }
-
     private func searchAndSelectWorkflowWindow(
         title: String,
         app workflowApp: SpaceFixtureResolvedWorkflow.App,
