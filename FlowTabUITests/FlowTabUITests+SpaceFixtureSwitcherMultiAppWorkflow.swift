@@ -227,11 +227,12 @@ extension FlowTabUITests {
                 ).waitForExistence(timeout: 8)
             )
 
+            let targetProcessIdentifier =
+                try runningWorkflowApplicationProcessIdentifier(targetApp)
             let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
             selectSwitcherWorkflowApp(targetApp, in: app, diagnosticsSummary: diagnosticsSummary)
             app.activate()
-            app.typeKey(.downArrow, modifierFlags: [])
-            XCTAssertTrue(waitForSwitcherMode(diagnosticsSummary, modePrefix: "windowCycle", timeout: 5))
+            guard enterSwitcherPreview(targetApp, in: app, diagnostics: diagnosticsSummary) else { return }
             assertSwitcherPreviewShowsOnlyExpectedTitles(
                 targetApp.expectedWindowTitles,
                 in: diagnosticsSummary,
@@ -243,7 +244,7 @@ extension FlowTabUITests {
                 in: diagnosticsSummary,
                 timeout: 40
             )
-            XCTAssertTrue(waitForSwitcherMode(diagnosticsSummary, modePrefix: "windowCycle", timeout: 5))
+            guard requireActiveSwitcherPreview(targetApp, diagnostics: diagnosticsSummary) else { return }
             waitForRuntimeLogFiles(
                 containing: [
                     "runtimeAXDestroyed appID=\(targetApp.identity.bundleIdentifier)",
@@ -252,9 +253,9 @@ extension FlowTabUITests {
                 since: mutationLogSnapshot,
                 timeout: 8
             )
-            XCTAssertNotEqual(
-                XCUIApplication(bundleIdentifier: targetApp.identity.bundleIdentifier).state,
-                .notRunning
+            assertWorkflowApplicationProcessRemainsRunning(
+                targetApp,
+                processIdentifier: targetProcessIdentifier
             )
             XCTAssertEqual(
                 Set(switcherPreviewTitles(from: diagnosticsSummary)),
@@ -317,11 +318,12 @@ extension FlowTabUITests {
                 ).waitForExistence(timeout: 8)
             )
 
+            let targetProcessIdentifier =
+                try runningWorkflowApplicationProcessIdentifier(targetApp)
             let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
             selectSwitcherWorkflowApp(targetApp, in: app, diagnosticsSummary: diagnosticsSummary)
             app.activate()
-            app.typeKey(.downArrow, modifierFlags: [])
-            XCTAssertTrue(waitForSwitcherMode(diagnosticsSummary, modePrefix: "windowCycle", timeout: 5))
+            guard enterSwitcherPreview(targetApp, in: app, diagnostics: diagnosticsSummary) else { return }
             XCTAssertTrue(
                 waitForNoisyFullscreenWorkflowPreviewTitles(
                     diagnosticsSummary,
@@ -343,7 +345,7 @@ extension FlowTabUITests {
                 in: diagnosticsSummary,
                 timeout: 45
             )
-            XCTAssertTrue(waitForSwitcherMode(diagnosticsSummary, modePrefix: "windowCycle", timeout: 5))
+            guard requireActiveSwitcherPreview(targetApp, diagnostics: diagnosticsSummary) else { return }
             waitForRuntimeLogFiles(
                 containing: [
                     "runtimeAXDestroyed appID=\(targetApp.identity.bundleIdentifier)",
@@ -352,9 +354,9 @@ extension FlowTabUITests {
                 since: mutationLogSnapshot,
                 timeout: 8
             )
-            XCTAssertNotEqual(
-                XCUIApplication(bundleIdentifier: targetApp.identity.bundleIdentifier).state,
-                .notRunning
+            assertWorkflowApplicationProcessRemainsRunning(
+                targetApp,
+                processIdentifier: targetProcessIdentifier
             )
             XCTAssertFalse(
                 switcherPreviewTitles(from: diagnosticsSummary).contains(closedFullscreenTitle),
@@ -719,23 +721,6 @@ extension FlowTabUITests {
             found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil").
             """
         )
-        return false
-    }
-
-    private func waitForSwitcherMode(
-        _ diagnosticsSummaryElement: XCUIElement,
-        modePrefix: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let mode = switcherPanelDiagnosticsValue(diagnosticsSummaryElement, key: "mode")
-            if mode.hasPrefix(modePrefix) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
         return false
     }
 

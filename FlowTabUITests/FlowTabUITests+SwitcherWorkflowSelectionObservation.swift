@@ -45,6 +45,9 @@ struct FlowTabUITestSwitcherSelectionState: Equatable {
 }
 
 enum FlowTabUITestSwitcherSelectionTransition: Equatable {
+    case enterWindowCycle(
+        from: FlowTabUITestSwitcherSelectionState
+    )
     case exitWindowCycle(
         from: FlowTabUITestSwitcherSelectionState
     )
@@ -65,6 +68,14 @@ enum FlowTabUITestSwitcherSelectionTransition: Equatable {
         }
 
         switch self {
+        case let .enterWindowCycle(baseline):
+            return baseline.mode == "appCycle"
+                && observedState.selectedBundleIdentifier
+                    == baseline.selectedBundleIdentifier
+                && observedState.mode
+                    == "windowCycle("
+                        + baseline.selectedBundleIdentifier
+                        + ")"
         case let .exitWindowCycle(baseline):
             return baseline.mode.hasPrefix("windowCycle(")
                 && observedState.selectedBundleIdentifier
@@ -79,6 +90,10 @@ enum FlowTabUITestSwitcherSelectionTransition: Equatable {
 
     var diagnosticSummary: String {
         switch self {
+        case let .enterWindowCycle(baseline):
+            return "enterWindowCycle from{"
+                + baseline.diagnosticSummary
+                + "}"
         case let .exitWindowCycle(baseline):
             return "exitWindowCycle from{"
                 + baseline.diagnosticSummary
@@ -348,6 +363,11 @@ extension FlowTabUITests {
         defer { owner.cancel() }
 
         switch transition {
+        case .enterWindowCycle:
+            app.typeKey(
+                .downArrow,
+                modifierFlags: []
+            )
         case .exitWindowCycle:
             app.typeKey(
                 .upArrow,

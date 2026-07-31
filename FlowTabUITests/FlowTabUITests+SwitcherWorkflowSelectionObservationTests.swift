@@ -47,6 +47,43 @@ extension FlowTabUITests {
                 selectedBundleIdentifier: "com.example.notes",
                 mode: "appCycle"
             )
+        let enterWindowCycle =
+            FlowTabUITestSwitcherSelectionTransition
+                .enterWindowCycle(from: appBaseline)
+
+        XCTAssertTrue(
+            enterWindowCycle.isSatisfied(
+                by: switcherSelectionTestSnapshot(
+                    selected: "com.example.notes",
+                    mode: "windowCycle(com.example.notes)"
+                )
+            )
+        )
+        XCTAssertFalse(
+            enterWindowCycle.isSatisfied(
+                by: switcherSelectionTestSnapshot(
+                    selected: "com.example.browser",
+                    mode: "windowCycle(com.example.browser)"
+                )
+            )
+        )
+        XCTAssertFalse(
+            enterWindowCycle.isSatisfied(
+                by: switcherSelectionTestSnapshot(
+                    selected: "com.example.notes",
+                    mode: "windowCycle(com.example.browser)"
+                )
+            )
+        )
+        XCTAssertFalse(
+            enterWindowCycle.isSatisfied(
+                by: switcherSelectionTestSnapshot(
+                    selected: "com.example.notes",
+                    mode: "appCycle"
+                )
+            )
+        )
+
         let advanceApplication =
             FlowTabUITestSwitcherSelectionTransition
                 .advanceApplication(from: appBaseline)
@@ -82,6 +119,74 @@ extension FlowTabUITests {
                     mode: "search"
                 )
             )
+        )
+    }
+
+    func testSwitcherPreviewEntryRequiresExactSelectedApplicationCycleBaseline() {
+        let expectedBundleIdentifier =
+            "com.example.notes"
+        let exactSnapshot =
+            switcherSelectionTestSnapshot(
+                selected: expectedBundleIdentifier,
+                mode: "appCycle"
+            )
+        let expectedState =
+            FlowTabUITestSwitcherSelectionState(
+                selectedBundleIdentifier:
+                    expectedBundleIdentifier,
+                mode: "appCycle"
+            )
+
+        XCTAssertEqual(
+            FlowTabUITestSwitcherSelectionTransition
+                .previewEntry(
+                    expectedBundleIdentifier:
+                        expectedBundleIdentifier,
+                    from: exactSnapshot
+                ),
+            .enterWindowCycle(from: expectedState)
+        )
+        XCTAssertNil(
+            FlowTabUITestSwitcherSelectionTransition
+                .previewEntry(
+                    expectedBundleIdentifier:
+                        expectedBundleIdentifier,
+                    from:
+                        switcherSelectionTestSnapshot(
+                            selected:
+                                "com.example.browser",
+                            mode: "appCycle"
+                        )
+                )
+        )
+        XCTAssertNil(
+            FlowTabUITestSwitcherSelectionTransition
+                .previewEntry(
+                    expectedBundleIdentifier:
+                        expectedBundleIdentifier,
+                    from:
+                        switcherSelectionTestSnapshot(
+                            selected:
+                                expectedBundleIdentifier,
+                            mode:
+                                "windowCycle("
+                                + expectedBundleIdentifier
+                                + ")"
+                        )
+                )
+        )
+        XCTAssertNil(
+            FlowTabUITestSwitcherSelectionTransition
+                .previewEntry(
+                    expectedBundleIdentifier:
+                        expectedBundleIdentifier,
+                    from:
+                        switcherSelectionTestSnapshot(
+                            selected:
+                                expectedBundleIdentifier,
+                            mode: "search"
+                        )
+                )
         )
     }
 

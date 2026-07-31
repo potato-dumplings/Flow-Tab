@@ -48,6 +48,47 @@ struct WorkflowCGWindowObservation: Equatable {
 }
 
 extension FlowTabUITests {
+    func runningWorkflowApplicationProcessIdentifier(
+        _ workflowApp: SpaceFixtureResolvedWorkflow.App
+    ) throws -> pid_t {
+        let runningApplication = try XCTUnwrap(
+            NSRunningApplication
+                .runningApplications(
+                    withBundleIdentifier:
+                        workflowApp.identity.bundleIdentifier
+                )
+                .first(where: { !$0.isTerminated }),
+            "Expected \(workflowApp.identity.bundleIdentifier) to expose a running process."
+        )
+        return runningApplication.processIdentifier
+    }
+
+    func assertWorkflowApplicationProcessRemainsRunning(
+        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
+        processIdentifier: pid_t,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let runningApplication =
+            NSRunningApplication(
+                processIdentifier:
+                    processIdentifier
+            )
+        XCTAssertEqual(
+            runningApplication?.bundleIdentifier,
+            workflowApp.identity.bundleIdentifier,
+            "Expected PID \(processIdentifier) to retain the exact workflow application identity.",
+            file: file,
+            line: line
+        )
+        XCTAssertFalse(
+            runningApplication?.isTerminated ?? true,
+            "Expected workflow application PID \(processIdentifier) to remain running.",
+            file: file,
+            line: line
+        )
+    }
+
     func workflowWindowTitleIsObservable(
         _ title: String,
         app workflowApp: SpaceFixtureResolvedWorkflow.App
