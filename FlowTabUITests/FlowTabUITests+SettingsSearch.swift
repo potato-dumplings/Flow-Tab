@@ -203,7 +203,15 @@ extension FlowTabUITests {
         let showToggle = appVisibilityShowToggle(in: settingsApp)
         setToggle(showToggle, to: false)
         XCTAssertFalse(toggleIsOn(showToggle))
-        settingsApp.terminate()
+        let settingsTermination = terminateFlowTabUITestApplication(
+            settingsApp,
+            targetDescription: "settings app visibility configuration"
+        )
+        XCTAssertTrue(
+            settingsTermination.isSatisfied,
+            "Settings app termination failed. "
+                + settingsTermination.diagnosticSummary
+        )
 
         let switcherApp = makeApp(
             additionalArguments: appVisibilityRuntimeArguments(opensSwitcher: true)
@@ -217,7 +225,15 @@ extension FlowTabUITests {
                 timeout: 2
             )
         )
-        switcherApp.terminate()
+        let switcherTermination = terminateFlowTabUITestApplication(
+            switcherApp,
+            targetDescription: "app visibility switcher verification"
+        )
+        XCTAssertTrue(
+            switcherTermination.isSatisfied,
+            "Switcher app termination failed. "
+                + switcherTermination.diagnosticSummary
+        )
 
         let searchApp = makeApp(
             additionalArguments: appVisibilityRuntimeArguments(opensSearch: true)
@@ -230,9 +246,44 @@ extension FlowTabUITests {
             in: searchApp,
             observedBy: searchReadiness
         )
-        searchApp.typeText("Mail")
-        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
-        XCTAssertFalse(element(in: searchApp, identifier: Identifier.switcherSearchAppMockMail).exists)
+        let diagnosticsSummary = element(
+            in: searchApp,
+            identifier: Identifier.switcherSummary
+        )
+        XCTAssertTrue(
+            diagnosticsSummary.waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            performAndWaitForSwitcherDiagnostics(
+                [
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "searchResultsScope",
+                        expectedValue: "app"
+                    ),
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "searchResultsQuery",
+                        expectedValue: "Mail",
+                        decodesPercentEncoding: true
+                    ),
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "searchResults",
+                        expectedValue: ""
+                    )
+                ],
+                in: diagnosticsSummary,
+                timeout: 5,
+                trigger: {
+                    searchApp.typeText("Mail")
+                }
+            ),
+            "Search did not commit the exact empty app-result projection for Mail."
+        )
+        XCTAssertFalse(
+            element(
+                in: searchApp,
+                identifier: Identifier.switcherSearchAppMockMail
+            ).exists
+        )
     }
 
     func testSettingsAppVisibilitySearchUsesSharedPinyinMatching() throws {

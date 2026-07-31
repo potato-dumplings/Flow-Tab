@@ -21,11 +21,15 @@ extension FlowTabTests {
         XCTAssertEqual(scheduler.entries.count, 1)
         XCTAssertEqual(scheduler.entries[0].interval, 0.020)
         XCTAssertEqual(scheduler.activeEntryCount, 1)
+        XCTAssertEqual(model.searchViewState.query, "s")
+        XCTAssertEqual(model.searchViewState.resultsQuery, "")
 
         XCTAssertTrue(model.appendSearchQuery("a"))
         XCTAssertEqual(scheduler.entries.count, 2)
         XCTAssertTrue(scheduler.entries[0].token.isCancelled)
         XCTAssertEqual(scheduler.activeEntryCount, 1)
+        XCTAssertEqual(model.searchViewState.query, "sa")
+        XCTAssertEqual(model.searchViewState.resultsQuery, "")
 
         scheduler.fire(at: 0, ignoringCancellation: true)
         XCTAssertTrue(executor.entries.isEmpty)
@@ -44,6 +48,8 @@ extension FlowTabTests {
             model.searchViewState.results.map(\.primaryText),
             ["Safari"]
         )
+        XCTAssertEqual(model.searchViewState.resultsScope, .app)
+        XCTAssertEqual(model.searchViewState.resultsQuery, "sa")
         XCTAssertEqual(model.searchSchedulingOwner.debounceInterval, 0.014)
         XCTAssertEqual(resultPublicationCount, 1)
     }
@@ -76,14 +82,18 @@ extension FlowTabTests {
         executor.complete(at: 1)
         let acceptedResults = model.searchViewState.results
         XCTAssertEqual(acceptedResults.map(\.primaryText), ["Safari"])
+        XCTAssertEqual(model.searchViewState.resultsQuery, "fa")
 
         executor.complete(at: 0, ignoringCancellation: true)
         XCTAssertEqual(model.searchViewState.results, acceptedResults)
+        XCTAssertEqual(model.searchViewState.resultsQuery, "fa")
         XCTAssertEqual(resultPublicationCount, 1)
 
         XCTAssertTrue(model.appendSearchQuery("r"))
         model.cancelPendingSearchComputation()
         scheduler.fire(at: 2, ignoringCancellation: true)
+        XCTAssertEqual(model.searchViewState.query, "far")
+        XCTAssertEqual(model.searchViewState.resultsQuery, "fa")
         XCTAssertEqual(executor.entries.count, 2)
         XCTAssertNil(model.searchSchedulingOwner.pendingDebounceToken)
         XCTAssertNil(model.searchSchedulingOwner.pendingComputationToken)
@@ -109,6 +119,8 @@ extension FlowTabTests {
             model.searchViewState.results.map(\.primaryText),
             ["Visual Studio Code"]
         )
+        XCTAssertEqual(model.searchViewState.resultsScope, .app)
+        XCTAssertEqual(model.searchViewState.resultsQuery, "vsc")
         XCTAssertNil(model.searchSchedulingOwner.pendingDebounceToken)
         XCTAssertNil(model.searchSchedulingOwner.pendingComputationToken)
         XCTAssertEqual(scheduler.activeEntryCount, 0)
@@ -137,6 +149,10 @@ extension FlowTabTests {
 
             resultIDsBySchedulerLatency.append(
                 model.searchViewState.results.map(\.id)
+            )
+            XCTAssertEqual(
+                model.searchViewState.resultsQuery,
+                "wechat"
             )
             XCTAssertEqual(model.searchSchedulingOwner.debounceInterval, 0.014)
         }

@@ -160,6 +160,8 @@ struct SwitcherPanelRootView: View {
             "previewImages=\(previewItems.filter { $0.image != nil }.count)",
             "searchScope=\(model.searchViewState.isActive ? model.searchViewState.scope.rawValue : "inactive")",
             "searchSelectedResult=\(diagnosticsEscaped(model.searchViewState.selectedResult?.id ?? "none"))",
+            "searchResultsScope=\(model.searchViewState.resultsScope?.rawValue ?? "none")",
+            "searchResultsQuery=\(diagnosticsEscaped(model.searchViewState.resultsQuery ?? ""))",
             "searchResults=\(searchResultsDiagnosticsSummary)"
         ] + searchIndexDiagnosticsFields).joined(separator: ";")
     }

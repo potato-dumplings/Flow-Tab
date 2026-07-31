@@ -75,6 +75,8 @@ struct SwitcherSearchViewState: Equatable, Sendable {
     var scope: SwitcherSearchScope
     var query: String
     var queryCursorPosition: Int
+    var resultsScope: SwitcherSearchScope?
+    var resultsQuery: String?
     var results: [SwitcherSearchResult]
     var selectedResultIndex: Int
     var indexStatus: SwitcherSearchIndexStatus?
@@ -85,6 +87,8 @@ struct SwitcherSearchViewState: Equatable, Sendable {
         scope: .app,
         query: "",
         queryCursorPosition: 0,
+        resultsScope: nil,
+        resultsQuery: nil,
         results: [],
         selectedResultIndex: 0,
         indexStatus: nil
@@ -430,6 +434,8 @@ final class SwitcherSearchCoordinator {
         let oldState = state
         appMatchCache = output.appMatchCache
         windowMatchCache = output.windowMatchCache
+        state.resultsScope = output.scope
+        state.resultsQuery = output.query
         state.results = output.results
         state.selectedResultIndex = output.selectedResultIndex
         return state != oldState
