@@ -257,8 +257,9 @@ and Process/Tooling.
 | SYNC-035J | `HomeInitialProjectionObservationOwner.readback`, `FlowTabUITestHomeInitialProjectionApplicationBootstrap`, and `testHomeInitialAppLayerUsesRuntimeOrderAndZeroCountsWithoutAccessibilityPermission`; post-maintenance Home projection application | A fixed 1.2-second RunLoop advance after the first zero-count and frame readbacks assumes the requested maintenance projection has been applied without changing row values or order. Evidence migration. | Publish a typed exact-service notification after each accepted projection callback returns. TestingSupport observes before Home construction, atomically persists the exact observation generation, transition, completeness, source generations, ordered app IDs, and window counts, then uses a distributed notification as a wakeup. The UI owner observes before launch, performs an immediate JSON readback, and retains a named cancellable 100ms fallback for a missed cross-process wakeup. Success requires a later `appSwitcherProjectionNotification` with `sourceGenerationAdvanced`, incomplete window coverage, Mail before Browser, and both counts zero; accessibility values and frames remain independent before/after readbacks. App termination and test teardown own observer, scheduler, and file cleanup. The eight-second watchdog reports the final path/file/decode/evidence state. | H Home initial projection UI Oracle; deterministic initial/synchronous/notification/generation/cancellation/atomic-readback coverage, 2,000-generation lifecycle Pressure, affected Home UI, Process/Tooling. | completed |
 | SYNC-035K | `SwitcherPointerSelectionGate`, `SwitcherPanelController` pointer-selection entry points, and the stationary-pointer Option+Tab, Control+Tab, and Search UI paths; suppression of presentation-time hover | Each UI path advances the RunLoop for one second in 100ms increments and treats an unchanged selection throughout that interval as proof that the stationary-pointer gate handled presentation. This is an absence-over-time inference rather than completion evidence. | Give each gate reset a monotonic generation and emit one blocked decision for each exact application, window, or Search-result target in that generation. The controller records a structured marker containing the exact target identity, preserved selection, and generation only for the first blocked callback. The UI test captures the post-baseline runtime log and starts its observer before launch or trigger, performs the shared immediate readback, requires that exact blocked marker, then independently reads back the unchanged selected identity and target frame. Duplicate callbacks are suppressed, reset releases prior-generation target storage, and movement reaching the existing threshold remains the sole transition to selection-enabled state. The test invocation owns observation cancellation and process cleanup. Because XCUI exposes no hover-gate callback, the shared named cancellable 200ms runtime-log cadence remains the fallback; the five-second gate watchdog is solely a failure bound with final log evidence. | H repeated pointer-input path; deterministic generation/target/dedup/reset/escaping rules, controller Behavior, shared observer event/cancel/watchdog and lifecycle Pressure, 2,000-generation gate Pressure, stationary and moved-pointer UI, Process/Tooling. | completed |
 | SYNC-036 | All literal XCTest timeouts in `FlowTabTests` and `FlowTabUITests` | 606 literal durations are generally terminal bounds for an independent expectation or XCUI predicate, but policy ownership and diagnostic tiers are implicit. Watchdog. | Replace literals with named app-test and UI-test watchdog policies by operation class; preserve expectation/predicate success Oracles and include unmet condition plus last observation in custom waits. Test case/helper owner supplies cleanup. | M mechanical/test infra; Unit/Behavior/UI, Process/Tooling. | planned |
-| SYNC-037 | `scripts/perf/tab-switch-stress.sh`, `search-committed-index-pressure.sh`, `runtime-topology-pressure.sh`, `lib/runtime-topology-target.sh` | Sampling duration/cadence and identity stability windows are pressure/safety protocols; process termination loops use unnamed 100ms cadence and attempt bounds. Domain duration/conditional observation/watchdog. | Retain measurement durations and sample cadence as named protocol inputs. Name process polling cadence/watchdogs, check state immediately, terminate from PID/start-identity/readback, and report the final `ps`/identity/status evidence. Traps own cancellation and cleanup. | M tooling/hot path; Pressure and Process/Tooling. | in progress; SYNC-037A tab-switch child cleanup completed |
+| SYNC-037 | `scripts/perf/tab-switch-stress.sh`, `search-committed-index-pressure.sh`, `runtime-topology-pressure.sh`, `lib/runtime-topology-target.sh` | Sampling duration/cadence and identity stability windows are pressure/safety protocols; process termination loops use unnamed 100ms cadence and attempt bounds. Domain duration/conditional observation/watchdog. | Retain measurement durations and sample cadence as named protocol inputs. Name process polling cadence/watchdogs, check state immediately, terminate from PID/start-identity/readback, and report the final `ps`/identity/status evidence. Traps own cancellation and cleanup. | M tooling/hot path; Pressure and Process/Tooling. | in progress; SYNC-037A tab-switch and SYNC-037B Search pressure child cleanup completed; runtime-topology owners remain |
 | SYNC-037A | `tab-switch-stress.sh`, `lib/process-exit-observation.sh`, and `test-process-exit-observation.sh`; tab-switch stress child termination and trap cleanup | After TERM, twenty unnamed 100ms attempts infer when the child is safe to reap or whether KILL escalation is required. A scheduling slowdown changes the observed opportunity count and diagnostics omit the expected process identity. | Capture the launched child PID and start identity, check `ps` state immediately, and accept only exact absence or zombie state before the owning shell performs `wait PID`. Retain a named 100ms conditional observation cadence while the child remains active. A named two-second monotonic watchdog only controls KILL escalation and reports the unmet exit condition, expected start identity, final PID/PPID/state/start/command record, and readback status. The synchronous trap owner supplies cancellation and reaping. Sampling duration, switch cadence, and sample cadence remain explicit pressure protocol inputs. | M perf process owner; deterministic initial/delayed/slow-scheduling/final-readback/watchdog/readback-error/identity/cancel tests, real child readiness/TERM/reap integration, normal and interrupted tab-switch Pressure, Process/Tooling. | completed |
+| SYNC-037B | `search-committed-index-pressure.sh`, `lib/process-exit-observation.sh`, and `test-process-exit-observation.sh`; Search pressure test-process-tree termination and trap cleanup | After TERM and after optional KILL, two independent twenty-attempt 100ms loops watch only the root shell PID. Attempt count and scheduler availability determine escalation and completion, while surviving descendants and PID reuse lack exact evidence. | Capture and deduplicate every observed PID plus `lstart` identity before signalling. Perform an immediate exact readback before each TERM/KILL, then observe the complete captured identity set immediately and at a named 100ms cadence. Exact absence, zombie state, or a changed identity proves the captured record inactive; readback, identity-capture, and monotonic-clock failures remain unmet evidence. A named 2,000ms TERM grace only controls exact-record KILL escalation, and a separate 2,000ms watchdog bounds KILL confirmation; each reports `processTreeExited` and final PID/PPID/state/start/command evidence. The synchronous trap owns capture, signalling, observation, cancellation, `wait PID`, atomic status persistence, and cleanup. Caller-selected sampling duration and cadence remain explicit pressure protocol inputs. | M perf process-tree owner/shared helper; deterministic initial/dedup/exact-signal/slow-scheduling/cancel/final-readback/watchdog/readback-error tests, real child integration, completed and interrupted Search Pressure, Process/Tooling. | completed |
 | SYNC-038 | `scripts/release/release-install.sh`, `scripts/release/uninstall-flowtab.js` | A fixed one-second delay assumes FlowTab exited before replacement or deletion. Evidence migration. | Wait on exact process absence/identity readback immediately after quit/TERM, with a named watchdog and last PID/state diagnostic before mutating installed resources. The install/uninstall command owns cleanup. | M release tooling; Process/Tooling and release contract tests. | completed through SYNC-038A installer and SYNC-038B uninstaller |
 | SYNC-038A | `release-install.sh`, `lib/process-exit-observation.sh`, and `test-process-exit-observation.sh`; installed-app replacement process boundary | A fixed one-second sleep after AppleScript quit and `pkill` assumes every `FlowTab` process has exited before permission reset, build, and eventual application replacement. | Read the exact process name immediately through `pgrep`, enrich every observed PID with `ps` PID/PPID/state/start/command identity, and treat readback errors as unmet evidence. Retain a named 100ms cancellable shell cadence only while records remain. Recheck immediately before removing the installed bundle. The release command owns the synchronous wait and interruption cleanup; its ten-second watchdog reports the unmet absence condition and final process records. | M release process/tooling; deterministic immediate/delayed/watchdog/readback-error contract tests, real process-list integration, static mutation-order contract, Process/Tooling. | completed |
 | SYNC-038B | `uninstall-flowtab.js`, `test-uninstall-flowtab-process-exit.js`, and `test-uninstall-flowtab-workspace-observer.jxa`; DMG uninstaller process and installed-app deletion boundary | The JXA applet advances a fixed one-second delay after quit and exact-name `pkill`, then treats elapsed time as proof that user data and the installed bundle can be removed. | Register `NSWorkspaceDidTerminateApplicationNotification` before the quit request, capture an initial exact bundle-ID readback, deduplicate exact PID/launch-date/executable identities into a monotonic generation, wake the owning RunLoop on the target event, and require a final `NSRunningApplication` absence readback. Keep the observer alive across cleanup and administrator authentication, then place an immediate exact-name `pgrep`/`ps` guard inside the privileged command before bundle removal. The applet invocation owns observer cancellation. A ten-second monotonic watchdog is only a failure bound and reports the unmet condition, final application records, and last notification. | M release process/tooling; deterministic initial/event/cancel/duplicate/out-of-order/readback-error/watchdog/slow-scheduling rules, real signed JXA fixture termination event, privileged guard present/absent integration, existing cleanup boundary, Process/Tooling. | completed |
@@ -7970,5 +7971,70 @@ polling cadence, deadline, or timeout in the scoped paths.
   Pressure is covered by both natural completion and signal interruption.
   Startup `prompts.zip` and the three pre-existing local Skill/reference edits
   remain unchanged and outside the slice.
-- Commit: pending current-slice local commit
+- Commit: `eb1bbc1921670bbdec8d84ef2ab4845f61a76eb1`
   (`refactor(sync): migrate SYNC-037A tab stress process exit`).
+
+### SYNC-037B Closure Record
+
+- Design and Oracle: the Search pressure runner captures the background test
+  shell identity immediately after launch, then captures and deduplicates the
+  current descendant tree as exact PID/`lstart` pairs before sending TERM.
+  Every signal is preceded by a fresh PID/PPID/state/start/command readback and
+  is delivered only while that same identity is active. Collective completion
+  requires every captured identity to be absent, a zombie awaiting its owner,
+  or replaced by a different identity; the owning shell then performs
+  `wait PID` as the independent exit-status Oracle. A failed identity capture,
+  `ps` readback, or monotonic-clock read remains unmet evidence.
+- Lifecycle and retained time policy: the synchronous signal/exit trap owns
+  identity capture, exact-record signalling, observation, optional escalation,
+  reaping, status persistence, cancellation, and cleanup. The named 100ms
+  cadence runs only while at least one exact record remains active. The named
+  2,000ms TERM grace controls KILL escalation, and the separate 2,000ms KILL
+  confirmation watchdog bounds terminal failure; neither establishes success.
+  Both perform a final readback and report `processTreeExited`, the final
+  condition, and every still-active exact record. The caller-selected 30-second
+  scenario duration and 0.5-second sample cadence remain the explicit Search
+  pressure protocol; scheduler load may extend active sampling to finish a
+  batch but cannot change its completion Oracle.
+- Deterministic regression: the shared contract covers immediate single-record
+  and tree satisfaction without clock or polling work, deduplication, recovery
+  of a start identity from an immediate full readback, signalling only a
+  matching active identity, delayed completion, completion after an injected
+  scheduler overshoots the nominal deadline, cancellation, final-readback
+  watchdog diagnostics, readback errors, and exact identity replacement. A
+  real child publishes readiness through a named pipe, handles TERM, exits, and
+  is reaped by the test owner. The static caller contract requires the Search
+  runner to source the shared owner, capture the root identity, use the
+  collective evidence wait, and contain no attempt-count or unnamed 100ms
+  cleanup loop.
+- Pressure: the completed reproduction
+  `./scripts/perf/search-committed-index-pressure.sh 0.5 --scenario realistic
+  --scenario-duration-seconds 30 --build-root
+  ./.build-local/evidence-driven-sync/SYNC-037B/build --output-dir
+  ./.build-local/evidence-driven-sync/SYNC-037B/normal-current-001` recorded
+  `stage=completed`, final/test-process exit code 0, four successful batches,
+  71 samples, 70 valid samples against a minimum of 25, 45.047 active seconds,
+  zero cadence gaps, and `termination_timed_out=false`. The exact six PIDs in
+  its final sample subsequently produced an empty `ps` readback.
+- Interrupted Pressure: the same command with output leaf
+  `interrupted-current-003` was interrupted during the second active test
+  batch. Its atomic status recorded `stage=interrupted`, final exit code 130,
+  test-process exit code 143, one completed batch, 26 samples,
+  `sampling_failed=false`, and `termination_timed_out=false`. Exact final
+  sample PIDs 99997, 1677, 1678, 1686, 1687, and 1758 subsequently produced an
+  empty `ps` readback, and no command containing the slice root remained.
+- Process/Tooling: `bash -n` accepts the runner, shared helper, and contract
+  test; the contract test passes at the Terminal process boundary;
+  `search-committed-index-pressure.sh --help` exits without mutation; and
+  `git diff --check` passes. The pressure runner invokes FlowTabTests only
+  through `run-flowtabtests-local.sh`; its build-for-testing and every
+  test-without-building batch used isolated slice roots. Unit, Behavior, and UI
+  are not relevant because this slice changes only pressure-tool process
+  ownership; the embedded committed-index FlowTabTests plus completed and
+  interrupted external runs supply Process/Tooling and Pressure evidence.
+  Startup `prompts.zip` and the three pre-existing local Skill/reference edits
+  remain unchanged and outside the slice. Rebuildable `.xcresult`, DerivedData,
+  caches, and logs are confined to the recorded `SYNC-037B` root for exact
+  post-commit cleanup.
+- Commit: pending current-slice local commit
+  (`refactor(sync): migrate SYNC-037B search pressure process exit`).

@@ -3,6 +3,8 @@
 FLOWTAB_PERF_PROCESS_EXIT_CONDITION=""
 FLOWTAB_PERF_PROCESS_EXIT_LAST_OBSERVATION=""
 FLOWTAB_PERF_PROCESS_EXIT_NOW_NS=0
+FLOWTAB_PERF_PROCESS_EXIT_OBSERVED_START_IDENTITY=""
+FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS=()
 FLOWTAB_PERF_PROCESS_EXIT_MONOTONIC_CLOCK_PATH="$(
   cd "$(dirname "${BASH_SOURCE[0]}")" && pwd
 )/monotonic-clock.sh"
@@ -19,6 +21,42 @@ flowtab_perf_process_start_identity() {
   printf '%s' "${started_at}"
 }
 
+flowtab_perf_remember_process_identity() {
+  local pid="$1"
+  local start_identity="$2"
+  local index
+
+  for ((index=0; index<${#FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS[@]}; index+=2)); do
+    if [[ "${FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS[$index]}" == "$pid" ]] \
+      && [[ "${FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS[$((index + 1))]}" == "$start_identity" ]]; then
+      return
+    fi
+  done
+  FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS+=("$pid" "$start_identity")
+}
+
+flowtab_perf_capture_process_identity() {
+  local pid="$1"
+  local start_identity
+
+  if start_identity="$(flowtab_perf_process_start_identity "$pid" 2>/dev/null)"; then
+    flowtab_perf_remember_process_identity "$pid" "$start_identity"
+    return 0
+  fi
+  flowtab_perf_process_exit_readback "$pid" ""
+  if [[ "$FLOWTAB_PERF_PROCESS_EXIT_CONDITION" == "exited" ]]; then
+    return 0
+  fi
+  if [[ "$FLOWTAB_PERF_PROCESS_EXIT_CONDITION" == "running" ]] \
+    && [[ -n "$FLOWTAB_PERF_PROCESS_EXIT_OBSERVED_START_IDENTITY" ]]; then
+    flowtab_perf_remember_process_identity \
+      "$pid" \
+      "$FLOWTAB_PERF_PROCESS_EXIT_OBSERVED_START_IDENTITY"
+    return 0
+  fi
+  return 1
+}
+
 flowtab_perf_process_exit_readback() {
   local pid="$1"
   local expected_start_identity="$2"
@@ -26,6 +64,8 @@ flowtab_perf_process_exit_readback() {
   local process_state
   local process_start_identity
   local ps_status
+
+  FLOWTAB_PERF_PROCESS_EXIT_OBSERVED_START_IDENTITY=""
 
   if process_record="$(
     LC_ALL=C /bin/ps \
@@ -63,6 +103,7 @@ flowtab_perf_process_exit_readback() {
     printf '%s\n' "${process_record}" \
       | LC_ALL=C /usr/bin/awk '{print $4, $5, $6, $7, $8}'
   )"
+  FLOWTAB_PERF_PROCESS_EXIT_OBSERVED_START_IDENTITY="$process_start_identity"
   FLOWTAB_PERF_PROCESS_EXIT_LAST_OBSERVATION="${process_record}"
 
   if [[ "${process_state}" == Z* ]]; then
@@ -72,6 +113,66 @@ flowtab_perf_process_exit_readback() {
     FLOWTAB_PERF_PROCESS_EXIT_CONDITION="identity_changed"
   else
     FLOWTAB_PERF_PROCESS_EXIT_CONDITION="running"
+  fi
+}
+
+flowtab_perf_signal_active_process_identities() {
+  local signal_name="$1"
+  local index
+  local process_identity_records
+  local process_pid
+  local start_identity
+  shift
+  process_identity_records=("$@")
+
+  for ((index=${#process_identity_records[@]} - 2; index>=0; index-=2)); do
+    process_pid="${process_identity_records[$index]}"
+    start_identity="${process_identity_records[$((index + 1))]}"
+    flowtab_perf_process_exit_readback "$process_pid" "$start_identity"
+    if [[ "$FLOWTAB_PERF_PROCESS_EXIT_CONDITION" == "running" ]]; then
+      kill "-${signal_name}" "$process_pid" 2>/dev/null || true
+    fi
+  done
+}
+
+flowtab_perf_process_identities_exit_readback() {
+  local aggregate_condition="exited"
+  local aggregate_observation=""
+  local expected_start_identity
+  local pid
+
+  while [[ "$#" -gt 0 ]]; do
+    pid="$1"
+    expected_start_identity="$2"
+    shift 2
+    flowtab_perf_process_exit_readback "$pid" "$expected_start_identity"
+    case "$FLOWTAB_PERF_PROCESS_EXIT_CONDITION" in
+      running)
+        if [[ "$aggregate_condition" != "readback_error" ]]; then
+          aggregate_condition="running"
+        fi
+        ;;
+      readback_error)
+        aggregate_condition="readback_error"
+        ;;
+      exited | identity_changed)
+        continue
+        ;;
+    esac
+    if [[ -n "$aggregate_observation" ]]; then
+      aggregate_observation+=$'\n'
+    fi
+    aggregate_observation+="pid=${pid} "
+    aggregate_observation+="expectedStartIdentity=${expected_start_identity} "
+    aggregate_observation+="condition=${FLOWTAB_PERF_PROCESS_EXIT_CONDITION} "
+    aggregate_observation+="record=${FLOWTAB_PERF_PROCESS_EXIT_LAST_OBSERVATION}"
+  done
+
+  FLOWTAB_PERF_PROCESS_EXIT_CONDITION="$aggregate_condition"
+  if [[ "$aggregate_condition" == "exited" ]]; then
+    FLOWTAB_PERF_PROCESS_EXIT_LAST_OBSERVATION="all exact process identities are inactive"
+  else
+    FLOWTAB_PERF_PROCESS_EXIT_LAST_OBSERVATION="$aggregate_observation"
   fi
 }
 
@@ -113,6 +214,22 @@ flowtab_perf_report_process_exit_failure() {
       ;;
   esac
   echo "expectedStartIdentity=${expected_start_identity:-unavailable}" >&2
+  echo "watchdogMilliseconds=${watchdog_milliseconds}" >&2
+  echo "lastCondition=${FLOWTAB_PERF_PROCESS_EXIT_CONDITION}" >&2
+  echo "lastObservation:" >&2
+  echo "${FLOWTAB_PERF_PROCESS_EXIT_LAST_OBSERVATION}" >&2
+}
+
+flowtab_perf_report_process_identities_exit_failure() {
+  local watchdog_milliseconds="$1"
+  local reason="${2:-watchdog}"
+
+  if [[ "$reason" == "observation_error" ]]; then
+    echo "Process-tree exit observation failed." >&2
+  else
+    echo "Timed out waiting for exact process identities to exit." >&2
+  fi
+  echo "unmetCondition=processTreeExited" >&2
   echo "watchdogMilliseconds=${watchdog_milliseconds}" >&2
   echo "lastCondition=${FLOWTAB_PERF_PROCESS_EXIT_CONDITION}" >&2
   echo "lastObservation:" >&2
@@ -208,5 +325,79 @@ flowtab_perf_wait_for_process_exit() {
         return 2
         ;;
     esac
+  done
+}
+
+flowtab_perf_wait_for_process_identities_exit() {
+  local watchdog_milliseconds="$1"
+  local poll_interval_seconds="$2"
+  local deadline_ns
+  local pid
+  local started_at_ns
+  shift 2
+
+  if [[ "$#" -eq 0 ]] || (( $# % 2 != 0 )); then
+    echo "Process-tree exit observation requires PID/identity pairs." >&2
+    return 2
+  fi
+  if [[ ! "$watchdog_milliseconds" =~ ^[0-9]+$ ]]; then
+    echo "Process-tree exit watchdog must be non-negative milliseconds." >&2
+    return 2
+  fi
+  if [[ ! "$poll_interval_seconds" =~ ^[0-9]+([.][0-9]+)?$ ]] \
+    || [[ "$poll_interval_seconds" =~ ^0+([.]0+)?$ ]]; then
+    echo "Process-tree exit polling interval must be positive." >&2
+    return 2
+  fi
+  local process_identity_records=("$@")
+  local index
+  for ((index=0; index<${#process_identity_records[@]}; index+=2)); do
+    pid="${process_identity_records[$index]}"
+    if [[ ! "$pid" =~ ^[1-9][0-9]*$ ]] \
+      || [[ -z "${process_identity_records[$((index + 1))]}" ]]; then
+      echo "Process-tree exit observation requires exact PID/identity pairs." >&2
+      return 2
+    fi
+  done
+
+  flowtab_perf_process_identities_exit_readback "${process_identity_records[@]}"
+  if [[ "$FLOWTAB_PERF_PROCESS_EXIT_CONDITION" == "exited" ]]; then
+    return 0
+  fi
+  if ! flowtab_perf_process_exit_read_clock; then
+    flowtab_perf_report_process_identities_exit_failure \
+      "$watchdog_milliseconds" \
+      "observation_error"
+    return 2
+  fi
+  started_at_ns="$FLOWTAB_PERF_PROCESS_EXIT_NOW_NS"
+  deadline_ns=$((started_at_ns + watchdog_milliseconds * 1000000))
+
+  while true; do
+    if ! flowtab_perf_process_exit_read_clock; then
+      flowtab_perf_report_process_identities_exit_failure \
+        "$watchdog_milliseconds" \
+        "observation_error"
+      return 2
+    fi
+    if ((FLOWTAB_PERF_PROCESS_EXIT_NOW_NS >= deadline_ns)); then
+      flowtab_perf_process_identities_exit_readback "${process_identity_records[@]}"
+      if [[ "$FLOWTAB_PERF_PROCESS_EXIT_CONDITION" == "exited" ]]; then
+        return 0
+      fi
+      flowtab_perf_report_process_identities_exit_failure "$watchdog_milliseconds"
+      return 1
+    fi
+
+    if ! flowtab_perf_process_exit_sleep "$poll_interval_seconds"; then
+      echo "Process-tree exit observation was cancelled." >&2
+      echo "lastObservation:" >&2
+      echo "$FLOWTAB_PERF_PROCESS_EXIT_LAST_OBSERVATION" >&2
+      return 130
+    fi
+    flowtab_perf_process_identities_exit_readback "${process_identity_records[@]}"
+    if [[ "$FLOWTAB_PERF_PROCESS_EXIT_CONDITION" == "exited" ]]; then
+      return 0
+    fi
   done
 }

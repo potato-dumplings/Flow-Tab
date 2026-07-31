@@ -5,6 +5,13 @@ ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 RESULTS_ROOT="${ROOT_DIR}/.build-local/search-committed-index-pressure"
 FLOWTABTESTS_RUNNER="${ROOT_DIR}/scripts/testing/run-flowtabtests-local.sh"
 MONOTONIC_CLOCK="${ROOT_DIR}/scripts/perf/lib/monotonic-clock.sh"
+PROCESS_EXIT_OBSERVATION_PATH="${ROOT_DIR}/scripts/perf/lib/process-exit-observation.sh"
+TEST_TERMINATION_GRACE_MILLISECONDS=2000
+TEST_KILL_CONFIRMATION_WATCHDOG_MILLISECONDS=2000
+TEST_TERMINATION_POLL_INTERVAL_SECONDS=0.1
+
+# shellcheck source=scripts/perf/lib/process-exit-observation.sh
+source "${PROCESS_EXIT_OBSERVATION_PATH}"
 
 usage() {
   cat <<'EOF'
@@ -48,6 +55,8 @@ SCENARIO=""
 SCENARIO_DURATION_SECONDS=""
 POSITIONAL_ARGS=()
 TEST_PID=""
+TEST_START_IDENTITY=""
+TEST_PROCESS_IDENTITY_CAPTURE_FAILED=false
 TEST_REAPED=true
 TEST_PROCESS_STATUS="not_started"
 STATUS_FILE=""
@@ -358,61 +367,67 @@ reap_test_process() {
   TEST_REAPED=true
 }
 
-process_is_running() {
-  local pid="$1"
-  local process_state
+capture_test_process_tree_identities() {
+  local process_pid
 
-  kill -0 "$pid" 2>/dev/null || return 1
-  process_state="$(LC_ALL=C ps -p "$pid" -o stat= 2>/dev/null | LC_ALL=C awk '{$1=$1; print}' || true)"
-  [[ "$process_state" == Z* ]] && return 1
-  return 0
+  while IFS= read -r process_pid; do
+    [[ -n "$process_pid" ]] || continue
+    if ! flowtab_perf_capture_process_identity "$process_pid"; then
+      TEST_PROCESS_IDENTITY_CAPTURE_FAILED=true
+      echo "Failed to capture an exact test-process identity." >&2
+      echo "unmetCondition=processIdentityCaptured pid=${process_pid}" >&2
+      echo "lastObservation: ${FLOWTAB_PERF_PROCESS_EXIT_LAST_OBSERVATION}" >&2
+    fi
+  done < <(descendant_pids "$TEST_PID")
 }
 
 terminate_test_process() {
-  local process_pid
-  local process_pids=()
-  local index
-  local wait_attempt=0
+  local observation_status=0
 
   if [[ -z "$TEST_PID" || "$TEST_REAPED" == true ]]; then
     return
   fi
 
-  while IFS= read -r process_pid; do
-    [[ -n "$process_pid" ]] || continue
-    process_pids+=("$process_pid")
-  done < <(descendant_pids "$TEST_PID")
-
-  for ((index=${#process_pids[@]} - 1; index >= 0; index--)); do
-    kill -TERM "${process_pids[$index]}" 2>/dev/null || true
-  done
-
-  while process_is_running "$TEST_PID" && [[ "$wait_attempt" -lt 20 ]]; do
-    sleep 0.1
-    wait_attempt=$((wait_attempt + 1))
-  done
-
-  if process_is_running "$TEST_PID"; then
-    process_pids=()
-    while IFS= read -r process_pid; do
-      [[ -n "$process_pid" ]] || continue
-      process_pids+=("$process_pid")
-    done < <(descendant_pids "$TEST_PID")
-    for ((index=${#process_pids[@]} - 1; index >= 0; index--)); do
-      kill -KILL "${process_pids[$index]}" 2>/dev/null || true
-    done
+  FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS=()
+  TEST_PROCESS_IDENTITY_CAPTURE_FAILED=false
+  if [[ -n "$TEST_START_IDENTITY" ]]; then
+    flowtab_perf_remember_process_identity "$TEST_PID" "$TEST_START_IDENTITY"
+  fi
+  capture_test_process_tree_identities
+  if [[ "${#FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS[@]}" -eq 0 ]]; then
+    if [[ "$TEST_PROCESS_IDENTITY_CAPTURE_FAILED" == true ]]; then
+      TERMINATION_TIMED_OUT=true
+    fi
+    reap_test_process
+    return
   fi
 
-  wait_attempt=0
-  while process_is_running "$TEST_PID" && [[ "$wait_attempt" -lt 20 ]]; do
-    sleep 0.1
-    wait_attempt=$((wait_attempt + 1))
-  done
-  if process_is_running "$TEST_PID"; then
+  flowtab_perf_signal_active_process_identities \
+    TERM \
+    "${FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS[@]}"
+  flowtab_perf_wait_for_process_identities_exit \
+    "$TEST_TERMINATION_GRACE_MILLISECONDS" \
+    "$TEST_TERMINATION_POLL_INTERVAL_SECONDS" \
+    "${FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS[@]}" \
+    || observation_status=$?
+
+  if [[ "$observation_status" -ne 0 ]]; then
+    echo "Escalating test process tree to SIGKILL after evidence watchdog." >&2
+    capture_test_process_tree_identities
+    flowtab_perf_signal_active_process_identities \
+      KILL \
+      "${FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS[@]}"
+    observation_status=0
+    flowtab_perf_wait_for_process_identities_exit \
+      "$TEST_KILL_CONFIRMATION_WATCHDOG_MILLISECONDS" \
+      "$TEST_TERMINATION_POLL_INTERVAL_SECONDS" \
+      "${FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS[@]}" \
+      || observation_status=$?
+  fi
+
+  if [[ "$observation_status" -ne 0 ]] \
+    || [[ "$TEST_PROCESS_IDENTITY_CAPTURE_FAILED" == true ]]; then
     TERMINATION_TIMED_OUT=true
-    TEST_PROCESS_STATUS=137
-    TEST_REAPED=true
-    return
   fi
   reap_test_process
 }
@@ -580,7 +595,7 @@ sample_process_tree() {
   done < <(descendant_pids "$root_pid")
 
   [[ "$sampled_any" == true ]] || return 1
-  process_is_running "$root_pid" || return 1
+  test_process_is_live || return 1
 
   SAMPLE_COUNT=$((SAMPLE_COUNT + 1))
   printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
@@ -703,6 +718,9 @@ CURRENT_STAGE="running_tests"
 run_test_loop &
 TEST_PID=$!
 TEST_REAPED=false
+TEST_START_IDENTITY="$(
+  flowtab_perf_process_start_identity "$TEST_PID" 2>/dev/null || true
+)"
 
 echo "[3/4] Sampling the test process tree every ${SAMPLE_INTERVAL_SECONDS}s for at least ${MIN_SAMPLE_SECONDS}s..."
 CURRENT_STAGE="sampling"
