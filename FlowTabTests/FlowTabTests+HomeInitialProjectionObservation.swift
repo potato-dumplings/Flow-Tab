@@ -4,6 +4,65 @@ import XCTest
 @testable import FlowTab
 
 extension FlowTabTests {
+    func testHomeInitialProjectionApplicationRouteRequiresUITestSentinelAndName() {
+        let argument =
+            FlowTabTestLaunchOptions
+                .homeInitialProjectionApplicationRouteArgument
+        let readbackArgument =
+            FlowTabTestLaunchOptions
+                .homeInitialProjectionApplicationReadbackPathArgument
+        withLaunchArgumentsForTesting([
+            "FlowTab",
+            argument,
+            "  test.home-initial-projection  ",
+            readbackArgument,
+            "  /tmp/home-initial-projection.json  "
+        ]) {
+            XCTAssertEqual(
+                FlowTabTestLaunchOptions
+                    .homeInitialProjectionApplicationRoute,
+                FlowTabUITestHomeInitialProjectionApplicationRoute(
+                    notificationName:
+                        Notification.Name(
+                            "test.home-initial-projection"
+                        ),
+                    readbackURL:
+                        URL(
+                            fileURLWithPath:
+                                "/tmp/home-initial-projection.json"
+                        )
+                )
+            )
+        }
+        withLaunchArgumentsForTesting(
+            [
+                "FlowTab",
+                argument,
+                "test.home-initial-projection",
+                readbackArgument,
+                "/tmp/home-initial-projection.json"
+            ],
+            environment: [:]
+        ) {
+            XCTAssertNil(
+                FlowTabTestLaunchOptions
+                    .homeInitialProjectionApplicationRoute
+            )
+        }
+        withLaunchArgumentsForTesting([
+            "FlowTab",
+            argument,
+            "test.home-initial-projection",
+            readbackArgument,
+            "relative/home-initial-projection.json"
+        ]) {
+            XCTAssertNil(
+                FlowTabTestLaunchOptions
+                    .homeInitialProjectionApplicationRoute
+            )
+        }
+    }
+
     @MainActor
     func testHomeVisibilityOwnsInitialProjectionObservationLifecycle() async {
         let notificationCenter = NotificationCenter()
@@ -96,6 +155,27 @@ extension FlowTabTests {
             readAccessibilityPermission: { true },
             readScreenCapturePermission: { true }
         )
+        var applicationWasPublishedAfterHandoff = false
+        let applicationToken = notificationCenter.addObserver(
+            forName:
+                .homeInitialProjectionObservationDidApply,
+            object: runtimeProjectionService,
+            queue: nil
+        ) { notification in
+            guard
+                HomeInitialProjectionObservationApplication(
+                    notification: notification
+                ) != nil
+            else {
+                return
+            }
+            applicationWasPublishedAfterHandoff =
+                appSummaryProjectionOwner.isObserving
+                && !initialProjectionOwner.isObserving
+        }
+        defer {
+            notificationCenter.removeObserver(applicationToken)
+        }
         let hostedView = NSHostingView(
             rootView: HomeLandingView(
                 isActive: true,
@@ -118,6 +198,7 @@ extension FlowTabTests {
 
         XCTAssertFalse(initialProjectionOwner.isObserving)
         XCTAssertTrue(appSummaryProjectionOwner.isObserving)
+        XCTAssertTrue(applicationWasPublishedAfterHandoff)
         let readCountBeforeCommit =
             runtimeProjectionService.homeSummaryProjectionReadCount()
         runtimeProjectionService.setHomeSummaryProjection(

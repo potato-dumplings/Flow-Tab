@@ -17,14 +17,40 @@ extension FlowTabPriorityCoverageTests {
             notificationCenter: notificationCenter
         )
         var evidence: [HomeInitialProjectionObservationEvidence] = []
+        var application:
+            HomeInitialProjectionObservationApplication?
+        var callbackHadReturnedWhenPublished = false
+        var callbackApplied = false
+        let applicationToken = notificationCenter.addObserver(
+            forName:
+                .homeInitialProjectionObservationDidApply,
+            object: runtimeProjectionService,
+            queue: nil
+        ) { notification in
+            callbackHadReturnedWhenPublished = callbackApplied
+            application =
+                HomeInitialProjectionObservationApplication(
+                    notification: notification
+                )
+        }
+        defer {
+            notificationCenter.removeObserver(applicationToken)
+        }
 
         owner.start(reason: "test_initial_ready") {
             evidence.append($0)
+            callbackApplied = true
         }
 
         XCTAssertEqual(evidence.map(\.source), [.initialReadback])
         XCTAssertEqual(evidence.map(\.transition), [.baseline])
         XCTAssertTrue(evidence[0].isReady)
+        XCTAssertTrue(callbackHadReturnedWhenPublished)
+        XCTAssertEqual(application?.evidence, evidence[0])
+        XCTAssertEqual(
+            application?.requestReason,
+            "test_initial_ready"
+        )
         XCTAssertFalse(owner.isObserving)
         XCTAssertEqual(
             runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
@@ -126,6 +152,151 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testHomeInitialProjectionApplicationForwarderPublishesExactEvidenceAndCancels() throws {
+        let notificationCenter = NotificationCenter()
+        let runtimeProjectionService =
+            RecordingRuntimeProjectionService(
+                homeSummaryProjection:
+                    makeHomeInitialSummaryProjection(
+                        generation: 5,
+                        isCompleteForScope: false
+                    )
+            )
+        let route =
+            FlowTabUITestHomeInitialProjectionApplicationRoute(
+                notificationName:
+                    Notification.Name(
+                        "test.home-initial-projection"
+                    ),
+                readbackURL:
+                    FileManager.default.temporaryDirectory
+                        .appendingPathComponent(
+                            "flowtab-home-initial-\(UUID().uuidString).json",
+                            isDirectory: false
+                        )
+            )
+        defer {
+            try? FileManager.default.removeItem(
+                at: route.readbackURL
+            )
+        }
+        var forwarded:
+            [
+                FlowTabUITestHomeInitialProjectionApplicationEvidence
+            ] = []
+        let forwarder =
+            FlowTabUITestHomeInitialProjectionApplicationForwarder(
+                route: route,
+                notificationObject:
+                    runtimeProjectionService,
+                notificationCenter: notificationCenter
+            ) {
+                forwarded.append($0)
+            }
+        let owner = HomeInitialProjectionObservationOwner(
+            runtimeProjectionService: runtimeProjectionService,
+            notificationCenter: notificationCenter
+        )
+        forwarder.start()
+
+        owner.start(reason: "initial_load") { _ in }
+
+        XCTAssertEqual(forwarded.count, 1)
+        XCTAssertEqual(
+            forwarded.first?.observationGeneration,
+            1
+        )
+        XCTAssertEqual(
+            forwarded.first?.source,
+            HomeInitialProjectionObservationSource
+                .initialReadback.rawValue
+        )
+        XCTAssertEqual(
+            forwarded.first?.transition,
+            HomeProjectionEvidenceTransition
+                .baseline.rawValue
+        )
+        XCTAssertEqual(
+            forwarded.first?.requestReason,
+            "initial_load"
+        )
+        XCTAssertEqual(
+            forwarded.first?.projectionGeneration,
+            5
+        )
+        XCTAssertEqual(
+            forwarded.first?.appSummaries,
+            [
+                FlowTabUITestHomeInitialProjectionApplicationEvidence
+                    .AppSummary(
+                        appID: "com.example.home-initial",
+                        windowCount: 0
+                    )
+            ]
+        )
+        XCTAssertEqual(
+            forwarded.first?.isCompleteForScope,
+            false
+        )
+        XCTAssertTrue(forwarder.isObserving)
+
+        runtimeProjectionService.setHomeSummaryProjection(
+            makeHomeInitialSummaryProjection(
+                generation: 6,
+                isCompleteForScope: false
+            )
+        )
+        notificationCenter.post(
+            name: .runtimeAppSwitcherProjectionDidUpdate,
+            object: runtimeProjectionService
+        )
+
+        XCTAssertEqual(forwarded.count, 2)
+        let exactEvidence = try XCTUnwrap(forwarded.last)
+        XCTAssertEqual(
+            exactEvidence.source,
+            HomeInitialProjectionObservationSource
+                .appSwitcherProjectionNotification.rawValue
+        )
+        XCTAssertEqual(
+            exactEvidence.transition,
+            HomeProjectionEvidenceTransition
+                .sourceGenerationAdvanced.rawValue
+        )
+        XCTAssertEqual(
+            exactEvidence.projectionGeneration,
+            6
+        )
+        try FlowTabUITestHomeInitialProjectionApplicationTransport
+            .writeReadback(
+                exactEvidence,
+                to: route.readbackURL
+            )
+        let readbackEvidence = try JSONDecoder().decode(
+            FlowTabUITestHomeInitialProjectionApplicationEvidence
+                .self,
+            from: Data(contentsOf: route.readbackURL)
+        )
+        XCTAssertEqual(readbackEvidence, exactEvidence)
+
+        forwarder.cancel()
+        runtimeProjectionService.setHomeSummaryProjection(
+            makeHomeInitialSummaryProjection(
+                generation: 7,
+                isCompleteForScope: false
+            )
+        )
+        notificationCenter.post(
+            name: .runtimeAppSwitcherProjectionDidUpdate,
+            object: runtimeProjectionService
+        )
+
+        XCTAssertEqual(forwarded.count, 2)
+        XCTAssertFalse(forwarder.isObserving)
+        owner.stop(reason: "test_complete")
+    }
+
+    @MainActor
     func testHomeInitialProjectionObservationUsesGenerationAndCompletenessEvidence() {
         let notificationCenter = NotificationCenter()
         let runtimeProjectionService = RecordingRuntimeProjectionService(
@@ -139,6 +310,25 @@ extension FlowTabPriorityCoverageTests {
             notificationCenter: notificationCenter
         )
         var evidence: [HomeInitialProjectionObservationEvidence] = []
+        var applications:
+            [HomeInitialProjectionObservationApplication] = []
+        let applicationToken = notificationCenter.addObserver(
+            forName:
+                .homeInitialProjectionObservationDidApply,
+            object: runtimeProjectionService,
+            queue: nil
+        ) { notification in
+            if let application =
+                HomeInitialProjectionObservationApplication(
+                    notification: notification
+                )
+            {
+                applications.append(application)
+            }
+        }
+        defer {
+            notificationCenter.removeObserver(applicationToken)
+        }
         owner.start(reason: "test_generation_transition") {
             evidence.append($0)
         }
@@ -191,6 +381,14 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertEqual(
             evidence.filter(\.shouldApply).map(\.transition),
+            [
+                .baseline,
+                .sourceGenerationAdvanced,
+                .completenessSatisfied
+            ]
+        )
+        XCTAssertEqual(
+            applications.map(\.evidence.transition),
             [
                 .baseline,
                 .sourceGenerationAdvanced,

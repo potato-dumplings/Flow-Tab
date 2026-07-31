@@ -1,6 +1,14 @@
 import Combine
 import Foundation
 
+extension Notification.Name {
+    static let homeInitialProjectionObservationDidApply =
+        Notification.Name(
+            "io.github.potato-dumplings.flowtab."
+                + "home-initial-projection-observation-did-apply"
+        )
+}
+
 enum HomeInitialProjectionObservationSource: String, Equatable {
     case initialReadback
     case maintenanceRequestReadback
@@ -21,6 +29,41 @@ struct HomeInitialProjectionObservationEvidence: Equatable {
     var isReady: Bool {
         projectionRead.isProjectionBacked
             && projectionRead.freshness?.isCompleteForScope == true
+    }
+}
+
+struct HomeInitialProjectionObservationApplication: Equatable {
+    private static let notificationUserInfoKey =
+        "homeInitialProjectionObservationApplication"
+
+    let evidence: HomeInitialProjectionObservationEvidence
+    let requestReason: String
+
+    init(
+        evidence:
+            HomeInitialProjectionObservationEvidence,
+        requestReason: String
+    ) {
+        self.evidence = evidence
+        self.requestReason = requestReason
+    }
+
+    init?(
+        notification: Notification
+    ) {
+        guard notification.name
+                == .homeInitialProjectionObservationDidApply,
+              let application = notification.userInfo?[
+                Self.notificationUserInfoKey
+              ] as? Self
+        else {
+            return nil
+        }
+        self = application
+    }
+
+    var notificationUserInfo: [AnyHashable: Any] {
+        [Self.notificationUserInfoKey: self]
     }
 }
 
@@ -163,16 +206,19 @@ final class HomeInitialProjectionObservationOwner: ObservableObject {
         )
         active.onEvidence(evidence)
 
-        guard observation?.generation == generation,
-              evidence.shouldApply,
-              evidence.isReady
-        else {
+        guard observation?.generation == generation else {
             return evidence
         }
-        finish(
-            generation: generation,
-            source: source,
-            reason: "completeProjectionObserved"
+        if evidence.shouldApply, evidence.isReady {
+            finish(
+                generation: generation,
+                source: source,
+                reason: "completeProjectionObserved"
+            )
+        }
+        publishApplication(
+            evidence,
+            requestReason: active.reason
         )
         return evidence
     }
@@ -199,6 +245,28 @@ final class HomeInitialProjectionObservationOwner: ObservableObject {
                 "requestReason=\(active.reason)",
                 "readbacks=\(active.readbackCount)"
             ].joined(separator: " ")
+        )
+    }
+
+    private func publishApplication(
+        _ evidence: HomeInitialProjectionObservationEvidence,
+        requestReason: String
+    ) {
+        guard evidence.shouldApply,
+              evidence.projectionRead.isProjectionBacked
+        else {
+            return
+        }
+        let application =
+            HomeInitialProjectionObservationApplication(
+                evidence: evidence,
+                requestReason: requestReason
+            )
+        notificationCenter.post(
+            name:
+                .homeInitialProjectionObservationDidApply,
+            object: notificationObject,
+            userInfo: application.notificationUserInfo
         )
     }
 

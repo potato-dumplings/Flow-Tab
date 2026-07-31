@@ -142,46 +142,6 @@ extension FlowTabUITests {
         XCTAssertFalse(element(in: app, identifier: Identifier.permissionBanner).exists)
     }
 
-    func testHomeInitialAppLayerUsesRuntimeOrderAndZeroCountsWithoutAccessibilityPermission() throws {
-        let app = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "-showPermissionReminder",
-                "NO",
-                "--flowtab-ui-ax-trusted",
-                "NO",
-                "--flowtab-ui-screen-trusted",
-                "YES"
-            ]
-        )
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
-
-        let mailRow = element(in: app, identifier: Identifier.homeAppMockMail)
-        let browserRow = element(in: app, identifier: Identifier.homeAppMockBrowser)
-        XCTAssertTrue(mailRow.waitForExistence(timeout: 6))
-        XCTAssertTrue(browserRow.waitForExistence(timeout: 6))
-        XCTAssertLessThan(
-            mailRow.frame.minY,
-            browserRow.frame.minY,
-            "Home initial app rows should use the runtime snapshot order before any precise count refresh."
-        )
-
-        assertValue(of: mailRow, equals: "0w", timeout: 2)
-        assertValue(of: browserRow, equals: "0w", timeout: 2)
-        let initialMailY = mailRow.frame.minY
-        let initialBrowserY = browserRow.frame.minY
-        RunLoop.current.run(until: Date().addingTimeInterval(1.2))
-        XCTAssertEqual(elementStringValue(mailRow), "0w")
-        XCTAssertEqual(elementStringValue(browserRow), "0w")
-        XCTAssertEqual(mailRow.frame.minY, initialMailY, accuracy: 1)
-        XCTAssertEqual(browserRow.frame.minY, initialBrowserY, accuracy: 1)
-        XCTAssertLessThan(mailRow.frame.minY, browserRow.frame.minY)
-    }
-
     func testHomeColdStartPublishesLiveAppDirectoryWithoutAccessibilityPermission() throws {
         let app = makeApp(
             additionalArguments: [

@@ -70,6 +70,10 @@ enum FlowTabUITestBootstrapper {
             .prepareIfNeeded(
                 service: resolvedRuntimeProjectionService
             )
+        FlowTabUITestHomeInitialProjectionApplicationBootstrap
+            .prepareIfNeeded(
+                service: resolvedRuntimeProjectionService
+            )
         FlowTabUITestAXSuppressionReadbackBootstrap
             .prepareIfNeeded()
 

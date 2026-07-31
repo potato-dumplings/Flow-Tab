@@ -7,6 +7,10 @@ enum FlowTabTestLaunchOptions {
     static let unitTestingBundlePathEnvironmentKey = "XCTestBundlePath"
     static let projectionAcknowledgementRouteArgument =
         "--flowtab-ui-projection-acknowledgement-route"
+    static let homeInitialProjectionApplicationRouteArgument =
+        "--flowtab-ui-home-initial-projection-application-notification-name"
+    static let homeInitialProjectionApplicationReadbackPathArgument =
+        "--flowtab-ui-home-initial-projection-application-readback-path"
     static let axSuppressionReadbackRouteArgument =
         "--flowtab-ui-ax-suppression-readback-route"
     static let tabSwitchStressEvidenceNotificationArgument =
@@ -20,6 +24,8 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-enable-mock-hotkey-effects",
         "--flowtab-ui-enable-verbose-logs",
         "--flowtab-ui-frontmost-bundle-id",
+        homeInitialProjectionApplicationRouteArgument,
+        homeInitialProjectionApplicationReadbackPathArgument,
         "--flowtab-ui-initial-panel-occlusion-stale-ms",
         "--flowtab-ui-listen-switcher-trigger",
         "--flowtab-ui-mock-launch-at-login-service",
@@ -145,6 +151,40 @@ enum FlowTabTestLaunchOptions {
             )
         }
         return routes
+    }
+
+    static var homeInitialProjectionApplicationRoute:
+        FlowTabUITestHomeInitialProjectionApplicationRoute?
+    {
+        guard isRunningUITests,
+              let notificationName = uiTestValue(
+                after:
+                    homeInitialProjectionApplicationRouteArgument
+              )?.trimmingCharacters(
+                in: .whitespacesAndNewlines
+              ),
+              !notificationName.isEmpty,
+              let readbackPath = uiTestValue(
+                after:
+                    homeInitialProjectionApplicationReadbackPathArgument
+              )?.trimmingCharacters(
+                in: .whitespacesAndNewlines
+              ),
+              !readbackPath.isEmpty,
+              NSString(string: readbackPath).isAbsolutePath
+        else {
+            return nil
+        }
+        return FlowTabUITestHomeInitialProjectionApplicationRoute(
+            notificationName:
+                Notification.Name(notificationName),
+            readbackURL:
+                URL(
+                    fileURLWithPath: readbackPath,
+                    isDirectory: false
+                )
+                .standardizedFileURL
+        )
     }
 
     static var axSuppressionReadbackRoutes:
