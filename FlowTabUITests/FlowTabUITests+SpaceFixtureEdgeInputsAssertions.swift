@@ -30,35 +30,19 @@ extension FlowTabUITests {
             XCTFail("Failed to write edge workflow switcher select-app payload: \(error)")
             return false
         }
-        postFlowTabUITestSwitcherCommand(
-            .selectApp,
-            traceLabel: "edgeInputs.selectApp.\(targetApp.appID)"
-        )
-
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected")
-                == targetApp.identity.bundleIdentifier {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        let latestCards = edgeSwitcherWindowCardObservations(in: app)
-        XCTFail(
-            """
-            Switcher direct app selection did not settle on \(targetApp.appName).
-
-            target=\(targetApp.identity.bundleIdentifier)
-            selected=\(switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected"))
-            mode=\(switcherPanelDiagnosticsValue(diagnosticsSummary, key: "mode"))
-            preview=\(switcherPreviewTitles(from: diagnosticsSummary).sorted())
-            windowCards=\(latestCards.map { "\($0.title)=\($0.identifier)" }.sorted())
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-        return false
+        return performAndWaitForSwitcherDiagnostics(
+            diagnosticsSummary,
+            key: "selected",
+            equals: targetApp.identity.bundleIdentifier,
+            timeout: timeout
+        ) {
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                .selectApp,
+                traceLabel:
+                    "edgeInputs.selectApp.\(targetApp.appID)",
+                timeout: timeout
+            )
+        }
     }
 
     func waitForEdgeSwitcherWindowCards(
