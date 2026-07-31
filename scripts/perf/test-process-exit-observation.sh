@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 PROCESS_EXIT_OBSERVATION_PATH="${ROOT_DIR}/scripts/perf/lib/process-exit-observation.sh"
 TAB_SWITCH_STRESS_PATH="${ROOT_DIR}/scripts/perf/tab-switch-stress.sh"
 SEARCH_PRESSURE_PATH="${ROOT_DIR}/scripts/perf/search-committed-index-pressure.sh"
+RUNTIME_TOPOLOGY_PRESSURE_PATH="${ROOT_DIR}/scripts/perf/runtime-topology-pressure.sh"
 REAL_FIXTURE_MAX_LIFETIME_SECONDS=5
 
 # shellcheck source=scripts/perf/lib/process-exit-observation.sh
@@ -470,6 +471,33 @@ test_search_pressure_owner_uses_observation_contract() {
   fi
 }
 
+test_runtime_topology_pressure_owner_uses_observation_contract() {
+  local cleanup_body
+
+  /usr/bin/grep -F -q \
+    'source "$PROCESS_EXIT_OBSERVATION_PATH"' \
+    "$RUNTIME_TOPOLOGY_PRESSURE_PATH" \
+    || fail "runtime-topology pressure runner does not source the process owner"
+  /usr/bin/grep -F -q \
+    'flowtab_perf_wait_for_process_identities_exit' \
+    "$RUNTIME_TOPOLOGY_PRESSURE_PATH" \
+    || fail "runtime-topology pressure runner does not wait for exact tree evidence"
+  /usr/bin/grep -F -q \
+    'flowtab_perf_process_start_identity "$TEST_PID"' \
+    "$RUNTIME_TOPOLOGY_PRESSURE_PATH" \
+    || fail "runtime-topology pressure runner does not capture child identity"
+  cleanup_body="$(
+    /usr/bin/sed -n \
+      '/^terminate_test_process()/,/^handle_signal()/p' \
+      "$RUNTIME_TOPOLOGY_PRESSURE_PATH"
+  )"
+  if /usr/bin/grep -E -q \
+    'wait_attempt|^[[:space:]]*sleep[[:space:]]+0[.]1([[:space:]]|$)' \
+    <<<"$cleanup_body"; then
+    fail "runtime-topology cleanup still contains an unnamed attempt cadence"
+  fi
+}
+
 test_initial_exit_avoids_clock_and_poll
 test_delayed_exit_uses_named_polling
 test_satisfied_readback_wins_after_slow_schedule
@@ -486,5 +514,6 @@ test_process_tree_watchdog_reports_final_records
 test_real_child_exit_readback
 test_tab_switch_owner_uses_observation_contract
 test_search_pressure_owner_uses_observation_contract
+test_runtime_topology_pressure_owner_uses_observation_contract
 
 echo "Perf process and process-tree exit observation checks immediate, delayed, cancelled, watchdog, identity, and real child evidence."

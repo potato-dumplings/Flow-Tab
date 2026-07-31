@@ -7,9 +7,15 @@ UI_TEST_RUNNER="${ROOT_DIR}/scripts/testing/run-ui-tests-local.sh"
 EVIDENCE_TOOL="${ROOT_DIR}/scripts/perf/lib/runtime-topology-evidence.py"
 MONOTONIC_CLOCK="${ROOT_DIR}/scripts/perf/lib/monotonic-clock.sh"
 TARGET_TOOL="${ROOT_DIR}/scripts/perf/lib/runtime-topology-target.sh"
+PROCESS_EXIT_OBSERVATION_PATH="${ROOT_DIR}/scripts/perf/lib/process-exit-observation.sh"
 DEFAULT_TEST="FlowTabUITests/FlowTabUITests/testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows"
+TEST_TERMINATION_GRACE_MILLISECONDS=2000
+TEST_KILL_CONFIRMATION_WATCHDOG_MILLISECONDS=2000
+TEST_TERMINATION_POLL_INTERVAL_SECONDS=0.1
 
 source "$TARGET_TOOL"
+# shellcheck source=scripts/perf/lib/process-exit-observation.sh
+source "$PROCESS_EXIT_OBSERVATION_PATH"
 
 usage() {
   cat <<'EOF'
@@ -54,6 +60,8 @@ BUILD_ROOT=""
 UI_APP_IDENTITY_MANIFEST=""
 POSITIONAL_ARGS=()
 TEST_PID=""
+TEST_START_IDENTITY=""
+TEST_PROCESS_IDENTITY_CAPTURE_FAILED=false
 TEST_REAPED=true
 TEST_PROCESS_STATUS="not_started"
 STATUS_FILE=""
@@ -398,51 +406,68 @@ process_is_running() {
 }
 
 terminate_test_process() {
-  local process_pid
-  local process_pids=()
-  local index
-  local wait_attempt=0
+  local observation_status=0
 
   if [[ -z "$TEST_PID" || "$TEST_REAPED" == true ]]; then
     return
   fi
 
-  while IFS= read -r process_pid; do
-    [[ -n "$process_pid" ]] || continue
-    process_pids+=("$process_pid")
-  done < <(descendant_pids "$TEST_PID")
-  for ((index=${#process_pids[@]} - 1; index >= 0; index--)); do
-    kill -TERM "${process_pids[$index]}" 2>/dev/null || true
-  done
-
-  while process_is_running "$TEST_PID" && [[ "$wait_attempt" -lt 20 ]]; do
-    sleep 0.1
-    wait_attempt=$((wait_attempt + 1))
-  done
-
-  if process_is_running "$TEST_PID"; then
-    process_pids=()
-    while IFS= read -r process_pid; do
-      [[ -n "$process_pid" ]] || continue
-      process_pids+=("$process_pid")
-    done < <(descendant_pids "$TEST_PID")
-    for ((index=${#process_pids[@]} - 1; index >= 0; index--)); do
-      kill -KILL "${process_pids[$index]}" 2>/dev/null || true
-    done
+  FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS=()
+  TEST_PROCESS_IDENTITY_CAPTURE_FAILED=false
+  if [[ -n "$TEST_START_IDENTITY" ]]; then
+    flowtab_perf_remember_process_identity "$TEST_PID" "$TEST_START_IDENTITY"
   fi
-
-  wait_attempt=0
-  while process_is_running "$TEST_PID" && [[ "$wait_attempt" -lt 20 ]]; do
-    sleep 0.1
-    wait_attempt=$((wait_attempt + 1))
-  done
-  if process_is_running "$TEST_PID"; then
-    TERMINATION_TIMED_OUT=true
-    TEST_PROCESS_STATUS=137
-    TEST_REAPED=true
+  capture_test_process_tree_identities
+  if [[ "${#FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS[@]}" -eq 0 ]]; then
+    if [[ "$TEST_PROCESS_IDENTITY_CAPTURE_FAILED" == true ]]; then
+      TERMINATION_TIMED_OUT=true
+    fi
+    reap_test_process
     return
   fi
+
+  flowtab_perf_signal_active_process_identities \
+    TERM \
+    "${FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS[@]}"
+  flowtab_perf_wait_for_process_identities_exit \
+    "$TEST_TERMINATION_GRACE_MILLISECONDS" \
+    "$TEST_TERMINATION_POLL_INTERVAL_SECONDS" \
+    "${FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS[@]}" \
+    || observation_status=$?
+
+  if [[ "$observation_status" -ne 0 ]]; then
+    echo "Escalating UI process tree to SIGKILL after evidence watchdog." >&2
+    capture_test_process_tree_identities
+    flowtab_perf_signal_active_process_identities \
+      KILL \
+      "${FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS[@]}"
+    observation_status=0
+    flowtab_perf_wait_for_process_identities_exit \
+      "$TEST_KILL_CONFIRMATION_WATCHDOG_MILLISECONDS" \
+      "$TEST_TERMINATION_POLL_INTERVAL_SECONDS" \
+      "${FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS[@]}" \
+      || observation_status=$?
+  fi
+
+  if [[ "$observation_status" -ne 0 ]] \
+    || [[ "$TEST_PROCESS_IDENTITY_CAPTURE_FAILED" == true ]]; then
+    TERMINATION_TIMED_OUT=true
+  fi
   reap_test_process
+}
+
+capture_test_process_tree_identities() {
+  local process_pid
+
+  while IFS= read -r process_pid; do
+    [[ -n "$process_pid" ]] || continue
+    if ! flowtab_perf_capture_process_identity "$process_pid"; then
+      TEST_PROCESS_IDENTITY_CAPTURE_FAILED=true
+      echo "Failed to capture an exact UI test-process identity." >&2
+      echo "unmetCondition=processIdentityCaptured pid=${process_pid}" >&2
+      echo "lastObservation: ${FLOWTAB_PERF_PROCESS_EXIT_LAST_OBSERVATION}" >&2
+    fi
+  done < <(descendant_pids "$TEST_PID")
 }
 
 handle_signal() {
@@ -540,6 +565,9 @@ LAUNCH_REQUEST_MONOTONIC_NS="$(monotonic_ns)"
 run_ui_test &
 TEST_PID=$!
 TEST_REAPED=false
+TEST_START_IDENTITY="$(
+  flowtab_perf_process_start_identity "$TEST_PID" 2>/dev/null || true
+)"
 
 CURRENT_STAGE="awaiting_target_launch"
 if ! await_target_launch; then
