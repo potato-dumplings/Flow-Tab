@@ -76,13 +76,28 @@ struct SwitcherSearchWindowResultObservation: Equatable {
 
 struct FlowTabUITestSwitcherSearchResultSnapshot: Equatable {
     let results: [SwitcherSearchWindowResultObservation]
+    let resultsScope: String?
+    let resultsQuery: String?
+
+    init(
+        results: [SwitcherSearchWindowResultObservation],
+        resultsScope: String? = nil,
+        resultsQuery: String? = nil
+    ) {
+        self.results = results
+        self.resultsScope = resultsScope
+        self.resultsQuery = resultsQuery
+    }
 
     var diagnosticSummary: String {
         let resultSummary = results
             .sorted { $0.identifier < $1.identifier }
             .map(\.diagnosticSummary)
             .joined(separator: " | ")
-        return "count=\(results.count) results=[\(resultSummary)]"
+        return "scope=\(resultsScope ?? "nil") "
+            + "query=\(resultsQuery ?? "nil") "
+            + "count=\(results.count) "
+            + "results=[\(resultSummary)]"
     }
 }
 
@@ -94,6 +109,12 @@ enum FlowTabUITestSwitcherSearchResultExpectation:
         appID: String,
         expectedTitles: Set<String>,
         expectedCount: Int?
+    )
+    case exactWindowIdentifiers(
+        scope: String,
+        query: String,
+        identifierFragment: String?,
+        expectedCount: Int
     )
 
     func matchingResult(
@@ -132,7 +153,39 @@ enum FlowTabUITestSwitcherSearchResultExpectation:
                 } ?? true
             return expectedTitles.isSubset(of: observedTitles)
                 && countMatches
+        case .exactWindowIdentifiers:
+            return matchingIdentifiers(in: snapshot) != nil
         }
+    }
+
+    func matchingIdentifiers(
+        in snapshot: FlowTabUITestSwitcherSearchResultSnapshot
+    ) -> [String]? {
+        guard
+            case let .exactWindowIdentifiers(
+                scope,
+                query,
+                identifierFragment,
+                expectedCount
+            ) = self,
+            snapshot.resultsScope == scope,
+            snapshot.resultsQuery == query
+        else {
+            return nil
+        }
+        let identifiers = snapshot.results
+            .map(\.identifier)
+            .filter { identifier in
+                identifierFragment.map {
+                    identifier.contains($0)
+                } ?? true
+            }
+        guard identifiers.count == expectedCount,
+              Set(identifiers).count == identifiers.count
+        else {
+            return nil
+        }
+        return identifiers
     }
 
     var diagnosticSummary: String {
@@ -147,6 +200,16 @@ enum FlowTabUITestSwitcherSearchResultExpectation:
             return "appWindowSet appID=\(appID) "
                 + "titles=\(expectedTitles.sorted()) "
                 + "count=\(expectedCount.map(String.init) ?? "any")"
+        case let .exactWindowIdentifiers(
+            scope,
+            query,
+            identifierFragment,
+            expectedCount
+        ):
+            return "exactWindowIdentifiers scope=\(scope) "
+                + "query=\(query) "
+                + "fragment=\(identifierFragment ?? "<any>") "
+                + "count=\(expectedCount)"
         }
     }
 }
@@ -160,6 +223,9 @@ final class FlowTabUITestSwitcherSearchResultObservationOwner {
     init(
         expectation:
             FlowTabUITestSwitcherSearchResultExpectation,
+        acceptsEvidence: @escaping () -> Bool = {
+            true
+        },
         observationRegistration:
             FlowTabUITestConditionObservationRegistration? =
                 FlowTabUITestConditionReadbackScheduler
@@ -174,9 +240,13 @@ final class FlowTabUITestSwitcherSearchResultObservationOwner {
         conditionOwner = FlowTabUITestConditionObservationOwner(
             observationRegistration: observationRegistration,
             readback: readback,
-            isSatisfied: expectation.isSatisfied(by:),
+            isSatisfied: {
+                acceptsEvidence()
+                    && expectation.isSatisfied(by: $0)
+            },
             describe: { snapshot in
-                "expected{\(expectation.diagnosticSummary)} "
+                "acceptanceEnabled=\(acceptsEvidence()) "
+                    + "expected{\(expectation.diagnosticSummary)} "
                     + snapshot.diagnosticSummary
             }
         )
@@ -184,6 +254,12 @@ final class FlowTabUITestSwitcherSearchResultObservationOwner {
 
     func start() {
         conditionOwner.start()
+    }
+
+    func requestReadback(
+        source: FlowTabUITestConditionObservationSource
+    ) {
+        conditionOwner.requestReadback(source: source)
     }
 
     func waitForResolution(
@@ -200,6 +276,12 @@ final class FlowTabUITestSwitcherSearchResultObservationOwner {
         conditionOwner.resolvedEvidence
     }
 
+    var latestSnapshot:
+        FlowTabUITestSwitcherSearchResultSnapshot?
+    {
+        conditionOwner.latestEvidence?.value
+    }
+
     var diagnosticSummary: String {
         conditionOwner.diagnosticSummary
     }
@@ -210,6 +292,157 @@ final class FlowTabUITestSwitcherSearchResultObservationOwner {
 }
 
 extension FlowTabUITests {
+    func searchWindowResultObservations(
+        inDiagnosticsProjection rawValue: String
+    ) -> [SwitcherSearchWindowResultObservation] {
+        guard !rawValue.isEmpty, rawValue != "inactive" else {
+            return []
+        }
+
+        var seenResultIDs: Set<String> = []
+        return rawValue
+            .split(
+                separator: "|",
+                omittingEmptySubsequences: true
+            )
+            .compactMap {
+                entry -> SwitcherSearchWindowResultObservation? in
+                let fields = entry.split(
+                    separator: ",",
+                    omittingEmptySubsequences: false
+                )
+                guard fields.count == 6,
+                      fields[1] == "window"
+                else {
+                    return nil
+                }
+
+                let decodedFields = fields.map {
+                    let rawField = String($0)
+                    return rawField.removingPercentEncoding
+                        ?? rawField
+                }
+                let resultID = decodedFields[0]
+                guard seenResultIDs.insert(resultID).inserted
+                else {
+                    return nil
+                }
+                let appID = decodedFields[2]
+                let windowID = decodedFields[3]
+                let title = decodedFields[4]
+                let appName = decodedFields[5]
+                let identifier =
+                    "flowtab.switcher.search.window."
+                    + resultID
+                        .flowTabUITestAccessibilityIdentifierComponent
+                return SwitcherSearchWindowResultObservation(
+                    identifier: identifier,
+                    searchableText:
+                        [title, appName, appID, windowID]
+                            .joined(separator: "\n"),
+                    resultID: resultID,
+                    title: title,
+                    appName: appName,
+                    appID: appID,
+                    windowID: windowID
+                )
+            }
+    }
+
+    func committedSwitcherSearchResultSnapshot(
+        in app: XCUIApplication
+    ) -> FlowTabUITestSwitcherSearchResultSnapshot {
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        let diagnostics = switcherDiagnosticsSnapshot(
+            diagnosticsSummary,
+            keys: [
+                "searchResultsScope",
+                "searchResultsQuery",
+                "searchResults"
+            ]
+        )
+        let rawQuery = diagnostics.values[
+            "searchResultsQuery"
+        ]
+        return FlowTabUITestSwitcherSearchResultSnapshot(
+            results:
+                searchWindowResultObservations(
+                    inDiagnosticsProjection:
+                        diagnostics.values["searchResults"]
+                            ?? ""
+                ),
+            resultsScope:
+                diagnostics.values["searchResultsScope"],
+            resultsQuery:
+                rawQuery.map {
+                    $0.removingPercentEncoding ?? $0
+                }
+        )
+    }
+
+    func performAndWaitForSwitcherSearchWindowIdentifiers(
+        in app: XCUIApplication,
+        scope: String,
+        query: String,
+        identifierFragment: String? = nil,
+        expectedCount: Int,
+        timeout: TimeInterval,
+        trigger: () -> Void
+    ) -> [String] {
+        let expectation =
+            FlowTabUITestSwitcherSearchResultExpectation
+                .exactWindowIdentifiers(
+                    scope: scope,
+                    query: query,
+                    identifierFragment: identifierFragment,
+                    expectedCount: expectedCount
+                )
+        var triggerCompleted = false
+        let owner =
+            FlowTabUITestSwitcherSearchResultObservationOwner(
+                expectation: expectation,
+                acceptsEvidence: {
+                    triggerCompleted
+                },
+                readback: {
+                    self.committedSwitcherSearchResultSnapshot(
+                        in: app
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        trigger()
+        triggerCompleted = true
+        owner.requestReadback(source: .triggerReadback)
+
+        guard
+            let evidence = owner.waitForResolution(
+                timeout: timeout
+            ),
+            let identifiers = expectation.matchingIdentifiers(
+                in: evidence.value
+            )
+        else {
+            XCTFail(
+                "Committed Search result projection watchdog "
+                    + "expired. \(owner.diagnosticSummary)"
+            )
+            return owner.latestSnapshot?.results
+                .map(\.identifier)
+                .filter { identifier in
+                    identifierFragment.map {
+                        identifier.contains($0)
+                    } ?? true
+                } ?? []
+        }
+        return identifiers
+    }
+
     func waitForSearchWindowResult(
         in app: XCUIApplication,
         title: String,

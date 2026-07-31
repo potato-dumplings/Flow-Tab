@@ -877,34 +877,13 @@ extension FlowTabUITests {
     func searchWindowResultObservations(
         from diagnosticsSummaryElement: XCUIElement
     ) -> [SwitcherSearchWindowResultObservation] {
-        let rawValue = switcherPanelDiagnosticsValue(diagnosticsSummaryElement, key: "searchResults")
-        guard !rawValue.isEmpty, rawValue != "inactive" else { return [] }
-
-        var seenResultIDs: Set<String> = []
-        return rawValue
-            .split(separator: "|", omittingEmptySubsequences: true)
-            .compactMap { entry -> SwitcherSearchWindowResultObservation? in
-                let fields = entry.split(separator: ",", omittingEmptySubsequences: false)
-                guard fields.count == 6 else { return nil }
-                guard fields[1] == "window" else { return nil }
-
-                let resultID = switcherDiagnosticsUnescaped(fields[0])
-                guard seenResultIDs.insert(resultID).inserted else { return nil }
-                let appID = switcherDiagnosticsUnescaped(fields[2])
-                let windowID = switcherDiagnosticsUnescaped(fields[3])
-                let title = switcherDiagnosticsUnescaped(fields[4])
-                let appName = switcherDiagnosticsUnescaped(fields[5])
-                let identifier = "flowtab.switcher.search.window.\(resultID.flowTabUITestAccessibilityIdentifierComponent)"
-                return SwitcherSearchWindowResultObservation(
-                    identifier: identifier,
-                    searchableText: [title, appName, appID, windowID].joined(separator: "\n"),
-                    resultID: resultID,
-                    title: title,
-                    appName: appName,
-                    appID: appID,
-                    windowID: windowID
+        searchWindowResultObservations(
+            inDiagnosticsProjection:
+                switcherPanelDiagnosticsValue(
+                    diagnosticsSummaryElement,
+                    key: "searchResults"
                 )
-            }
+        )
     }
 
     private func searchWindowResultObservationsFromElements(in app: XCUIApplication) -> [SwitcherSearchWindowResultObservation] {
@@ -927,11 +906,6 @@ extension FlowTabUITests {
                     searchableText: searchableText
                 )
             }
-    }
-
-    private func switcherDiagnosticsUnescaped(_ value: Substring) -> String {
-        let rawValue = String(value)
-        return rawValue.removingPercentEncoding ?? rawValue
     }
 
     func confirmSwitcherSearchSelection(in app: XCUIApplication, searchInput: XCUIElement) {

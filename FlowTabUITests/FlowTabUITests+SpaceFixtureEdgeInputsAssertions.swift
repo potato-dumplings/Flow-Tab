@@ -40,35 +40,6 @@ extension FlowTabUITests {
         }
     }
 
-    func waitForEdgeSearchWindowResultIdentifiers(
-        in app: XCUIApplication,
-        identifierFragment: String? = nil,
-        expectedCount: Int,
-        timeout: TimeInterval
-    ) -> [String] {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestMatches: [String] = []
-        repeat {
-            latestMatches = uniqueEdgeSearchWindowResultIdentifiers(in: app)
-                .filter { identifier in
-                    guard let identifierFragment else { return true }
-                    return identifier.contains(identifierFragment)
-                }
-            if latestMatches.count == expectedCount {
-                return latestMatches
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected \(expectedCount) window-scope search result identifiers matching \
-            \(identifierFragment ?? "<any>"), found \(latestMatches.sorted()).
-            """
-        )
-        return latestMatches
-    }
-
     func confirmEdgeSwitcherSearchSelection(in app: XCUIApplication, searchInput: XCUIElement) {
         app.typeText("\r")
         if !waitForNonExistence(searchInput, timeout: 1.2) {
@@ -101,42 +72,6 @@ extension FlowTabUITests {
         guard let rawWindowID = readableComponent.split(separator: "-").last else { return nil }
         guard let windowID = UInt32(rawWindowID) else { return nil }
         return CGWindowID(windowID)
-    }
-
-    private func uniqueEdgeSearchWindowResultIdentifiers(in app: XCUIApplication) -> [String] {
-        var seenIdentifiers: Set<String> = []
-        return edgeWorkflowIdentifiers(
-            in: app.debugDescription,
-            identifierPrefix: "flowtab.switcher.search.window."
-        ).compactMap { identifier in
-            guard seenIdentifiers.insert(identifier).inserted else { return nil }
-            return identifier
-        }
-    }
-
-    private func edgeWorkflowIdentifiers(
-        in hierarchyDescription: String,
-        identifierPrefix: String
-    ) -> [String] {
-        let escapedPrefix = NSRegularExpression.escapedPattern(for: identifierPrefix)
-        let pattern = "identifier: ['\"](" + escapedPrefix + "[^'\"]*)['\"]"
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
-        let range = NSRange(hierarchyDescription.startIndex..<hierarchyDescription.endIndex, in: hierarchyDescription)
-        return regex.matches(in: hierarchyDescription, range: range).compactMap { match in
-            guard let identifierRange = Range(match.range(at: 1), in: hierarchyDescription) else {
-                return nil
-            }
-            return String(hierarchyDescription[identifierRange])
-        }
-    }
-
-    private func edgeWorkflowElements(
-        in app: XCUIApplication,
-        identifierPrefix: String
-    ) -> [XCUIElement] {
-        app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", identifierPrefix))
-            .allElementsBoundByIndex
     }
 
 }

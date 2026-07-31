@@ -7,6 +7,54 @@ private enum FlowTabUITestSwitcherSearchResultTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testSwitcherSearchResultDiagnosticsParserPreservesExactWindowIdentity() {
+        let resultID =
+            "window:com.example.chrome#123"
+        let rawProjection = [
+            [
+                "window%3Acom.example.chrome%23123",
+                "window",
+                "com.example.chrome",
+                "cg%3A123",
+                "Shared%20Docs",
+                "Chrome%20Fixture"
+            ].joined(separator: ","),
+            [
+                "window%3Acom.example.chrome%23123",
+                "window",
+                "com.example.chrome",
+                "cg%3A123",
+                "Shared%20Docs",
+                "Chrome%20Fixture"
+            ].joined(separator: ","),
+            [
+                "app%3Acom.example.chrome",
+                "app",
+                "com.example.chrome",
+                "",
+                "Chrome%20Fixture",
+                ""
+            ].joined(separator: ",")
+        ].joined(separator: "|")
+
+        let results = searchWindowResultObservations(
+            inDiagnosticsProjection: rawProjection
+        )
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.resultID, resultID)
+        XCTAssertEqual(results.first?.appID, "com.example.chrome")
+        XCTAssertEqual(results.first?.windowID, "cg:123")
+        XCTAssertEqual(results.first?.title, "Shared Docs")
+        XCTAssertEqual(results.first?.appName, "Chrome Fixture")
+        XCTAssertEqual(
+            results.first?.identifier,
+            "flowtab.switcher.search.window."
+                + resultID
+                    .flowTabUITestAccessibilityIdentifierComponent
+        )
+    }
+
     func testSwitcherSearchResultObserverAcceptsMatchingInitialWindow() {
         let expectation =
             FlowTabUITestSwitcherSearchResultExpectation
@@ -172,6 +220,181 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherSearchResultObserverRequiresFreshCommittedExactIdentifiers() {
+        let expectation =
+            FlowTabUITestSwitcherSearchResultExpectation
+                .exactWindowIdentifiers(
+                    scope: "window",
+                    query: "Shared Docs",
+                    identifierFragment: "browser",
+                    expectedCount: 2
+                )
+        let matchingResults = [
+            switcherSearchResultTestObservation(
+                resultID: "window:browser-1",
+                title: "Shared Docs",
+                appName: "Browser",
+                appID: "com.example.browser"
+            ),
+            switcherSearchResultTestObservation(
+                resultID: "window:browser-2",
+                title: "Shared Docs",
+                appName: "Browser",
+                appID: "com.example.browser"
+            )
+        ]
+        var acceptsEvidence = false
+        var snapshot = switcherSearchResultTestSnapshot(
+            matchingResults,
+            resultsScope: "window",
+            resultsQuery: "Shared Docs"
+        )
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var cancellationCount = 0
+        let owner =
+            FlowTabUITestSwitcherSearchResultObservationOwner(
+                expectation: expectation,
+                acceptsEvidence: {
+                    acceptsEvidence
+                },
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {
+                        cancellationCount += 1
+                    }
+                },
+                readback: {
+                    snapshot
+                }
+            )
+        owner.start()
+
+        XCTAssertNil(owner.resolvedEvidence)
+        acceptsEvidence = true
+        snapshot = switcherSearchResultTestSnapshot(
+            matchingResults,
+            resultsScope: "window",
+            resultsQuery: "stale"
+        )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = switcherSearchResultTestSnapshot(
+            matchingResults,
+            resultsScope: "app",
+            resultsQuery: "Shared Docs"
+        )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = switcherSearchResultTestSnapshot(
+            [matchingResults[0], matchingResults[0]],
+            resultsScope: "window",
+            resultsQuery: "Shared Docs"
+        )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = switcherSearchResultTestSnapshot(
+            [
+                matchingResults[0],
+                switcherSearchResultTestObservation(
+                    resultID: "window:mail-1",
+                    title: "Shared Docs",
+                    appName: "Mail",
+                    appID: "com.example.mail"
+                )
+            ],
+            resultsScope: "window",
+            resultsQuery: "Shared Docs"
+        )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        let matchingSnapshot =
+            switcherSearchResultTestSnapshot(
+                matchingResults,
+                resultsScope: "window",
+                resultsQuery: "Shared Docs"
+            )
+        snapshot = matchingSnapshot
+        owner.requestReadback(source: .triggerReadback)
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .triggerReadback
+        )
+        XCTAssertEqual(
+            expectation.matchingIdentifiers(
+                in: owner.resolvedEvidence?.value
+                    ?? switcherSearchResultTestSnapshot([])
+            ),
+            matchingResults.map(\.identifier)
+        )
+        XCTAssertEqual(cancellationCount, 1)
+        owner.cancel()
+        XCTAssertEqual(cancellationCount, 1)
+    }
+
+    func testSwitcherSearchResultObserverSchedulerDelayOnlyDefersExactEvidence() {
+        let expectation =
+            FlowTabUITestSwitcherSearchResultExpectation
+                .exactWindowIdentifiers(
+                    scope: "window",
+                    query: "punctuation",
+                    identifierFragment: "chrome",
+                    expectedCount: 1
+                )
+        var snapshot = switcherSearchResultTestSnapshot(
+            [],
+            resultsScope: "window",
+            resultsQuery: ""
+        )
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        let owner =
+            FlowTabUITestSwitcherSearchResultObservationOwner(
+                expectation: expectation,
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: {
+                    snapshot
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        snapshot = switcherSearchResultTestSnapshot(
+            [
+                switcherSearchResultTestObservation(
+                    resultID: "window:chrome-42",
+                    title: "Punctuation",
+                    appName: "Chrome",
+                    appID: "com.example.chrome"
+                )
+            ],
+            resultsScope: "window",
+            resultsQuery: "punctuation"
+        )
+        XCTAssertNil(owner.resolvedEvidence)
+        scheduledReadback?(.scheduledReadback)
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .scheduledReadback
+        )
+        XCTAssertEqual(
+            expectation.matchingIdentifiers(
+                in: owner.resolvedEvidence?.value
+                    ?? switcherSearchResultTestSnapshot([])
+            )?.count,
+            1
+        )
+    }
+
     func testSwitcherSearchResultObserverRejectsStaleReadbacksUnderPressure() {
         let expectation =
             FlowTabUITestSwitcherSearchResultExpectation
@@ -287,10 +510,14 @@ extension FlowTabUITests {
     }
 
     private func switcherSearchResultTestSnapshot(
-        _ results: [SwitcherSearchWindowResultObservation]
+        _ results: [SwitcherSearchWindowResultObservation],
+        resultsScope: String? = nil,
+        resultsQuery: String? = nil
     ) -> FlowTabUITestSwitcherSearchResultSnapshot {
         FlowTabUITestSwitcherSearchResultSnapshot(
-            results: results
+            results: results,
+            resultsScope: resultsScope,
+            resultsQuery: resultsQuery
         )
     }
 }

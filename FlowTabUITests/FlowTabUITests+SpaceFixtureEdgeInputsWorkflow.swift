@@ -154,13 +154,16 @@ extension FlowTabUITests {
                 traceLabel: "edgeInputs.search.duplicates"
             )
 
-            app.typeText(sharedTitle)
-
-            let results = waitForEdgeSearchWindowResultIdentifiers(
-                in: app,
-                expectedCount: expectedSharedCount,
-                timeout: 8
-            )
+            let results =
+                performAndWaitForSwitcherSearchWindowIdentifiers(
+                    in: app,
+                    scope: "window",
+                    query: sharedTitle,
+                    expectedCount: expectedSharedCount,
+                    timeout: 8
+                ) {
+                    app.typeText(sharedTitle)
+                }
             let finderIdentifierFragment = edgeWorkflowSearchWindowIdentifierAppFragment(for: finderApp)
             let chromeIdentifierFragment = edgeWorkflowSearchWindowIdentifierAppFragment(for: chromeApp)
 
@@ -199,17 +202,31 @@ extension FlowTabUITests {
                 traceLabel: "edgeInputs.search.edgeTitle"
             )
 
-            app.typeText("punctuation")
-
-            let results = waitForEdgeSearchWindowResultIdentifiers(
-                in: app,
-                identifierFragment: edgeWorkflowSearchWindowIdentifierAppFragment(for: targetApp),
-                expectedCount: 1,
-                timeout: 8
-            )
+            let query = "punctuation"
+            let results =
+                performAndWaitForSwitcherSearchWindowIdentifiers(
+                    in: app,
+                    scope: "window",
+                    query: query,
+                    identifierFragment:
+                        edgeWorkflowSearchWindowIdentifierAppFragment(
+                            for: targetApp
+                        ),
+                    expectedCount: 1,
+                    timeout: 8
+                ) {
+                    app.typeText(query)
+                }
             XCTAssertEqual(results.count, 1)
+            let resultIdentifier = try XCTUnwrap(
+                results.first,
+                "Edge-title Search result evidence was unavailable."
+            )
             let targetWindowNumber = try XCTUnwrap(
-                edgeWorkflowCGWindowID(fromSearchResultIdentifier: results[0]),
+                edgeWorkflowCGWindowID(
+                    fromSearchResultIdentifier:
+                        resultIdentifier
+                ),
                 "Edge-title search result did not include a recoverable CG window id."
             )
 
