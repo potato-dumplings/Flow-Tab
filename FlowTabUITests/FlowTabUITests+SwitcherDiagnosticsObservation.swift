@@ -331,6 +331,35 @@ extension FlowTabUITests {
         return true
     }
 
+    func assertSwitcherWindowCycle(
+        in app: XCUIApplication,
+        timeout: TimeInterval,
+        trigger: (() -> Void)? = nil
+    ) {
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        let matched: Bool
+        if let trigger {
+            matched = performAndWaitForSwitcherDiagnostics(
+                diagnosticsSummary,
+                key: "mode",
+                hasPrefix: "windowCycle",
+                timeout: timeout,
+                trigger: trigger
+            )
+        } else {
+            matched = waitForSwitcherDiagnostics(
+                diagnosticsSummary,
+                key: "mode",
+                hasPrefix: "windowCycle",
+                timeout: timeout
+            )
+        }
+        XCTAssertTrue(matched)
+    }
+
     func switcherPanelDiagnosticsValue(
         _ diagnosticsSummaryElement: XCUIElement,
         key: String

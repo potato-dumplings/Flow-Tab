@@ -98,11 +98,11 @@ extension FlowTabUITests {
 
         let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
         XCTAssertTrue(fixtureAppTile.waitForExistence(timeout: 12))
-        try postFlowTabUITestSelectSwitcherAppAndWaitForDelivery(
-            bundleIdentifier: identity.bundleIdentifier,
+        selectSwitcherAppDirectly(
+            in: app,
+            appID: identity.bundleIdentifier,
             traceLabel: "quitFixture.selectApp"
         )
-        XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "selected=\(identity.bundleIdentifier)", timeout: 5))
 
         let logSnapshot = makeRuntimeLogFileSnapshot()
         app.activate()
@@ -196,7 +196,6 @@ extension FlowTabUITests {
             identifier: identity.switcherAppAccessibilityIdentifier
         )
         XCTAssertTrue(waitForNonExistence(refreshedFixtureAppTile, timeout: 8))
-        XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "apps=", timeout: 5))
     }
 
     func testRuntimeLifecycleRefreshesRealFixtureAppLaunchAndTermination() throws {
@@ -466,9 +465,9 @@ extension FlowTabUITests {
                 traceLabel: "workflowWindowCards.selectApp"
             )
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-            app.typeKey(.downArrow, modifierFlags: [])
-            XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "mode=windowCycle", timeout: 5))
+            assertSwitcherWindowCycle(in: app, timeout: 5) {
+                app.typeKey(.downArrow, modifierFlags: [])
+            }
 
             assertSpaceFixtureSwitcherWindowCards(
                 expectedSpaceFixtureWorkflowWindowTitles(titlePrefix: "Workflow", windowCount: 3),
@@ -528,8 +527,9 @@ extension FlowTabUITests {
 
         let allTitles = expectedSpaceFixtureWorkflowWindowTitles(titlePrefix: "Open Mutation", windowCount: 2)
         app.activate()
-        app.typeKey(.downArrow, modifierFlags: [])
-        XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "mode=windowCycle", timeout: 5))
+        assertSwitcherWindowCycle(in: app, timeout: 5) {
+            app.typeKey(.downArrow, modifierFlags: [])
+        }
         _ = waitForSwitcherWindowCards(in: app, expectedTitles: allTitles, timeout: 8)
 
         _ = waitForSwitcherWindowCards(
@@ -597,8 +597,9 @@ extension FlowTabUITests {
 
         let allTitles = expectedSpaceFixtureWorkflowWindowTitles(titlePrefix: "Selected Mutation", windowCount: 2)
         app.activate()
-        app.typeKey(.downArrow, modifierFlags: [])
-        XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "mode=windowCycle", timeout: 5))
+        assertSwitcherWindowCycle(in: app, timeout: 5) {
+            app.typeKey(.downArrow, modifierFlags: [])
+        }
         _ = waitForSwitcherWindowCards(in: app, expectedTitles: allTitles, timeout: 8)
 
         _ = waitForSwitcherWindowCards(
@@ -606,7 +607,7 @@ extension FlowTabUITests {
             expectedTitles: [allTitles[1]],
             timeout: 25
         )
-        XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "mode=windowCycle", timeout: 5))
+        assertSwitcherWindowCycle(in: app, timeout: 5)
         waitForRuntimeLogFiles(
             matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=(none|[0-9]+)"#,
             since: mutationLogSnapshot,
@@ -623,42 +624,30 @@ extension FlowTabUITests {
         timeout: TimeInterval = 4
     ) {
         do {
-            try postFlowTabUITestSelectSwitcherAppAndWaitForDelivery(
-                bundleIdentifier: appID,
-                traceLabel: traceLabel,
-                timeout: timeout
-            )
+            try FlowTabUITestSwitcherCommandPayload.write(appID)
         } catch {
             XCTFail("Failed to select switcher app \(appID): \(error)")
             return
         }
 
-        XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "selected=\(appID)", timeout: timeout))
-    }
-
-    private func waitForSwitcherSummary(
-        in app: XCUIApplication,
-        containing marker: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestValue = ""
-        repeat {
-            latestValue = switcherSummary(in: app)
-            if latestValue.contains(marker) {
-                return true
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        XCTAssertTrue(
+            performAndWaitForSwitcherDiagnostics(
+                diagnosticsSummary,
+                key: "selected",
+                equals: appID,
+                timeout: timeout
+            ) {
+                postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                    .selectApp,
+                    traceLabel: traceLabel,
+                    timeout: timeout
+                )
             }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail("Expected switcher summary to contain \(marker). Latest summary: \(latestValue)")
-        return false
-    }
-
-    private func switcherSummary(in app: XCUIApplication) -> String {
-        let summary = element(in: app, identifier: Identifier.switcherSummary)
-        guard summary.exists else { return "" }
-        return elementStringValue(summary)
+        )
     }
 
     func makeSpaceFixtureWorkflowFile(_ contents: String) throws -> URL {

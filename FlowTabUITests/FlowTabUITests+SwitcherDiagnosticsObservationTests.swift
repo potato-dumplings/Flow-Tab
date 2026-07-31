@@ -125,6 +125,54 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherDiagnosticsObserverRequiresExactSelectedApplicationIdentity() {
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var selectedApplication =
+            "io.github.potato-dumplings.flowtab.spacefixture.backup"
+        let expectedApplication =
+            "io.github.potato-dumplings.flowtab.spacefixture"
+        let owner =
+            FlowTabUITestSwitcherDiagnosticsObservationOwner(
+                expectations: [
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "selected",
+                        expectedValue: expectedApplication
+                    )
+                ],
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: {
+                    FlowTabUITestSwitcherDiagnosticsSnapshot(
+                        identifier: "switcher-summary",
+                        exists: true,
+                        rawValue:
+                            "selected=\(selectedApplication)",
+                        values: [
+                            "selected": selectedApplication
+                        ]
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+        XCTAssertNil(owner.resolvedEvidence)
+
+        selectedApplication = expectedApplication
+        scheduledReadback?(.scheduledReadback)
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .scheduledReadback
+        )
+        XCTAssertEqual(
+            owner.resolvedEvidence?.value.values["selected"],
+            expectedApplication
+        )
+    }
+
     func testSwitcherDiagnosticsObserverRequiresPostTriggerProjection() {
         var acceptsEvidence = false
         var cancellationCount = 0
