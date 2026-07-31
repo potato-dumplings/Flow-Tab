@@ -171,7 +171,18 @@ extension FlowTabUITests {
             appliedEvidence.source,
             scheduledEvidence.source
         )
-        XCTAssertTrue(waitForApplicationToTerminate(fixtureApp, timeout: 8))
+        let terminationWaitCompleted = fixtureApp.wait(
+            for: .notRunning,
+            timeout: 8
+        )
+        let finalFixtureState = fixtureApp.state
+        XCTAssertTrue(
+            terminationWaitCompleted
+                && finalFixtureState == .notRunning,
+            "Fixture process termination evidence was not satisfied. "
+                + "waiterCompleted=\(terminationWaitCompleted) "
+                + "finalState=\(String(describing: finalFixtureState))"
+        )
         waitForRuntimeLogFiles(
             containing: [
                 "terminate post-refresh reason=",
@@ -648,20 +659,6 @@ extension FlowTabUITests {
         let summary = element(in: app, identifier: Identifier.switcherSummary)
         guard summary.exists else { return "" }
         return elementStringValue(summary)
-    }
-
-    private func waitForApplicationToTerminate(
-        _ app: XCUIApplication,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if app.state == .notRunning {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
     }
 
     func makeSpaceFixtureWorkflowFile(_ contents: String) throws -> URL {
