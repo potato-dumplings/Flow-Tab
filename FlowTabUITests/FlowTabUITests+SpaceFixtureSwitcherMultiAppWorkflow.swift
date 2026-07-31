@@ -416,34 +416,6 @@ extension FlowTabUITests {
         )
     }
 
-    private func selectSwitcherWorkflowAppDirectly(
-        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
-        diagnosticsSummary: XCUIElement,
-        timeout: TimeInterval = 1.5
-    ) -> Bool {
-        do {
-            try FlowTabUITestSwitcherCommandPayload.write(workflowApp.identity.bundleIdentifier)
-        } catch {
-            return false
-        }
-
-        postFlowTabUITestSwitcherCommand(
-            .selectApp,
-            traceLabel: "selectWorkflowApp.direct.\(workflowApp.appID)"
-        )
-
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected")
-                == workflowApp.identity.bundleIdentifier {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.08))
-        } while Date() < deadline
-
-        return false
-    }
-
     func testSwitcherPanelWindowSearchFindsAndActivatesRealWorkflowWindow() throws {
         let workflow = try configuredSwitcherSpaceFixtureWorkflow()
         let targetWindowTitle = "Docs"

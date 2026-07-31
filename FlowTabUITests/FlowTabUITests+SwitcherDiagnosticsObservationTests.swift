@@ -174,12 +174,18 @@ extension FlowTabUITests {
     }
 
     func testSwitcherDiagnosticsObserverRequiresPostTriggerProjection() {
+        let expectedApplication =
+            "io.github.potato-dumplings.flowtab.spacefixture"
         var acceptsEvidence = false
         var cancellationCount = 0
         let owner =
             FlowTabUITestSwitcherDiagnosticsObservationOwner(
-                expectations:
-                    switcherDiagnosticsTestExpectations,
+                expectations: [
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "selected",
+                        expectedValue: expectedApplication
+                    )
+                ],
                 acceptsEvidence: {
                     acceptsEvidence
                 },
@@ -189,9 +195,14 @@ extension FlowTabUITests {
                     }
                 },
                 readback: {
-                    self.switcherDiagnosticsTestSnapshot(
-                        selectedWindow: "secondary",
-                        previewImages: "2"
+                    FlowTabUITestSwitcherDiagnosticsSnapshot(
+                        identifier: "switcher-summary",
+                        exists: true,
+                        rawValue:
+                            "selected=\(expectedApplication)",
+                        values: [
+                            "selected": expectedApplication
+                        ]
                     )
                 }
             )
@@ -205,6 +216,12 @@ extension FlowTabUITests {
         XCTAssertEqual(
             owner.resolvedEvidence?.source,
             .triggerReadback
+        )
+        XCTAssertEqual(
+            owner.resolvedEvidence?.value.values[
+                "selected"
+            ],
+            expectedApplication
         )
         XCTAssertEqual(cancellationCount, 1)
     }
