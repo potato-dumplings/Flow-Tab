@@ -114,14 +114,14 @@ extension FlowTabUITests {
                 ]
             )
         snapshot = matchingSnapshot
-        scheduledReadback?(.scheduledReadback)
+        owner.requestReadback(source: .triggerReadback)
         let evidence = owner.waitForResolution(
             timeout:
                 FlowTabUITestSwitcherWindowCardTestPolicy
                     .watchdog
         )
 
-        XCTAssertEqual(evidence?.source, .scheduledReadback)
+        XCTAssertEqual(evidence?.source, .triggerReadback)
         XCTAssertEqual(evidence?.value, matchingSnapshot)
         XCTAssertEqual(cancellationCount, 1)
         owner.cancel()

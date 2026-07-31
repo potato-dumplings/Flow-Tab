@@ -2,11 +2,6 @@ import CoreGraphics
 import Foundation
 import XCTest
 
-struct EdgeWorkflowWindowCardObservation: Equatable {
-    let identifier: String
-    let title: String
-}
-
 extension FlowTabUITests {
     func selectEdgeWorkflowAppInSwitcherAppLayer(
         _ targetApp: SpaceFixtureResolvedWorkflow.App,
@@ -43,34 +38,6 @@ extension FlowTabUITests {
                 timeout: timeout
             )
         }
-    }
-
-    func waitForEdgeSwitcherWindowCards(
-        in app: XCUIApplication,
-        expectedTitles: [String],
-        timeout: TimeInterval
-    ) -> [EdgeWorkflowWindowCardObservation] {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestCards: [EdgeWorkflowWindowCardObservation] = []
-        let expectedTitleCounts = edgeTitleCounts(expectedTitles)
-
-        repeat {
-            latestCards = edgeSwitcherWindowCardObservations(in: app)
-            if latestCards.count == expectedTitles.count,
-               Set(latestCards.map(\.identifier)).count == latestCards.count,
-               edgeTitleCounts(latestCards.map(\.title)) == expectedTitleCounts {
-                return latestCards
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected switcher preview cards to preserve titles \(expectedTitles), \
-            found \(latestCards.map { "\($0.title)=\($0.identifier)" }.sorted()).
-            """
-        )
-        return latestCards
     }
 
     func waitForEdgeSearchWindowResultIdentifiers(
@@ -134,20 +101,6 @@ extension FlowTabUITests {
         guard let rawWindowID = readableComponent.split(separator: "-").last else { return nil }
         guard let windowID = UInt32(rawWindowID) else { return nil }
         return CGWindowID(windowID)
-    }
-
-    private func edgeSwitcherWindowCardObservations(in app: XCUIApplication) -> [EdgeWorkflowWindowCardObservation] {
-        var seenIdentifiers: Set<String> = []
-        return edgeWorkflowElements(in: app, identifierPrefix: "flowtab.switcher.window.").compactMap { element in
-            let identifier = element.identifier
-            let title = element.label.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !title.isEmpty else { return nil }
-            guard seenIdentifiers.insert(identifier).inserted else { return nil }
-            return EdgeWorkflowWindowCardObservation(
-                identifier: identifier,
-                title: title
-            )
-        }
     }
 
     private func uniqueEdgeSearchWindowResultIdentifiers(in app: XCUIApplication) -> [String] {

@@ -53,12 +53,13 @@ extension FlowTabUITests {
                 "Switcher did not select the duplicate-window workflow app before preview assertions."
             )
 
-            app.typeKey(.downArrow, modifierFlags: [])
-            let cards = waitForEdgeSwitcherWindowCards(
+            let cards = performAndWaitForSwitcherWindowCards(
                 in: app,
                 expectedTitles: targetApp.expectedWindowTitles,
                 timeout: 8
-            )
+            ) {
+                app.typeKey(.downArrow, modifierFlags: [])
+            }
 
             XCTAssertEqual(cards.count, targetApp.expectedWindowTitles.count)
             XCTAssertEqual(Set(cards.map(\.identifier)).count, cards.count)
@@ -105,12 +106,13 @@ extension FlowTabUITests {
                 "Switcher did not select the duplicate-window workflow app before minimized-state assertions."
             )
 
-            app.typeKey(.downArrow, modifierFlags: [])
-            _ = waitForEdgeSwitcherWindowCards(
+            _ = performAndWaitForSwitcherWindowCards(
                 in: app,
                 expectedTitles: targetApp.expectedWindowTitles,
                 timeout: 8
-            )
+            ) {
+                app.typeKey(.downArrow, modifierFlags: [])
+            }
             let targetPID = try targetProcessIdentifier(for: targetApp)
             waitForRuntimeLogFiles(
                 matching: #"chrome-topology app=Chrome Fixture pid=\#(targetPID) .* ax=\[.*min=1.*\] cg=\[.*Shared Docs:off:spaces=\[[0-9,]*\]:frame="#,

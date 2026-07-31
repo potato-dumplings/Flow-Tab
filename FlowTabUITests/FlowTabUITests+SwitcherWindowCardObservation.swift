@@ -149,6 +149,12 @@ final class FlowTabUITestSwitcherWindowCardObservationOwner {
         conditionOwner.waitForResolution(timeout: timeout)
     }
 
+    func requestReadback(
+        source: FlowTabUITestConditionObservationSource
+    ) {
+        conditionOwner.requestReadback(source: source)
+    }
+
     var resolvedEvidence: FlowTabUITestConditionEvidence<
         FlowTabUITestSwitcherWindowCardSnapshot
     >? {
@@ -170,6 +176,58 @@ final class FlowTabUITestSwitcherWindowCardObservationOwner {
 }
 
 extension FlowTabUITests {
+    func performAndWaitForSwitcherWindowCards(
+        in app: XCUIApplication,
+        expectedTitles: [String],
+        excludedTitles: [String] = [],
+        previousWindowCardIdentifiers: Set<String> = [],
+        timeout: TimeInterval,
+        trigger: () -> Void
+    ) -> [SwitcherWindowCardObservation] {
+        let expectation =
+            FlowTabUITestSwitcherWindowCardExpectation(
+                expectedTitles: expectedTitles,
+                excludedTitles: excludedTitles,
+                previousWindowCardIdentifiers:
+                    previousWindowCardIdentifiers
+            )
+        var triggerCompleted = false
+        let owner =
+            FlowTabUITestSwitcherWindowCardObservationOwner(
+                expectation: expectation,
+                acceptsResolution: {
+                    triggerCompleted
+                },
+                readback: {
+                    FlowTabUITestSwitcherWindowCardSnapshot(
+                        cards:
+                            self.switcherWindowCardObservations(
+                                in: app
+                            )
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        trigger()
+        triggerCompleted = true
+        owner.requestReadback(source: .triggerReadback)
+
+        guard
+            let evidence = owner.waitForResolution(
+                timeout: timeout
+            )
+        else {
+            XCTFail(
+                "Switcher window-card projection watchdog "
+                    + "expired. \(owner.diagnosticSummary)"
+            )
+            return owner.latestSnapshot?.cards ?? []
+        }
+        return evidence.value.cards
+    }
+
     func switcherWindowCardObservations(
         in app: XCUIApplication
     ) -> [SwitcherWindowCardObservation] {
