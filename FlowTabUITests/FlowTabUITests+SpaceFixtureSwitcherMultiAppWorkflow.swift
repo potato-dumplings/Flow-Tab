@@ -378,44 +378,6 @@ extension FlowTabUITests {
         }
     }
 
-    func selectSwitcherWorkflowApp(
-        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
-        in app: XCUIApplication,
-        diagnosticsSummary: XCUIElement,
-        maxMoves: Int = 40
-    ) {
-        if selectSwitcherWorkflowAppDirectly(workflowApp, diagnosticsSummary: diagnosticsSummary) {
-            return
-        }
-
-        for attempt in 0..<maxMoves {
-            let selectedAppID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected")
-            let selectedMode = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "mode")
-            logFlowTabUITestTrace(
-                "[selectWorkflowApp.\(attempt + 1)] target=\(workflowApp.identity.bundleIdentifier) selected=\(selectedAppID) mode=\(selectedMode)"
-            )
-            if selectedAppID
-                == workflowApp.identity.bundleIdentifier {
-                return
-            }
-            if selectedMode.hasPrefix("windowCycle(") {
-                app.typeKey(.upArrow, modifierFlags: [])
-                RunLoop.current.run(until: Date().addingTimeInterval(0.12))
-                continue
-            }
-            app.typeKey(.rightArrow, modifierFlags: [])
-            RunLoop.current.run(until: Date().addingTimeInterval(0.08))
-        }
-
-        XCTFail(
-            """
-            Failed to select switcher workflow app \(workflowApp.appName).
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-    }
-
     func testSwitcherPanelWindowSearchFindsAndActivatesRealWorkflowWindow() throws {
         let workflow = try configuredSwitcherSpaceFixtureWorkflow()
         let targetWindowTitle = "Docs"
