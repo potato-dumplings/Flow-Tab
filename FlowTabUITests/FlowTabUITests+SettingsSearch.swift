@@ -222,10 +222,14 @@ extension FlowTabUITests {
         let searchApp = makeApp(
             additionalArguments: appVisibilityRuntimeArguments(opensSearch: true)
         )
+        let searchReadiness =
+            prepareInitialFlowTabSearchInputReadiness()
         launchFlowTabUITestApplication(searchApp)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(searchApp, timeout: 10))
-        XCTAssertTrue(element(in: searchApp, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 6))
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        _ = requireInitialFlowTabSearchInput(
+            in: searchApp,
+            observedBy: searchReadiness
+        )
         searchApp.typeText("Mail")
         RunLoop.current.run(until: Date().addingTimeInterval(0.8))
         XCTAssertFalse(element(in: searchApp, identifier: Identifier.switcherSearchAppMockMail).exists)
@@ -335,22 +339,36 @@ extension FlowTabUITests {
         let app = makeApp(
             additionalArguments: [
                 "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-open-switcher",
+                "--flowtab-ui-listen-switcher-trigger",
                 "--flowtab-ui-ax-trusted",
                 "YES",
                 "--flowtab-ui-screen-trusted",
                 "YES"
             ]
+                + FlowTabUITestSearchInputReadinessPolicy
+                    .applicationEvidenceLaunchArguments
         )
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherAppMockMail).waitForExistence(timeout: 8))
+        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+            .global,
+            traceLabel: "settings-search-user-path"
+        )
+        XCTAssertTrue(
+            element(
+                in: app,
+                identifier: Identifier.switcherAppMockMail
+            ).waitForExistence(timeout: 8)
+        )
 
-        app.activate()
+        let searchReadiness =
+            prepareInitialFlowTabSearchInputReadiness()
         app.typeText("\r")
 
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: searchReadiness
+        )
         return app
     }
 
@@ -375,6 +393,9 @@ extension FlowTabUITests {
         ]
         if opensSearch {
             arguments.append("--flowtab-ui-open-switcher-search")
+            arguments +=
+                FlowTabUITestSearchInputReadinessPolicy
+                    .applicationEvidenceLaunchArguments
         } else if opensSwitcher {
             arguments.append("--flowtab-ui-open-switcher")
         }

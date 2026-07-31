@@ -259,8 +259,13 @@ extension FlowTabUITests {
             }
         ) { _, app in
             logWorkflowSpaceObservation("\(traceLabel).beforeTrigger", app: targetApp)
+            let readiness =
+                prepareInitialFlowTabSearchInputReadiness()
             postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.search, traceLabel: traceLabel)
-            var searchInput = assertWindowSearchReady(in: app)
+            var searchInput = assertWindowSearchReady(
+                in: app,
+                observedBy: readiness
+            )
             var diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
             assertWindowSearchDataUsesWorkflowWindowCount(
                 for: targetApp,
@@ -704,7 +709,6 @@ extension FlowTabUITests {
         in app: XCUIApplication,
         traceLabel: String
     ) throws -> RuntimeTruthWindowSelection {
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         try postFlowTabUITestSwitcherSearchQueryAndWaitForDelivery(title, traceLabel: "\(traceLabel).query")
 
         let result = try XCTUnwrap(
@@ -819,14 +823,25 @@ extension FlowTabUITests {
 
     private func relaunchWindowSearch(_ app: XCUIApplication, traceLabel: String) -> XCUIElement {
         XCTAssertTrue(app.state == .runningForeground || app.state == .runningBackground)
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
         postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.search, traceLabel: "\(traceLabel).relaunch")
-        return assertWindowSearchReady(in: app)
+        return assertWindowSearchReady(
+            in: app,
+            observedBy: readiness
+        )
     }
 
-    private func assertWindowSearchReady(in app: XCUIApplication) -> XCUIElement {
-        let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
+    private func assertWindowSearchReady(
+        in app: XCUIApplication,
+        observedBy readiness:
+            FlowTabUITestSearchInputReadinessObservationOwner
+    ) -> XCUIElement {
+        let searchInput = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: readiness
+        )
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        XCTAssertTrue(searchInput.waitForExistence(timeout: 12))
         XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 12))
         return searchInput
     }

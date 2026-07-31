@@ -1,6 +1,6 @@
 # Evidence-Driven Synchronization Migration
 
-Updated: 2026-07-30
+Updated: 2026-07-31
 
 ## Goal
 
@@ -211,6 +211,7 @@ and Process/Tooling.
 | SYNC-035B | `FlowTabUITests+Support.commitEditing`, `+ElementValueObservation.assertTriggerMakesValue`, and `testSettingsWindowBehaviorDelayAndTogglesPersistAcrossRelaunch`; delay-input commit | A fixed 200ms RunLoop advance after Tab assumes AppKit ended editing, normalized the value, and republished its accessibility value. | Start the generation-owned element-value observer before Tab, reject a matching baseline until the trigger returns, and accept only the exact normalized `1.23` accessibility readback. XCUI exposes no value-publication callback, so retain the shared serial named cadence. The helper invocation owns cancellation; its watchdog is solely a failure bound with acceptance state and last exact value. | H Settings UI commit Oracle; deterministic owner regression, affected Settings UI, Process/Tooling. | completed |
 | SYNC-035C | `FlowTabUITests+SpaceFixtureOptionTabNoisyRoundTrip.selectNoisyOptionTabWindow`; noisy Option-Tab selected-window advance | A fixed 250ms RunLoop advance after each delivered `.advanceRight` command assumes the switcher has published the next selected window before reading its title and ID. | Establish a generation-owned diagnostics observer before each command, retain the current exact CG window number as the baseline, gate acceptance until command delivery returns, and close the synchronous race with an immediate readback. Accept only one atomic diagnostics value containing window-cycle mode, a nonempty title, the canonical `cg:<pid>:<windowNumber>` stable identity, and a CG window number different from the baseline. XCUI exposes no diagnostics-publication callback, so retain the shared named serial cadence. The helper owns cancellation; its watchdog is solely a failure bound with the final atomic readback. | H noisy fullscreen/off-Space UI Oracle; deterministic identity/gating/cancel/watchdog tests, lifecycle Pressure, affected real-topology UI, Process/Tooling. | completed |
 | SYNC-035D | `FlowTabUITests+SpaceFixtureInAppWindowSwitcher.relaunchInAppWindowSwitcher`; exact fixture refocus before Control+Tab reopen | A bundle-only `XCUIApplication` activation followed by a fixed 350ms RunLoop advance assumes XCTest attached to the launched fixture process and the previously selected window became frontmost. | Resolve the fixture path intent through `makeSpaceFixtureWorkflowApplication` at the fixture boundary. Install the generation-owned workflow-window activation observer before activation, gate baseline evidence until activation returns, and accept only the exact fixture bundle plus the previously selected CG window number. The helper invocation owns observer cancellation; its named watchdog reports the final workspace, CG, AX, and title readback. | H real-fixture process/window identity Oracle; deterministic activation-owner regression and lifecycle Pressure, affected clean Control+Tab round trip, Process/Tooling. | completed |
+| SYNC-035E | `SearchSystemTextInputBridge.Coordinator`, `FlowTabUITests+SearchInputReadinessObservation`, and Search/Settings/Space-fixture Search entry callers; initial Search keyboard readiness | Fixed 400ms RunLoop advances after Search input existence assume AppKit has made the exact Search text view first responder in the key panel before XCTest sends keyboard input. Evidence migration plus conditional observation. | Establish window-mount and key-window observers before responder synchronization, read back `window.isKeyWindow && window.firstResponder === textView` with responder class `SearchSystemTextView`, and publish an INFO runtime marker on the false-to-true transition. UI owners establish a runtime-log baseline and file observer before launch or trigger, require that exact marker, then require the exact XCU input identity. The shared named 200ms runtime-log readback cadence closes file-event gaps; coordinator and UI helper owners manage generation, cancellation, and cleanup. The 35-second marker and five-second accessibility watchdogs report the final observed evidence. | H shared production/UI keyboard-readiness Oracle; Behavior initial/event/cancel/dedup coverage, deterministic marker owner tests, 100-generation lifecycle Pressure, affected mock/settings/real-topology Search UI, Process/Tooling. | completed |
 | SYNC-036 | All literal XCTest timeouts in `FlowTabTests` and `FlowTabUITests` | 606 literal durations are generally terminal bounds for an independent expectation or XCUI predicate, but policy ownership and diagnostic tiers are implicit. Watchdog. | Replace literals with named app-test and UI-test watchdog policies by operation class; preserve expectation/predicate success Oracles and include unmet condition plus last observation in custom waits. Test case/helper owner supplies cleanup. | M mechanical/test infra; Unit/Behavior/UI, Process/Tooling. | planned |
 | SYNC-037 | `scripts/perf/tab-switch-stress.sh`, `search-committed-index-pressure.sh`, `runtime-topology-pressure.sh`, `lib/runtime-topology-target.sh` | Sampling duration/cadence and identity stability windows are pressure/safety protocols; process termination loops use unnamed 100ms cadence and attempt bounds. Domain duration/conditional observation/watchdog. | Retain measurement durations and sample cadence as named protocol inputs. Name process polling cadence/watchdogs, check state immediately, terminate from PID/start-identity/readback, and report the final `ps`/identity/status evidence. Traps own cancellation and cleanup. | M tooling/hot path; Pressure and Process/Tooling. | verification-needed |
 | SYNC-038 | `scripts/release/release-install.sh`, `scripts/release/uninstall-flowtab.js` | A fixed one-second delay assumes FlowTab exited before replacement or deletion. Evidence migration. | Wait on exact process absence/identity readback immediately after quit/TERM, with a named watchdog and last PID/state diagnostic before mutating installed resources. The install/uninstall command owns cleanup. | M release tooling; Process/Tooling and release contract tests. | planned |
@@ -6661,3 +6662,60 @@ polling cadence, deadline, or timeout in the scoped paths.
   UI-test fixture refocus Oracle and its real-topology regression path.
 - Commit: pending current-slice local commit
   (`test(sync): migrate SYNC-035D fixture refocus`).
+
+### SYNC-035E Closure Record
+
+- Design and Oracle: the production coordinator establishes window-mount and
+  key-window observers before synchronizing first responder. Its exact
+  readiness readback is `window.isKeyWindow && window.firstResponder ===
+  textView`, where the responder class is `SearchSystemTextView`. A
+  false-to-true transition writes the persistent INFO marker
+  `keyboardReadiness ready=1 identifier=flowtab.switcher.search.input
+  responder=SearchSystemTextView windowKey=1`. Each UI caller establishes its
+  runtime-log baseline and observer before launch or trigger, waits for that
+  exact marker, and then requires the exact XCU input identity.
+- Lifecycle and retained cadence: the production coordinator owns its
+  notification tokens, weak window/view references, synchronization generation,
+  and detach/deinit cancellation. The UI helper owns the runtime-log baseline,
+  file observation, wait, and teardown cancellation. The shared named 200ms
+  runtime-log readback cadence closes file-event gaps, and success remains tied
+  to the exact marker. The 35-second marker watchdog and five-second
+  accessibility-publication watchdog are terminal failure bounds with the
+  final runtime-log evidence.
+- Behavior: the current-source FlowTabTests run passes 3/3 in 0.669 seconds
+  under
+  `.build-local/evidence-driven-sync/SYNC-035E/behavior-readiness-current-013`.
+  It covers initially satisfied exact readiness, duplicate key-window
+  notifications, delayed key-window evidence, cancellation, and stale
+  generation rejection.
+- Deterministic owner regression and lifecycle Pressure: the current-source
+  owner run passes 5/5 in 2.654 seconds under
+  `.build-local/evidence-driven-sync/SYNC-035E/owner-log-current-002`. Coverage
+  includes observer-before-readback ordering, initial and later marker
+  evidence, exact identifier/responder/key-window rejection, 100
+  cancel/restart generations with stale and duplicate callbacks, and watchdog
+  final-evidence diagnostics.
+- UI affected paths: the fixed-path app was rebuilt, signed, and verified with
+  Team `96PUA726W9` under
+  `.build-local/evidence-driven-sync/SYNC-035E/install-build-current-004`.
+  The Chinese mock Search path passes 1/1 in 7.518 seconds under
+  `.build-local/evidence-driven-sync/SYNC-035E/affected-mock-current-002`.
+  The Settings default-scope persistence path passes 1/1 in 33.262 seconds
+  under
+  `.build-local/evidence-driven-sync/SYNC-035E/affected-user-path-current-006`.
+  The real Space-fixture Search entry, exact application result, activation,
+  and panel dismissal path passes 1/1 in 27.502 seconds under
+  `.build-local/evidence-driven-sync/SYNC-035E/affected-real-topology-current-001`.
+- Process/Tooling: the complete UI-test target build and runner signing pass
+  under
+  `.build-local/evidence-driven-sync/SYNC-035E/owner-build-current-005`.
+  All ten changed Swift files parse, the Xcode project plist and new source
+  references validate, scoped 400ms Search waits and the retired helper have
+  no remaining references, the 758-line production bridge retains one text
+  input responsibility, and `git diff --check` passes. Startup `prompts.zip`
+  remains unchanged and outside the slice.
+- Unit and FlowTabCore: not relevant because the synchronization owner is the
+  AppKit bridge; its deterministic state, event, cancellation, and ordering
+  rules are covered by the Behavior tests above.
+- Commit: pending current-slice local commit
+  (`refactor(sync): migrate SYNC-035E Search input readiness`).

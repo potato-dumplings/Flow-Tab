@@ -452,6 +452,8 @@ extension FlowTabUITests {
             "Switcher workflow must include a real fixture window titled \(targetWindowTitle)"
         )
 
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
         try runRealSpaceFixtureWorkflow(
             workflow,
             flowTabAdditionalArguments: [
@@ -459,11 +461,15 @@ extension FlowTabUITests {
                 "-searchDefaultScope",
                 "window"
             ]
+                + FlowTabUITestSearchInputReadinessPolicy
+                    .applicationEvidenceLaunchArguments
         ) { _, app in
-            let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-            XCTAssertTrue(waitForInitialFlowTabSearchReadiness(searchInput))
+            let searchInput =
+                requireInitialFlowTabSearchInput(
+                    in: app,
+                    observedBy: readiness
+                )
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
             app.typeText(targetWindowTitle)
 
             guard let result = waitForSearchWindowResult(
@@ -502,6 +508,8 @@ extension FlowTabUITests {
             "Switcher workflow must include the Chrome-style fixture app for app-scope search"
         )
 
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
         try runRealSpaceFixtureWorkflow(
             workflow,
             flowTabAdditionalArguments: [
@@ -509,16 +517,20 @@ extension FlowTabUITests {
                 "-searchDefaultScope",
                 "app"
             ]
+                + FlowTabUITestSearchInputReadinessPolicy
+                    .applicationEvidenceLaunchArguments
         ) { _, app in
-            let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-            XCTAssertTrue(waitForInitialFlowTabSearchReadiness(searchInput))
+            let searchInput =
+                requireInitialFlowTabSearchInput(
+                    in: app,
+                    observedBy: readiness
+                )
             XCTAssertNotEqual(
                 NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
                 targetApp.identity.bundleIdentifier,
                 "The app-scope activation scenario must start outside the target fixture app."
             )
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
             app.typeText(targetApp.identity.switcherSearchQuery)
 
             let result = element(
@@ -549,6 +561,8 @@ extension FlowTabUITests {
             "Switcher workflow must expose the fullscreen fixture window title"
         )
 
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
         try runRealSpaceFixtureWorkflow(
             workflow,
             flowTabAdditionalArguments: [
@@ -556,10 +570,15 @@ extension FlowTabUITests {
                 "-searchDefaultScope",
                 "window"
             ]
+                + FlowTabUITestSearchInputReadinessPolicy
+                    .applicationEvidenceLaunchArguments
         ) { _, app in
-            let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
+            let searchInput =
+                requireInitialFlowTabSearchInput(
+                    in: app,
+                    observedBy: readiness
+                )
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(waitForInitialFlowTabSearchReadiness(searchInput))
             XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
             XCTAssertNotEqual(
                 NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
@@ -567,7 +586,6 @@ extension FlowTabUITests {
                 "The fullscreen activation scenario must start outside the target fixture app."
             )
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
             app.typeText(targetWindowTitle)
 
             guard let result = waitForSearchWindowResult(

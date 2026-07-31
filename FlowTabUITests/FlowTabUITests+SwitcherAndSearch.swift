@@ -42,14 +42,46 @@ extension FlowTabUITests {
         return arguments
     }
 
-    func testSearchPanelEntryAndResultActivation() throws {
-        runRealSpaceFixtureWorkflow(
-            flowTabAdditionalArguments: ["--flowtab-ui-open-switcher-search"]
-        ) { identity, app in
-            let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-            XCTAssertTrue(searchInput.waitForExistence(timeout: 5))
+    private func launchSearchMockApplication(
+        mockRuntimeVariant: String? = nil
+    ) -> (
+        app: XCUIApplication,
+        readiness:
+            FlowTabUITestSearchInputReadinessObservationOwner
+    ) {
+        let app = makeApp(
+            additionalArguments:
+                searchMockRuntimeArguments(
+                    mockRuntimeVariant:
+                        mockRuntimeVariant
+                )
+        )
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(
+            waitForFlowTabUITestApplicationToBecomeReady(
+                app,
+                timeout: 10
+            )
+        )
+        return (app, readiness)
+    }
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+    func testSearchPanelEntryAndResultActivation() throws {
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
+        runRealSpaceFixtureWorkflow(
+            flowTabAdditionalArguments:
+                ["--flowtab-ui-open-switcher-search"]
+                + FlowTabUITestSearchInputReadinessPolicy
+                    .applicationEvidenceLaunchArguments
+        ) { identity, app in
+            let searchInput =
+                requireInitialFlowTabSearchInput(
+                    in: app,
+                    observedBy: readiness
+                )
             app.typeText(identity.switcherSearchQuery)
 
             let fixtureResult = app.descendants(matching: .any)
@@ -85,15 +117,13 @@ extension FlowTabUITests {
     }
 
     func testSearchPanelChineseQueryShowsChineseMockResult() throws {
-        let app = makeApp(
-            additionalArguments: searchMockRuntimeArguments()
+        let launch = launchSearchMockApplication()
+        let app = launch.app
+
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: launch.readiness
         )
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
-
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         app.typeText("测")
 
         let chineseResult = app.descendants(matching: .any)
@@ -103,15 +133,13 @@ extension FlowTabUITests {
     }
 
     func testSearchPanelPinyinInitialsShowChineseMockResult() throws {
-        let app = makeApp(
-            additionalArguments: searchMockRuntimeArguments()
+        let launch = launchSearchMockApplication()
+        let app = launch.app
+
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: launch.readiness
         )
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
-
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         app.typeText("cs")
 
         let chineseResult = app.descendants(matching: .any)
@@ -121,15 +149,13 @@ extension FlowTabUITests {
     }
 
     func testSearchPanelSharedCsQueryShowsCSGOAndChineseMockResults() throws {
-        let app = makeApp(
-            additionalArguments: searchMockRuntimeArguments()
+        let launch = launchSearchMockApplication()
+        let app = launch.app
+
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: launch.readiness
         )
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
-
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         app.typeText("cs")
 
         let csgoResult = app.descendants(matching: .any)
@@ -144,15 +170,13 @@ extension FlowTabUITests {
     }
 
     func testSearchPanelCodeLikeSubsequenceShowsMockResult() throws {
-        let app = makeApp(
-            additionalArguments: searchMockRuntimeArguments()
+        let launch = launchSearchMockApplication()
+        let app = launch.app
+
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: launch.readiness
         )
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
-
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         app.typeText("cgo")
 
         let csgoResult = app.descendants(matching: .any)
@@ -162,15 +186,13 @@ extension FlowTabUITests {
     }
 
     func testSearchPanelSegmentedChineseQueryShowsCompoundMockResult() throws {
-        let app = makeApp(
-            additionalArguments: searchMockRuntimeArguments()
+        let launch = launchSearchMockApplication()
+        let app = launch.app
+
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: launch.readiness
         )
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
-
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         app.typeText("文件助手")
 
         let segmentedResult = app.descendants(matching: .any)
@@ -723,18 +745,20 @@ extension FlowTabUITests {
     }
 
     func testSearchPanelWrapFromLastResultScrollsBackToFirstResult() throws {
-        let app = makeApp(
-            additionalArguments: searchMockRuntimeArguments(mockRuntimeVariant: "search-wrap")
-        )
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        let launch =
+            launchSearchMockApplication(
+                mockRuntimeVariant: "search-wrap"
+            )
+        let app = launch.app
 
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: launch.readiness
+        )
 
         let firstResultIdentifier = "flowtab.switcher.search.app.\("com.flowtab.mock.wrap.01".flowTabUITestAccessibilityIdentifierComponent)"
         let lastResultIdentifier = "flowtab.switcher.search.app.\("com.flowtab.mock.wrap.10".flowTabUITestAccessibilityIdentifierComponent)"
 
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         app.typeKey(.downArrow, modifierFlags: [])
         RunLoop.current.run(until: Date().addingTimeInterval(0.1))
 

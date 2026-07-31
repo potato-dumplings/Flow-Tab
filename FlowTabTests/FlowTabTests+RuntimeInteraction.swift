@@ -46,6 +46,128 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testSearchSystemTextInputBridgePublishesExactKeyboardReadiness()
+        async
+    {
+        let readiness =
+            expectation(
+                description:
+                    "exact Search text responder became ready"
+            )
+        let harness = SearchSystemTextInputBridgeTestHarness()
+        harness.observeKeyboardReadiness { isReady in
+            if isReady {
+                readiness.fulfill()
+            }
+        }
+        let window = harness.installInKeyWindow()
+        defer { harness.closeHostingWindow() }
+
+        harness.synchronize(
+            query: "",
+            cursorPosition: 0,
+            isSearchActive: true
+        )
+
+        await fulfillment(of: [readiness], timeout: 1)
+        XCTAssertTrue(window.isKeyWindow)
+        XCTAssertTrue(
+            window.firstResponder === harness.textView
+        )
+        XCTAssertEqual(
+            harness.textView.accessibilityIdentifier(),
+            "flowtab.switcher.search.input"
+        )
+        XCTAssertEqual(
+            harness.keyboardReadinessChanges,
+            [true]
+        )
+
+        harness.postHostingWindowDidBecomeKey()
+        harness.postHostingWindowDidBecomeKey()
+        await waitForSearchInputMainQueueTurn()
+        XCTAssertEqual(
+            harness.keyboardReadinessChanges,
+            [true]
+        )
+    }
+
+    @MainActor
+    func testSearchSystemTextInputBridgeWaitsForKeyWindowEvidence()
+        async
+    {
+        let readiness =
+            expectation(
+                description:
+                    "delayed key-window evidence made Search ready"
+            )
+        let harness = SearchSystemTextInputBridgeTestHarness()
+        harness.observeKeyboardReadiness { isReady in
+            if isReady {
+                readiness.fulfill()
+            }
+        }
+        let window = harness.installInWindow()
+        defer { harness.closeHostingWindow() }
+
+        harness.synchronize(
+            query: "",
+            cursorPosition: 0,
+            isSearchActive: true
+        )
+        await waitForSearchInputMainQueueTurn()
+
+        XCTAssertFalse(window.isKeyWindow)
+        XCTAssertTrue(
+            harness.keyboardReadinessChanges.isEmpty
+        )
+
+        harness.makeHostingWindowKey()
+        await fulfillment(of: [readiness], timeout: 1)
+
+        XCTAssertTrue(window.isKeyWindow)
+        XCTAssertTrue(
+            window.firstResponder === harness.textView
+        )
+        XCTAssertEqual(
+            harness.keyboardReadinessChanges,
+            [true]
+        )
+    }
+
+    @MainActor
+    func testSearchSystemTextInputBridgeCancelsStaleReadiness()
+        async
+    {
+        let harness = SearchSystemTextInputBridgeTestHarness()
+        let window = harness.installInWindow()
+        defer { harness.closeHostingWindow() }
+
+        harness.synchronize(
+            query: "",
+            cursorPosition: 0,
+            isSearchActive: true
+        )
+        harness.synchronize(
+            query: "",
+            cursorPosition: 0,
+            isSearchActive: false
+        )
+        await waitForSearchInputMainQueueTurn()
+
+        harness.makeHostingWindowKey()
+        await waitForSearchInputMainQueueTurn()
+
+        XCTAssertTrue(window.isKeyWindow)
+        XCTAssertFalse(
+            window.firstResponder === harness.textView
+        )
+        XCTAssertFalse(
+            harness.keyboardReadinessChanges.contains(true)
+        )
+    }
+
+    @MainActor
     func testSearchSystemTextInputBridgeSynchronizeClampsQueryAndCursor() {
         let harness = SearchSystemTextInputBridgeTestHarness()
 
@@ -439,6 +561,24 @@ extension FlowTabTests {
             maintenanceRequests,
             file: file,
             line: line
+        )
+    }
+
+    @MainActor
+    private func waitForSearchInputMainQueueTurn()
+        async
+    {
+        let mainQueueTurn =
+            expectation(
+                description:
+                    "Search input main-queue transition completed"
+            )
+        DispatchQueue.main.async {
+            mainQueueTurn.fulfill()
+        }
+        await fulfillment(
+            of: [mainQueueTurn],
+            timeout: 1
         )
     }
 

@@ -152,7 +152,6 @@ extension FlowTabUITests {
                 traceLabel: "edgeInputs.search.duplicates"
             )
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
             app.typeText(sharedTitle)
 
             let results = waitForEdgeSearchWindowResultIdentifiers(
@@ -198,7 +197,6 @@ extension FlowTabUITests {
                 traceLabel: "edgeInputs.search.edgeTitle"
             )
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
             app.typeText("punctuation")
 
             let results = waitForEdgeSearchWindowResultIdentifiers(
@@ -235,22 +233,16 @@ extension FlowTabUITests {
         in app: XCUIApplication,
         traceLabel: String
     ) -> XCUIElement {
-        let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-        let deadline = Date().addingTimeInterval(10)
-        var attempt = 1
-        repeat {
-            postFlowTabUITestSwitcherTrigger(
-                .search,
-                traceLabel: "\(traceLabel).attempt\(attempt)"
-            )
-            if searchInput.waitForExistence(timeout: 1.2) {
-                return searchInput
-            }
-            attempt += 1
-        } while Date() < deadline
-
-        XCTFail("Edge workflow window Search did not present from committed runtime index.")
-        return searchInput
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
+        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+            .search,
+            traceLabel: traceLabel
+        )
+        return requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: readiness
+        )
     }
 
     private func configuredSwitcherEdgeInputsWorkflow(
