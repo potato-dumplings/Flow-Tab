@@ -97,11 +97,27 @@ extension FlowTabUITests {
                 """
             )
 
+            let advanceEvidenceSnapshot =
+                makeRuntimeLogFileSnapshot()
             postFlowTabUITestSwitcherCommandAndWaitForDelivery(
                 .advanceDown,
                 traceLabel: "option.provisionalHidden.enterWindowState"
             )
-            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+            let escapedAppName =
+                NSRegularExpression.escapedPattern(
+                    for: targetApp.appName
+                )
+            waitForRuntimeLogFiles(
+                matching:
+                    "advance key=downArrow "
+                    + "app=\(escapedAppName) "
+                    + "windows=1 mode=appCycle",
+                since: advanceEvidenceSnapshot,
+                timeout: 4,
+                description:
+                    "single eligible window remains in app cycle "
+                    + "after manual Down"
+            )
             XCTAssertFalse(
                 switcherPanelDiagnosticsValue(diagnosticsSummary, key: "mode").hasPrefix("windowCycle"),
                 """
