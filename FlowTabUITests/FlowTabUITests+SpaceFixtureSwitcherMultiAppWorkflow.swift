@@ -476,11 +476,18 @@ extension FlowTabUITests {
                 "FlowTab did not expose \(targetApp.appName) as a real app-scope search result."
             )
 
-            confirmSwitcherSearchSelection(in: app, searchInput: searchInput)
-            XCTAssertTrue(
-                waitForFrontmostWorkflowApp(targetApp, timeout: 10),
-                "Search confirmation did not activate the \(targetApp.appName) fixture app."
-            )
+            assertTriggerMakesApplicationFrontmost(
+                targetApp.identity.bundleIdentifier,
+                timeout: 10,
+                message:
+                    "Search confirmation did not activate "
+                    + "the \(targetApp.appName) fixture app."
+            ) {
+                confirmSwitcherSearchSelection(
+                    in: app,
+                    searchInput: searchInput
+                )
+            }
         }
     }
 
@@ -699,29 +706,6 @@ extension FlowTabUITests {
                 )
             )
         }
-    }
-
-    private func waitForFrontmostWorkflowApp(
-        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestFrontmostBundleIdentifier: String?
-        repeat {
-            latestFrontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            if latestFrontmostBundleIdentifier == workflowApp.identity.bundleIdentifier {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected frontmost app \(workflowApp.appName), \
-            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil").
-            """
-        )
-        return false
     }
 
     private func assertSwitcherPreviewWindowCards(
