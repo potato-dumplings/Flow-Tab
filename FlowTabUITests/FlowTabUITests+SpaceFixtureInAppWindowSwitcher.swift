@@ -478,7 +478,7 @@ extension FlowTabUITests {
 
         if allowsNoisyCGSiblings {
             XCTAssertTrue(
-                waitForInAppSwitcherAppEntry(
+                waitForSwitcherAppEntry(
                     diagnosticsSummary,
                     bundleIdentifier: workflowApp.identity.bundleIdentifier,
                     timeout: 8
@@ -745,26 +745,6 @@ extension FlowTabUITests {
             in: app,
             allowsNoisyCGSiblings: allowsNoisyCGSiblings
         )
-    }
-
-    private func waitForInAppSwitcherAppEntry(
-        _ diagnosticsSummary: XCUIElement,
-        bundleIdentifier: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let entries = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "apps")
-                .split(separator: "|")
-                .map(String.init)
-            if entries.contains(where: { entry in
-                entry.split(separator: ":", maxSplits: 1).first.map(String.init) == bundleIdentifier
-            }) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
     }
 
 }

@@ -93,6 +93,40 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherAppProjectionBundleEntryRejectsPrefixCollision() {
+        var entries = [
+            "com.example.browser.backup:2"
+        ]
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        let owner =
+            FlowTabUITestSwitcherAppProjectionObservationOwner(
+                expectation:
+                    .bundleIdentifier("com.example.browser"),
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: {
+                    self.switcherAppProjectionTestSnapshot(
+                        entries
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertNil(owner.resolvedEvidence)
+        entries = ["com.example.browser:2"]
+        scheduledReadback?(.scheduledReadback)
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.value.entries.first?
+                .bundleIdentifier,
+            "com.example.browser"
+        )
+    }
+
     func testSwitcherAppProjectionRejectsWrongExactCountEntry() {
         var entries = ["com.example.browser:3"]
         var scheduledReadback:
