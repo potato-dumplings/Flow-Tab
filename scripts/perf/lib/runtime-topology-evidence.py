@@ -157,6 +157,26 @@ def write_launch_receipt(arguments):
     write_json_atomically(output_path, payload, exclusive=False)
 
 
+def workflow_bundle_identifiers(arguments):
+    if not arguments:
+        raise SystemExit("At least one workflow path is required")
+    bundle_identifiers = set()
+    for path in arguments:
+        with open(path, encoding="utf-8") as handle:
+            payload = json.load(handle)
+        apps = payload.get("apps")
+        if not isinstance(apps, list) or not apps:
+            raise SystemExit(f"workflow has no non-empty apps array: {path}")
+        for app in apps:
+            bundle_id = app.get("bundleId")
+            if not isinstance(bundle_id, str) or not bundle_id or any(
+                character in bundle_id for character in "\t\n"
+            ):
+                raise SystemExit(f"workflow app has an invalid bundleId: {path}")
+            bundle_identifiers.add(bundle_id)
+    print("\n".join(sorted(bundle_identifiers)))
+
+
 def percentile(values, percentile_value):
     ordered = sorted(values)
     index = math.ceil((percentile_value / 100.0) * len(ordered)) - 1
@@ -258,6 +278,7 @@ def main():
         "read-plist": read_plist,
         "write-manifest": write_manifest,
         "write-launch-receipt": write_launch_receipt,
+        "workflow-bundle-identifiers": workflow_bundle_identifiers,
         "summarize": summarize,
     }
     command = sys.argv[1]

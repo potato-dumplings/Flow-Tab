@@ -8,6 +8,9 @@ EVIDENCE_TOOL="${ROOT_DIR}/scripts/perf/lib/runtime-topology-evidence.py"
 MONOTONIC_CLOCK="${ROOT_DIR}/scripts/perf/lib/monotonic-clock.sh"
 TARGET_TOOL="${ROOT_DIR}/scripts/perf/lib/runtime-topology-target.sh"
 PROCESS_EXIT_OBSERVATION_PATH="${ROOT_DIR}/scripts/perf/lib/process-exit-observation.sh"
+APPLICATION_LIFECYCLE_TOOL="${ROOT_DIR}/scripts/perf/lib/runtime-topology-application-lifecycle.js"
+SPACE_FIXTURE_WORKFLOW_CONFIG="${ROOT_DIR}/docs/fixtures/space-fixture-home-multi-app-workflow.json"
+SYSTEM_APP_MRU_FIXTURE_WORKFLOW_CONFIG="${ROOT_DIR}/docs/fixtures/space-fixture-system-app-mru-workflow.json"
 DEFAULT_TEST="FlowTabUITests/FlowTabUITests/testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows"
 TEST_TERMINATION_GRACE_MILLISECONDS=2000
 TEST_KILL_CONFIRMATION_WATCHDOG_MILLISECONDS=2000
@@ -64,6 +67,10 @@ TEST_START_IDENTITY=""
 TEST_PROCESS_IDENTITY_CAPTURE_FAILED=false
 TEST_REAPED=true
 TEST_PROCESS_STATUS="not_started"
+APPLICATION_BASELINE_STATUS="null"
+APPLICATION_CLEANUP_STATUS="null"
+APPLICATION_CLEANUP_FAILED=false
+APPLICATION_CLEANUP_FINISHED=false
 STATUS_FILE=""
 CURRENT_STAGE="argument_parsing"
 UI_WRAPPER_STATUS="null"
@@ -242,7 +249,14 @@ if [[ "$ACTUAL_DESIGNATED_REQUIREMENT_SHA256" != "$EXPECTED_DESIGNATED_REQUIREME
 fi
 UI_APP_IDENTITY_MANIFEST_SHA256="$(LC_ALL=C shasum -a 256 "$UI_APP_IDENTITY_MANIFEST" | awk '{print $1}')"
 if [[ "$HAS_CUSTOM_BUILD_ROOT" == true ]]; then
-  CHILD_BUILD_ROOT_ARGS=(--build-root "${BUILD_ROOT}/ui-tests")
+  CHILD_UI_BUILD_ROOT="${BUILD_ROOT}/ui-tests"
+  CHILD_BUILD_ROOT_ARGS=(--build-root "$CHILD_UI_BUILD_ROOT")
+  SPACE_FIXTURE_RESOLVED_WORKFLOW="${CHILD_UI_BUILD_ROOT}/space-fixture-workflow/variants/resolved-workflow.json"
+  SYSTEM_APP_MRU_RESOLVED_WORKFLOW="${CHILD_UI_BUILD_ROOT}/space-fixture-workflow/system-app-mru-variants/resolved-workflow.json"
+else
+  CHILD_UI_BUILD_ROOT="${ROOT_DIR}/.build-local/ui-tests"
+  SPACE_FIXTURE_RESOLVED_WORKFLOW="${ROOT_DIR}/.build-local/space-fixture-workflow/variants/resolved-workflow.json"
+  SYSTEM_APP_MRU_RESOLVED_WORKFLOW="${ROOT_DIR}/.build-local/space-fixture-workflow/system-app-mru-variants/resolved-workflow.json"
 fi
 
 if [[ "$HAS_CUSTOM_OUTPUT_DIR" == true ]]; then
@@ -286,6 +300,8 @@ LOG_DIR="${OUTPUT_DIR}/logs"
 UI_LOG_FILE="${LOG_DIR}/ui-test.log"
 SUMMARY_LOG_FILE="${LOG_DIR}/summary.log"
 UI_RUN_STATUS_FILE="${OUTPUT_DIR}/ui-run-status.txt"
+APPLICATION_BASELINE_FILE="${OUTPUT_DIR}/application-baseline.json"
+APPLICATION_CLEANUP_EVIDENCE_FILE="${OUTPUT_DIR}/application-cleanup.json"
 STATUS_FILE="${OUTPUT_DIR}/status.json"
 UI_ATTEMPT_DIR="${OUTPUT_DIR}/attempts/ui-tests/run"
 
@@ -299,6 +315,8 @@ write_status() {
   local sampling_failed_json="false"
   local termination_timed_out_json="false"
   local target_terminal_exit_observed_json="false"
+  local application_cleanup_failed_json="false"
+  local application_cleanup_evidence_present="false"
   local result_bundle_directory_present="false"
   local result_bundle_present="false"
 
@@ -310,6 +328,12 @@ write_status() {
   fi
   if [[ "$TARGET_TERMINAL_EXIT_OBSERVED" == true ]]; then
     target_terminal_exit_observed_json="true"
+  fi
+  if [[ "$APPLICATION_CLEANUP_FAILED" == true ]]; then
+    application_cleanup_failed_json="true"
+  fi
+  if [[ -f "$APPLICATION_CLEANUP_EVIDENCE_FILE" ]]; then
+    application_cleanup_evidence_present="true"
   fi
   if [[ -d "${UI_ATTEMPT_DIR}/results/FlowTabUITests.xcresult" ]]; then
     result_bundle_directory_present="true"
@@ -332,6 +356,10 @@ write_status() {
     printf '  "ui_result_bundle_valid": %s,\n' "$result_bundle_present"
     printf '  "sampling_failed": %s,\n' "$sampling_failed_json"
     printf '  "termination_timed_out": %s,\n' "$termination_timed_out_json"
+    printf '  "application_baseline_exit_code": %s,\n' "$APPLICATION_BASELINE_STATUS"
+    printf '  "application_cleanup_exit_code": %s,\n' "$APPLICATION_CLEANUP_STATUS"
+    printf '  "application_cleanup_failed": %s,\n' "$application_cleanup_failed_json"
+    printf '  "application_cleanup_evidence_present": %s,\n' "$application_cleanup_evidence_present"
     printf '  "identity_verdict": "%s",\n' "$IDENTITY_VERDICT"
     printf '  "identity_check_count": %s,\n' "$IDENTITY_CHECK_COUNT"
     printf '  "pid_binding_policy_version": "%s",\n' "$PID_BINDING_POLICY_VERSION"
@@ -359,6 +387,77 @@ load_ui_run_status() {
   value="$(awk -F= '$1 == "log_exit_code" { print $2 }' "$UI_RUN_STATUS_FILE")"
   [[ -n "$value" ]] && UI_LOG_STATUS="$value"
   return 0
+}
+
+capture_application_baseline() {
+  local bundle_identifier
+  local baseline_status
+  local fixture_bundle_identifiers
+  local bundle_identifiers=("$EXPECTED_BUNDLE_ID")
+
+  if ! fixture_bundle_identifiers="$(
+    /usr/bin/python3 "$EVIDENCE_TOOL" workflow-bundle-identifiers \
+      "$SPACE_FIXTURE_WORKFLOW_CONFIG" \
+      "$SYSTEM_APP_MRU_FIXTURE_WORKFLOW_CONFIG"
+  )"; then
+    APPLICATION_BASELINE_STATUS=1
+    echo "Could not resolve the configured fixture bundle identities." >&2
+    echo "unmetCondition=fixtureBundleIdentitiesResolved" >&2
+    return 1
+  fi
+  while IFS= read -r bundle_identifier; do
+    [[ -n "$bundle_identifier" ]] || continue
+    bundle_identifiers+=("$bundle_identifier")
+  done <<<"$fixture_bundle_identifiers"
+
+  if /usr/bin/osascript -l JavaScript \
+    "$APPLICATION_LIFECYCLE_TOOL" \
+    capture \
+    "$APPLICATION_BASELINE_FILE" \
+    "${bundle_identifiers[@]}"; then
+    APPLICATION_BASELINE_STATUS=0
+    return 0
+  else
+    baseline_status=$?
+  fi
+  APPLICATION_BASELINE_STATUS="$baseline_status"
+  echo "Could not capture the pre-request application identity baseline." >&2
+  echo "unmetCondition=applicationBaselineCaptured" >&2
+  return "$baseline_status"
+}
+
+cleanup_independent_applications() {
+  local cleanup_status
+
+  if [[ "$APPLICATION_CLEANUP_FINISHED" == true ]]; then
+    [[ "$APPLICATION_CLEANUP_FAILED" == false ]]
+    return
+  fi
+  APPLICATION_CLEANUP_FINISHED=true
+  if [[ "$APPLICATION_BASELINE_STATUS" != 0 ]]; then
+    return 0
+  fi
+
+  if /usr/bin/osascript -l JavaScript \
+    "$APPLICATION_LIFECYCLE_TOOL" \
+    terminate \
+    "$APPLICATION_BASELINE_FILE" \
+    "$APPLICATION_CLEANUP_EVIDENCE_FILE" \
+    "$EXPECTED_BUNDLE_ID" \
+    "$EXPECTED_APP_PATH" \
+    "$SPACE_FIXTURE_RESOLVED_WORKFLOW" \
+    "$SYSTEM_APP_MRU_RESOLVED_WORKFLOW"; then
+    APPLICATION_CLEANUP_STATUS=0
+    return 0
+  else
+    cleanup_status=$?
+  fi
+  APPLICATION_CLEANUP_STATUS="$cleanup_status"
+  APPLICATION_CLEANUP_FAILED=true
+  echo "Independent runtime-topology application cleanup failed." >&2
+  echo "unmetCondition=postRequestApplicationsAbsent" >&2
+  echo "lastObservationFile=${APPLICATION_CLEANUP_EVIDENCE_FILE}" >&2
+  return "$cleanup_status"
 }
 
 descendant_pids() {
@@ -475,6 +574,7 @@ handle_signal() {
   trap - EXIT INT TERM
   CURRENT_STAGE="interrupted"
   terminate_test_process
+  cleanup_independent_applications || true
   load_ui_run_status
   write_status "$signal_exit_code" || true
   exit "$signal_exit_code"
@@ -484,9 +584,14 @@ handle_exit() {
   local script_exit_code="$1"
   trap - EXIT INT TERM
   terminate_test_process
+  cleanup_independent_applications || true
   load_ui_run_status
   if [[ "$TERMINATION_TIMED_OUT" == true && "$script_exit_code" -eq 0 ]]; then
     CURRENT_STAGE="termination_timed_out"
+    script_exit_code=1
+  fi
+  if [[ "$APPLICATION_CLEANUP_FAILED" == true && "$script_exit_code" -eq 0 ]]; then
+    CURRENT_STAGE="application_cleanup_failed"
     script_exit_code=1
   fi
   if ! write_status "$script_exit_code"; then
@@ -558,6 +663,11 @@ run_ui_test() {
 
 echo "Evidence directory: $OUTPUT_DIR"
 echo "[1/3] Starting runtime topology UI pressure: $TEST_FILTER"
+CURRENT_STAGE="capturing_application_baseline"
+if ! capture_application_baseline; then
+  CURRENT_STAGE="application_baseline_failed"
+  exit 1
+fi
 CURRENT_STAGE="running_ui_test"
 capture_preexisting_target_identities
 LAUNCH_REQUEST_EPOCH_SECONDS="$(date +%s)"
