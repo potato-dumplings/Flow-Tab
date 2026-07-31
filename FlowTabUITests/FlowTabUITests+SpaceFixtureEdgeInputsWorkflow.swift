@@ -412,8 +412,7 @@ extension FlowTabUITests {
 
     private func terminateEdgeWorkflowApps(_ apps: [XCUIApplication]) {
         for app in apps.reversed() where app.state == .runningForeground || app.state == .runningBackground {
-            app.terminate()
-            waitForSpaceFixtureApplicationToTerminate(app)
+            terminateSpaceFixtureApplicationAndWait(app)
         }
     }
 

@@ -192,6 +192,41 @@ extension FlowTabUITests {
         XCTAssertEqual(target.waitCallCount, 1)
     }
 
+    func testApplicationTerminationRepeatedLifecycleUsesEachExactTargetState() {
+        for iteration in 0..<100 {
+            let target =
+                FlowTabUITestApplicationTerminationTargetStub(
+                    initialState: .runningBackground,
+                    postTerminateState:
+                        iteration.isMultiple(of: 2)
+                        ? .notRunning
+                        : .runningBackground,
+                    waitResult:
+                        !iteration.isMultiple(of: 2),
+                    postWaitState: .notRunning
+                )
+
+            let evidence = terminateFlowTabUITestApplication(
+                target,
+                targetDescription:
+                    "pressure-\(iteration)"
+            )
+
+            XCTAssertTrue(
+                evidence.isSatisfied,
+                evidence.diagnosticSummary
+            )
+            XCTAssertEqual(
+                target.terminateCallCount,
+                1
+            )
+            XCTAssertEqual(
+                target.waitCallCount,
+                iteration.isMultiple(of: 2) ? 0 : 1
+            )
+        }
+    }
+
     func testApplicationTerminationWatchdogReportsFinalState() {
         let target =
             FlowTabUITestApplicationTerminationTargetStub(

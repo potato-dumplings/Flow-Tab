@@ -100,8 +100,10 @@ extension FlowTabUITests {
     private func terminateSpaceFixtureAppIfRunning(identity: SpaceFixtureAppIdentity) {
         let app = makeSpaceFixtureApplication(for: identity)
         if app.state == .runningForeground || app.state == .runningBackground {
-            app.terminate()
-            waitForSpaceFixtureApplicationToTerminate(app)
+            terminateSpaceFixtureApplicationAndWait(
+                app,
+                identity: identity
+            )
         }
     }
 
@@ -193,17 +195,35 @@ extension FlowTabUITests {
         return app
     }
 
-    func waitForSpaceFixtureApplicationToTerminate(
+    func terminateSpaceFixtureApplicationAndWait(
         _ app: XCUIApplication,
+        identity: SpaceFixtureAppIdentity,
         timeout: TimeInterval = 5
     ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if app.state == .notRunning {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
+        terminateSpaceFixtureApplicationAndWait(
+            app,
+            targetDescription:
+                identity.bundleIdentifier,
+            timeout: timeout
+        )
+    }
+
+    func terminateSpaceFixtureApplicationAndWait(
+        _ app: XCUIApplication,
+        targetDescription: String = "space-fixture application",
+        timeout: TimeInterval = 5
+    ) {
+        let evidence =
+            terminateFlowTabUITestApplication(
+                app,
+                targetDescription: targetDescription,
+                timeout: timeout
+            )
+        XCTAssertTrue(
+            evidence.isSatisfied,
+            "Space fixture termination failed. "
+                + evidence.diagnosticSummary
+        )
     }
 
     func makeRealRuntimeFlowTabApp(
@@ -266,7 +286,10 @@ extension FlowTabUITests {
         app.launch()
         defer {
             if app.state == .runningForeground || app.state == .runningBackground {
-                app.terminate()
+                terminateSpaceFixtureApplicationAndWait(
+                    app,
+                    identity: identity
+                )
             }
         }
 
@@ -300,7 +323,10 @@ extension FlowTabUITests {
         app.launch()
         defer {
             if app.state == .runningForeground || app.state == .runningBackground {
-                app.terminate()
+                terminateSpaceFixtureApplicationAndWait(
+                    app,
+                    identity: identity
+                )
             }
         }
 

@@ -21,6 +21,23 @@ row ID in the commit subject.
 - Baseline ownership rule: `prompts.zip` remains unchanged and outside every
   migration commit.
 
+## Local Evidence Lifecycle
+
+- Each implementation slice owns its local raw evidence under
+  `.build-local/evidence-driven-sync/<slice-id>/` only while that slice is
+  active.
+- The tracked ledger row, closure record, and independent slice commit are the
+  durable migration evidence.
+- After a slice reaches its recorded terminal state, remove its reproducible
+  `DerivedData`, `.xcresult` bundles, fixture products, source-package and
+  module caches, temporary homes, and superseded build roots before starting
+  the next slice.
+- A blocked slice may retain one compact diagnostic bundle only when its named
+  remediation consumes that bundle. The closure record names its owner and
+  cleanup boundary.
+- Historical `.build-local` paths below remain provenance path intents for the
+  original local attempts. They may be unavailable after terminal cleanup.
+
 ## Audit Method
 
 The baseline combined source search with call-path review across `FlowTab`,
@@ -164,7 +181,7 @@ and Process/Tooling.
 | SYNC-033C | `FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication`; background notification publication while MainActor is unavailable | A 500ms blocking wait proves publishers return, then a raw 10ms RunLoop loop assumes cleanup eventually completes. Evidence migration plus watchdog. | Enter all publishers and register DispatchGroup completion before dispatch. Keep a named blocking watchdog solely as the nonblocking failure bound, then wait for exact publisher-return completion through XCTest to release MainActor and clean up. Test scope owns the group expectation and controller lifetime; failure reports completed notification names. | M runtime-notification delivery; affected Behavior, Process/Tooling. | completed |
 | SYNC-033D | `FlowTabPriorityCoverageTests+RuntimeAXBackgroundResolution`; background remote AX resolution | A 250ms main-thread sleep is treated as proof that remote AX resolution can proceed without MainActor availability. Evidence migration plus watchdog. | Establish worker-start, resolver-invoked, and fetch-completed evidence before dispatch. Block MainActor only on a named resolver-invocation watchdog, then require exact off-main-thread readback and terminal worker completion. Test scope owns semaphores and override cleanup. | M AX runtime behavior; affected Behavior, runtime-topology Pressure, Process/Tooling. | completed |
 | SYNC-033E | `FlowTabPriorityCoverageTests+RuntimeSnapshotPressure`; bounded AX collection workload | Per-item thread sleep simulates I/O latency and elapsed-time comparison is treated as concurrency success. Deterministic pressure workload migration. | Replace sleep with a named, test-owned blocking workload gate. Require the configured number of workers to enter concurrently, release work from explicit evidence, and verify bounded maximum concurrency plus ordered results independently of elapsed wall time. | M runtime hot path; affected Behavior, deterministic Pressure, Process/Tooling. | completed |
-| SYNC-034 | `FlowTabUITests+Support.swift`, `+WorkflowWindowObservation.swift`, `+SpaceFixtureApp.swift`, `+ScrollingSupport.swift`, `+StatusItem.swift`, and fixture assertion helpers; shared UI condition loops | RunLoop cadence advances drive XCUI/CG/AX/process predicate observation. Conditional observation. | Centralize named UI observation cadence and watchdog diagnostics, check immediately, use `waitForExistence`/predicate expectations where possible, and keep exact CG/AX/window/process readback as the sole Oracle. XCTest case lifetime owns the wait. | H test infrastructure; affected UI suites, Process/Tooling. | in progress; SYNC-034A–SYNC-034AO completed, with remaining owners split into later slices |
+| SYNC-034 | `FlowTabUITests+Support.swift`, `+WorkflowWindowObservation.swift`, `+SpaceFixtureApp.swift`, `+ScrollingSupport.swift`, `+StatusItem.swift`, and fixture assertion helpers; shared UI condition loops | RunLoop cadence advances drive XCUI/CG/AX/process predicate observation. Conditional observation. | Centralize named UI observation cadence and watchdog diagnostics, check immediately, use `waitForExistence`/predicate expectations where possible, and keep exact CG/AX/window/process readback as the sole Oracle. XCTest case lifetime owns the wait. | H test infrastructure; affected UI suites, Process/Tooling. | in progress; SYNC-034A–SYNC-034AP completed, with remaining owners split into later slices |
 | SYNC-034A | `FlowTabUITests+WorkflowWindowObservation.waitForExactFrontmostSpaceFixtureWindow`; exact frontmost fixture-window observation | Optional AX and CG window numbers can both be absent and compare equal, allowing the condition loop to return without observing an exact window. Evidence-Oracle defect discovered by the SYNC-028B2 diagnostic run. | Reuse the generation-owned desktop-anchor observer and require the exact PID to be running, active, frontmost, and XCUI-foreground; join the exact title/identifier XCUI window to a present PID-scoped topmost CG window by valid matching frames and require desktop-Space readback. Install workspace observers before initial readback, treat XCUI attachment as an observed condition, retain only the named cancellable 100ms condition cadence where no exact attachment/window callback exists, and use the caller's named watchdog as a diagnostic failure bound. The helper invocation owns cancellation and cleanup. | H test Oracle; desktop-refocus UI, runtime-topology Pressure, Process/Tooling. | completed |
 | SYNC-034B | `FlowTabUITests+ConditionObservation`, `waitForFrontmostBundleIdentifier`, status-item reopen and system-app MRU activation callers; exact frontmost application | A raw 100ms RunLoop loop begins after activation and infers that the expected application eventually became frontmost. | Start a generation-owned condition observer before activation. Register `NSWorkspace.didActivateApplicationNotification` before an initial `frontmostApplication` readback, accept only the exact bundle identifier, and use the caller timeout solely as a failure bound with last-readback diagnostics. Test scope cancels the notification token; stale, duplicate, replaced, and cancelled callbacks are rejected. | H shared UI observation; affected status-item/System MRU UI, deterministic owner Pressure, Process/Tooling. | completed |
 | SYNC-034C | `FlowTabUITests+ConditionObservation`, `FlowTabUITests+SystemAppMRU.triggerAndWaitForWorkflowAppOrder`; exact switcher application order | A raw 100ms RunLoop loop returns on any complete fixture-application permutation, so a stale order can fail the caller before the expected order is published. | Install the exact-order observer before an explicit post-baseline runtime-log-confirmed switcher trigger. Check immediately, then use a test-owned main-RunLoop timer at the named XCUI readback cadence because the accessibility summary exposes no publication callback. Accept only the expected complete ordered identifiers. The helper owns timer cancellation; the caller timeout is solely a failure bound with the last summary/order readback. | H shared UI conditional observation; System MRU UI, deterministic owner Pressure, Process/Tooling. | completed |
@@ -206,6 +223,7 @@ and Process/Tooling.
 | SYNC-034AM | `terminateFlowTabUITestApplicationIfRunning`, `FlowTabUITests.setUpWithError`, and `tearDownWithError`; shared UI application process lifecycle | `XCUIApplication.terminate()` returned before the exact process reached `.notRunning`, allowing a prior test process and its Darwin notification observers to overlap the next test launch. | Capture each exact URL or bundle target's initial state, request termination when running, immediately read back state, then use `XCUIApplication.wait(for: .notRunning)` and a final state readback. Success is determined only by the final `.notRunning` evidence. The setup/teardown invocation owns the wait; the named watchdog is solely a failure bound and reports target plus initial, post-trigger, waiter, and final states. | H shared UI process lifecycle; deterministic initial/immediate/delayed/wait-boundary/watchdog tests, repeated application lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-034AN | `FlowTabUITests+PointerSwitcherPresentation`, `postFlowTabUITestSwitcherTriggerAndWaitForDelivery`, Option+Tab launch arguments, `SwitcherTriggerNotificationObserver`, `openInAppSwitcherForPointerHover`, and `openSearchSwitcherForPointerHover`; pointer-test switcher presentation | Option+Tab opens the panel during launch, while Control+Tab and Search repeatedly post Darwin notifications after launch and use 1.2-second existence windows plus an eight-second deadline to infer listener delivery and presentation. | Launch every on-demand pointer path with the test trigger listener and runtime logging active. Capture the runtime-log baseline before one exact global, in-app, or Search notification, require its post-baseline `presented=1 syntheticModifierHeld=1` completion record, then require the exact diagnostics panel element and each caller's exact tile, card, or result element. The test trigger holds the mode's primary modifier through the launched process so visibility recovery observes the same input contract as a held shortcut. The invocation owns log observation and XCTest existence waits; named four- and five-second watchdogs are solely failure bounds with runtime-log and accessibility diagnostics. | H shared pointer presentation transport; affected Option+Tab/Control+Tab/Search pointer UI, repeated lifecycle Pressure, Process/Tooling. | completed |
 | SYNC-034AO | `FlowTabUITestSwitcherTriggerDeliveryObservationOwner` and `postFlowTabUITestSwitcherTriggerAndWaitForDelivery`; switcher-trigger receipt and presentation completion | One four-second runtime-log watchdog waits only for the final presentation record, combining Darwin notification delivery with potentially expensive real-topology session construction. Under noisy fixture topology the listener records receipt while valid runtime collection continues beyond that bound. | Establish receipt and completion observers from one pre-trigger runtime-log baseline before posting. First require the exact notification receipt record, then require the exact `presented=1 syntheticModifierHeld=1` completion record. Retain separate named four-second receipt and 12-second presentation-completion watchdogs solely as failure bounds; each reports the missing stage and final post-baseline log projection. The trigger invocation owns both observers, schedules, cancellation, and cleanup. | H shared UI trigger transport; deterministic initial/delayed/out-of-order/cancel/watchdog tests, 100 lifecycle Pressure, affected noisy Control+Tab and representative pointer UI, Process/Tooling. | completed |
+| SYNC-034AP | `terminateSpaceFixtureApplicationAndWait` and Space-fixture cleanup callers; exact fixture process termination | A raw 100ms RunLoop loop begins after callers request termination and silently exits at its wall-clock deadline, so cleanup success and the next fixture launch can depend on polling opportunities. | Reuse the shared application-termination evidence contract. Capture the exact `XCUIApplication` state before requesting termination, perform one termination request, read back immediately, use XCTest's persistent `.notRunning` state wait only while needed, and require a final `.notRunning` readback. Each cleanup invocation owns the wait; its named watchdog is solely a failure bound and reports target plus initial, post-trigger, waiter, and final states. | H shared real-fixture process lifecycle; deterministic initial/immediate/delayed/wait-boundary/watchdog tests, affected lifecycle UI, repeated cleanup Pressure, Process/Tooling. | completed |
 | SYNC-035 | Direct UI settle waits in Search, Settings, Home/Logs, MRU, Space fixture and switcher workflow tests; files enumerated in the UI audit scope below | Fixed 80ms–1.2s RunLoop advances occur between input/action and assertion, so assertion timing can change results. Evidence migration. | Remove each settle wait in favor of the affected visible element, log marker, fixture generation, process state, exact frontmost CG/AX window, or nonexistence Oracle. Observer/baseline setup precedes the action. | H; affected UI suites and matching Behavior coverage. | in progress; SYNC-035A–SYNC-035F and the Logs projection settle path are completed, with remaining owners split into later slices |
 | SYNC-035A | `FlowTabUITests+SystemAppMRU.dismissSwitcherAndWait`; switcher dismissal between repeated MRU triggers | A fixed 300ms RunLoop advance after Escape assumes the previous panel has disappeared before the next trigger. | Establish an XCTest nonexistence expectation for the exact switcher summary before Escape, then require that persistent UI state to become absent. The named dismissal watchdog is only a failure bound and reports the final switcher hierarchy. The helper invocation owns the expectation. | H repeated UI presentation; System MRU UI and repeated-path Pressure, Process/Tooling. | completed |
 | SYNC-035B | `FlowTabUITests+Support.commitEditing`, `+ElementValueObservation.assertTriggerMakesValue`, and `testSettingsWindowBehaviorDelayAndTogglesPersistAcrossRelaunch`; delay-input commit | A fixed 200ms RunLoop advance after Tab assumes AppKit ended editing, normalized the value, and republished its accessibility value. | Start the generation-owned element-value observer before Tab, reject a matching baseline until the trigger returns, and accept only the exact normalized `1.23` accessibility readback. XCUI exposes no value-publication callback, so retain the shared serial named cadence. The helper invocation owns cancellation; its watchdog is solely a failure bound with acceptance state and last exact value. | H Settings UI commit Oracle; deterministic owner regression, affected Settings UI, Process/Tooling. | completed |
@@ -6482,6 +6500,43 @@ polling cadence, deadline, or timeout in the scoped paths.
   shared UI-test trigger observation and its regression infrastructure.
 - Commit: pending current-slice local commit
   (`test(sync): migrate SYNC-034AO trigger completion`).
+
+### SYNC-034AP Closure Record
+
+- Design and Oracle: every Space-fixture cleanup caller delegates to the
+  shared application-termination evidence contract. The helper reads the
+  exact `XCUIApplication` state before one termination request, reads back
+  immediately, enters XCTest's persistent `.notRunning` state wait only when
+  needed, and succeeds only when the final readback is `.notRunning`.
+- Lifecycle and watchdog: one cleanup invocation owns the synchronous state
+  wait through return. The named five-second default is solely a terminal
+  failure bound. Failure reports the target identity and initial,
+  post-trigger, waiter, and final states; an already stopped target completes
+  from its initial readback without another termination request.
+- Deterministic regression and Pressure: the final-source owner run passes
+  6/6 with zero failures in 1.289 seconds under
+  `.build-local/evidence-driven-sync/SYNC-034AP/owner-tests-current-002`.
+  It covers initially stopped, immediate completion, delayed state evidence,
+  final readback at the wait boundary, terminal failure diagnostics, and 100
+  independent immediate/delayed termination lifecycles.
+- UI affected path: the real fixture launch, Home projection, exact process
+  termination, runtime lifecycle publication, and Home removal path passes
+  1/1 in 21.613 seconds under
+  `.build-local/evidence-driven-sync/SYNC-034AP/affected-lifecycle-current-002`.
+- Process/Tooling: the final complete UI-test target build and runner signing
+  pass under
+  `.build-local/evidence-driven-sync/SYNC-034AP/process-build-current-002`.
+  The five changed Swift files parse, the retired helper name and its raw
+  RunLoop loop are absent, the shared termination owner is 301 lines, the
+  Space-fixture helper is 390 lines, the existing main workflow shrinks to
+  786 lines, the oversized multi-app workflow shrinks by two lines, and
+  `git diff --check` passes. The slice root is owned by the immediate
+  post-commit cleanup step.
+- Unit, Behavior, and FlowTabCore: not relevant because this slice changes
+  UI-test process cleanup and its deterministic test-owned evidence helper,
+  with no application or core-domain runtime behavior change.
+- Commit: pending current-slice local commit
+  (`test(sync): migrate SYNC-034AP fixture termination`).
 
 ### SYNC-035A Closure Record
 

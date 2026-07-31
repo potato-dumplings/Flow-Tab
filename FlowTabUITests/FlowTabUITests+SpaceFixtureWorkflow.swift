@@ -72,8 +72,7 @@ extension FlowTabUITests {
         )
         defer {
             if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
-                fixtureApp.terminate()
-                waitForSpaceFixtureApplicationToTerminate(fixtureApp)
+                terminateSpaceFixtureApplicationAndWait(fixtureApp, identity: identity)
             }
         }
 
@@ -220,8 +219,7 @@ extension FlowTabUITests {
         )
         defer {
             if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
-                fixtureApp.terminate()
-                waitForSpaceFixtureApplicationToTerminate(fixtureApp)
+                terminateSpaceFixtureApplicationAndWait(fixtureApp, identity: identity)
             }
         }
 
@@ -240,8 +238,11 @@ extension FlowTabUITests {
         assertValue(of: fixtureAppRow, equals: "1w", timeout: 12)
 
         let terminationLogSnapshot = makeRuntimeLogFileSnapshot()
-        fixtureApp.terminate()
-        XCTAssertTrue(waitForApplicationToTerminate(fixtureApp, timeout: 8))
+        terminateSpaceFixtureApplicationAndWait(
+            fixtureApp,
+            identity: identity,
+            timeout: 8
+        )
         waitForRuntimeLogFiles(
             containing: [
                 "runtimeLifecycle appTerminated appID=\(identity.bundleIdentifier)",
@@ -296,8 +297,7 @@ extension FlowTabUITests {
         )
         defer {
             if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
-                fixtureApp.terminate()
-                waitForSpaceFixtureApplicationToTerminate(fixtureApp)
+                terminateSpaceFixtureApplicationAndWait(fixtureApp, identity: identity)
             }
         }
         guard let scheduledClose =
@@ -483,8 +483,7 @@ extension FlowTabUITests {
         let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
         defer {
             if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
-                fixtureApp.terminate()
-                waitForSpaceFixtureApplicationToTerminate(fixtureApp)
+                terminateSpaceFixtureApplicationAndWait(fixtureApp, identity: identity)
             }
         }
 
@@ -553,8 +552,7 @@ extension FlowTabUITests {
         let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
         defer {
             if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
-                fixtureApp.terminate()
-                waitForSpaceFixtureApplicationToTerminate(fixtureApp)
+                terminateSpaceFixtureApplicationAndWait(fixtureApp, identity: identity)
             }
         }
 
@@ -694,7 +692,7 @@ extension FlowTabUITests {
         )
         defer {
             if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
-                fixtureApp.terminate()
+                terminateSpaceFixtureApplicationAndWait(fixtureApp, identity: identity)
             }
         }
 

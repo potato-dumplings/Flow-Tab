@@ -1065,16 +1065,14 @@ extension FlowTabUITests {
         for identity in identities.reversed() {
             let app = makeSpaceFixtureWorkflowApplication(for: identity)
             if app.state == .runningForeground || app.state == .runningBackground {
-                app.terminate()
-                waitForSpaceFixtureApplicationToTerminate(app)
+                terminateSpaceFixtureApplicationAndWait(app, identity: identity)
             }
         }
     }
 
     private func terminateSpaceFixtureWorkflowApps(_ apps: [XCUIApplication]) {
         for app in apps.reversed() where app.state == .runningForeground || app.state == .runningBackground {
-            app.terminate()
-            waitForSpaceFixtureApplicationToTerminate(app)
+            terminateSpaceFixtureApplicationAndWait(app)
         }
     }
 }
