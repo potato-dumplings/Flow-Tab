@@ -258,7 +258,8 @@ and Process/Tooling.
 | SYNC-035K | `SwitcherPointerSelectionGate`, `SwitcherPanelController` pointer-selection entry points, and the stationary-pointer Option+Tab, Control+Tab, and Search UI paths; suppression of presentation-time hover | Each UI path advances the RunLoop for one second in 100ms increments and treats an unchanged selection throughout that interval as proof that the stationary-pointer gate handled presentation. This is an absence-over-time inference rather than completion evidence. | Give each gate reset a monotonic generation and emit one blocked decision for each exact application, window, or Search-result target in that generation. The controller records a structured marker containing the exact target identity, preserved selection, and generation only for the first blocked callback. The UI test captures the post-baseline runtime log and starts its observer before launch or trigger, performs the shared immediate readback, requires that exact blocked marker, then independently reads back the unchanged selected identity and target frame. Duplicate callbacks are suppressed, reset releases prior-generation target storage, and movement reaching the existing threshold remains the sole transition to selection-enabled state. The test invocation owns observation cancellation and process cleanup. Because XCUI exposes no hover-gate callback, the shared named cancellable 200ms runtime-log cadence remains the fallback; the five-second gate watchdog is solely a failure bound with final log evidence. | H repeated pointer-input path; deterministic generation/target/dedup/reset/escaping rules, controller Behavior, shared observer event/cancel/watchdog and lifecycle Pressure, 2,000-generation gate Pressure, stationary and moved-pointer UI, Process/Tooling. | completed |
 | SYNC-036 | All literal XCTest timeouts in `FlowTabTests` and `FlowTabUITests` | 606 literal durations are generally terminal bounds for an independent expectation or XCUI predicate, but policy ownership and diagnostic tiers are implicit. Watchdog. | Replace literals with named app-test and UI-test watchdog policies by operation class; preserve expectation/predicate success Oracles and include unmet condition plus last observation in custom waits. Test case/helper owner supplies cleanup. | M mechanical/test infra; Unit/Behavior/UI, Process/Tooling. | planned |
 | SYNC-037 | `scripts/perf/tab-switch-stress.sh`, `search-committed-index-pressure.sh`, `runtime-topology-pressure.sh`, `lib/runtime-topology-target.sh` | Sampling duration/cadence and identity stability windows are pressure/safety protocols; process termination loops use unnamed 100ms cadence and attempt bounds. Domain duration/conditional observation/watchdog. | Retain measurement durations and sample cadence as named protocol inputs. Name process polling cadence/watchdogs, check state immediately, terminate from PID/start-identity/readback, and report the final `ps`/identity/status evidence. Traps own cancellation and cleanup. | M tooling/hot path; Pressure and Process/Tooling. | verification-needed |
-| SYNC-038 | `scripts/release/release-install.sh`, `scripts/release/uninstall-flowtab.js` | A fixed one-second delay assumes FlowTab exited before replacement or deletion. Evidence migration. | Wait on exact process absence/identity readback immediately after quit/TERM, with a named watchdog and last PID/state diagnostic before mutating installed resources. The install/uninstall command owns cleanup. | M release tooling; Process/Tooling and release contract tests. | planned |
+| SYNC-038 | `scripts/release/release-install.sh`, `scripts/release/uninstall-flowtab.js` | A fixed one-second delay assumes FlowTab exited before replacement or deletion. Evidence migration. | Wait on exact process absence/identity readback immediately after quit/TERM, with a named watchdog and last PID/state diagnostic before mutating installed resources. The install/uninstall command owns cleanup. | M release tooling; Process/Tooling and release contract tests. | in progress; SYNC-038A release install completed, uninstaller remains |
+| SYNC-038A | `release-install.sh`, `lib/process-exit-observation.sh`, and `test-process-exit-observation.sh`; installed-app replacement process boundary | A fixed one-second sleep after AppleScript quit and `pkill` assumes every `FlowTab` process has exited before permission reset, build, and eventual application replacement. | Read the exact process name immediately through `pgrep`, enrich every observed PID with `ps` PID/PPID/state/start/command identity, and treat readback errors as unmet evidence. Retain a named 100ms cancellable shell cadence only while records remain. Recheck immediately before removing the installed bundle. The release command owns the synchronous wait and interruption cleanup; its ten-second watchdog reports the unmet absence condition and final process records. | M release process/tooling; deterministic immediate/delayed/watchdog/readback-error contract tests, real process-list integration, static mutation-order contract, Process/Tooling. | completed |
 | SYNC-039 | `RuntimeWindowRecencyTracker`; semantic fallback age and generation age | A 300-second age is an explicit expiry rule for weak semantic identity; exact identity remains preferred. Domain duration. | Retain injected clock, maximum generation age, exact-window identity precedence, and deterministic expiry tests. Tracker owns records and pruning. | H identity semantics; Unit, Behavior, relevant UI only if implementation changes. | closed-retained |
 
 ## UI Fixed-Settle Audit Scope
@@ -7834,5 +7835,44 @@ polling cadence, deadline, or timeout in the scoped paths.
 - FlowTabCore: not relevant because the gate, controller, runtime-log
   transport, and affected tests remain inside the application and UI-test
   boundaries.
-- Commit: pending current-slice local commit
+- Commit: `f430fc67ccd49378c13fcf6c4c8a4225b46b6fe1`
   (`refactor(sync): migrate SYNC-035K stationary pointer gate`).
+
+### SYNC-038A Closure Record
+
+- Design and Oracle: `release-install.sh` now delegates its process boundary
+  to a release-owned observation helper. The first readback runs immediately
+  after AppleScript quit and exact-name `pkill`. `pgrep -x` supplies the exact
+  process-name set, and `ps` enriches each PID with parent PID, state, start
+  identity, and command. A PID that exits between those reads remains pending
+  as `identity=unavailable` until the next observation, while a process-list
+  readback error remains explicit unmet evidence. Success is established only
+  by an empty exact-name readback.
+- Lifecycle and retained time policy: the release command synchronously owns
+  the observation loop, so shell interruption terminates the current sleep
+  and retains no background observer or timer. The condition is checked before
+  the clock or any polling work. A named 100ms cadence is retained only while
+  process records remain. The ten-second watchdog is solely a terminal failure
+  bound and reports `processAbsent`, the exact process name, and the final
+  PID/state/start/command evidence. A second invocation immediately before
+  `rm -rf` closes a process relaunch gap during the Release build.
+- Deterministic and integration regression: the release observation contract
+  test covers initial satisfaction with zero polls, later satisfaction after
+  two named polling opportunities, terminal watchdog diagnostics, a real
+  exact-name absence readback, the two required caller boundaries, mutation
+  ordering, and removal of the one-second sleep. The first sandboxed real
+  readback returned `sysmond service not found`; the helper preserved that as
+  `readbackError` instead of accepting absence. The same test then passed at
+  the release script's Terminal process-list boundary.
+- Process/Tooling: `bash -n` accepts the installer, observation helper, and
+  contract test; the contract test passes; `release-install.sh --help` exits
+  successfully without mutation; and `git diff --check` passes. The full
+  installer is intentionally outside this slice's non-destructive validation
+  because it resets TCC records and replaces `/Applications/Flow Tab.app`.
+  Unit, Behavior, UI, and Pressure are not relevant because this slice changes
+  only the release command's bounded process observation and does not alter
+  application runtime code, a user journey, or a sustained hot path. Startup
+  `prompts.zip` and the three pre-existing local Skill/reference edits remain
+  unchanged and outside the slice.
+- Commit: pending current-slice local commit
+  (`refactor(sync): migrate SYNC-038A release process exit`).

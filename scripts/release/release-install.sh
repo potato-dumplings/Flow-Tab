@@ -12,10 +12,16 @@ BUNDLE_ID="io.github.potato-dumplings.flowtab"
 LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
 RELEASE_BINARY_VERIFY_PATH="${ROOT_DIR}/scripts/release/verify-release-binary.sh"
 SIGN_BUNDLE_PATH="${ROOT_DIR}/scripts/release/sign-macos-bundle.sh"
+PROCESS_EXIT_OBSERVATION_PATH="${ROOT_DIR}/scripts/release/lib/process-exit-observation.sh"
 APP_ENTITLEMENTS_PATH="${ROOT_DIR}/FlowTab/Resources/FlowTab.entitlements"
 DEVELOPMENT_TEAM="${FLOWTAB_DEVELOPMENT_TEAM:-}"
 CODE_SIGN_IDENTITY="${FLOWTAB_CODE_SIGN_IDENTITY:-Apple Development}"
 RESOLVED_CODE_SIGN_IDENTITY=""
+PROCESS_EXIT_WATCHDOG_SECONDS=10
+PROCESS_EXIT_POLL_INTERVAL_SECONDS=0.1
+
+# shellcheck source=scripts/release/lib/process-exit-observation.sh
+source "${PROCESS_EXIT_OBSERVATION_PATH}"
 
 for arg in "$@"; do
   case "${arg}" in
@@ -139,7 +145,10 @@ reset_tcc_permission() {
 echo "[${STEP}/${TOTAL_STEPS}] Quit running ${APP_DISPLAY_NAME}"
 osascript -e "quit app \"${APP_DISPLAY_NAME}\"" >/dev/null 2>&1 || true
 pkill -x "${APP_PROCESS_NAME}" >/dev/null 2>&1 || true
-sleep 1
+flowtab_wait_for_process_exit \
+  "${APP_PROCESS_NAME}" \
+  "${PROCESS_EXIT_WATCHDOG_SECONDS}" \
+  "${PROCESS_EXIT_POLL_INTERVAL_SECONDS}"
 
 STEP=$((STEP + 1))
 echo "[${STEP}/${TOTAL_STEPS}] Resolve local signing identity"
@@ -170,6 +179,10 @@ fi
 
 STEP=$((STEP + 1))
 echo "[${STEP}/${TOTAL_STEPS}] Remove old app"
+flowtab_wait_for_process_exit \
+  "${APP_PROCESS_NAME}" \
+  "${PROCESS_EXIT_WATCHDOG_SECONDS}" \
+  "${PROCESS_EXIT_POLL_INTERVAL_SECONDS}"
 rm -rf "${INSTALL_PATH}"
 
 STEP=$((STEP + 1))
