@@ -109,8 +109,7 @@ extension FlowTabUITests {
                     timeout: 8
                 )
 
-                app.typeKey(.upArrow, modifierFlags: [])
-                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+                guard exitSwitcherPreview(selectedApp, in: app, diagnostics: diagnosticsSummary) else { return }
             }
 
             XCTAssertEqual(Set(observedAppIDs), Set(workflow.apps.map(\.appID)))
