@@ -170,8 +170,8 @@ extension FlowTabUITests {
             "Home initial app rows should use the runtime snapshot order before any precise count refresh."
         )
 
-        assertHomeAppRowValue(mailRow, equals: "0w", timeout: 2)
-        assertHomeAppRowValue(browserRow, equals: "0w", timeout: 2)
+        assertValue(of: mailRow, equals: "0w", timeout: 2)
+        assertValue(of: browserRow, equals: "0w", timeout: 2)
         let initialMailY = mailRow.frame.minY
         let initialBrowserY = browserRow.frame.minY
         RunLoop.current.run(until: Date().addingTimeInterval(1.2))
@@ -797,22 +797,6 @@ extension FlowTabUITests {
         }
 
         return CGWindowID(windowNumber)
-    }
-
-    private func assertHomeAppRowValue(
-        _ row: XCUIElement,
-        equals expectedValue: String,
-        timeout: TimeInterval
-    ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if row.exists && elementStringValue(row) == expectedValue {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail("Expected Home app row value '\(expectedValue)', actual: '\(elementStringValue(row))'")
     }
 
     private func homeAppVisibilityRuntimeArguments(resetDefaults: Bool = false) -> [String] {
