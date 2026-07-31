@@ -60,17 +60,17 @@ extension FlowTabUITests {
         try runRealSpaceFixtureWorkflow(
             workflow,
             flowTabAdditionalArguments: [
-                "--flowtab-ui-open-switcher",
                 "--flowtab-ui-listen-switcher-trigger",
+                "--flowtab-ui-runtime-log-level", "DEBUG",
+                "--flowtab-ui-enable-verbose-logs",
                 "-windowLayerAutoEnterDelay", "30.0"
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         ) { workflow, app in
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(
-                element(
-                    in: app,
-                    identifier: workflow.apps[0].identity.switcherAppAccessibilityIdentifier
-                ).waitForExistence(timeout: 8)
+            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: "multi-app-preview.initial")
+            assertSwitcherAppStripContainsWorkflowApp(
+                workflow.apps[0], in: app,
+                diagnosticsSummary: diagnosticsSummary
             )
             XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
             selectSwitcherWorkflowApp(workflow.apps[0], in: app, diagnosticsSummary: diagnosticsSummary)
