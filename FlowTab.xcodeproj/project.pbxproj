@@ -376,6 +376,7 @@
 		C1F100023A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F100013A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift */; };
 		F8A1000236B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A1000136B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift */; };
 		B10012042F76000100B0D737 /* FlowTabUITests+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */; };
+		A4B600023D7D000100B0D737 /* FlowTabUITests+SupportWatchdogPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B600013D7D000100B0D737 /* FlowTabUITests+SupportWatchdogPolicy.swift */; };
 		F9A1000236C0000100B0D737 /* FlowTabUITests+ScrollingSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9A1000136C0000100B0D737 /* FlowTabUITests+ScrollingSupport.swift */; };
 		B10012052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift */; };
 		B31012012FF400100B0D737 /* FlowTabUITests+StatusItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31002012FF400100B0D737 /* FlowTabUITests+StatusItem.swift */; };
@@ -737,6 +738,7 @@
 		C1F100013A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherInteractionRegressions.swift"; sourceTree = "<group>"; };
 		F8A1000136B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+RuntimeProjectionPublication.swift"; sourceTree = "<group>"; };
 		B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+Support.swift"; sourceTree = "<group>"; };
+		A4B600013D7D000100B0D737 /* FlowTabUITests+SupportWatchdogPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SupportWatchdogPolicy.swift"; sourceTree = "<group>"; };
 		F9A1000136C0000100B0D737 /* FlowTabUITests+ScrollingSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ScrollingSupport.swift"; sourceTree = "<group>"; };
 		B10002052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SettingsSearch.swift"; sourceTree = "<group>"; };
 		B31002012FF400100B0D737 /* FlowTabUITests+StatusItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+StatusItem.swift"; sourceTree = "<group>"; };
@@ -1250,6 +1252,7 @@
 				F8A1000136B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift */,
 				B31002012FF400100B0D737 /* FlowTabUITests+StatusItem.swift */,
 				B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */,
+				A4B600013D7D000100B0D737 /* FlowTabUITests+SupportWatchdogPolicy.swift */,
 				A43B00013D43000100B0D737 /* FlowTabUITests+ConditionObservation.swift */,
 				A43B00033D43000100B0D737 /* FlowTabUITests+ConditionObservationTests.swift */,
 				A43C00013D44000100B0D737 /* FlowTabUITests+SettingsCommandTabObservation.swift */,
@@ -2270,6 +2273,7 @@
 				F8A1000236B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift in Sources */,
 				B31012012FF400100B0D737 /* FlowTabUITests+StatusItem.swift in Sources */,
 				B10012042F76000100B0D737 /* FlowTabUITests+Support.swift in Sources */,
+				A4B600023D7D000100B0D737 /* FlowTabUITests+SupportWatchdogPolicy.swift in Sources */,
 				A43B00023D43000100B0D737 /* FlowTabUITests+ConditionObservation.swift in Sources */,
 				A43B00043D43000100B0D737 /* FlowTabUITests+ConditionObservationTests.swift in Sources */,
 				A43C00023D44000100B0D737 /* FlowTabUITests+SettingsCommandTabObservation.swift in Sources */,

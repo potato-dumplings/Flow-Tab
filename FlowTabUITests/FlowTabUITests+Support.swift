@@ -2,6 +2,9 @@ import AppKit
 import Foundation
 import XCTest
 
+private typealias SupportWatchdog =
+    FlowTabUITestSupportWatchdogPolicy
+
 private enum FlowTabUITestAppEnvironmentKey {
     static let appPath = "FLOWTAB_UI_TEST_APP_PATH"
     static let uiTesting = "FLOWTAB_UI_TESTING"
@@ -134,8 +137,17 @@ func launchFlowTabUITestApplication(
     if shouldActivateFlowTabUITestApplicationAfterLaunch(environment: environment) {
         logFlowTabUITestLaunchTrace(traceLabel, phase: "before app.activate")
         app.activate()
-        _ = app.wait(for: .runningForeground, timeout: 12)
-        logFlowTabUITestLaunchTrace(traceLabel, phase: "after app.activate")
+        let becameForeground = app.wait(
+            for: .runningForeground,
+            timeout: SupportWatchdog.foregroundActivation
+        )
+        logFlowTabUITestLaunchTrace(
+            traceLabel,
+            phase:
+                "after app.activate "
+                + "becameForeground=\(becameForeground) "
+                + "finalState=\(String(describing: app.state))"
+        )
     }
 }
 
@@ -158,8 +170,20 @@ func waitForFlowTabUITestApplicationToBecomeReady(
 
     logFlowTabUITestLaunchTrace(traceLabel, phase: "before fallback app.activate")
     app.activate()
-    let becameReady = app.wait(for: .runningForeground, timeout: min(timeout, 4))
-    logFlowTabUITestLaunchTrace(traceLabel, phase: "after fallback app.activate")
+    let becameReady = app.wait(
+        for: .runningForeground,
+        timeout: min(
+            timeout,
+            SupportWatchdog.fallbackForegroundActivation
+        )
+    )
+    logFlowTabUITestLaunchTrace(
+        traceLabel,
+        phase:
+            "after fallback app.activate "
+            + "becameReady=\(becameReady) "
+            + "finalState=\(String(describing: app.state))"
+    )
     return becameReady
 }
 
@@ -367,7 +391,7 @@ extension FlowTabUITests {
     func postFlowTabUITestSwitcherCommandAndWaitForDelivery(
         _ command: FlowTabUITestSwitcherCommand,
         traceLabel: String,
-        timeout: TimeInterval = 4
+        timeout: TimeInterval = SupportWatchdog.switcherCommandDelivery
     ) {
         let logSnapshot = makeRuntimeLogFileSnapshot()
         postFlowTabUITestSwitcherCommand(command, traceLabel: traceLabel)
@@ -383,7 +407,7 @@ extension FlowTabUITests {
     func postFlowTabUITestSwitcherSearchQueryAndWaitForDelivery(
         _ query: String,
         traceLabel: String,
-        timeout: TimeInterval = 4
+        timeout: TimeInterval = SupportWatchdog.switcherCommandDelivery
     ) throws {
         try FlowTabUITestSwitcherCommandPayload.write(query)
         postFlowTabUITestSwitcherCommandAndWaitForDelivery(
@@ -396,7 +420,7 @@ extension FlowTabUITests {
     func postFlowTabUITestSelectSwitcherAppAndWaitForDelivery(
         bundleIdentifier: String,
         traceLabel: String,
-        timeout: TimeInterval = 4
+        timeout: TimeInterval = SupportWatchdog.switcherCommandDelivery
     ) throws {
         try FlowTabUITestSwitcherCommandPayload.write(bundleIdentifier)
         postFlowTabUITestSwitcherCommandAndWaitForDelivery(
@@ -409,7 +433,7 @@ extension FlowTabUITests {
     func postFlowTabUITestSelectSearchResultAndWaitForDelivery(
         resultID: String,
         traceLabel: String,
-        timeout: TimeInterval = 4
+        timeout: TimeInterval = SupportWatchdog.switcherCommandDelivery
     ) throws {
         try FlowTabUITestSwitcherCommandPayload.write(resultID)
         postFlowTabUITestSwitcherCommandAndWaitForDelivery(
@@ -423,23 +447,62 @@ extension FlowTabUITests {
         toggleElement(in: app, identifier: Identifier.permissionReminderSwitch)
     }
     func openSettingsTab(in app: XCUIApplication) {
-        XCTAssertTrue(
-            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.settingsTabButton), timeout: 6)
+        let tabQuery = app.buttons.matching(
+            identifier: Identifier.settingsTabButton
         )
-        XCTAssertTrue(element(in: app, identifier: Identifier.settingsTabContent).waitForExistence(timeout: 6))
+        XCTAssertTrue(
+            tapFirstHittable(
+                in: tabQuery,
+                timeout: SupportWatchdog.tabNavigation
+            ),
+            "unmetCondition=settingsTabHittable "
+                + "finalCandidateCount=\(tabQuery.count)"
+        )
+        let content = element(
+            in: app,
+            identifier: Identifier.settingsTabContent
+        )
+        XCTAssertTrue(
+            content.waitForExistence(
+                timeout: SupportWatchdog.tabNavigation
+            ),
+            "unmetCondition=settingsTabContentExists "
+                + "finalExists=\(content.exists)"
+        )
     }
     func openLogsTab(in app: XCUIApplication) {
-        XCTAssertTrue(
-            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsTabButton), timeout: 6)
+        let tabQuery = app.buttons.matching(
+            identifier: Identifier.logsTabButton
         )
-        XCTAssertTrue(element(in: app, identifier: Identifier.logsTabContent).waitForExistence(timeout: 6))
+        XCTAssertTrue(
+            tapFirstHittable(
+                in: tabQuery,
+                timeout: SupportWatchdog.tabNavigation
+            ),
+            "unmetCondition=logsTabHittable "
+                + "finalCandidateCount=\(tabQuery.count)"
+        )
+        let content = element(
+            in: app,
+            identifier: Identifier.logsTabContent
+        )
+        XCTAssertTrue(
+            content.waitForExistence(
+                timeout: SupportWatchdog.tabNavigation
+            ),
+            "unmetCondition=logsTabContentExists "
+                + "finalExists=\(content.exists)"
+        )
     }
     func element(in app: XCUIApplication, identifier: String) -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
     }
     func toggleElement(in app: XCUIApplication, identifier: String) -> XCUIElement {
         let switchElement = app.switches[identifier]
-        if switchElement.exists || switchElement.waitForExistence(timeout: 1) {
+        if switchElement.exists
+            || switchElement.waitForExistence(
+                timeout: SupportWatchdog.briefElementDiscovery
+            ) {
             return switchElement
         }
         return app.checkBoxes[identifier]
@@ -465,19 +528,32 @@ extension FlowTabUITests {
         optionIdentifier: String
     ) {
         let control = element(in: app, identifier: controlIdentifier)
-        XCTAssertTrue(control.waitForExistence(timeout: 6), "Missing control: \(controlIdentifier)")
+        XCTAssertTrue(
+            control.waitForExistence(
+                timeout: SupportWatchdog.settingsControlDiscovery
+            ),
+            "unmetCondition=settingsControlExists "
+                + "identifier=\(controlIdentifier) "
+                + "finalExists=\(control.exists)"
+        )
         tapElement(control)
 
         if control.elementType == .radioGroup {
             let segmentedOptionQuery = control.descendants(matching: .any).matching(identifier: optionIdentifier)
-            if tapFirstHittable(in: segmentedOptionQuery, timeout: 1) {
+            if tapFirstHittable(
+                in: segmentedOptionQuery,
+                timeout: SupportWatchdog.briefElementDiscovery
+            ) {
                 return
             }
         }
 
         let scopedOptionIdentifier = "\(controlIdentifier).option.\(optionIdentifier)"
         let scopedOptionsQuery = app.descendants(matching: .any).matching(identifier: scopedOptionIdentifier)
-        if tapFirstHittable(in: scopedOptionsQuery, timeout: 2) {
+        if tapFirstHittable(
+            in: scopedOptionsQuery,
+            timeout: SupportWatchdog.scopedOptionDiscovery
+        ) {
             return
         }
         let scopedScrollContainer = app.scrollViews["\(controlIdentifier).options"]
@@ -492,10 +568,19 @@ extension FlowTabUITests {
         }
 
         let optionsQuery = app.descendants(matching: .any).matching(identifier: optionIdentifier)
-        if tapFirstHittable(in: optionsQuery, timeout: 3) {
+        if tapFirstHittable(
+            in: optionsQuery,
+            timeout: SupportWatchdog.genericOptionDiscovery
+        ) {
             return
         }
-        if tapFirstHittable(in: app.menuItems.matching(identifier: optionIdentifier), timeout: 1) {
+        let menuOptionsQuery = app.menuItems.matching(
+            identifier: optionIdentifier
+        )
+        if tapFirstHittable(
+            in: menuOptionsQuery,
+            timeout: SupportWatchdog.briefElementDiscovery
+        ) {
             return
         }
 
@@ -503,20 +588,41 @@ extension FlowTabUITests {
             controlIdentifier: controlIdentifier,
             optionIdentifier: optionIdentifier
         )
+        var titleReadbacks: [String] = []
         for title in titleCandidates {
             let titleQuery = app.descendants(matching: .any).matching(
                 NSPredicate(format: "label == %@", title)
             )
-            if tapFirstHittable(in: titleQuery, timeout: 1) {
+            if tapFirstHittable(
+                in: titleQuery,
+                timeout: SupportWatchdog.briefElementDiscovery
+            ) {
                 return
             }
             let menuItemQuery = app.menuItems.matching(NSPredicate(format: "label == %@", title))
-            if tapFirstHittable(in: menuItemQuery, timeout: 1) {
+            if tapFirstHittable(
+                in: menuItemQuery,
+                timeout: SupportWatchdog.briefElementDiscovery
+            ) {
                 return
             }
+            titleReadbacks.append(
+                "title=\(String(reflecting: title)) "
+                    + "elementCount=\(titleQuery.count) "
+                    + "menuItemCount=\(menuItemQuery.count)"
+            )
         }
 
-        XCTFail("Missing or non-hittable option: \(optionIdentifier)")
+        XCTFail(
+            "unmetCondition=settingsOptionHittable "
+                + "controlIdentifier=\(controlIdentifier) "
+                + "controlType=\(String(describing: control.elementType)) "
+                + "optionIdentifier=\(optionIdentifier) "
+                + "finalScopedCount=\(scopedOptionsQuery.count) "
+                + "finalGenericCount=\(optionsQuery.count) "
+                + "finalMenuCount=\(menuOptionsQuery.count) "
+                + "finalTitleReadbacks=\(titleReadbacks)"
+        )
     }
 
     func selectOptionTitleCandidates(controlIdentifier: String, optionIdentifier: String) -> [String] {
