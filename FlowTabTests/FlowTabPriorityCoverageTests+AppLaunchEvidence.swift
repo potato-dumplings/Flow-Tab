@@ -8,8 +8,14 @@ extension FlowTabPriorityCoverageTests {
         let windowRecordStore = RuntimeWindowRecordStore()
         let requestLock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
-        let initialRepair = expectation(description: "initial app launch readback")
-        let windowEvidenceRepair = expectation(description: "AX window evidence readback")
+        let initialRepair = expectation(
+            description: "unmetCondition=initialAppLaunchMaintenanceExecuted"
+        )
+        initialRepair.assertForOverFulfill = true
+        let windowEvidenceRepair = expectation(
+            description: "unmetCondition=axWindowEvidenceMaintenanceExecuted"
+        )
+        windowEvidenceRepair.assertForOverFulfill = true
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.AppLaunchWindowEvidence",
             repairProvider: RuntimeProjectionRepairProvider(
@@ -34,7 +40,10 @@ extension FlowTabPriorityCoverageTests {
             appID: "com.example.launch-evidence",
             pid: 18_408
         )
-        wait(for: [initialRepair], timeout: 1)
+        wait(
+            for: [initialRepair],
+            timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeMaintenanceExecution
+        )
         service.waitForMaintenanceQueueForTesting()
 
         requestLock.lock()
@@ -47,7 +56,10 @@ extension FlowTabPriorityCoverageTests {
             appID: "com.example.launch-evidence",
             pid: 18_408
         )
-        wait(for: [windowEvidenceRepair], timeout: 1)
+        wait(
+            for: [windowEvidenceRepair],
+            timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeMaintenanceExecution
+        )
         service.waitForMaintenanceQueueForTesting()
 
         requestLock.lock()
