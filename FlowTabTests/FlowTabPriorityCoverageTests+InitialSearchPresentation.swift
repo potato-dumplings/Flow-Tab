@@ -61,7 +61,7 @@ extension FlowTabPriorityCoverageTests {
             }
             let presentationResolved = expectation(
                 description:
-                    "initial Search presentation publishes matching resolution"
+                    "unmetCondition=initialSearchPresentationResolvedWithExactState"
             )
             presentationResolved.assertForOverFulfill =
                 true
@@ -150,7 +150,9 @@ extension FlowTabPriorityCoverageTests {
 
             await fulfillment(
                 of: [presentationResolved],
-                timeout: 1
+                timeout:
+                    FlowTabPriorityCoverageWatchdogPolicy
+                        .initialSearchPresentationResolution
             )
 
             guard let resolvedEvidence else {
@@ -250,7 +252,7 @@ extension FlowTabPriorityCoverageTests {
             let model = controller.modelForTesting
             let presentationResolved = expectation(
                 description:
-                    "initial Search waits for committed index"
+                    "unmetCondition=initialSearchPresentationResolvedAfterCommittedIndex"
             )
             presentationResolved
                 .assertForOverFulfill = true
@@ -328,7 +330,9 @@ extension FlowTabPriorityCoverageTests {
 
             await fulfillment(
                 of: [presentationResolved],
-                timeout: 1
+                timeout:
+                    FlowTabPriorityCoverageWatchdogPolicy
+                        .initialSearchPresentationResolution
             )
 
             XCTAssertTrue(model.isSearchActive)

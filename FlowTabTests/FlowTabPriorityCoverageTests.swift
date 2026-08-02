@@ -10,6 +10,7 @@ enum FlowTabPriorityCoverageWatchdogPolicy {
     static let windowPreviewEventDelivery: TimeInterval = 1
     static let runtimeFocusRecoveryObservation: TimeInterval = 1
     static let appDelegateWorkspaceLifecycleSignal: TimeInterval = 1
+    static let initialSearchPresentationResolution: TimeInterval = 1
 }
 
 final class FlowTabPriorityCoverageTests: XCTestCase {}
@@ -49,5 +50,14 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(appDelegateWorkspaceLifecycleSignal, 1)
         XCTAssertTrue(appDelegateWorkspaceLifecycleSignal.isFinite)
         XCTAssertGreaterThan(appDelegateWorkspaceLifecycleSignal, 0)
+    }
+
+    func testPriorityCoverageWatchdogPolicyPreservesInitialSearchPresentationResolutionBound() {
+        let initialSearchPresentationResolution =
+            FlowTabPriorityCoverageWatchdogPolicy.initialSearchPresentationResolution
+
+        XCTAssertEqual(initialSearchPresentationResolution, 1)
+        XCTAssertTrue(initialSearchPresentationResolution.isFinite)
+        XCTAssertGreaterThan(initialSearchPresentationResolution, 0)
     }
 }
