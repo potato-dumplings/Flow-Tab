@@ -2,7 +2,21 @@ import Combine
 import XCTest
 @testable import FlowTab
 
+private enum HotkeyRegistrationObservationWatchdogPolicy {
+    static let newerEvidenceDelivery: TimeInterval = 1
+}
+
 extension FlowTabTests {
+    func testHotkeyRegistrationObservationWatchdogPolicyPreservesNewerEvidenceBound() {
+        let newerEvidenceDelivery =
+            HotkeyRegistrationObservationWatchdogPolicy
+                .newerEvidenceDelivery
+
+        XCTAssertEqual(newerEvidenceDelivery, 1)
+        XCTAssertTrue(newerEvidenceDelivery.isFinite)
+        XCTAssertGreaterThan(newerEvidenceDelivery, 0)
+    }
+
     @MainActor
     func testHotkeyRegistrationObservationInstallsBeforeInitialReadback() async {
         let notificationCenter = NotificationCenter()
@@ -36,22 +50,38 @@ extension FlowTabTests {
             }
         )
         let receivedNewerEvidence = expectation(
-            description: "observer receives evidence posted during initial readback"
+            description:
+                "unmetCondition=newerExactHotkeyRegistrationEvidenceSurvivedInitialReadback"
         )
+        receivedNewerEvidence.assertForOverFulfill = true
+        var receivedEvidence: HotkeyRegistrationEvidence?
         let observation = owner.$latestEvidence
             .compactMap { $0 }
-            .filter { $0.generation == notificationEvidence.generation }
-            .sink { _ in receivedNewerEvidence.fulfill() }
+            .filter { $0 == notificationEvidence }
+            .sink {
+                receivedEvidence = $0
+                receivedNewerEvidence.fulfill()
+            }
+        defer {
+            observation.cancel()
+            owner.stop()
+        }
 
         owner.start()
 
-        await fulfillment(of: [receivedNewerEvidence], timeout: 1)
+        await fulfillment(
+            of: [receivedNewerEvidence],
+            timeout:
+                HotkeyRegistrationObservationWatchdogPolicy
+                    .newerEvidenceDelivery
+        )
+        XCTAssertTrue(didPostDuringReadback)
+        XCTAssertEqual(receivedEvidence, notificationEvidence)
         XCTAssertEqual(owner.latestEvidence, notificationEvidence)
         XCTAssertEqual(
             owner.takeoverState(matching: request),
             .active
         )
-        withExtendedLifetime(observation) {}
     }
 
     @MainActor
