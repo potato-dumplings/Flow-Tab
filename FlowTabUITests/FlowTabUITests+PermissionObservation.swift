@@ -29,7 +29,19 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        let foregroundReadinessSatisfied =
+            waitForFlowTabUITestApplicationToBecomeReady(
+                app,
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .foregroundActivation
+            )
+        XCTAssertTrue(
+            foregroundReadinessSatisfied,
+            "Home permission foreground watchdog expired. "
+                + "finalState=\(String(describing: app.state))"
+        )
+        guard foregroundReadinessSatisfied else { return }
         XCTAssertTrue(
             tapFirstHittable(
                 in: app.buttons.matching(identifier: Identifier.homeTabButton),
