@@ -2374,7 +2374,7 @@ extension FlowTabPriorityCoverageTests {
         let fullRepair = coordinator.scheduleFullRepairFallback(now: 10.1)
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
-        let expectation = expectation(description: "runtime maintenance defers full repair while scoped evidence is pending")
+        let expectation = expectation(description: "unmetCondition=runtimeMaintenanceDefersFullRepairWhileScopedEvidencePending")
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.FullRepairWaitsForScopedEvidence",
             repairProvider: RuntimeProjectionRepairProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator),
@@ -2389,7 +2389,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
-        wait(for: [expectation], timeout: 1)
+        wait(for: [expectation], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeMaintenanceExecution)
         service.waitForMaintenanceQueueForTesting()
 
         XCTAssertEqual(executedRequests.map(\.id), [scopedRepair.id])
@@ -2418,7 +2418,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
-        let expectation = expectation(description: "runtime maintenance drains ready requests")
+        let expectation = expectation(description: "unmetCondition=runtimeMaintenanceDrainsReadyRequests")
         expectation.expectedFulfillmentCount = 2
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.MaintenancePriority",
@@ -2433,7 +2433,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
-        wait(for: [expectation], timeout: 1)
+        wait(for: [expectation], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeMaintenanceExecution)
 
         XCTAssertEqual(executedRequests.map(\.id), [highPriority.id, lowPriority.id])
         XCTAssertEqual(executedRequests.map(\.priority), [.high, .low])
@@ -2470,7 +2470,7 @@ extension FlowTabPriorityCoverageTests {
         ]
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
-        let expectation = expectation(description: "runtime maintenance executes full repair fallback")
+        let expectation = expectation(description: "unmetCondition=runtimeMaintenanceExecutesFullRepairFallback")
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.FullRepairFallback",
             repairProvider: RuntimeProjectionRepairProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator),
@@ -2494,7 +2494,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
-        wait(for: [expectation], timeout: 1)
+        wait(for: [expectation], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeMaintenanceExecution)
         service.waitForMaintenanceQueueForTesting()
 
         XCTAssertEqual(executedRequests.map(\.target), [.fullRepair])
@@ -2560,7 +2560,7 @@ extension FlowTabPriorityCoverageTests {
         let expectedExecuted = Array(requests.prefix(runtimeSearchFreshnessBarrierMaxReadyRepairs))
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
-        let expectation = expectation(description: "search freshness barrier drains ready requests")
+        let expectation = expectation(description: "unmetCondition=searchFreshnessBarrierDrainsReadyRequests")
         expectation.expectedFulfillmentCount = runtimeSearchFreshnessBarrierMaxReadyRepairs
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrier",
@@ -2576,7 +2576,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
-        wait(for: [expectation], timeout: 1)
+        wait(for: [expectation], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeMaintenanceExecution)
 
         XCTAssertEqual(executedRequests.map(\.id), expectedExecuted.map(\.id))
         XCTAssertEqual(
@@ -2627,7 +2627,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
-        let expectation = expectation(description: "search barrier drains scoped repair only")
+        let expectation = expectation(description: "unmetCondition=searchBarrierDrainsScopedRepairOnly")
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchBarrierSkipsFullRepair",
             repairProvider: RuntimeProjectionRepairProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator),
@@ -2642,7 +2642,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
-        wait(for: [expectation], timeout: 1)
+        wait(for: [expectation], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeMaintenanceExecution)
         service.waitForMaintenanceQueueForTesting()
 
         XCTAssertEqual(executedRequests.map(\.target), [.app(pid)])
@@ -2777,7 +2777,7 @@ extension FlowTabPriorityCoverageTests {
             reason: .axNotification,
             now: 10
         )
-        let expectation = expectation(description: "search freshness barrier commits repaired index")
+        let expectation = expectation(description: "unmetCondition=searchFreshnessBarrierCommitsRepairedIndex")
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierCommit",
             repairProvider: RuntimeProjectionRepairProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator),
@@ -2800,7 +2800,7 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .degradedStaleCommitted)
         service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
-        wait(for: [expectation], timeout: 1)
+        wait(for: [expectation], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeMaintenanceExecution)
         _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting(now: 11)
 
         let read = store.readCommittedSearchIndexForSearch()
@@ -2857,7 +2857,7 @@ extension FlowTabPriorityCoverageTests {
             reason: .axNotification,
             now: 10
         )
-        let expectation = expectation(description: "search freshness barrier defers repair")
+        let expectation = expectation(description: "unmetCondition=searchFreshnessBarrierDefersRepair")
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierDeferred",
             repairProvider: RuntimeProjectionRepairProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator),
@@ -2870,7 +2870,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
-        wait(for: [expectation], timeout: 1)
+        wait(for: [expectation], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeMaintenanceExecution)
         _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting(now: 10.1)
 
         let read = store.readCommittedSearchIndexForSearch()
@@ -2967,7 +2967,7 @@ extension FlowTabPriorityCoverageTests {
             affectedCGWindowIDs: [cgWindowID],
             now: 12
         )
-        let expectation = expectation(description: "search freshness barrier completes scoped repair")
+        let expectation = expectation(description: "unmetCondition=searchFreshnessBarrierCompletesScopedRepair")
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierCoveredScopedRepair",
             repairProvider: RuntimeProjectionRepairProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator),
@@ -2985,7 +2985,7 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .degradedStaleCommitted)
         service.requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason.searchFreshnessBarrier)
-        wait(for: [expectation], timeout: 1)
+        wait(for: [expectation], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeMaintenanceExecution)
         service.waitForMaintenanceQueueForTesting()
 
         let read = store.readCommittedSearchIndexForSearch()
@@ -3073,7 +3073,7 @@ extension FlowTabPriorityCoverageTests {
             generatedAt: 12
         )
         let fullRepair = coordinator.scheduleFullRepairFallback(now: 12)
-        let expectation = expectation(description: "search freshness barrier schedules dirty topology repair")
+        let expectation = expectation(description: "unmetCondition=searchFreshnessBarrierSchedulesDirtyTopologyRepair")
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierDirtyTopologyRepair",
             repairProvider: RuntimeProjectionRepairProvider(
@@ -3103,7 +3103,7 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .degradedStaleCommitted)
         service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
-        wait(for: [expectation], timeout: 1)
+        wait(for: [expectation], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeMaintenanceExecution)
         service.waitForMaintenanceQueueForTesting()
 
         let read = store.readCommittedSearchIndexForSearch()
@@ -3201,7 +3201,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let executedTargetsLock = NSLock()
         var executedTargets: [RuntimeReconciliationTarget] = []
-        let expectation = expectation(description: "search freshness barrier drains created topology request")
+        let expectation = expectation(description: "unmetCondition=searchFreshnessBarrierDrainsCreatedTopologyRequest")
         expectation.expectedFulfillmentCount = 2
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierCreatedTopology",
@@ -3241,7 +3241,7 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .degradedStaleCommitted)
         service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
-        wait(for: [expectation], timeout: 1)
+        wait(for: [expectation], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeMaintenanceExecution)
         service.waitForMaintenanceQueueForTesting()
 
         let read = store.readCommittedSearchIndexForSearch()
@@ -3298,7 +3298,7 @@ extension FlowTabPriorityCoverageTests {
             reason: .axNotification,
             now: 10
         )
-        let expectation = expectation(description: "search freshness barrier completes without repair payload")
+        let expectation = expectation(description: "unmetCondition=searchFreshnessBarrierCompletesWithoutRepairPayload")
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierNoRepairEvidence",
             repairProvider: RuntimeProjectionRepairProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator),
@@ -3310,7 +3310,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
-        wait(for: [expectation], timeout: 1)
+        wait(for: [expectation], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeMaintenanceExecution)
         service.waitForMaintenanceQueueForTesting()
 
         let read = store.readCommittedSearchIndexForSearch()
@@ -3368,7 +3368,7 @@ extension FlowTabPriorityCoverageTests {
             reason: .axNotification,
             now: 10
         )
-        let expectation = expectation(description: "search freshness barrier awaits scoped evidence")
+        let expectation = expectation(description: "unmetCondition=searchFreshnessBarrierAwaitsScopedEvidence")
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierEvidencePending",
             repairProvider: RuntimeProjectionRepairProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator),
@@ -3381,7 +3381,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
-        wait(for: [expectation], timeout: 1)
+        wait(for: [expectation], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeMaintenanceExecution)
         service.waitForMaintenanceQueueForTesting()
 
         XCTAssertTrue(coordinator.readyRequests().isEmpty)
