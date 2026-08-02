@@ -616,7 +616,12 @@ extension FlowTabPriorityCoverageTests {
             object: service
         )
         service.signalAppWindowsChanged(appID: appID, pid: pid)
-        wait(for: [publication], timeout: 1)
+        wait(
+            for: [publication],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .committedSearchIndexPublication
+        )
         service.waitForMaintenanceQueueForTesting()
 
         let searchRead = readModelStore.readCommittedSearchIndexForSearch()
