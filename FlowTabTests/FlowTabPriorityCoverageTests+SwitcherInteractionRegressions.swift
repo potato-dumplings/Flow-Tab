@@ -153,12 +153,52 @@ extension FlowTabPriorityCoverageTests {
         let capturedImage = makeColorImage(color: .systemPurple)
         let previewBatchStarted = expectation(
             description:
-                "window-only preview batch starts"
+                "unmetCondition=exactWindowOnlyPreviewBatchStarted"
         )
         previewBatchStarted.assertForOverFulfill = true
         let previewBatchRelease = DispatchSemaphore(value: 0)
+        let previewBatchStateLock = NSLock()
+        var previewBatchCallCount = 0
+        var lastRequestTitles: [String] = []
+        var lastRequestOwnerPIDs: [pid_t] = []
+        var lastRequestPreferredWindowIDs: [CGWindowID?] = []
+        var lastRequestInferenceFlags: [Bool] = []
+        XCTAssertEqual(model.windowOnlyPreviewCaptureInFlightCount, 0)
+        XCTAssertTrue(
+            model
+                .previewCaptureStatesForTesting()
+                .isEmpty
+        )
+        XCTAssertEqual(previewBatchCallCount, 0)
         model.previewCaptureBatchOverride = { requests in
-            previewBatchStarted.fulfill()
+            let requestTitles =
+                requests.map { $0.preferredTitle ?? "" }
+            let requestOwnerPIDs = requests.map(\.ownerPID)
+            let requestPreferredWindowIDs =
+                requests.map(\.preferredWindowID)
+            let requestInferenceFlags =
+                requests.map(\.inferTitleBarStyle)
+            previewBatchStateLock.withLock {
+                previewBatchCallCount += 1
+                lastRequestTitles = requestTitles
+                lastRequestOwnerPIDs = requestOwnerPIDs
+                lastRequestPreferredWindowIDs =
+                    requestPreferredWindowIDs
+                lastRequestInferenceFlags =
+                    requestInferenceFlags
+            }
+            if requestTitles == windows.map(\.title),
+               requestOwnerPIDs
+                == Array(
+                    repeating: currentApp.processIdentifier,
+                    count: windows.count
+                ),
+               requestPreferredWindowIDs.allSatisfy({ $0 == nil }),
+               requestInferenceFlags
+                == Array(repeating: true, count: windows.count)
+            {
+                previewBatchStarted.fulfill()
+            }
             previewBatchRelease.wait()
             return requests.enumerated().map { index, _ in
                 RuntimeWindowPreviewProvider.CaptureResult(
@@ -229,7 +269,64 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(controller.presentInAppWindowHotkeySessionForTesting())
         await fulfillment(
             of: [previewBatchStarted],
-            timeout: 1
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .windowPreviewEventDelivery
+        )
+        let finalPreviewBatchState =
+            previewBatchStateLock.withLock {
+                (
+                    callCount: previewBatchCallCount,
+                    requestTitles: lastRequestTitles,
+                    requestOwnerPIDs: lastRequestOwnerPIDs,
+                    requestPreferredWindowIDs:
+                        lastRequestPreferredWindowIDs,
+                    requestInferenceFlags:
+                        lastRequestInferenceFlags
+                )
+            }
+        XCTAssertEqual(
+            finalPreviewBatchState.callCount,
+            1,
+            "unmetCondition=singleExactWindowOnlyPreviewBatch finalTitles=\(finalPreviewBatchState.requestTitles) finalOwnerPIDs=\(finalPreviewBatchState.requestOwnerPIDs) finalPreferredWindowIDs=\(finalPreviewBatchState.requestPreferredWindowIDs) finalInferenceFlags=\(finalPreviewBatchState.requestInferenceFlags)"
+        )
+        XCTAssertEqual(
+            finalPreviewBatchState.requestTitles,
+            windows.map(\.title)
+        )
+        XCTAssertEqual(
+            finalPreviewBatchState.requestOwnerPIDs,
+            Array(
+                repeating: currentApp.processIdentifier,
+                count: windows.count
+            )
+        )
+        XCTAssertTrue(
+            finalPreviewBatchState
+                .requestPreferredWindowIDs
+                .allSatisfy({ $0 == nil })
+        )
+        XCTAssertEqual(
+            finalPreviewBatchState.requestInferenceFlags,
+            Array(repeating: true, count: windows.count)
+        )
+        XCTAssertEqual(
+            model.windowOnlyPreviewCaptureInFlightCount,
+            windows.count
+        )
+        let startedCaptureStates =
+            model
+                .previewCaptureStatesForTesting()
+        XCTAssertEqual(startedCaptureStates.count, windows.count)
+        XCTAssertTrue(
+            startedCaptureStates
+                .values
+                .allSatisfy({ state in
+                    if case .inFlight = state {
+                        return true
+                    }
+                    return false
+                })
         )
         XCTAssertEqual(controller.panel.alphaValue, 0, accuracy: 0.001)
         XCTAssertTrue(
