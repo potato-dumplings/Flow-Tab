@@ -50,7 +50,8 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
-        let allCapturesFinished = expectation(description: "deferred previews captured after visible page")
+        defer { model.cancelSelection() }
+        let allCapturesFinished = expectation(description: "unmetCondition=deferredPreviewsCapturedAfterVisiblePage")
         var capturedTitles: [String] = []
         model.previewCaptureOverride = { _, _, title, _ in
             capturedTitles.append(title ?? "")
@@ -76,7 +77,12 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(firstPageItems.allSatisfy { $0.image != nil })
         XCTAssertEqual(capturedTitles, windows[visibleRange].map(\.title))
 
-        await fulfillment(of: [allCapturesFinished], timeout: 1.0)
+        await fulfillment(
+            of: [allCapturesFinished],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .windowPreviewEventDelivery
+        )
         XCTAssertEqual(capturedTitles, windows.map(\.title))
     }
 
@@ -105,8 +111,9 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        defer { model.cancelSelection() }
 
-        let visibleBatchStarted = expectation(description: "large visible preview batch started")
+        let visibleBatchStarted = expectation(description: "unmetCondition=largeVisiblePreviewBatchStarted")
         let batchStateLock = NSLock()
         var batchRequestCounts: [Int] = []
         model.previewCaptureBatchOutcomeOverride = { requests in
@@ -126,7 +133,12 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(initialSnapshot.count, visibleRange.count)
         XCTAssertTrue(initialSnapshot.allSatisfy { !$0.hasImage })
 
-        await fulfillment(of: [visibleBatchStarted], timeout: 1.0)
+        await fulfillment(
+            of: [visibleBatchStarted],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .windowPreviewEventDelivery
+        )
         batchStateLock.lock()
         XCTAssertEqual(batchRequestCounts, [visibleRange.count])
         batchStateLock.unlock()
@@ -234,8 +246,9 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        defer { model.cancelSelection() }
 
-        let deferredCapturesFinished = expectation(description: "deferred previews captured")
+        let deferredCapturesFinished = expectation(description: "unmetCondition=deferredPreviewsCaptured")
         var captureCallCount = 0
         model.previewCaptureOverride = { _, _, _, _ in
             captureCallCount += 1
@@ -258,7 +271,12 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(firstPage.allSatisfy(\.hasImage))
         XCTAssertEqual(captureCallCount, firstVisibleRange.count)
 
-        await fulfillment(of: [deferredCapturesFinished], timeout: 1.0)
+        await fulfillment(
+            of: [deferredCapturesFinished],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .windowPreviewEventDelivery
+        )
         XCTAssertEqual(captureCallCount, windows.count)
 
         model.previewImageCache.removeAll()
@@ -294,9 +312,11 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        defer { model.cancelSelection() }
 
-        let batchStarted = expectation(description: "visible preview batch started")
+        let batchStarted = expectation(description: "unmetCondition=visiblePreviewBatchStarted")
         let batchReleased = DispatchSemaphore(value: 0)
+        defer { batchReleased.signal() }
         let batchStateLock = NSLock()
         var batchCallCount = 0
         var batchRequestTitles: [String] = []
@@ -326,13 +346,18 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(initialSnapshot.count, visibleRange.count)
         XCTAssertTrue(initialSnapshot.allSatisfy { !$0.hasImage })
 
-        await fulfillment(of: [batchStarted], timeout: 1.0)
+        await fulfillment(
+            of: [batchStarted],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .windowPreviewEventDelivery
+        )
         batchStateLock.lock()
         XCTAssertEqual(batchCallCount, 1)
         XCTAssertEqual(batchRequestTitles, windows.map(\.title))
         batchStateLock.unlock()
 
-        let batchPublished = expectation(description: "visible preview batch published")
+        let batchPublished = expectation(description: "unmetCondition=visiblePreviewBatchPublished")
         var publishCount = 0
         var publicationWasOnMainThread = false
         var cancellables: Set<AnyCancellable> = []
@@ -343,9 +368,15 @@ extension FlowTabPriorityCoverageTests {
                 batchPublished.fulfill()
             }
         }.store(in: &cancellables)
+        defer { cancellables.removeAll() }
 
         batchReleased.signal()
-        await fulfillment(of: [batchPublished], timeout: 1.0)
+        await fulfillment(
+            of: [batchPublished],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .windowPreviewEventDelivery
+        )
         XCTAssertEqual(publishCount, 1)
         XCTAssertTrue(publicationWasOnMainThread)
 
@@ -383,9 +414,11 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        defer { model.cancelSelection() }
 
-        let batchStarted = expectation(description: "failed visible preview batch started")
+        let batchStarted = expectation(description: "unmetCondition=failedVisiblePreviewBatchStarted")
         let batchReleased = DispatchSemaphore(value: 0)
+        defer { batchReleased.signal() }
         var batchCallCount = 0
         model.previewCaptureBatchOverride = { requests in
             batchCallCount += 1
@@ -402,9 +435,14 @@ extension FlowTabPriorityCoverageTests {
         let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
         XCTAssertEqual(initialSnapshot.count, visibleRange.count)
         XCTAssertTrue(initialSnapshot.allSatisfy { !$0.hasImage })
-        await fulfillment(of: [batchStarted], timeout: 1.0)
+        await fulfillment(
+            of: [batchStarted],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .windowPreviewEventDelivery
+        )
 
-        let batchPublished = expectation(description: "failed visible preview batch published")
+        let batchPublished = expectation(description: "unmetCondition=failedVisiblePreviewBatchPublished")
         var publishCount = 0
         var cancellables: Set<AnyCancellable> = []
         model.objectWillChange.sink {
@@ -413,9 +451,15 @@ extension FlowTabPriorityCoverageTests {
                 batchPublished.fulfill()
             }
         }.store(in: &cancellables)
+        defer { cancellables.removeAll() }
 
         batchReleased.signal()
-        await fulfillment(of: [batchPublished], timeout: 1.0)
+        await fulfillment(
+            of: [batchPublished],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .windowPreviewEventDelivery
+        )
         XCTAssertEqual(publishCount, 1)
 
         let completedSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
@@ -450,6 +494,7 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        defer { model.cancelSelection() }
 
         var batchCallCount = 0
         model.previewCaptureBatchOutcomeOverride = { requests in
@@ -462,7 +507,7 @@ extension FlowTabPriorityCoverageTests {
         assertPreviewSessionStartedFromAppSwitcherProjection(runtimeProjectionService)
 
         let visibleRange = 0..<3
-        let batchPublished = expectation(description: "provider failure preview batch published")
+        let batchPublished = expectation(description: "unmetCondition=providerFailurePreviewBatchPublished")
         var publishCount = 0
         var cancellables: Set<AnyCancellable> = []
         model.objectWillChange.sink {
@@ -471,12 +516,18 @@ extension FlowTabPriorityCoverageTests {
                 batchPublished.fulfill()
             }
         }.store(in: &cancellables)
+        defer { cancellables.removeAll() }
 
         let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
         XCTAssertEqual(initialSnapshot.count, visibleRange.count)
         XCTAssertTrue(initialSnapshot.allSatisfy { !$0.hasImage })
 
-        await fulfillment(of: [batchPublished], timeout: 1.0)
+        await fulfillment(
+            of: [batchPublished],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .windowPreviewEventDelivery
+        )
 
         let completedSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
         XCTAssertEqual(completedSnapshot.count, visibleRange.count)

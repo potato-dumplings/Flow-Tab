@@ -7,6 +7,7 @@ import FlowTabCore
 
 enum FlowTabPriorityCoverageWatchdogPolicy {
     static let runtimeMaintenanceExecution: TimeInterval = 1
+    static let windowPreviewEventDelivery: TimeInterval = 1
 }
 
 final class FlowTabPriorityCoverageTests: XCTestCase {}
@@ -19,5 +20,14 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(runtimeMaintenanceExecution, 1)
         XCTAssertTrue(runtimeMaintenanceExecution.isFinite)
         XCTAssertGreaterThan(runtimeMaintenanceExecution, 0)
+    }
+
+    func testPriorityCoverageWatchdogPolicyPreservesWindowPreviewEventDeliveryBound() {
+        let windowPreviewEventDelivery =
+            FlowTabPriorityCoverageWatchdogPolicy.windowPreviewEventDelivery
+
+        XCTAssertEqual(windowPreviewEventDelivery, 1)
+        XCTAssertTrue(windowPreviewEventDelivery.isFinite)
+        XCTAssertGreaterThan(windowPreviewEventDelivery, 0)
     }
 }
