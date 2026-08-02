@@ -42,6 +42,30 @@ extension FlowTabUITests {
                 + "finalState=\(String(describing: app.state))"
         )
         guard foregroundReadinessSatisfied else { return }
+        let permissionActionIdentifier =
+            Identifier.permissionOpenSettings
+        let permissionAction = element(
+            in: app,
+            identifier: permissionActionIdentifier
+        )
+        let permissionProjectionObservation =
+            FlowTabUITestConditionObservationOwner(
+                observationRegistration:
+                    FlowTabUITestConditionReadbackScheduler
+                        .mainRunLoopRegistration(
+                            cadence:
+                                FlowTabUITestConditionObservationPolicy
+                                    .xcuiReadbackCadence
+                        ),
+                readback: { permissionAction.exists },
+                isSatisfied: { $0 },
+                describe: {
+                    "element=\(permissionActionIdentifier) exists=\($0)"
+                }
+            )
+        permissionProjectionObservation.start()
+        defer { permissionProjectionObservation.cancel() }
+
         let homeTabButtons = app.buttons.matching(
             identifier: Identifier.homeTabButton
         )
@@ -66,11 +90,18 @@ extension FlowTabUITests {
         )
         guard navigationSatisfied else { return }
 
-        let permissionAction = element(
-            in: app,
-            identifier: Identifier.permissionOpenSettings
+        let permissionProjectionEvidence =
+            permissionProjectionObservation.waitForResolution(
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .permissionStateProjection
+            )
+        XCTAssertNotNil(
+            permissionProjectionEvidence,
+            "Home permission projection watchdog expired. "
+                + permissionProjectionObservation.diagnosticSummary
         )
-        XCTAssertTrue(permissionAction.waitForExistence(timeout: 5))
+        guard permissionProjectionEvidence != nil else { return }
         let logSnapshot = makeRuntimeLogFileSnapshot()
 
         try writePermissionState(

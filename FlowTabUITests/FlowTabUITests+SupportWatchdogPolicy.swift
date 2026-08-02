@@ -8,6 +8,7 @@ enum FlowTabUITestSupportWatchdogPolicy {
     static let spaceFixtureInitialForegroundObservation: TimeInterval = 3
     static let switcherCommandDelivery: TimeInterval = 4
     static let tabNavigation: TimeInterval = 6
+    static let permissionStateProjection: TimeInterval = 6
     static let settingsControlDiscovery: TimeInterval = 6
     static let briefElementDiscovery: TimeInterval = 1
     static let scopedOptionDiscovery: TimeInterval = 2
@@ -42,6 +43,10 @@ extension FlowTabUITests {
             6
         )
         XCTAssertEqual(
+            FlowTabUITestSupportWatchdogPolicy.permissionStateProjection,
+            6
+        )
+        XCTAssertEqual(
             FlowTabUITestSupportWatchdogPolicy.settingsControlDiscovery,
             6
         )
@@ -66,6 +71,7 @@ extension FlowTabUITests {
                 .spaceFixtureInitialForegroundObservation,
             FlowTabUITestSupportWatchdogPolicy.switcherCommandDelivery,
             FlowTabUITestSupportWatchdogPolicy.tabNavigation,
+            FlowTabUITestSupportWatchdogPolicy.permissionStateProjection,
             FlowTabUITestSupportWatchdogPolicy.settingsControlDiscovery,
             FlowTabUITestSupportWatchdogPolicy.briefElementDiscovery,
             FlowTabUITestSupportWatchdogPolicy.scopedOptionDiscovery,
