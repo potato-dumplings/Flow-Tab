@@ -1,0 +1,316 @@
+import Foundation
+import XCTest
+
+private enum FlowTabUITestHomeAppRowProjectionTestPolicy {
+    static let watchdog: TimeInterval = 0.01
+}
+
+private enum FlowTabUITestHomeAppRowProjectionTestFixture {
+    static let mailIdentifier =
+        "flowtab.home.app.com-flowtab-mock-mail"
+    static let browserIdentifier =
+        "flowtab.home.app.com-flowtab-mock-browser"
+    static let value = "0w"
+
+    static let expectation =
+        FlowTabUITestHomeAppRowProjectionExpectation(
+            rows: [
+                .init(identifier: mailIdentifier, value: value),
+                .init(identifier: browserIdentifier, value: value)
+            ]
+        )
+
+    static func snapshot(
+        mailIdentifier: String =
+            FlowTabUITestHomeAppRowProjectionTestFixture
+                .mailIdentifier,
+        mailExists: Bool = true,
+        mailValue: String? =
+            FlowTabUITestHomeAppRowProjectionTestFixture.value,
+        mailFrameMinY: Double? = 100,
+        browserIdentifier: String =
+            FlowTabUITestHomeAppRowProjectionTestFixture
+                .browserIdentifier,
+        browserExists: Bool = true,
+        browserValue: String? =
+            FlowTabUITestHomeAppRowProjectionTestFixture.value,
+        browserFrameMinY: Double? = 200
+    ) -> FlowTabUITestHomeAppRowProjectionSnapshot {
+        FlowTabUITestHomeAppRowProjectionSnapshot(
+            rows: [
+                .init(
+                    identifier: mailIdentifier,
+                    exists: mailExists,
+                    value: mailValue,
+                    frameMinY: mailFrameMinY
+                ),
+                .init(
+                    identifier: browserIdentifier,
+                    exists: browserExists,
+                    value: browserValue,
+                    frameMinY: browserFrameMinY
+                )
+            ]
+        )
+    }
+}
+
+extension FlowTabUITests {
+    func testHomeInitialRowProjectionWatchdogPreservesCompatibleBound() {
+        XCTAssertEqual(
+            FlowTabUITestHomeInitialRowProjectionPolicy.watchdog,
+            16
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeInitialRowProjectionPolicy
+                .watchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestHomeInitialRowProjectionPolicy.watchdog,
+            0
+        )
+    }
+
+    func testHomeAppRowProjectionRequiresOneExactOrderedSnapshot() {
+        let expectation =
+            FlowTabUITestHomeAppRowProjectionTestFixture.expectation
+
+        XCTAssertTrue(
+            expectation.isSatisfied(
+                by:
+                    FlowTabUITestHomeAppRowProjectionTestFixture
+                        .snapshot()
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by:
+                    FlowTabUITestHomeAppRowProjectionTestFixture
+                        .snapshot(
+                            mailIdentifier:
+                                "flowtab.home.app.com.example.other"
+                        )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by:
+                    FlowTabUITestHomeAppRowProjectionTestFixture
+                        .snapshot(
+                            mailExists: false,
+                            mailValue: nil,
+                            mailFrameMinY: nil
+                        )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by:
+                    FlowTabUITestHomeAppRowProjectionTestFixture
+                        .snapshot(browserValue: "1w")
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by:
+                    FlowTabUITestHomeAppRowProjectionTestFixture
+                        .snapshot(mailFrameMinY: .nan)
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by:
+                    FlowTabUITestHomeAppRowProjectionTestFixture
+                        .snapshot(
+                            mailFrameMinY: 200,
+                            browserFrameMinY: 100
+                        )
+            )
+        )
+    }
+
+    func testHomeAppRowProjectionObserverUsesInitialExactSnapshot() {
+        let owner =
+            FlowTabUITestHomeAppRowProjectionObservationOwner(
+                expectation:
+                    FlowTabUITestHomeAppRowProjectionTestFixture
+                        .expectation,
+                observationRegistration: nil,
+                readback: {
+                    FlowTabUITestHomeAppRowProjectionTestFixture
+                        .snapshot()
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        let evidence = owner.waitForResolution(
+            timeout:
+                FlowTabUITestHomeAppRowProjectionTestPolicy.watchdog
+        )
+
+        XCTAssertEqual(evidence?.source, .initialReadback)
+        XCTAssertEqual(
+            evidence?.value,
+            FlowTabUITestHomeAppRowProjectionTestFixture.snapshot()
+        )
+    }
+
+    func testHomeAppRowProjectionObserverUsesPreinstalledScheduledReadback() {
+        var snapshot =
+            FlowTabUITestHomeAppRowProjectionTestFixture.snapshot(
+                mailExists: false,
+                mailValue: nil,
+                mailFrameMinY: nil,
+                browserExists: false,
+                browserValue: nil,
+                browserFrameMinY: nil
+            )
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var cancellationCount = 0
+        let owner =
+            FlowTabUITestHomeAppRowProjectionObservationOwner(
+                expectation:
+                    FlowTabUITestHomeAppRowProjectionTestFixture
+                        .expectation,
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {
+                        cancellationCount += 1
+                    }
+                },
+                readback: { snapshot }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertNil(owner.resolvedEvidence)
+        snapshot =
+            FlowTabUITestHomeAppRowProjectionTestFixture.snapshot()
+        scheduledReadback?(.scheduledReadback)
+        scheduledReadback?(.notificationReadback)
+
+        let evidence = owner.waitForResolution(
+            timeout:
+                FlowTabUITestHomeAppRowProjectionTestPolicy.watchdog
+        )
+        XCTAssertEqual(evidence?.source, .scheduledReadback)
+        XCTAssertEqual(evidence?.value, snapshot)
+        XCTAssertEqual(cancellationCount, 1)
+    }
+
+    func testHomeAppRowProjectionObserverRequiresTriggerAcceptance() {
+        var acceptsEvidence = false
+        let snapshot =
+            FlowTabUITestHomeAppRowProjectionTestFixture.snapshot()
+        let owner =
+            FlowTabUITestHomeAppRowProjectionObservationOwner(
+                expectation:
+                    FlowTabUITestHomeAppRowProjectionTestFixture
+                        .expectation,
+                acceptsEvidence: {
+                    acceptsEvidence
+                },
+                observationRegistration: nil,
+                readback: { snapshot }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertNil(owner.resolvedEvidence)
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "acceptanceEnabled=false"
+            )
+        )
+
+        acceptsEvidence = true
+        owner.requestReadback(source: .triggerReadback)
+
+        let evidence = owner.waitForResolution(
+            timeout:
+                FlowTabUITestHomeAppRowProjectionTestPolicy.watchdog
+        )
+        XCTAssertEqual(evidence?.source, .triggerReadback)
+        XCTAssertEqual(evidence?.value, snapshot)
+    }
+
+    func testHomeAppRowProjectionObserverIgnoresEventsAfterCancellation() {
+        var snapshot =
+            FlowTabUITestHomeAppRowProjectionTestFixture.snapshot(
+                mailExists: false,
+                mailValue: nil,
+                mailFrameMinY: nil
+            )
+        var eventHandler:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var cancellationCount = 0
+        let owner =
+            FlowTabUITestHomeAppRowProjectionObservationOwner(
+                expectation:
+                    FlowTabUITestHomeAppRowProjectionTestFixture
+                        .expectation,
+                observationRegistration: { callback in
+                    eventHandler = callback
+                    return FlowTabUITestObservationCancellation {
+                        cancellationCount += 1
+                    }
+                },
+                readback: { snapshot }
+            )
+        owner.start()
+
+        owner.cancel()
+        snapshot =
+            FlowTabUITestHomeAppRowProjectionTestFixture.snapshot()
+        eventHandler?(.notificationReadback)
+
+        XCTAssertNil(owner.resolvedEvidence)
+        XCTAssertEqual(cancellationCount, 1)
+    }
+
+    func testHomeAppRowProjectionWatchdogReportsFinalSnapshot() {
+        var readbackCount = 0
+        let owner =
+            FlowTabUITestHomeAppRowProjectionObservationOwner(
+                expectation:
+                    FlowTabUITestHomeAppRowProjectionTestFixture
+                        .expectation,
+                observationRegistration: nil,
+                readback: {
+                    defer { readbackCount += 1 }
+                    return readbackCount == 0
+                        ? FlowTabUITestHomeAppRowProjectionTestFixture
+                            .snapshot(
+                                mailExists: false,
+                                mailValue: nil,
+                                mailFrameMinY: nil
+                            )
+                        : FlowTabUITestHomeAppRowProjectionTestFixture
+                            .snapshot(browserValue: "1w")
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertNil(
+            owner.waitForResolution(
+                timeout:
+                    FlowTabUITestHomeAppRowProjectionTestPolicy
+                        .watchdog
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "source=watchdogReadback"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains("value=0w")
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains("value=1w")
+        )
+    }
+}

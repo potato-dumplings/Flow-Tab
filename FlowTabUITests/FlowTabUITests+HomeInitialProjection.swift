@@ -283,6 +283,27 @@ extension FlowTabUITests {
             "Home initial-projection foreground watchdog expired. "
                 + "finalState=\(String(describing: app.state))"
         )
+        var acceptsInitialRowEvidence = false
+        let initialRowObservation =
+            makeHomeAppRowProjectionObservation(
+                in: app,
+                rows: [
+                    .init(
+                        identifier: Identifier.homeAppMockMail,
+                        value: "0w"
+                    ),
+                    .init(
+                        identifier: Identifier.homeAppMockBrowser,
+                        value: "0w"
+                    )
+                ],
+                acceptsEvidence: {
+                    acceptsInitialRowEvidence
+                }
+            )
+        initialRowObservation.start()
+        defer { initialRowObservation.cancel() }
+
         let homeTabButtons = app.buttons.matching(
             identifier: Identifier.homeTabButton
         )
@@ -290,7 +311,7 @@ extension FlowTabUITests {
             in: app,
             identifier: Identifier.homeTabContent
         )
-        XCTAssertTrue(
+        let navigationSatisfied =
             tapFirstHittableAndWaitForExistence(
                 in: homeTabButtons,
                 content: homeContent,
@@ -298,35 +319,48 @@ extension FlowTabUITests {
                 timeout:
                     FlowTabUITestSupportWatchdogPolicy
                         .tabNavigation
-            ),
+            )
+        XCTAssertTrue(
+            navigationSatisfied,
             "Home initial-projection navigation watchdog expired. "
                 + "finalCandidateCount=\(homeTabButtons.count) "
                 + "finalContentExists=\(homeContent.exists)"
         )
+        guard navigationSatisfied else { return }
+        acceptsInitialRowEvidence = true
+        initialRowObservation.requestReadback(
+            source: .triggerReadback
+        )
 
-        let mailRow = element(
-            in: app,
-            identifier: Identifier.homeAppMockMail
-        )
-        let browserRow = element(
-            in: app,
-            identifier: Identifier.homeAppMockBrowser
-        )
-        XCTAssertTrue(mailRow.waitForExistence(timeout: 6))
-        XCTAssertTrue(browserRow.waitForExistence(timeout: 6))
+        guard
+            let initialRowProjection =
+                initialRowObservation.waitForResolution(
+                    timeout:
+                        FlowTabUITestHomeInitialRowProjectionPolicy
+                            .watchdog
+                )?.value,
+            let initialMailRow = initialRowProjection.row(
+                identifier: Identifier.homeAppMockMail
+            ),
+            let initialBrowserRow = initialRowProjection.row(
+                identifier: Identifier.homeAppMockBrowser
+            ),
+            let initialMailY = initialMailRow.frameMinY,
+            let initialBrowserY = initialBrowserRow.frameMinY
+        else {
+            XCTFail(
+                "Home initial row projection watchdog expired. "
+                    + initialRowObservation.diagnosticSummary
+            )
+            return
+        }
+        XCTAssertEqual(initialMailRow.value, "0w")
+        XCTAssertEqual(initialBrowserRow.value, "0w")
         XCTAssertLessThan(
-            mailRow.frame.minY,
-            browserRow.frame.minY,
+            initialMailY,
+            initialBrowserY,
             "Home initial app rows should use the runtime snapshot order before any precise count refresh."
         )
-        assertValue(of: mailRow, equals: "0w", timeout: 2)
-        assertValue(
-            of: browserRow,
-            equals: "0w",
-            timeout: 2
-        )
-        let initialMailY = mailRow.frame.minY
-        let initialBrowserY = browserRow.frame.minY
 
         guard
             let application =
