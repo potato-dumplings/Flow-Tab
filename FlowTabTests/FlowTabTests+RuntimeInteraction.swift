@@ -389,7 +389,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testTerminateSelectedAppUnitKeepsPendingRequestWithoutSurfaceTimeout() async {
+    func testTerminateSelectedAppUnitKeepsPendingRequestWithoutSurfaceTimeout() {
         let initialApps = terminateScenarioApps()
         let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
@@ -400,11 +400,17 @@ extension FlowTabTests {
             return
         }
 
-        model.terminateRequestOverride = { _ in (sent: true, pid: 42_001) }
+        let terminatedPID = pid_t(42_001)
+        model.terminateRequestOverride = { _ in
+            (sent: true, pid: terminatedPID)
+        }
 
-        let noDeferredLayoutRefresh = expectation(description: "no deferred layout refresh")
-        noDeferredLayoutRefresh.isInverted = true
-        model.onSessionLayoutChanged = { noDeferredLayoutRefresh.fulfill() }
+        var layoutRefreshCount = 0
+        model.onSessionLayoutChanged = { layoutRefreshCount += 1 }
+        defer {
+            model.onSessionLayoutChanged = nil
+            model.cancelSelection()
+        }
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
@@ -416,7 +422,12 @@ extension FlowTabTests {
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
         XCTAssertEqual(model.terminatingAppID, terminatedAppID)
 
-        await fulfillment(of: [noDeferredLayoutRefresh], timeout: 0.01)
+        XCTAssertEqual(
+            layoutRefreshCount,
+            0,
+            "unmetCondition=layoutRefreshRequiresTerminationEvidence "
+                + "finalLayoutRefreshCount=\(layoutRefreshCount)"
+        )
         XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
         assertRuntimeProjectionSessionRead(
             from: runtimeProjectionService,
@@ -426,7 +437,8 @@ extension FlowTabTests {
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
         XCTAssertEqual(model.terminatingAppID, terminatedAppID)
         XCTAssertEqual(model.pendingTerminateRequest?.appID, terminatedAppID)
-        model.cancelSelection()
+        XCTAssertEqual(model.pendingTerminateRequest?.pid, terminatedPID)
+        XCTAssertEqual(model.pendingTerminateRequest?.generation, 1)
     }
 
     @MainActor
@@ -519,7 +531,6 @@ extension FlowTabTests {
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
 
-        await Task.yield()
         XCTAssertEqual(layoutRefreshCount, 0)
         XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
         assertRuntimeProjectionSessionRead(
