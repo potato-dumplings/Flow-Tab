@@ -44,7 +44,18 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        let foregroundReadinessSatisfied =
+            waitForFlowTabUITestApplicationToBecomeReady(
+                app,
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .foregroundActivation
+            )
+        XCTAssertTrue(
+            foregroundReadinessSatisfied,
+            "Runtime-projection FlowTab foreground watchdog expired. "
+                + "finalState=\(String(describing: app.state))"
+        )
 
         _ = requireInitialFlowTabSearchInput(
             in: app,
