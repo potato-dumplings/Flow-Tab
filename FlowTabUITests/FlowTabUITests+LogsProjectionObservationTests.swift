@@ -7,6 +7,38 @@ private enum FlowTabUITestLogsProjectionTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testLogsProjectionWatchdogsRemainTerminalBounds() {
+        XCTAssertEqual(
+            FlowTabUITestLogsProjectionPolicy
+                .tabNavigationWatchdog,
+            5
+        )
+        XCTAssertEqual(
+            FlowTabUITestLogsProjectionPolicy
+                .exactProjectionWatchdog,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestLogsProjectionPolicy
+                .tabNavigationWatchdog.isFinite
+        )
+        XCTAssertTrue(
+            FlowTabUITestLogsProjectionPolicy
+                .exactProjectionWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestLogsProjectionPolicy
+                .tabNavigationWatchdog,
+            0
+        )
+        XCTAssertGreaterThanOrEqual(
+            FlowTabUITestLogsProjectionPolicy
+                .exactProjectionWatchdog,
+            FlowTabUITestLogsProjectionPolicy
+                .tabNavigationWatchdog
+        )
+    }
+
     func testLogsProjectionObserverRequiresPostTriggerExactRows() {
         let expectation =
             FlowTabUITestLogsProjectionExpectation(

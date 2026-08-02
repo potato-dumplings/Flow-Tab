@@ -1,9 +1,11 @@
 import Foundation
 import XCTest
 
-private enum FlowTabUITestLogsProjectionPolicy {
+enum FlowTabUITestLogsProjectionPolicy {
     static let seededRowIdentifierPrefix =
         "flowtab.logs.line.seeded."
+    static let tabNavigationWatchdog: TimeInterval = 5
+    static let exactProjectionWatchdog: TimeInterval = 8
 }
 
 struct FlowTabUITestLogsProjectionSnapshot: Equatable {
@@ -214,7 +216,9 @@ extension FlowTabUITests {
             in: app.buttons.matching(
                 identifier: Identifier.logsTabButton
             ),
-            timeout: 5
+            timeout:
+                FlowTabUITestLogsProjectionPolicy
+                    .tabNavigationWatchdog
         )
         triggerDidComplete = true
         guard didOpenLogs else {
@@ -224,7 +228,13 @@ extension FlowTabUITests {
             return
         }
 
-        guard owner.waitForResolution(timeout: 8) != nil else {
+        guard
+            owner.waitForResolution(
+                timeout:
+                    FlowTabUITestLogsProjectionPolicy
+                        .exactProjectionWatchdog
+            ) != nil
+        else {
             XCTFail(
                 "Logs projection watchdog expired at level "
                     + "\(logLevel). \(owner.diagnosticSummary)"
