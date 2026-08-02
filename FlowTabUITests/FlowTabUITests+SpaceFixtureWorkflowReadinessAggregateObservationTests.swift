@@ -10,7 +10,8 @@ extension FlowTabUITests {
             )
         defer { owner.cancel() }
 
-        owner.start()
+        let generation = owner.start()
+        XCTAssertNil(owner.currentReadySnapshot)
         Self.recordReadbackAggregate(
             route: fixture.route,
             stages: [.configured, .ready]
@@ -20,9 +21,11 @@ extension FlowTabUITests {
                 "unmet=[readback.configured]"
             )
         )
+        owner.observeReadbackEvidence()
 
         Self.assertReadyReadback(
-            owner.waitForReady(timeout: 2)
+            owner.currentReadySnapshot,
+            observationGeneration: generation
         )
     }
 
@@ -35,6 +38,7 @@ extension FlowTabUITests {
         defer { owner.cancel() }
 
         let generation = owner.start()
+        XCTAssertNil(owner.currentReadySnapshot)
         owner.observeReadbackEvidence()
         Self.recordReadbackAggregate(
             route: fixture.route,
@@ -61,7 +65,8 @@ extension FlowTabUITests {
             )
         )
         Self.assertReadyReadback(
-            owner.waitForReady(timeout: 2)
+            owner.currentReadySnapshot,
+            observationGeneration: generation
         )
     }
 
@@ -75,6 +80,7 @@ extension FlowTabUITests {
 
         let staleGeneration = owner.start()
         let currentGeneration = owner.start()
+        XCTAssertNil(owner.currentReadySnapshot)
         Self.recordReadbackAggregate(
             route: fixture.route,
             stages: [.configured, .ready]
@@ -96,6 +102,7 @@ extension FlowTabUITests {
                 "unmet=[readback.configured]"
             )
         )
+        XCTAssertNil(owner.currentReadySnapshot)
 
         for _ in 0..<100 {
             owner.observeNotificationEvent(
@@ -105,7 +112,8 @@ extension FlowTabUITests {
             )
         }
         Self.assertReadyReadback(
-            owner.waitForReady(timeout: 2)
+            owner.currentReadySnapshot,
+            observationGeneration: currentGeneration
         )
     }
 
@@ -166,9 +174,16 @@ extension FlowTabUITests {
     private static func assertReadyReadback(
         _ snapshot:
             SpaceFixtureWorkflowReadinessAggregateSnapshot?,
+        observationGeneration: Int,
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
+        XCTAssertEqual(
+            snapshot?.observationGeneration,
+            observationGeneration,
+            file: file,
+            line: line
+        )
         XCTAssertEqual(
             snapshot?
                 .configuredEvidenceByWorkflowAppID[

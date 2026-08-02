@@ -106,6 +106,12 @@ final class SpaceFixtureWorkflowReadinessAggregateObservationOwner {
         return readySnapshot
     }
 
+    var currentReadySnapshot:
+        SpaceFixtureWorkflowReadinessAggregateSnapshot?
+    {
+        readySnapshot
+    }
+
     func observeReadbackEvidence() {
         guard let aggregateGeneration else {
             return
