@@ -185,10 +185,12 @@ extension FlowTabPriorityCoverageTests {
         delegate = appDelegate
         let presentationResolved = expectation(
             description:
-                "initial Search presentation publishes exact resolution"
+                "unmetCondition=launchInitialSearchPresentationPublishesExactResolution"
         )
         presentationResolved.assertForOverFulfill = true
         var presentationEvidence:
+            FlowTabUITestInitialPresentationEvidence?
+        var lastPresentationEvidence:
             FlowTabUITestInitialPresentationEvidence?
         presentationObserver =
             NotificationCenter.default.addObserver(
@@ -199,29 +201,40 @@ extension FlowTabPriorityCoverageTests {
             ) { notification in
                 MainActor.assumeIsolated {
                     guard
-                        presentationEvidence == nil,
                         let evidence =
                             FlowTabUITestInitialPresentationEvidence(
                                 notification: notification
-                            ),
+                            )
+                    else {
+                        return
+                    }
+                    lastPresentationEvidence = evidence
+                    guard
+                        evidence.observationGeneration > 0,
+                        evidence.source == .initialReadback,
                         evidence.resolution == .presented,
+                        evidence.attempt?.didPresent == true,
                         evidence.attempt?
                             .searchIsActiveOrPending == true
                     else {
                         return
                     }
-                    presentationEvidence = evidence
+                    if presentationEvidence == nil {
+                        presentationEvidence = evidence
+                    }
                     presentationResolved.fulfill()
                 }
             }
 
         let launchRegistrationPublished = expectation(
             description:
-                "application launch publishes registration generation one"
+                "unmetCondition=launchPublishesHotkeyRegistrationGenerationOne"
         )
         launchRegistrationPublished
             .assertForOverFulfill = true
         var launchRegistrationEvidence:
+            HotkeyRegistrationEvidence?
+        var lastLaunchRegistrationEvidence:
             HotkeyRegistrationEvidence?
         var launchRegistrationRecordSignatures:
             [OSType] = []
@@ -234,22 +247,30 @@ extension FlowTabPriorityCoverageTests {
             ) { notification in
                 MainActor.assumeIsolated {
                     guard
-                        launchRegistrationEvidence == nil,
                         let evidence =
                             HotkeyRegistrationEvidence(
                                 notification: notification
-                        ),
-                        evidence.generation == 1,
-                        evidence.source
-                            == HotkeyRegistrationEvidence
-                                .applicationLaunchSource
+                            )
                     else {
                         return
                     }
-                    launchRegistrationEvidence = evidence
-                    launchRegistrationRecordSignatures =
-                        hotkeyFactory.records
-                            .map(\.signature)
+                    lastLaunchRegistrationEvidence =
+                        evidence
+                    guard
+                        evidence.generation == 1,
+                        evidence.source
+                            == HotkeyRegistrationEvidence
+                                .applicationLaunchSource,
+                        !evidence.commandTabTakeoverActive
+                    else {
+                        return
+                    }
+                    if launchRegistrationEvidence == nil {
+                        launchRegistrationEvidence = evidence
+                        launchRegistrationRecordSignatures =
+                            hotkeyFactory.records
+                                .map(\.signature)
+                    }
                     launchRegistrationPublished
                         .fulfill()
                 }
@@ -257,7 +278,7 @@ extension FlowTabPriorityCoverageTests {
 
         let seededLogWritesObserved = expectation(
             description:
-                "launch log reset is followed by seeded append evidence"
+                "unmetCondition=launchLogResetFollowedByThreeSeededAppends"
         )
         seededLogWritesObserved.assertForOverFulfill =
             true
@@ -289,7 +310,9 @@ extension FlowTabPriorityCoverageTests {
                 launchRegistrationPublished,
                 seededLogWritesObserved
             ],
-            timeout: 4
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .appDelegateLaunchBootstrapEvidence
         )
         let lines =
             await RuntimeDiagnostics.shared
@@ -330,7 +353,14 @@ extension FlowTabPriorityCoverageTests {
             )
         XCTAssertEqual(
             launchRegistrationEvidence?.generation,
-            1
+            1,
+            """
+            unmetCondition=launchPublishesHotkeyRegistrationGenerationOne \
+            lastGeneration=\(lastLaunchRegistrationEvidence?.generation.description ?? "none") \
+            lastSource=\(lastLaunchRegistrationEvidence?.source ?? "none") \
+            lastTakeover=\(lastLaunchRegistrationEvidence?.commandTabTakeoverActive.description ?? "none") \
+            recordSignatures=\(hotkeyFactory.records.map(\.signature))
+            """
         )
         XCTAssertEqual(
             launchRegistrationEvidence?.source,
@@ -360,7 +390,13 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(
             presentationEvidence?.resolution,
-            .presented
+            .presented,
+            """
+            unmetCondition=launchInitialSearchPresentationPublishesExactResolution \
+            lastEvidence={\(lastPresentationEvidence?.logFields ?? "none")} \
+            searchActive=\(panelController.modelForTesting.isSearchActive) \
+            hasSession=\(panelController.modelForTesting.session != nil)
+            """
         )
         XCTAssertTrue(
             panelController.modelForTesting
@@ -369,14 +405,15 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNotNil(
             panelController.modelForTesting.session
         )
+        let finalLogSnapshot = recorder.snapshot
         XCTAssertTrue(
-            recorder.snapshot.didObserveClear,
-            recorder.snapshot.description
+            finalLogSnapshot.didObserveClear,
+            "unmetCondition=launchLogResetObserved \(finalLogSnapshot.description)"
         )
         XCTAssertGreaterThanOrEqual(
-            recorder.snapshot.appendCount,
+            finalLogSnapshot.appendCount,
             expectedSeededLogCount,
-            recorder.snapshot.description
+            "unmetCondition=launchSeededLogAppendCount \(finalLogSnapshot.description)"
         )
 
         XCTAssertFalse(
