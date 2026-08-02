@@ -1,7 +1,28 @@
 import AppKit
 import XCTest
 
+enum FlowTabUITestHomeActivationPolicy {
+    static let homeTabNavigationWatchdog: TimeInterval = 10
+}
+
 extension FlowTabUITests {
+    func testHomeActivationWatchdogPolicyCompatibility() {
+        XCTAssertEqual(
+            FlowTabUITestHomeActivationPolicy
+                .homeTabNavigationWatchdog,
+            10
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeActivationPolicy
+                .homeTabNavigationWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestHomeActivationPolicy
+                .homeTabNavigationWatchdog,
+            0
+        )
+    }
+
     func testHomePageClickingRealWorkflowWindowActivatesExactFixtureWindow() throws {
         try runRealSpaceFixtureMultiAppWorkflow(
             waitsForFullscreenMarkers: false
@@ -15,8 +36,22 @@ extension FlowTabUITests {
                 "Home activation workflow must expose a non-initial target window title."
             )
 
+            let homeTabButtons =
+                app.buttons.matching(
+                    identifier: Identifier.homeTabButton
+                )
+            let homeTab = homeTabButtons.firstMatch
             XCTAssertTrue(
-                tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10)
+                tapFirstHittable(
+                    in: homeTabButtons,
+                    timeout:
+                        FlowTabUITestHomeActivationPolicy
+                            .homeTabNavigationWatchdog
+                ),
+                "Home activation Home-tab watchdog expired. "
+                    + "candidateCount=\(homeTabButtons.count) "
+                    + "firstExists=\(homeTab.exists) "
+                    + "firstHittable=\(homeTab.isHittable)"
             )
             XCTAssertNotEqual(
                 NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
