@@ -23,6 +23,8 @@ extension FlowTabUITests {
     }
 
     func testWindowSearchPublishesMockWindowRowsAtLaunch() throws {
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
         let app = makeApp(
             additionalArguments: [
                 "--flowtab-ui-reset-defaults",
@@ -44,8 +46,10 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
 
-        let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-        XCTAssertTrue(searchInput.waitForExistence(timeout: 5))
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: readiness
+        )
         let result = performAndWaitForCommittedSearchWindowResult(
             in: app,
             scope: "window",
@@ -72,6 +76,8 @@ extension FlowTabUITests {
             workflow.apps.first { $0.expectedWindowTitles.contains(targetWindowTitle) },
             "Switcher workflow must include a real fixture window titled \(targetWindowTitle)"
         )
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
 
         try runRealSpaceFixtureWorkflow(
             workflow,
@@ -84,8 +90,10 @@ extension FlowTabUITests {
                 "window"
             ]
         ) { _, app in
-            let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-            XCTAssertTrue(searchInput.waitForExistence(timeout: 8))
+            _ = requireInitialFlowTabSearchInput(
+                in: app,
+                observedBy: readiness
+            )
 
             XCTAssertNotNil(
                 performAndWaitForCommittedSearchWindowResult(
