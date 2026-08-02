@@ -109,14 +109,31 @@ extension FlowTabUITests {
 
     func launchSpaceFixtureApplicationAndWaitForForeground(
         _ app: XCUIApplication,
-        timeout: TimeInterval = 10
+        timeout: TimeInterval =
+            FlowTabUITestSupportWatchdogPolicy
+                .spaceFixtureForegroundActivation
     ) {
         app.launch()
-        if app.wait(for: .runningForeground, timeout: min(timeout, 3)) {
+        if app.wait(
+            for: .runningForeground,
+            timeout: min(
+                timeout,
+                FlowTabUITestSupportWatchdogPolicy
+                    .spaceFixtureInitialForegroundObservation
+            )
+        ) {
             return
         }
         app.activate()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: timeout))
+        let becameForeground = app.wait(
+            for: .runningForeground,
+            timeout: timeout
+        )
+        XCTAssertTrue(
+            becameForeground,
+            "Space fixture foreground watchdog expired. "
+                + "finalState=\(String(describing: app.state))"
+        )
     }
 
     func launchSpaceFixtureWorkflow(
@@ -283,7 +300,7 @@ extension FlowTabUITests {
                 "--staggered-layout"
             ]
         )
-        app.launch()
+        launchSpaceFixtureApplicationAndWaitForForeground(app)
         defer {
             if app.state == .runningForeground || app.state == .runningBackground {
                 terminateSpaceFixtureApplicationAndWait(
@@ -293,7 +310,6 @@ extension FlowTabUITests {
             }
         }
 
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
         waitForSpaceFixtureWorkflowReadiness(
             in: app,
             windowCount: 3,
@@ -320,7 +336,7 @@ extension FlowTabUITests {
                 "--staggered-layout"
             ]
         )
-        app.launch()
+        launchSpaceFixtureApplicationAndWaitForForeground(app)
         defer {
             if app.state == .runningForeground || app.state == .runningBackground {
                 terminateSpaceFixtureApplicationAndWait(
@@ -330,7 +346,6 @@ extension FlowTabUITests {
             }
         }
 
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
         XCTAssertTrue(element(in: app, identifier: "flowtab.spacefixture.window.mode.2").waitForExistence(timeout: 5))
         XCTAssertEqual(element(in: app, identifier: "flowtab.spacefixture.window.mode.2").label, "Fullscreen Target")
     }

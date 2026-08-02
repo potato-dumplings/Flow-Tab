@@ -4,6 +4,8 @@ import XCTest
 enum FlowTabUITestSupportWatchdogPolicy {
     static let foregroundActivation: TimeInterval = 12
     static let fallbackForegroundActivation: TimeInterval = 4
+    static let spaceFixtureForegroundActivation: TimeInterval = 10
+    static let spaceFixtureInitialForegroundObservation: TimeInterval = 3
     static let switcherCommandDelivery: TimeInterval = 4
     static let tabNavigation: TimeInterval = 6
     static let settingsControlDiscovery: TimeInterval = 6
@@ -21,6 +23,15 @@ extension FlowTabUITests {
         XCTAssertEqual(
             FlowTabUITestSupportWatchdogPolicy.fallbackForegroundActivation,
             4
+        )
+        XCTAssertEqual(
+            FlowTabUITestSupportWatchdogPolicy.spaceFixtureForegroundActivation,
+            10
+        )
+        XCTAssertEqual(
+            FlowTabUITestSupportWatchdogPolicy
+                .spaceFixtureInitialForegroundObservation,
+            3
         )
         XCTAssertEqual(
             FlowTabUITestSupportWatchdogPolicy.switcherCommandDelivery,
@@ -50,6 +61,9 @@ extension FlowTabUITests {
         let operationBounds = [
             FlowTabUITestSupportWatchdogPolicy.foregroundActivation,
             FlowTabUITestSupportWatchdogPolicy.fallbackForegroundActivation,
+            FlowTabUITestSupportWatchdogPolicy.spaceFixtureForegroundActivation,
+            FlowTabUITestSupportWatchdogPolicy
+                .spaceFixtureInitialForegroundObservation,
             FlowTabUITestSupportWatchdogPolicy.switcherCommandDelivery,
             FlowTabUITestSupportWatchdogPolicy.tabNavigation,
             FlowTabUITestSupportWatchdogPolicy.settingsControlDiscovery,
@@ -63,6 +77,12 @@ extension FlowTabUITests {
         XCTAssertLessThanOrEqual(
             FlowTabUITestSupportWatchdogPolicy.fallbackForegroundActivation,
             FlowTabUITestSupportWatchdogPolicy.foregroundActivation
+        )
+        XCTAssertLessThanOrEqual(
+            FlowTabUITestSupportWatchdogPolicy
+                .spaceFixtureInitialForegroundObservation,
+            FlowTabUITestSupportWatchdogPolicy
+                .spaceFixtureForegroundActivation
         )
     }
 }

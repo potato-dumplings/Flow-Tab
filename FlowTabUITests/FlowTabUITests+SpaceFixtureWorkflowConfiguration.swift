@@ -51,14 +51,13 @@ extension FlowTabUITests {
             "--workflow-app-id", "chrome",
             "--staggered-layout"
         ]
-        app.launch()
+        launchSpaceFixtureApplicationAndWaitForForeground(app)
         defer {
             if app.state == .runningForeground || app.state == .runningBackground {
                 app.terminate()
             }
         }
 
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
         waitForSpaceFixtureWorkflowReadiness(
             in: app,
             expectedWindowTitles: ["Docs", "Mail"],
