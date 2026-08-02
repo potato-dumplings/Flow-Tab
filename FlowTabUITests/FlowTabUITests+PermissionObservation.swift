@@ -42,16 +42,29 @@ extension FlowTabUITests {
                 + "finalState=\(String(describing: app.state))"
         )
         guard foregroundReadinessSatisfied else { return }
-        XCTAssertTrue(
-            tapFirstHittable(
-                in: app.buttons.matching(identifier: Identifier.homeTabButton),
-                timeout: 5
+        let homeTabButtons = app.buttons.matching(
+            identifier: Identifier.homeTabButton
+        )
+        let homeContent = element(
+            in: app,
+            identifier: Identifier.homeTabContent
+        )
+        let navigationSatisfied =
+            tapFirstHittableAndWaitForExistence(
+                in: homeTabButtons,
+                content: homeContent,
+                contentDescription: Identifier.homeTabContent,
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .tabNavigation
             )
-        )
         XCTAssertTrue(
-            element(in: app, identifier: Identifier.homeTabContent)
-                .waitForExistence(timeout: 5)
+            navigationSatisfied,
+            "Home permission navigation watchdog expired. "
+                + "finalCandidateCount=\(homeTabButtons.count) "
+                + "finalContentExists=\(homeContent.exists)"
         )
+        guard navigationSatisfied else { return }
 
         let permissionAction = element(
             in: app,
