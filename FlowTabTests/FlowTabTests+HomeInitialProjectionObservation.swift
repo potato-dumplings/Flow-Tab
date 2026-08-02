@@ -3,7 +3,21 @@ import SwiftUI
 import XCTest
 @testable import FlowTab
 
+private enum HomeInitialProjectionObservationWatchdogPolicy {
+    static let maintenanceRequestDelivery: TimeInterval = 1
+}
+
 extension FlowTabTests {
+    func testHomeInitialProjectionObservationWatchdogPolicyPreservesMaintenanceRequestBound() {
+        let maintenanceRequestDelivery =
+            HomeInitialProjectionObservationWatchdogPolicy
+                .maintenanceRequestDelivery
+
+        XCTAssertEqual(maintenanceRequestDelivery, 1)
+        XCTAssertTrue(maintenanceRequestDelivery.isFinite)
+        XCTAssertGreaterThan(maintenanceRequestDelivery, 0)
+    }
+
     func testHomeInitialProjectionApplicationRouteRequiresUITestSentinelAndName() {
         let argument =
             FlowTabTestLaunchOptions
@@ -78,11 +92,17 @@ extension FlowTabTests {
             readScreenCapturePermission: { true }
         )
         let maintenanceRequested = expectation(
-            description: "Home requested initial projection maintenance."
+            description:
+                "unmetCondition=homeInitialProjectionMaintenanceRequested expectedReason=homeProjectionMissing"
         )
+        maintenanceRequested.assertForOverFulfill = true
         runtimeProjectionService.setAppSwitcherMaintenanceRequestHandler {
-            _ in
+            reason in
+            guard reason == .homeProjectionMissing else { return }
             maintenanceRequested.fulfill()
+        }
+        defer {
+            runtimeProjectionService.setAppSwitcherMaintenanceRequestHandler(nil)
         }
         let hostedView = NSHostingView(
             rootView: HomeLandingView(
@@ -102,8 +122,16 @@ extension FlowTabTests {
         )
         hostedView.layoutSubtreeIfNeeded()
 
-        await fulfillment(of: [maintenanceRequested], timeout: 1)
-        runtimeProjectionService.setAppSwitcherMaintenanceRequestHandler(nil)
+        await fulfillment(
+            of: [maintenanceRequested],
+            timeout:
+                HomeInitialProjectionObservationWatchdogPolicy
+                    .maintenanceRequestDelivery
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
+            [.homeProjectionMissing]
+        )
         XCTAssertTrue(projectionOwner.isObserving)
 
         hostedView.rootView = HomeLandingView(
