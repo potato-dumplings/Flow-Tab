@@ -239,7 +239,8 @@ extension FlowTabUITests {
                     trigger: {
                         confirmEdgeSwitcherSearchSelection(
                             in: app,
-                            searchInput: searchInput
+                            searchInput: searchInput,
+                            expectedQuery: query
                         )
                     }
                 ),

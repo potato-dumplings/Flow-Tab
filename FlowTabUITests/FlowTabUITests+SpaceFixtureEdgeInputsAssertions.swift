@@ -40,12 +40,16 @@ extension FlowTabUITests {
         }
     }
 
-    func confirmEdgeSwitcherSearchSelection(in app: XCUIApplication, searchInput: XCUIElement) {
-        app.typeText("\r")
-        if !waitForNonExistence(searchInput, timeout: 1.2) {
-            app.typeText("\r")
-        }
-        XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
+    func confirmEdgeSwitcherSearchSelection(
+        in app: XCUIApplication,
+        searchInput: XCUIElement,
+        expectedQuery: String
+    ) {
+        confirmSwitcherSearchSelection(
+            in: app,
+            searchInput: searchInput,
+            expectedQuery: expectedQuery
+        )
     }
 
     func edgeTitleCounts(_ titles: [String]) -> [String: Int] {

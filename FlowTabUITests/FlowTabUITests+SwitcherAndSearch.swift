@@ -74,7 +74,7 @@ extension FlowTabUITests {
         runRealSpaceFixtureWorkflow(
             flowTabAdditionalArguments:
                 ["--flowtab-ui-open-switcher-search"]
-                + FlowTabUITestSearchInputReadinessPolicy
+                + FlowTabUITestSwitcherSearchConfirmationPolicy
                     .applicationEvidenceLaunchArguments
         ) { identity, app in
             let searchInput =
@@ -89,13 +89,11 @@ extension FlowTabUITests {
                 .firstMatch
             XCTAssertTrue(fixtureResult.waitForExistence(timeout: 5))
 
-            app.typeText("\r")
-            if !waitForNonExistence(searchInput, timeout: 1.2) {
-                // XCUI keyboard input may leave the hidden NSTextView in a marked-text
-                // composition state, so the first Return only commits composition.
-                app.typeText("\r")
-            }
-            XCTAssertTrue(waitForNonExistence(searchInput, timeout: 3))
+            confirmSwitcherSearchSelection(
+                in: app,
+                searchInput: searchInput,
+                expectedQuery: identity.switcherSearchQuery
+            )
         }
     }
 

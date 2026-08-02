@@ -395,7 +395,7 @@ extension FlowTabUITests {
                 "-searchDefaultScope",
                 "window"
             ]
-                + FlowTabUITestSearchInputReadinessPolicy
+                + FlowTabUITestSwitcherSearchConfirmationPolicy
                     .applicationEvidenceLaunchArguments
         ) { _, app in
             let searchInput =
@@ -426,7 +426,8 @@ extension FlowTabUITests {
                     trigger: {
                         confirmSwitcherSearchSelection(
                             in: app,
-                            searchInput: searchInput
+                            searchInput: searchInput,
+                            expectedQuery: targetWindowTitle
                         )
                     }
                 ),
@@ -451,7 +452,7 @@ extension FlowTabUITests {
                 "-searchDefaultScope",
                 "app"
             ]
-                + FlowTabUITestSearchInputReadinessPolicy
+                + FlowTabUITestSwitcherSearchConfirmationPolicy
                     .applicationEvidenceLaunchArguments
         ) { _, app in
             let searchInput =
@@ -485,7 +486,9 @@ extension FlowTabUITests {
             ) {
                 confirmSwitcherSearchSelection(
                     in: app,
-                    searchInput: searchInput
+                    searchInput: searchInput,
+                    expectedQuery:
+                        targetApp.identity.switcherSearchQuery
                 )
             }
         }
@@ -511,7 +514,7 @@ extension FlowTabUITests {
                 "-searchDefaultScope",
                 "window"
             ]
-                + FlowTabUITestSearchInputReadinessPolicy
+                + FlowTabUITestSwitcherSearchConfirmationPolicy
                     .applicationEvidenceLaunchArguments
         ) { _, app in
             let searchInput =
@@ -549,7 +552,8 @@ extension FlowTabUITests {
                     trigger: {
                         confirmSwitcherSearchSelection(
                             in: app,
-                            searchInput: searchInput
+                            searchInput: searchInput,
+                            expectedQuery: targetWindowTitle
                         )
                     }
                 ),
@@ -807,14 +811,6 @@ extension FlowTabUITests {
                     searchableText: searchableText
                 )
             }
-    }
-
-    func confirmSwitcherSearchSelection(in app: XCUIApplication, searchInput: XCUIElement) {
-        app.typeText("\r")
-        if !waitForNonExistence(searchInput, timeout: 1.2) {
-            app.typeText("\r")
-        }
-        XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
     }
 
     func switcherAppStripSummary(
