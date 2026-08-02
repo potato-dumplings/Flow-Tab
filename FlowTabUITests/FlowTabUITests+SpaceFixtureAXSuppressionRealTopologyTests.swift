@@ -39,13 +39,19 @@ extension FlowTabUITests {
                     "AX-suppression FlowTab"
             )
         }
-        XCTAssertTrue(
+        let flowTabReadinessSatisfied =
             waitForFlowTabUITestApplicationToBecomeReady(
                 flowTabApp,
-                timeout: 12,
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .foregroundActivation,
                 traceLabel:
                     "ax-suppression.authorized-readback"
             )
+        XCTAssertTrue(
+            flowTabReadinessSatisfied,
+            "AX-suppression FlowTab readiness watchdog expired. "
+                + "finalState=\(String(describing: flowTabApp.state))"
         )
         guard
             assertSpaceFixtureWorkflowPermissionsAvailable(
