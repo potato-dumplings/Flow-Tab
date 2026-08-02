@@ -549,79 +549,6 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(searchRead.committedIndexCoversCurrentGeneration)
     }
 
-    func testRuntimeProjectionServiceSearchFreshnessBarrierCommitsAfterScheduledCoverageRepairUpdatesMainTable() throws {
-        let runningApp = NSRunningApplication.current
-        let appID = RuntimeAppIdentity.appID(for: runningApp)
-        let pid = runningApp.processIdentifier
-        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
-        let cgWindowID = CGWindowID(240_170)
-        let axWindowID = "ax:\(pid):scheduled-search-coverage"
-        let readModelStore = RuntimeReadModelStore()
-        let windowRecordStore = RuntimeWindowRecordStore()
-        let builder = RuntimeMainTableProjectionBuilder(windowRecordStore: windowRecordStore)
-        let expectation = expectation(description: "search coverage repair is scheduled and drained")
-        let service = RuntimeProjectionService(
-            label: "FlowTabTests.RuntimeProjectionService.SearchScheduledCoverageRepairCommit",
-            repairProvider: RuntimeProjectionRepairProvider(
-                windowRecordStore: windowRecordStore,
-                reconciliationCoordinator: RuntimeReconciliationCoordinator()
-            ),
-            mainTableProjectionBuilder: builder,
-            appDirectoryProvider: FixedRuntimeAppDirectoryProvider(entries: [appDirectoryEntry]),
-            readModelStore: readModelStore,
-            reconciliationExecutor: { request, _ in
-                XCTAssertEqual(request.target, .app(pid))
-                XCTAssertTrue(request.reasons.contains(.searchFreshnessBarrier))
-                windowRecordStore.setState(
-                    RuntimeWindowMappingState(
-                        windowRecordsByCGWindowID: [
-                            cgWindowID: self.makeMainTableProjectionWindowRecord(
-                                pid: pid,
-                                cgWindowID: cgWindowID,
-                                axWindowID: axWindowID
-                            )
-                        ],
-                        currentAXToCG: [axWindowID: cgWindowID],
-                        validCGWindowIDs: [cgWindowID],
-                        lastAXWindowIDs: [axWindowID],
-                        hasObservedAXWindowHandle: true
-                    ),
-                    for: pid
-                )
-                expectation.fulfill()
-                return .completedWithCurrentAppRepairEvidence([
-                    RuntimeCurrentAppRepairEvidence(
-                        appID: appID,
-                        pid: pid,
-                        appDirectoryEntries: [appDirectoryEntry],
-                        currentAppWindowPayloadWasEmpty: false
-                    )
-                ])
-            }
-        )
-
-        service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
-        wait(for: [expectation], timeout: 1)
-        service.waitForMaintenanceQueueForTesting()
-
-        let diagnostics = readModelStore.diagnostics()
-        XCTAssertTrue(diagnostics.dirtyAppIDs.isEmpty)
-        XCTAssertTrue(diagnostics.dirtyPIDs.isEmpty)
-        XCTAssertTrue(diagnostics.dirtyCGWindowIDs.isEmpty)
-        XCTAssertTrue(diagnostics.pendingRepairScopes.isEmpty)
-        XCTAssertTrue(diagnostics.hasCommittedSearchIndex)
-
-        let searchRead = readModelStore.readCommittedSearchIndexForSearch()
-        let projection = try XCTUnwrap(searchRead.projection)
-        XCTAssertEqual(searchRead.readiness, .committedGenerationValidated)
-        XCTAssertEqual(searchRead.resultState, .committedGenerationResult)
-        XCTAssertTrue(searchRead.committedIndexCoversCurrentGeneration)
-        XCTAssertEqual(
-            projection.windowEntries.map(\.windowID),
-            [RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)]
-        )
-    }
-
     func testRuntimeProjectionServiceFiltersNestedZeroWindowDirectoryEntriesBeforeMainTableProjection() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)
@@ -3806,7 +3733,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(store.readHomeAppDetailProjection(appID: appID))
     }
 
-    private func makeMainTableProjectionWindowRecord(
+    func makeMainTableProjectionWindowRecord(
         pid: pid_t,
         cgWindowID: CGWindowID,
         axWindowID: String
@@ -3840,7 +3767,7 @@ extension FlowTabPriorityCoverageTests {
         return record
     }
 
-    private final class FixedRuntimeAppDirectoryProvider: RuntimeAppDirectoryProviding {
+    final class FixedRuntimeAppDirectoryProvider: RuntimeAppDirectoryProviding {
         private let entries: [RuntimeAppDirectoryEntry]
 
         init(entries: [RuntimeAppDirectoryEntry]) {
