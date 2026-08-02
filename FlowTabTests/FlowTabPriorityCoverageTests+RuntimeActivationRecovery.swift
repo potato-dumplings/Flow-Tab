@@ -79,7 +79,7 @@ extension FlowTabPriorityCoverageTests {
             return true
         }
 
-        let verifiedVisibleTarget = expectation(description: "focus retry verifies target CG window onscreen")
+        let verifiedVisibleTarget = expectation(description: "unmetCondition=focusRecoveryTargetCGWindowOnscreen")
         var didFulfillVisibleTarget = false
         var visibilityChecks: [Bool] = []
         activator.currentCGWindowsOverride = { pid in
@@ -128,7 +128,7 @@ extension FlowTabPriorityCoverageTests {
             contextsByID: [appID: context]
         )
 
-        await fulfillment(of: [verifiedVisibleTarget], timeout: 1.0)
+        await fulfillment(of: [verifiedVisibleTarget], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeFocusRecoveryObservation)
         XCTAssertEqual(focusCallCount, 2)
         XCTAssertEqual(visibilityChecks.first, false)
         XCTAssertTrue(visibilityChecks.contains(true))
@@ -1508,7 +1508,7 @@ extension FlowTabPriorityCoverageTests {
             return true
         }
 
-        let visibilitySettled = expectation(description: "cg bridge retry sees target window onscreen")
+        let visibilitySettled = expectation(description: "unmetCondition=focusRecoveryCGBridgeTargetOnscreen")
         var didFulfillVisibilitySettled = false
         var cgWindowReadCount = 0
         activator.currentCGWindowsOverride = { pid in
@@ -1557,7 +1557,7 @@ extension FlowTabPriorityCoverageTests {
             contextsByID: [appID: context]
         )
 
-        await fulfillment(of: [visibilitySettled], timeout: 1.0)
+        await fulfillment(of: [visibilitySettled], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeFocusRecoveryObservation)
         XCTAssertEqual(requestActivationCallCount, 0)
         XCTAssertEqual(focusedCGWindowIDs, [targetCGWindowID, targetCGWindowID])
         XCTAssertGreaterThanOrEqual(cgWindowReadCount, 2)
@@ -1771,7 +1771,7 @@ extension FlowTabPriorityCoverageTests {
             pollingIntervals: [0.02],
             watchdogInterval: 1
         )
-        let recoveredFocus = expectation(description: "focus recovered window after activation settles")
+        let recoveredFocus = expectation(description: "unmetCondition=focusRecoveryExactAXWindowAttempted")
         var focusedWindowPointers: [UnsafeMutableRawPointer] = []
         activator.focusAXWindowOverride = { window, restoreIfMinimized, _ in
             XCTAssertFalse(restoreIfMinimized)
@@ -1813,7 +1813,7 @@ extension FlowTabPriorityCoverageTests {
             contextsByID: [appID: context]
         )
 
-        await fulfillment(of: [recoveredFocus], timeout: 1.0)
+        await fulfillment(of: [recoveredFocus], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeFocusRecoveryObservation)
         XCTAssertGreaterThanOrEqual(focusedWindowPointers.count, 2)
         XCTAssertEqual(focusedWindowPointers.first, stalePointer)
         XCTAssertEqual(focusedWindowPointers.last, recoveredPointer)
