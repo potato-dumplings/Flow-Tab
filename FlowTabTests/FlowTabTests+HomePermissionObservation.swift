@@ -5,7 +5,20 @@ import SwiftUI
 import XCTest
 @testable import FlowTab
 
+private enum HomePermissionObservationLifecycleWatchdogPolicy {
+    static let eventDelivery: TimeInterval = 1
+}
+
 extension FlowTabTests {
+    func testHomePermissionObservationLifecycleWatchdogPolicyPreservesEventDeliveryBound() {
+        let eventDelivery =
+            HomePermissionObservationLifecycleWatchdogPolicy.eventDelivery
+
+        XCTAssertEqual(eventDelivery, 1)
+        XCTAssertTrue(eventDelivery.isFinite)
+        XCTAssertGreaterThan(eventDelivery, 0)
+    }
+
     @MainActor
     func testHomeLandingVisibilityOwnsPermissionObservationLifecycle() async {
         let scheduler = HomePermissionManualScheduler()
@@ -28,18 +41,27 @@ extension FlowTabTests {
             readScreenCapturePermission: { false }
         )
         let initialReadbackApplied = expectation(
-            description: "Home applied initial permission readback."
+            description:
+                "unmetCondition=bothHomePermissionInitialReadbacksPublished"
         )
         initialReadbackApplied.expectedFulfillmentCount = 2
+        initialReadbackApplied.assertForOverFulfill = true
         let stateObservation = owner.objectWillChange.sink {
             initialReadbackApplied.fulfill()
         }
         let observationStopped = expectation(
-            description: "Home cancelled both fallback readbacks."
+            description:
+                "unmetCondition=bothHomePermissionFallbackTokensCancelled"
         )
         observationStopped.expectedFulfillmentCount = 2
+        observationStopped.assertForOverFulfill = true
         scheduler.onTokenCancelled = {
             observationStopped.fulfill()
+        }
+        defer {
+            scheduler.onTokenCancelled = nil
+            stateObservation.cancel()
+            owner.stop()
         }
         let runtimeProjectionService =
             RecordingRuntimeProjectionService()
@@ -60,9 +82,18 @@ extension FlowTabTests {
         )
         hostedView.layoutSubtreeIfNeeded()
 
-        await fulfillment(of: [initialReadbackApplied], timeout: 1)
+        await fulfillment(
+            of: [initialReadbackApplied],
+            timeout:
+                HomePermissionObservationLifecycleWatchdogPolicy
+                    .eventDelivery
+        )
+        XCTAssertFalse(owner.accessibilityTrusted)
+        XCTAssertFalse(owner.screenCaptureTrusted)
         XCTAssertTrue(owner.isObserving(.accessibility))
         XCTAssertTrue(owner.isObserving(.screenCapture))
+        XCTAssertEqual(scheduler.availableEntries.count, 2)
+        XCTAssertEqual(activationObserver.availableObservationCount, 1)
 
         hostedView.rootView = HomeLandingView(
             isActive: false,
@@ -73,11 +104,16 @@ extension FlowTabTests {
         )
         hostedView.layoutSubtreeIfNeeded()
 
-        await fulfillment(of: [observationStopped], timeout: 1)
+        await fulfillment(
+            of: [observationStopped],
+            timeout:
+                HomePermissionObservationLifecycleWatchdogPolicy
+                    .eventDelivery
+        )
         XCTAssertFalse(owner.isObserving(.accessibility))
         XCTAssertFalse(owner.isObserving(.screenCapture))
+        XCTAssertTrue(scheduler.availableEntries.isEmpty)
         XCTAssertEqual(activationObserver.availableObservationCount, 0)
-        withExtendedLifetime(stateObservation) {}
     }
 
     @MainActor
