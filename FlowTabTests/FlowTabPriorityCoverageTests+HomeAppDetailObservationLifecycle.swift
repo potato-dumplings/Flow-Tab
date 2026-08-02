@@ -168,21 +168,37 @@ extension FlowTabPriorityCoverageTests {
             runtimeProjectionService: runtimeProjectionService,
             notificationCenter: notificationCenter
         )
+        defer {
+            owner.cancel(appID: appID, reason: "test_teardown")
+        }
+        let expectedSourceGeneration =
+            RuntimeReadModelGeneration(projection: 2)
         let delivered = expectation(
             description:
-                "Home receives exact committed detail projection evidence"
+                "unmetCondition=exactHomeDetailProjectionEvidenceDeliveredOnMainActor"
         )
+        delivered.assertForOverFulfill = true
+        var deliveredEvidence: HomeAppDetailProjectionObservationEvidence?
         owner.request(
             appID: appID,
             reason: "test_background_commit",
             performRequest: {}
         ) { evidence in
-            guard evidence.source
-                    == .currentAppWindowProjectionNotification
+            guard
+                evidence.appID == appID,
+                evidence.observationGeneration == 1,
+                evidence.readbackCount == 3,
+                evidence.source == .currentAppWindowProjectionNotification,
+                evidence.transition == .sourceGenerationAdvanced,
+                evidence.projection?.freshness.sourceGeneration
+                    == expectedSourceGeneration,
+                evidence.isComplete,
+                evidence.completesObservation
             else {
                 return
             }
             XCTAssertTrue(Thread.isMainThread)
+            deliveredEvidence = evidence
             delivered.fulfill()
         }
         runtimeProjectionService.setHomeDetailProjection(
@@ -202,7 +218,29 @@ extension FlowTabPriorityCoverageTests {
             )
         }
 
-        await fulfillment(of: [delivered], timeout: 1)
+        await fulfillment(
+            of: [delivered],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .homeProjectionEvidenceDelivery
+        )
+        XCTAssertEqual(deliveredEvidence?.appID, appID)
+        XCTAssertEqual(deliveredEvidence?.observationGeneration, 1)
+        XCTAssertEqual(deliveredEvidence?.readbackCount, 3)
+        XCTAssertEqual(
+            deliveredEvidence?.source,
+            .currentAppWindowProjectionNotification
+        )
+        XCTAssertEqual(
+            deliveredEvidence?.transition,
+            .sourceGenerationAdvanced
+        )
+        XCTAssertEqual(
+            deliveredEvidence?.projection?.freshness.sourceGeneration,
+            expectedSourceGeneration
+        )
+        XCTAssertTrue(deliveredEvidence?.isComplete == true)
+        XCTAssertTrue(deliveredEvidence?.completesObservation == true)
         XCTAssertFalse(owner.isObserving(appID: appID))
     }
 }
