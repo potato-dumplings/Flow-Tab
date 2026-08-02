@@ -4,6 +4,8 @@ import XCTest
 enum FlowTabUITestSearchSelectionWrapPolicy {
     static let diagnosticsPublicationWatchdog: TimeInterval = 5
     static let diagnosticsTransitionWatchdog: TimeInterval = 3
+    static let lastResultHittabilityWatchdog: TimeInterval = 2
+    static let wrappedFirstResultHittabilityWatchdog: TimeInterval = 5
 }
 
 extension FlowTabUITests {
@@ -17,6 +19,16 @@ extension FlowTabUITests {
             FlowTabUITestSearchSelectionWrapPolicy
                 .diagnosticsTransitionWatchdog,
             3
+        )
+        XCTAssertEqual(
+            FlowTabUITestSearchSelectionWrapPolicy
+                .lastResultHittabilityWatchdog,
+            2
+        )
+        XCTAssertEqual(
+            FlowTabUITestSearchSelectionWrapPolicy
+                .wrappedFirstResultHittabilityWatchdog,
+            5
         )
     }
 
@@ -82,15 +94,21 @@ extension FlowTabUITests {
             "flowtab.switcher.search.app."
             + "com.flowtab.mock.wrap.10"
                 .flowTabUITestAccessibilityIdentifierComponent
+        let lastResultQuery =
+            app.descendants(matching: .any)
+                .matching(identifier: lastResultIdentifier)
         XCTAssertTrue(
             hasHittableElement(
-                in: app.descendants(matching: .any)
-                    .matching(
-                        identifier:
-                            lastResultIdentifier
-                    ),
-                timeout: 2
-            )
+                in: lastResultQuery,
+                timeout:
+                    FlowTabUITestSearchSelectionWrapPolicy
+                        .lastResultHittabilityWatchdog
+            ),
+            "Last Search result did not become hittable. "
+                + "expectedIdentifier=\(lastResultIdentifier) "
+                + "finalCandidateCount=\(lastResultQuery.count) "
+                + "finalExists=\(lastResultQuery.firstMatch.exists) "
+                + "finalHittable=\(lastResultQuery.firstMatch.isHittable)"
         )
 
         let firstResultID =
@@ -118,15 +136,21 @@ extension FlowTabUITests {
             "flowtab.switcher.search.app."
             + "com.flowtab.mock.wrap.01"
                 .flowTabUITestAccessibilityIdentifierComponent
+        let firstResultQuery =
+            app.descendants(matching: .any)
+                .matching(identifier: firstResultIdentifier)
         XCTAssertTrue(
             hasHittableElement(
-                in: app.descendants(matching: .any)
-                    .matching(
-                        identifier:
-                            firstResultIdentifier
-                    ),
-                timeout: 5
-            )
+                in: firstResultQuery,
+                timeout:
+                    FlowTabUITestSearchSelectionWrapPolicy
+                        .wrappedFirstResultHittabilityWatchdog
+            ),
+            "Wrapped first Search result did not become hittable. "
+                + "expectedIdentifier=\(firstResultIdentifier) "
+                + "finalCandidateCount=\(firstResultQuery.count) "
+                + "finalExists=\(firstResultQuery.firstMatch.exists) "
+                + "finalHittable=\(firstResultQuery.firstMatch.isHittable)"
         )
     }
 }
