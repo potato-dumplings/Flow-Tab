@@ -32,7 +32,13 @@ extension FlowTabUITests {
             traceLabel:
                 "ax-suppression.authorized-readback"
         )
-        defer { terminateIfRunning(flowTabApp) }
+        defer {
+            terminateIfRunning(
+                flowTabApp,
+                targetDescription:
+                    "AX-suppression FlowTab"
+            )
+        }
         XCTAssertTrue(
             waitForFlowTabUITestApplicationToBecomeReady(
                 flowTabApp,
@@ -53,7 +59,12 @@ extension FlowTabUITests {
             makeAXSuppressionFixtureApplication(
                 workflowApp
             )
-        terminateIfRunning(fixtureApp)
+        let fixtureTargetDescription =
+            "AX-suppression fixture \(workflowApp.appID)"
+        terminateIfRunning(
+            fixtureApp,
+            targetDescription: fixtureTargetDescription
+        )
         fixtureApp.launchArguments += [
             "--workflow-config",
             workflow.workflowURL.path,
@@ -72,7 +83,12 @@ extension FlowTabUITests {
         launchSpaceFixtureApplicationAndWaitForForeground(
             fixtureApp
         )
-        defer { terminateIfRunning(fixtureApp) }
+        defer {
+            terminateIfRunning(
+                fixtureApp,
+                targetDescription: fixtureTargetDescription
+            )
+        }
 
         XCTAssertTrue(
             observationOwner.waitForSuppression(
@@ -99,16 +115,22 @@ extension FlowTabUITests {
     }
 
     private func terminateIfRunning(
-        _ app: XCUIApplication
+        _ app: XCUIApplication,
+        targetDescription: String
     ) {
         guard app.state == .runningForeground
             || app.state == .runningBackground
         else {
             return
         }
-        app.terminate()
+        let evidence = terminateFlowTabUITestApplication(
+            app,
+            targetDescription: targetDescription
+        )
         XCTAssertTrue(
-            app.wait(for: .notRunning, timeout: 5)
+            evidence.isSatisfied,
+            "Application termination failed. "
+                + evidence.diagnosticSummary
         )
     }
 }
