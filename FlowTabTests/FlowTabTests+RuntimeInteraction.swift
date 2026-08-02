@@ -7,6 +7,7 @@ import Carbon
 
 private enum RuntimeInteractionWatchdogPolicy {
     static let keyboardReadinessEvent: TimeInterval = 1
+    static let mainQueueTransition: TimeInterval = 1
 }
 
 extension FlowTabTests {
@@ -17,6 +18,15 @@ extension FlowTabTests {
         XCTAssertEqual(keyboardReadinessEvent, 1)
         XCTAssertTrue(keyboardReadinessEvent.isFinite)
         XCTAssertGreaterThan(keyboardReadinessEvent, 0)
+    }
+
+    func testRuntimeInteractionWatchdogPolicyPreservesMainQueueTransitionBound() {
+        let mainQueueTransition =
+            RuntimeInteractionWatchdogPolicy.mainQueueTransition
+
+        XCTAssertEqual(mainQueueTransition, 1)
+        XCTAssertTrue(mainQueueTransition.isFinite)
+        XCTAssertGreaterThan(mainQueueTransition, 0)
     }
 
     @MainActor
@@ -659,17 +669,29 @@ extension FlowTabTests {
     private func waitForSearchInputMainQueueTurn()
         async
     {
+        var didDeliverMainQueueTurn = false
         let mainQueueTurn =
             expectation(
                 description:
-                    "Search input main-queue transition completed"
+                    "unmetCondition=searchInputMainQueueTransition callback"
             )
-        DispatchQueue.main.async {
+        let mainQueueTurnWorkItem = DispatchWorkItem {
+            didDeliverMainQueueTurn = true
             mainQueueTurn.fulfill()
         }
+        defer { mainQueueTurnWorkItem.cancel() }
+        DispatchQueue.main.async(execute: mainQueueTurnWorkItem)
         await fulfillment(
             of: [mainQueueTurn],
-            timeout: 1
+            timeout:
+                RuntimeInteractionWatchdogPolicy
+                    .mainQueueTransition
+        )
+        XCTAssertTrue(
+            didDeliverMainQueueTurn,
+            "unmetCondition=searchInputMainQueueTransition "
+                + "finalCallbackDelivered="
+                + "\(didDeliverMainQueueTurn ? 1 : 0)"
         )
     }
 
