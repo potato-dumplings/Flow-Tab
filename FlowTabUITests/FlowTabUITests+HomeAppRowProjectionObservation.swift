@@ -5,6 +5,11 @@ enum FlowTabUITestHomeInitialRowProjectionPolicy {
     static let watchdog: TimeInterval = 16
 }
 
+enum FlowTabUITestHomeAppliedRowProjectionPolicy {
+    static let watchdog: TimeInterval = 4
+    static let positionAccuracy: Double = 1
+}
+
 struct FlowTabUITestHomeAppRowProjectionExpectation: Equatable {
     struct Row: Equatable {
         let identifier: String
@@ -75,6 +80,49 @@ struct FlowTabUITestHomeAppRowProjectionSnapshot: Equatable {
     }
 }
 
+struct FlowTabUITestHomeAppRowPositionExpectation: Equatable {
+    struct Row: Equatable {
+        let identifier: String
+        let frameMinY: Double
+        let accuracy: Double
+    }
+
+    let rows: [Row]
+
+    func isSatisfied(
+        by snapshot: FlowTabUITestHomeAppRowProjectionSnapshot
+    ) -> Bool {
+        guard snapshot.rows.count == rows.count else {
+            return false
+        }
+
+        for (expected, actual) in zip(rows, snapshot.rows) {
+            guard expected.frameMinY.isFinite,
+                  expected.accuracy.isFinite,
+                  expected.accuracy >= 0,
+                  actual.identifier == expected.identifier,
+                  actual.exists,
+                  let frameMinY = actual.frameMinY,
+                  frameMinY.isFinite,
+                  abs(frameMinY - expected.frameMinY)
+                    <= expected.accuracy
+            else {
+                return false
+            }
+        }
+        return true
+    }
+
+    var diagnosticSummary: String {
+        rows.map {
+            "identifier=\($0.identifier) "
+                + "frameMinY=\($0.frameMinY) "
+                + "accuracy=\($0.accuracy)"
+        }
+        .joined(separator: ";")
+    }
+}
+
 struct FlowTabUITestHomeAppRowProjectionElement {
     let identifier: String
     let element: XCUIElement
@@ -83,6 +131,7 @@ struct FlowTabUITestHomeAppRowProjectionElement {
 final class FlowTabUITestHomeAppRowProjectionObservationOwner {
     private let expectation:
         FlowTabUITestHomeAppRowProjectionExpectation
+    private let snapshotExpectationDescription: () -> String
     private let conditionOwner:
         FlowTabUITestConditionObservationOwner<
             FlowTabUITestHomeAppRowProjectionSnapshot
@@ -93,6 +142,14 @@ final class FlowTabUITestHomeAppRowProjectionObservationOwner {
             FlowTabUITestHomeAppRowProjectionExpectation,
         acceptsEvidence: @escaping () -> Bool = {
             true
+        },
+        acceptsSnapshot: @escaping (
+            FlowTabUITestHomeAppRowProjectionSnapshot
+        ) -> Bool = { _ in
+            true
+        },
+        snapshotExpectationDescription: @escaping () -> String = {
+            "none"
         },
         observationRegistration:
             FlowTabUITestConditionObservationRegistration? =
@@ -106,12 +163,15 @@ final class FlowTabUITestHomeAppRowProjectionObservationOwner {
             FlowTabUITestHomeAppRowProjectionSnapshot
     ) {
         self.expectation = expectation
+        self.snapshotExpectationDescription =
+            snapshotExpectationDescription
         conditionOwner = FlowTabUITestConditionObservationOwner(
             observationRegistration: observationRegistration,
             readback: readback,
             isSatisfied: {
                 acceptsEvidence()
                     && expectation.isSatisfied(by: $0)
+                    && acceptsSnapshot($0)
             },
             describe: {
                 "acceptanceEnabled=\(acceptsEvidence()) "
@@ -140,6 +200,8 @@ final class FlowTabUITestHomeAppRowProjectionObservationOwner {
 
     var diagnosticSummary: String {
         "expected{\(expectation.diagnosticSummary)} "
+            + "snapshotExpected{"
+            + "\(snapshotExpectationDescription())} "
             + conditionOwner.diagnosticSummary
     }
 
@@ -161,6 +223,14 @@ extension FlowTabUITests {
             [FlowTabUITestHomeAppRowProjectionExpectation.Row],
         acceptsEvidence: @escaping () -> Bool = {
             true
+        },
+        acceptsSnapshot: @escaping (
+            FlowTabUITestHomeAppRowProjectionSnapshot
+        ) -> Bool = { _ in
+            true
+        },
+        snapshotExpectationDescription: @escaping () -> String = {
+            "none"
         }
     ) -> FlowTabUITestHomeAppRowProjectionObservationOwner {
         let elements = rows.map {
@@ -178,6 +248,9 @@ extension FlowTabUITests {
                     rows: rows
                 ),
             acceptsEvidence: acceptsEvidence,
+            acceptsSnapshot: acceptsSnapshot,
+            snapshotExpectationDescription:
+                snapshotExpectationDescription,
             readback: {
                 self.homeAppRowProjectionSnapshot(
                     for: elements

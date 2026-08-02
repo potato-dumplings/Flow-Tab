@@ -283,20 +283,21 @@ extension FlowTabUITests {
             "Home initial-projection foreground watchdog expired. "
                 + "finalState=\(String(describing: app.state))"
         )
+        let expectedHomeRows = [
+            FlowTabUITestHomeAppRowProjectionExpectation.Row(
+                identifier: Identifier.homeAppMockMail,
+                value: "0w"
+            ),
+            FlowTabUITestHomeAppRowProjectionExpectation.Row(
+                identifier: Identifier.homeAppMockBrowser,
+                value: "0w"
+            )
+        ]
         var acceptsInitialRowEvidence = false
         let initialRowObservation =
             makeHomeAppRowProjectionObservation(
                 in: app,
-                rows: [
-                    .init(
-                        identifier: Identifier.homeAppMockMail,
-                        value: "0w"
-                    ),
-                    .init(
-                        identifier: Identifier.homeAppMockBrowser,
-                        value: "0w"
-                    )
-                ],
+                rows: expectedHomeRows,
                 acceptsEvidence: {
                     acceptsInitialRowEvidence
                 }
@@ -362,6 +363,44 @@ extension FlowTabUITests {
             "Home initial app rows should use the runtime snapshot order before any precise count refresh."
         )
 
+        let appliedPositionExpectation =
+            FlowTabUITestHomeAppRowPositionExpectation(
+                rows: [
+                    .init(
+                        identifier: Identifier.homeAppMockMail,
+                        frameMinY: initialMailY,
+                        accuracy:
+                            FlowTabUITestHomeAppliedRowProjectionPolicy
+                                .positionAccuracy
+                    ),
+                    .init(
+                        identifier:
+                            Identifier.homeAppMockBrowser,
+                        frameMinY: initialBrowserY,
+                        accuracy:
+                            FlowTabUITestHomeAppliedRowProjectionPolicy
+                                .positionAccuracy
+                    )
+                ]
+            )
+        var acceptsAppliedRowEvidence = false
+        let appliedRowObservation =
+            makeHomeAppRowProjectionObservation(
+                in: app,
+                rows: expectedHomeRows,
+                acceptsEvidence: {
+                    acceptsAppliedRowEvidence
+                },
+                acceptsSnapshot: {
+                    appliedPositionExpectation.isSatisfied(by: $0)
+                },
+                snapshotExpectationDescription: {
+                    appliedPositionExpectation.diagnosticSummary
+                }
+            )
+        appliedRowObservation.start()
+        defer { appliedRowObservation.cancel() }
+
         guard
             let application =
                 applicationOwner.waitForApplication(
@@ -389,38 +428,54 @@ extension FlowTabUITests {
         XCTAssertTrue(
             application.satisfiesApplicationContract
         )
+        acceptsAppliedRowEvidence = true
+        appliedRowObservation.requestReadback(
+            source: .triggerReadback
+        )
 
-        let appliedMailRow = element(
-            in: app,
-            identifier: Identifier.homeAppMockMail
-        )
-        let appliedBrowserRow = element(
-            in: app,
-            identifier: Identifier.homeAppMockBrowser
-        )
-        assertValue(
-            of: appliedMailRow,
-            equals: "0w",
-            timeout: 2
-        )
-        assertValue(
-            of: appliedBrowserRow,
-            equals: "0w",
-            timeout: 2
-        )
+        guard
+            let appliedRowProjection =
+                appliedRowObservation.waitForResolution(
+                    timeout:
+                        FlowTabUITestHomeAppliedRowProjectionPolicy
+                            .watchdog
+                )?.value,
+            let appliedMailRow = appliedRowProjection.row(
+                identifier: Identifier.homeAppMockMail
+            ),
+            let appliedBrowserRow = appliedRowProjection.row(
+                identifier: Identifier.homeAppMockBrowser
+            ),
+            let appliedMailY = appliedMailRow.frameMinY,
+            let appliedBrowserY = appliedBrowserRow.frameMinY
+        else {
+            XCTFail(
+                "Home applied row projection watchdog expired. "
+                    + "applicationObservationGeneration="
+                    + "\(application.observationGeneration) "
+                    + appliedRowObservation.diagnosticSummary
+            )
+            return
+        }
+        XCTAssertEqual(appliedMailRow.value, "0w")
+        XCTAssertEqual(appliedBrowserRow.value, "0w")
         XCTAssertEqual(
-            appliedMailRow.frame.minY,
+            appliedMailY,
             initialMailY,
-            accuracy: 1
+            accuracy:
+                FlowTabUITestHomeAppliedRowProjectionPolicy
+                    .positionAccuracy
         )
         XCTAssertEqual(
-            appliedBrowserRow.frame.minY,
+            appliedBrowserY,
             initialBrowserY,
-            accuracy: 1
+            accuracy:
+                FlowTabUITestHomeAppliedRowProjectionPolicy
+                    .positionAccuracy
         )
         XCTAssertLessThan(
-            appliedMailRow.frame.minY,
-            appliedBrowserRow.frame.minY
+            appliedMailY,
+            appliedBrowserY
         )
     }
 }
