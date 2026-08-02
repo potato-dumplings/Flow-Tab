@@ -9,6 +9,7 @@ enum FlowTabPriorityCoverageWatchdogPolicy {
     static let runtimeMaintenanceExecution: TimeInterval = 1
     static let windowPreviewEventDelivery: TimeInterval = 1
     static let runtimeFocusRecoveryObservation: TimeInterval = 1
+    static let appDelegateWorkspaceLifecycleSignal: TimeInterval = 1
 }
 
 final class FlowTabPriorityCoverageTests: XCTestCase {}
@@ -39,5 +40,14 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(runtimeFocusRecoveryObservation, 1)
         XCTAssertTrue(runtimeFocusRecoveryObservation.isFinite)
         XCTAssertGreaterThan(runtimeFocusRecoveryObservation, 0)
+    }
+
+    func testPriorityCoverageWatchdogPolicyPreservesAppDelegateWorkspaceLifecycleSignalBound() {
+        let appDelegateWorkspaceLifecycleSignal =
+            FlowTabPriorityCoverageWatchdogPolicy.appDelegateWorkspaceLifecycleSignal
+
+        XCTAssertEqual(appDelegateWorkspaceLifecycleSignal, 1)
+        XCTAssertTrue(appDelegateWorkspaceLifecycleSignal.isFinite)
+        XCTAssertGreaterThan(appDelegateWorkspaceLifecycleSignal, 0)
     }
 }

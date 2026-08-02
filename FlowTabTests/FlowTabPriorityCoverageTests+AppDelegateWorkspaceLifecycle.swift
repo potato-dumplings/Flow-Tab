@@ -71,11 +71,11 @@ extension FlowTabPriorityCoverageTests {
         let expectedAppID = RuntimeAppIdentity.appID(for: workspaceApp)
         let expectedPID = workspaceApp.processIdentifier
         let launchSignalRecorded = expectation(
-            description: "workspace launch recorded for exact app instance"
+            description: "unmetCondition=workspaceLaunchRecordedForExactAppInstance"
         )
         launchSignalRecorded.assertForOverFulfill = true
         let terminationSignalRecorded = expectation(
-            description: "workspace termination recorded for exact app instance"
+            description: "unmetCondition=workspaceTerminationRecordedForExactAppInstance"
         )
         terminationSignalRecorded.assertForOverFulfill = true
         runtimeProjectionService.setAppLaunchSignalHandler {
@@ -97,14 +97,24 @@ extension FlowTabPriorityCoverageTests {
             object: nil,
             userInfo: [NSWorkspace.applicationUserInfoKey: workspaceApp]
         )
-        await fulfillment(of: [launchSignalRecorded], timeout: 1)
+        await fulfillment(
+            of: [launchSignalRecorded],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .appDelegateWorkspaceLifecycleSignal
+        )
 
         workspaceNotificationCenter.post(
             name: NSWorkspace.didTerminateApplicationNotification,
             object: nil,
             userInfo: [NSWorkspace.applicationUserInfoKey: workspaceApp]
         )
-        await fulfillment(of: [terminationSignalRecorded], timeout: 1)
+        await fulfillment(
+            of: [terminationSignalRecorded],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .appDelegateWorkspaceLifecycleSignal
+        )
 
         let launchSignals = runtimeProjectionService.appLaunchSignalsRecorded()
         XCTAssertEqual(launchSignals.count, 1)
