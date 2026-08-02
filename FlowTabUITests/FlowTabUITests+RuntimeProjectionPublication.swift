@@ -1,6 +1,27 @@
 import XCTest
 
+private enum FlowTabUITestRuntimeProjectionPublicationPolicy {
+    static let windowResultPublicationWatchdog: TimeInterval = 8
+}
+
 extension FlowTabUITests {
+    func testRuntimeProjectionPublicationWatchdogPolicyCompatibility() {
+        XCTAssertEqual(
+            FlowTabUITestRuntimeProjectionPublicationPolicy
+                .windowResultPublicationWatchdog,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestRuntimeProjectionPublicationPolicy
+                .windowResultPublicationWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestRuntimeProjectionPublicationPolicy
+                .windowResultPublicationWatchdog,
+            0
+        )
+    }
+
     func testWindowSearchPublishesMockWindowRowsAtLaunch() throws {
         let app = makeApp(
             additionalArguments: [
@@ -25,11 +46,22 @@ extension FlowTabUITests {
 
         let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
         XCTAssertTrue(searchInput.waitForExistence(timeout: 5))
-        app.typeText("Inbox")
-
-        XCTAssertTrue(
-            element(in: app, identifier: Identifier.switcherSearchWindowMockMailInbox)
-                .waitForExistence(timeout: 8)
+        let result = performAndWaitForCommittedSearchWindowResult(
+            in: app,
+            scope: "window",
+            query: "Inbox",
+            title: "Inbox",
+            appName: "Mock Mail",
+            timeout:
+                FlowTabUITestRuntimeProjectionPublicationPolicy
+                    .windowResultPublicationWatchdog,
+            trigger: {
+                app.typeText("Inbox")
+            }
+        )
+        XCTAssertEqual(
+            result?.identifier,
+            Identifier.switcherSearchWindowMockMailInbox
         )
     }
 
@@ -55,13 +87,19 @@ extension FlowTabUITests {
             let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
             XCTAssertTrue(searchInput.waitForExistence(timeout: 8))
 
-            app.typeText(targetWindowTitle)
             XCTAssertNotNil(
-                waitForSearchWindowResult(
+                performAndWaitForCommittedSearchWindowResult(
                     in: app,
+                    scope: "window",
+                    query: targetWindowTitle,
                     title: targetWindowTitle,
                     appName: targetApp.appName,
-                    timeout: 8
+                    timeout:
+                        FlowTabUITestRuntimeProjectionPublicationPolicy
+                            .windowResultPublicationWatchdog,
+                    trigger: {
+                        app.typeText(targetWindowTitle)
+                    }
                 )
             )
         }

@@ -95,6 +95,77 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherSearchResultObserverRequiresCommittedQueryAfterTrigger() {
+        let expectation =
+            FlowTabUITestSwitcherSearchResultExpectation
+                .committedMatchingWindow(
+                    scope: "window",
+                    query: "Docs",
+                    title: "Docs",
+                    appName: "Browser"
+                )
+        let matchingResult =
+            switcherSearchResultTestObservation(
+                resultID: "window:42",
+                title: "Docs",
+                appName: "Browser",
+                appID: "com.example.browser"
+            )
+        var acceptsEvidence = false
+        var snapshot = switcherSearchResultTestSnapshot(
+            [matchingResult],
+            resultsScope: "window",
+            resultsQuery: "Docs"
+        )
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        let owner =
+            FlowTabUITestSwitcherSearchResultObservationOwner(
+                expectation: expectation,
+                acceptsEvidence: {
+                    acceptsEvidence
+                },
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: {
+                    snapshot
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertNil(owner.resolvedEvidence)
+        acceptsEvidence = true
+        snapshot = switcherSearchResultTestSnapshot(
+            [matchingResult],
+            resultsScope: "window",
+            resultsQuery: "stale"
+        )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = switcherSearchResultTestSnapshot(
+            [matchingResult],
+            resultsScope: "window",
+            resultsQuery: "Docs"
+        )
+        owner.requestReadback(source: .triggerReadback)
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .triggerReadback
+        )
+        XCTAssertEqual(
+            expectation.matchingResult(
+                in: owner.resolvedEvidence?.value
+                    ?? switcherSearchResultTestSnapshot([])
+            )?.resultID,
+            "window:42"
+        )
+    }
+
     func testSwitcherSearchResultObserverMatchesFallbackAccessibilityText() {
         let owner =
             FlowTabUITestSwitcherSearchResultObservationOwner(

@@ -105,6 +105,12 @@ enum FlowTabUITestSwitcherSearchResultExpectation:
     Equatable
 {
     case matchingWindow(title: String, appName: String)
+    case committedMatchingWindow(
+        scope: String,
+        query: String,
+        title: String,
+        appName: String
+    )
     case appWindowSet(
         appID: String,
         expectedTitles: Set<String>,
@@ -120,9 +126,29 @@ enum FlowTabUITestSwitcherSearchResultExpectation:
     func matchingResult(
         in snapshot: FlowTabUITestSwitcherSearchResultSnapshot
     ) -> SwitcherSearchWindowResultObservation? {
-        guard
-            case let .matchingWindow(title, appName) = self
-        else {
+        let title: String
+        let appName: String
+        switch self {
+        case let .matchingWindow(
+            expectedTitle,
+            expectedAppName
+        ):
+            title = expectedTitle
+            appName = expectedAppName
+        case let .committedMatchingWindow(
+            scope,
+            query,
+            expectedTitle,
+            expectedAppName
+        ):
+            guard snapshot.resultsScope == scope,
+                  snapshot.resultsQuery == query
+            else {
+                return nil
+            }
+            title = expectedTitle
+            appName = expectedAppName
+        default:
             return nil
         }
         return snapshot.results.first {
@@ -134,7 +160,8 @@ enum FlowTabUITestSwitcherSearchResultExpectation:
         by snapshot: FlowTabUITestSwitcherSearchResultSnapshot
     ) -> Bool {
         switch self {
-        case .matchingWindow:
+        case .matchingWindow,
+             .committedMatchingWindow:
             return matchingResult(in: snapshot) != nil
         case let .appWindowSet(
             appID,
@@ -192,6 +219,15 @@ enum FlowTabUITestSwitcherSearchResultExpectation:
         switch self {
         case let .matchingWindow(title, appName):
             return "matchingWindow title=\(title) appName=\(appName)"
+        case let .committedMatchingWindow(
+            scope,
+            query,
+            title,
+            appName
+        ):
+            return "committedMatchingWindow scope=\(scope) "
+                + "query=\(query) title=\(title) "
+                + "appName=\(appName)"
         case let .appWindowSet(
             appID,
             expectedTitles,
@@ -481,6 +517,60 @@ extension FlowTabUITests {
             XCTFail(
                 "Search result projection watchdog expired. "
                     + owner.diagnosticSummary
+            )
+            return nil
+        }
+        return result
+    }
+
+    func performAndWaitForCommittedSearchWindowResult(
+        in app: XCUIApplication,
+        scope: String,
+        query: String,
+        title: String,
+        appName: String,
+        timeout: TimeInterval,
+        trigger: () -> Void
+    ) -> SwitcherSearchWindowResultObservation? {
+        let expectation =
+            FlowTabUITestSwitcherSearchResultExpectation
+                .committedMatchingWindow(
+                    scope: scope,
+                    query: query,
+                    title: title,
+                    appName: appName
+                )
+        var triggerCompleted = false
+        let owner =
+            FlowTabUITestSwitcherSearchResultObservationOwner(
+                expectation: expectation,
+                acceptsEvidence: {
+                    triggerCompleted
+                },
+                readback: {
+                    self.committedSwitcherSearchResultSnapshot(
+                        in: app
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        trigger()
+        triggerCompleted = true
+        owner.requestReadback(source: .triggerReadback)
+
+        guard
+            let evidence = owner.waitForResolution(
+                timeout: timeout
+            ),
+            let result = expectation.matchingResult(
+                in: evidence.value
+            )
+        else {
+            XCTFail(
+                "Committed Search window-result projection "
+                    + "watchdog expired. \(owner.diagnosticSummary)"
             )
             return nil
         }
