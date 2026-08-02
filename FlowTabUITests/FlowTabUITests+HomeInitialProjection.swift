@@ -271,11 +271,17 @@ extension FlowTabUITests {
             ] + route.launchArguments
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(
+        let foregroundReadinessSatisfied =
             waitForFlowTabUITestApplicationToBecomeReady(
                 app,
-                timeout: 8
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .foregroundActivation
             )
+        XCTAssertTrue(
+            foregroundReadinessSatisfied,
+            "Home initial-projection foreground watchdog expired. "
+                + "finalState=\(String(describing: app.state))"
         )
         XCTAssertTrue(
             tapFirstHittable(
