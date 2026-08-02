@@ -1482,54 +1482,6 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerTerminateRequestProtectsPanelResignAfterModifierRelease() async {
-        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: terminateScenarioApps())
-        let controller = SwitcherPanelController(
-            model: LiveSwitcherModel(
-                runtimeProjectionService: runtimeProjectionService
-            )
-        )
-        let terminateRequestSent = expectation(
-            description: "terminate request sent after protection preparation"
-        )
-        controller.modelForTesting.terminateRequestOverride = { _ in
-            XCTAssertTrue(
-                controller
-                    .terminateInterruptionProtectionObservationOwner
-                    .isPrepared
-            )
-            terminateRequestSent.fulfill()
-            return (sent: true, pid: 42_301)
-        }
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
-        controller.appIsActiveOverride = false
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        assertAppSwitcherProjectionRead(
-            from: runtimeProjectionService,
-            maintenanceRequests: [.switcherSessionStarted]
-        )
-        let selectedAppID = controller.modelForTesting.selectedApp?.id
-
-        controller.terminateSelectedApp()
-        await fulfillment(of: [terminateRequestSent], timeout: 1.0)
-
-        XCTAssertEqual(controller.modelForTesting.terminatingAppID, selectedAppID)
-        XCTAssertTrue(controller.shouldProtectTerminateSystemInterruption())
-        XCTAssertEqual(
-            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
-            [.switcherSessionStarted, .appLifecycleRefresh]
-        )
-        XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
-        controller.handlePanelDidResignKeyForTesting()
-
-        XCTAssertNotNil(controller.modelForTesting.session)
-        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
-        controller.cancelSelectionForTesting()
-    }
-
-    @MainActor
     func testSwitcherPanelControllerRecoverableOcclusionKeepsSessionVisible() {
         let recoveryScheduler =
             ManualPanelVisibilityRecoveryObservationScheduler()

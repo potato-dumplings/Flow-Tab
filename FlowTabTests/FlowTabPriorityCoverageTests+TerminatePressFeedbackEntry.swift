@@ -114,6 +114,156 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelControllerTerminateRequestProtectsPanelResignAfterModifierRelease() {
+        let scheduler =
+            ManualTerminatePressFeedbackScheduler()
+        let runtimeProjectionService =
+            RecordingRuntimeProjectionService(
+                appSwitcherApps: terminateScenarioApps()
+            )
+        let model = LiveSwitcherModel(
+            runtimeProjectionService:
+                runtimeProjectionService
+        )
+        let controller = SwitcherPanelController(
+            model: model,
+            terminatePressFeedbackScheduler:
+                scheduler
+        )
+        var requestedAppIDs: [String] = []
+        var protectionPreparedReadbacks: [Bool] = []
+        model.terminateRequestOverride = {
+            [weak controller] appID in
+            XCTAssertTrue(Thread.isMainThread)
+            requestedAppIDs.append(appID)
+            protectionPreparedReadbacks.append(
+                controller?
+                    .terminateInterruptionProtectionObservationOwner
+                    .isPrepared ?? false
+            )
+            return (sent: true, pid: 42_301)
+        }
+        defer {
+            model.terminateRequestOverride = nil
+            controller.cancelSelectionForTesting()
+        }
+        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalMainKeyPressedOverride = false
+        controller.appIsActiveOverride = false
+
+        XCTAssertFalse(
+            controller
+                .terminatePressFeedbackCompletionOwner
+                .isPending
+        )
+        XCTAssertEqual(
+            controller
+                .terminatePressFeedbackCompletionOwner
+                .generation,
+            0
+        )
+        XCTAssertTrue(scheduler.scheduledIntervals.isEmpty)
+        XCTAssertTrue(requestedAppIDs.isEmpty)
+        XCTAssertTrue(protectionPreparedReadbacks.isEmpty)
+        XCTAssertFalse(
+            controller
+                .terminateInterruptionProtectionObservationOwner
+                .isPrepared
+        )
+
+        XCTAssertTrue(
+            controller.beginGlobalHotkeySessionForTesting()
+        )
+        assertAppSwitcherProjectionSessionRead(
+            from: runtimeProjectionService
+        )
+        guard let selectedAppID = model.selectedApp?.id else {
+            return XCTFail("Expected selected app")
+        }
+
+        controller.terminateSelectedApp()
+
+        XCTAssertEqual(model.terminatingAppID, selectedAppID)
+        XCTAssertNil(model.pendingTerminateRequest)
+        XCTAssertTrue(
+            controller
+                .terminatePressFeedbackCompletionOwner
+                .isPending
+        )
+        XCTAssertEqual(
+            controller
+                .terminatePressFeedbackCompletionOwner
+                .generation,
+            1
+        )
+        XCTAssertEqual(
+            scheduler.scheduledIntervals,
+            [
+                TerminatePressFeedbackPolicy
+                    .default
+                    .completionInterval
+            ]
+        )
+        XCTAssertTrue(requestedAppIDs.isEmpty)
+        XCTAssertTrue(protectionPreparedReadbacks.isEmpty)
+        XCTAssertFalse(
+            controller
+                .terminateInterruptionProtectionObservationOwner
+                .isPrepared
+        )
+
+        XCTAssertTrue(scheduler.fire(at: 0))
+
+        XCTAssertFalse(
+            controller
+                .terminatePressFeedbackCompletionOwner
+                .isPending
+        )
+        XCTAssertEqual(requestedAppIDs, [selectedAppID])
+        XCTAssertEqual(protectionPreparedReadbacks, [true])
+        XCTAssertEqual(model.terminatingAppID, selectedAppID)
+        XCTAssertEqual(
+            model.pendingTerminateRequest?.appID,
+            selectedAppID
+        )
+        XCTAssertEqual(
+            model.pendingTerminateRequest?.pid,
+            42_301
+        )
+        XCTAssertEqual(
+            model.pendingTerminateRequest?.generation,
+            1
+        )
+        XCTAssertTrue(
+            controller.shouldProtectTerminateSystemInterruption()
+        )
+        XCTAssertEqual(
+            runtimeProjectionService
+                .appSwitcherMaintenanceRequestsRecorded(),
+            [
+                .switcherSessionStarted,
+                .appLifecycleRefresh
+            ]
+        )
+        XCTAssertTrue(
+            runtimeProjectionService
+                .appTerminationSignalsRecorded()
+                .isEmpty
+        )
+        XCTAssertFalse(scheduler.fire(at: 0))
+        XCTAssertEqual(requestedAppIDs, [selectedAppID])
+        XCTAssertEqual(protectionPreparedReadbacks, [true])
+
+        controller.handlePanelDidResignKeyForTesting()
+
+        XCTAssertNotNil(model.session)
+        XCTAssertFalse(
+            controller
+                .suppressHotkeyReplayUntilReleaseForTesting
+        )
+    }
+
+    @MainActor
     func testSwitcherPanelControllerQuitFrontmostAppInAppLayerKeepsSessionAfterWorkspaceTerminationRefresh()
         async
     {
