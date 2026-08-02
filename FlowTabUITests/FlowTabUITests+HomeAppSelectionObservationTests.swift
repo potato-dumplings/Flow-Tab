@@ -3,6 +3,10 @@ import XCTest
 
 private enum FlowTabUITestHomeAppSelectionTestPolicy {
     static let watchdog: TimeInterval = 0.01
+    static let budgetWatchdog: TimeInterval = 8
+    static let monotonicOrigin: TimeInterval = 100
+    static let beforeDeadlineElapsed: TimeInterval = 7.5
+    static let afterDeadlineElapsed: TimeInterval = 9
     static let pressureIterations = 100
 }
 
@@ -186,17 +190,57 @@ extension FlowTabUITests {
     }
 
     func testHomeAppSelectionWatchdogBudgetUsesMonotonicTime() {
-        var monotonicTime: TimeInterval = 100
+        XCTAssertEqual(
+            FlowTabUITestHomeAppSelectionTestPolicy
+                .budgetWatchdog,
+            8
+        )
+        XCTAssertLessThan(
+            FlowTabUITestHomeAppSelectionTestPolicy
+                .beforeDeadlineElapsed,
+            FlowTabUITestHomeAppSelectionTestPolicy
+                .budgetWatchdog
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestHomeAppSelectionTestPolicy
+                .afterDeadlineElapsed,
+            FlowTabUITestHomeAppSelectionTestPolicy
+                .budgetWatchdog
+        )
+
+        var monotonicTime =
+            FlowTabUITestHomeAppSelectionTestPolicy
+                .monotonicOrigin
         let budget =
             FlowTabUITestHomeAppSelectionWatchdogBudget(
-                timeout: 8,
+                timeout:
+                    FlowTabUITestHomeAppSelectionTestPolicy
+                        .budgetWatchdog,
                 monotonicTime: { monotonicTime }
             )
 
-        XCTAssertEqual(budget.remaining, 8)
-        monotonicTime = 107.5
-        XCTAssertEqual(budget.remaining, 0.5)
-        monotonicTime = 109
+        XCTAssertEqual(
+            budget.remaining,
+            FlowTabUITestHomeAppSelectionTestPolicy
+                .budgetWatchdog
+        )
+        monotonicTime =
+            FlowTabUITestHomeAppSelectionTestPolicy
+                .monotonicOrigin
+            + FlowTabUITestHomeAppSelectionTestPolicy
+                .beforeDeadlineElapsed
+        XCTAssertEqual(
+            budget.remaining,
+            FlowTabUITestHomeAppSelectionTestPolicy
+                .budgetWatchdog
+                - FlowTabUITestHomeAppSelectionTestPolicy
+                    .beforeDeadlineElapsed
+        )
+        monotonicTime =
+            FlowTabUITestHomeAppSelectionTestPolicy
+                .monotonicOrigin
+            + FlowTabUITestHomeAppSelectionTestPolicy
+                .afterDeadlineElapsed
         XCTAssertEqual(budget.remaining, 0)
     }
 
