@@ -3,6 +3,7 @@ import XCTest
 
 enum FlowTabUITestHomeActivationPolicy {
     static let homeTabNavigationWatchdog: TimeInterval = 10
+    static let appRowPublicationWatchdog: TimeInterval = 20
 }
 
 extension FlowTabUITests {
@@ -20,6 +21,21 @@ extension FlowTabUITests {
             FlowTabUITestHomeActivationPolicy
                 .homeTabNavigationWatchdog,
             0
+        )
+        XCTAssertEqual(
+            FlowTabUITestHomeActivationPolicy
+                .appRowPublicationWatchdog,
+            20
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeActivationPolicy
+                .appRowPublicationWatchdog.isFinite
+        )
+        XCTAssertGreaterThanOrEqual(
+            FlowTabUITestHomeActivationPolicy
+                .appRowPublicationWatchdog,
+            FlowTabUITestHomeActivationPolicy
+                .homeTabNavigationWatchdog
         )
     }
 
@@ -62,9 +78,20 @@ extension FlowTabUITests {
             let homeAppRow = app.buttons
                 .matching(identifier: targetApp.identity.homeAppAccessibilityIdentifier)
                 .firstMatch
+            let appRowPublished =
+                homeAppRow.waitForExistence(
+                    timeout:
+                        FlowTabUITestHomeActivationPolicy
+                            .appRowPublicationWatchdog
+                )
             XCTAssertTrue(
-                homeAppRow.waitForExistence(timeout: 20),
-                "FlowTab did not surface \(targetApp.appName) on the home page."
+                appRowPublished,
+                "Home activation App-row publication watchdog expired. "
+                    + "app=\(targetApp.appName) "
+                    + "expectedIdentifier="
+                    + "\(targetApp.identity.homeAppAccessibilityIdentifier) "
+                    + "finalExists=\(homeAppRow.exists) "
+                    + "finalHittable=\(homeAppRow.isHittable)"
             )
             tapElement(homeAppRow)
 
