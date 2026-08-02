@@ -103,16 +103,45 @@ extension FlowTabUITests {
         )
         guard permissionProjectionEvidence != nil else { return }
         let logSnapshot = makeRuntimeLogFileSnapshot()
+        let permissionTransitionObservation =
+            FlowTabUITestConditionObservationOwner(
+                observationRegistration:
+                    FlowTabUITestConditionReadbackScheduler
+                        .mainRunLoopRegistration(
+                            cadence:
+                                FlowTabUITestConditionObservationPolicy
+                                    .xcuiReadbackCadence
+                        ),
+                readback: { permissionAction.exists },
+                isSatisfied: { !$0 },
+                describe: {
+                    "element=\(permissionActionIdentifier) exists=\($0)"
+                }
+            )
+        permissionTransitionObservation.start()
+        defer { permissionTransitionObservation.cancel() }
 
         try writePermissionState(
             accessibilityTrusted: true,
             screenCaptureTrusted: true,
             to: stateURL
         )
-
-        XCTAssertTrue(
-            waitForNonExistence(permissionAction, timeout: 6)
+        permissionTransitionObservation.requestReadback(
+            source: .triggerReadback
         )
+
+        let permissionTransitionEvidence =
+            permissionTransitionObservation.waitForResolution(
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .permissionStateProjection
+            )
+        XCTAssertNotNil(
+            permissionTransitionEvidence,
+            "Home permission transition watchdog expired. "
+                + permissionTransitionObservation.diagnosticSummary
+        )
+        guard permissionTransitionEvidence != nil else { return }
         waitForRuntimeLogFiles(
             containing: [
                 "home permission observed target=accessibility source=fallbackReadback granted=true",
