@@ -283,20 +283,25 @@ extension FlowTabUITests {
             "Home initial-projection foreground watchdog expired. "
                 + "finalState=\(String(describing: app.state))"
         )
-        XCTAssertTrue(
-            tapFirstHittable(
-                in: app.buttons.matching(
-                    identifier: Identifier.homeTabButton
-                ),
-                timeout: 5
-            )
+        let homeTabButtons = app.buttons.matching(
+            identifier: Identifier.homeTabButton
+        )
+        let homeContent = element(
+            in: app,
+            identifier: Identifier.homeTabContent
         )
         XCTAssertTrue(
-            element(
-                in: app,
-                identifier: Identifier.homeTabContent
-            )
-            .waitForExistence(timeout: 5)
+            tapFirstHittableAndWaitForExistence(
+                in: homeTabButtons,
+                content: homeContent,
+                contentDescription: Identifier.homeTabContent,
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .tabNavigation
+            ),
+            "Home initial-projection navigation watchdog expired. "
+                + "finalCandidateCount=\(homeTabButtons.count) "
+                + "finalContentExists=\(homeContent.exists)"
         )
 
         let mailRow = element(
