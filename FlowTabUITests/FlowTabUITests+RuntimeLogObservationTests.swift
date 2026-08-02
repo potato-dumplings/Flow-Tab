@@ -4,6 +4,7 @@ import XCTest
 private enum FlowTabUITestRuntimeLogObservationTestPolicy {
     static let watchdog: TimeInterval = 0.01
     static let fileEventWatchdog: TimeInterval = 2
+    static let applicationReadinessWatchdog: TimeInterval = 10
     static let pressureIterations = 100
     static let triggerNotificationName =
         "io.github.potato-dumplings.flowtab.ui-test."
@@ -40,12 +41,21 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(app)
         defer { app.terminate() }
-        XCTAssertTrue(
+        guard
             waitForFlowTabUITestApplicationToBecomeReady(
                 app,
-                timeout: 10
+                timeout:
+                    FlowTabUITestRuntimeLogObservationTestPolicy
+                        .applicationReadinessWatchdog
             )
-        )
+        else {
+            XCTFail(
+                "unmetCondition=applicationState.runningForeground "
+                    + "finalState=\(app.state)"
+            )
+            return
+        }
+        XCTAssertEqual(app.state, .runningForeground)
 
         let baseline = makeRuntimeLogFileSnapshot()
         postFlowTabUITestSwitcherTrigger(
@@ -212,6 +222,22 @@ extension FlowTabUITests {
     func testRuntimeLogObservationContractsAndEventResolution()
         throws
     {
+        XCTAssertEqual(
+            FlowTabUITestRuntimeLogObservationTestPolicy
+                .applicationReadinessWatchdog,
+            10
+        )
+        XCTAssertTrue(
+            FlowTabUITestRuntimeLogObservationTestPolicy
+                .applicationReadinessWatchdog.isFinite
+        )
+        XCTAssertGreaterThanOrEqual(
+            FlowTabUITestRuntimeLogObservationTestPolicy
+                .applicationReadinessWatchdog,
+            FlowTabUITestRuntimeLogObservationTestPolicy
+                .fileEventWatchdog
+        )
+
         let regex = try NSRegularExpression(
             pattern: #"route=(event|readback)"#
         )
