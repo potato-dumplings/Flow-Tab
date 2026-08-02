@@ -58,19 +58,14 @@ extension FlowTabPriorityCoverageTests {
             XCTAssertEqual(model.searchViewState.query, expectedQuery)
             XCTAssertEqual(model.searchViewState.results.map(\.primaryText), expectedResultTitles)
 
-            let layoutRefreshed = expectation(
-                description: "layout refresh published after app termination"
-            )
-            layoutRefreshed.assertForOverFulfill = true
-            var didObserveLayoutRefresh = false
+            var layoutPublicationCount = 0
             model.onSessionLayoutChanged = {
-                guard !didObserveLayoutRefresh else { return }
-                didObserveLayoutRefresh = true
-                layoutRefreshed.fulfill()
+                layoutPublicationCount += 1
             }
 
             let preservedSearchPublished = expectation(
-                description: "preserved search result published after projection refresh"
+                description:
+                    "unmetCondition=preservedSearchComputationPublishedAfterTermination"
             )
             preservedSearchPublished.assertForOverFulfill = true
             var didObservePreservedSearch = false
@@ -90,17 +85,22 @@ extension FlowTabPriorityCoverageTests {
             }
 
             runtimeProjectionService.installAppSwitcherProjection(apps: refreshedApps)
+            XCTAssertEqual(layoutPublicationCount, 0)
             XCTAssertTrue(
                 model.handleApplicationTerminated(
                     appID: "com.example.code",
                     pid: 42_300
                 )
             )
+            XCTAssertEqual(layoutPublicationCount, 1)
 
             await fulfillment(
-                of: [layoutRefreshed, preservedSearchPublished],
-                timeout: 1.0
+                of: [preservedSearchPublished],
+                timeout:
+                    FlowTabPriorityCoverageWatchdogPolicy
+                        .searchComputationPublication
             )
+            XCTAssertEqual(layoutPublicationCount, 1)
             XCTAssertEqual(model.appCount, refreshedApps.count)
             XCTAssertTrue(model.isSearchActive)
             XCTAssertEqual(model.searchViewState.scope, .app)
