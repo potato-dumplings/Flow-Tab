@@ -1,7 +1,21 @@
 import XCTest
 @testable import FlowTab
 
+private enum MockWindowPreviewLatencyLifecycleWatchdogPolicy {
+    static let eventDelivery: TimeInterval = 1
+}
+
 extension FlowTabTests {
+    func testMockWindowPreviewLatencyLifecycleWatchdogPolicyPreservesEventDeliveryBound() {
+        let eventDelivery =
+            MockWindowPreviewLatencyLifecycleWatchdogPolicy
+                .eventDelivery
+
+        XCTAssertEqual(eventDelivery, 1)
+        XCTAssertTrue(eventDelivery.isFinite)
+        XCTAssertGreaterThan(eventDelivery, 0)
+    }
+
     func testUITestMockWindowPreviewLatencyPolicyAndEvidence() {
         XCTAssertEqual(
             FlowTabUITestMockWindowPreviewLatencyPolicy(
@@ -81,40 +95,107 @@ extension FlowTabTests {
             )
         let completed = expectation(
             description:
-                "cancelled preview latency wait completes"
+                "unmetCondition=cancelledPreviewLatencyWaitPublishesExactEvidence ownerGeneration=23 requestCount=3"
         )
-
-        DispatchQueue.global().async {
-            _ = owner.waitBeforeCapture(
+        completed.assertForOverFulfill = true
+        let expectedEvidence =
+            FlowTabUITestMockWindowPreviewLatencyEvidence(
+                ownerGeneration: 23,
+                batchGeneration: 1,
+                requestCount: 3,
+                policy:
+                    FlowTabUITestMockWindowPreviewLatencyPolicy(
+                        rawMilliseconds: 1_000
+                    ),
+                outcome: .cancelled
+            )
+        let returnedEvidenceStore =
+            LockedMockWindowPreviewLatencyEvidenceStore()
+        let workItem = DispatchWorkItem {
+            let result = owner.waitBeforeCapture(
                 requestCount: 3
             )
-            completed.fulfill()
+            returnedEvidenceStore.append(result)
+            if result == expectedEvidence {
+                completed.fulfill()
+            }
+        }
+        defer {
+            owner.cancel()
+            workItem.cancel()
         }
 
         XCTAssertEqual(
-            waiter.started.wait(
-                timeout: .now() + 1
-            ),
-            .success
+            waiter.snapshot,
+            BlockingMockWindowPreviewLatencyWaiter
+                .Snapshot(
+                    waitCount: 0,
+                    isWaiting: false,
+                    cancelCount: 0
+                )
         )
-        owner.cancel()
-        wait(for: [completed], timeout: 1)
+        XCTAssertTrue(evidenceStore.values.isEmpty)
+        XCTAssertTrue(returnedEvidenceStore.values.isEmpty)
 
-        XCTAssertEqual(waiter.cancelCount, 1)
+        DispatchQueue.global().async(execute: workItem)
+
+        let startResult = waiter.started.wait(
+            timeout:
+                .now()
+                + MockWindowPreviewLatencyLifecycleWatchdogPolicy
+                    .eventDelivery
+        )
+        XCTAssertEqual(
+            startResult,
+            .success,
+            "unmetCondition=previewLatencyWaitEnteredControlledBlock "
+                + "finalWaiterSnapshot=\(waiter.snapshot) "
+                + "finalPublishedEvidence=\(evidenceStore.values) "
+                + "finalReturnedEvidence=\(returnedEvidenceStore.values)"
+        )
+        XCTAssertEqual(
+            waiter.snapshot,
+            BlockingMockWindowPreviewLatencyWaiter
+                .Snapshot(
+                    waitCount: 1,
+                    isWaiting: true,
+                    cancelCount: 0
+                )
+        )
+        XCTAssertTrue(evidenceStore.values.isEmpty)
+        XCTAssertTrue(returnedEvidenceStore.values.isEmpty)
+
+        owner.cancel()
+        wait(
+            for: [completed],
+            timeout:
+                MockWindowPreviewLatencyLifecycleWatchdogPolicy
+                    .eventDelivery
+        )
+
+        XCTAssertEqual(
+            waiter.snapshot,
+            BlockingMockWindowPreviewLatencyWaiter
+                .Snapshot(
+                    waitCount: 1,
+                    isWaiting: false,
+                    cancelCount: 1
+                ),
+            "unmetCondition=previewLatencyWaitReleasedAfterCancellation "
+                + "finalPublishedEvidence=\(evidenceStore.values) "
+                + "finalReturnedEvidence=\(returnedEvidenceStore.values)"
+        )
+        XCTAssertEqual(
+            returnedEvidenceStore.values,
+            [expectedEvidence]
+        )
         XCTAssertEqual(
             evidenceStore.values,
-            [
-                FlowTabUITestMockWindowPreviewLatencyEvidence(
-                    ownerGeneration: 23,
-                    batchGeneration: 1,
-                    requestCount: 3,
-                    policy:
-                        FlowTabUITestMockWindowPreviewLatencyPolicy(
-                            rawMilliseconds: 1_000
-                        ),
-                    outcome: .cancelled
-                )
-            ]
+            [expectedEvidence]
+        )
+        XCTAssertEqual(
+            waiter.cancelCount,
+            1
         )
     }
 
@@ -267,24 +348,47 @@ private final class
     FlowTabUITestMockWindowPreviewLatencyWaiting,
     @unchecked Sendable
 {
+    struct Snapshot: Equatable {
+        let waitCount: Int
+        let isWaiting: Bool
+        let cancelCount: Int
+    }
+
     let started = DispatchSemaphore(value: 0)
 
     private let lock = NSLock()
     private let release = DispatchSemaphore(value: 0)
+    private var storedWaitCount = 0
+    private var storedIsWaiting = false
     private var storedCancelCount = 0
 
-    var cancelCount: Int {
+    var snapshot: Snapshot {
         lock.lock()
-        let result = storedCancelCount
+        let result = Snapshot(
+            waitCount: storedWaitCount,
+            isWaiting: storedIsWaiting,
+            cancelCount: storedCancelCount
+        )
         lock.unlock()
         return result
+    }
+
+    var cancelCount: Int {
+        snapshot.cancelCount
     }
 
     func wait(
         for _: TimeInterval
     ) -> FlowTabUITestMockWindowPreviewLatencyOutcome {
+        lock.lock()
+        storedWaitCount += 1
+        storedIsWaiting = true
+        lock.unlock()
         started.signal()
         release.wait()
+        lock.lock()
+        storedIsWaiting = false
+        lock.unlock()
         return .cancelled
     }
 
