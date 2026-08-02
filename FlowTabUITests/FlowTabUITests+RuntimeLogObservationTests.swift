@@ -23,6 +23,25 @@ private enum FlowTabUITestRuntimeLogObservationTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testRuntimeLogObservationPolicyPreservesCompatibleDefaults() {
+        XCTAssertEqual(
+            FlowTabUITestRuntimeLogObservationPolicy.defaultWatchdog,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestRuntimeLogObservationPolicy
+                .defaultWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestRuntimeLogObservationPolicy.defaultWatchdog,
+            0
+        )
+        XCTAssertEqual(
+            FlowTabUITestRuntimeLogObservationPolicy.readbackCadence,
+            0.2
+        )
+    }
+
     func testRuntimeLogRegexObservationReadsMockRuntimeTriggerDelivery()
         throws
     {

@@ -1,7 +1,8 @@
 import Foundation
 import XCTest
 
-private enum FlowTabUITestRuntimeLogObservationPolicy {
+enum FlowTabUITestRuntimeLogObservationPolicy {
+    static let defaultWatchdog: TimeInterval = 8
     static let readbackCadence: TimeInterval = 0.2
     static let maximumDiagnosticCharacterCount = 4_000
 }
@@ -271,7 +272,9 @@ extension FlowTabUITests {
         containing markers: [String],
         since snapshot:
             FlowTabUITestRuntimeLogObservationBaseline,
-        timeout: TimeInterval = 8
+        timeout: TimeInterval =
+            FlowTabUITestRuntimeLogObservationPolicy
+                .defaultWatchdog
     ) {
         waitForRuntimeLogFiles(
             satisfying: .allMarkers(markers),
@@ -284,7 +287,9 @@ extension FlowTabUITests {
         matching pattern: String,
         since snapshot:
             FlowTabUITestRuntimeLogObservationBaseline,
-        timeout: TimeInterval = 8,
+        timeout: TimeInterval =
+            FlowTabUITestRuntimeLogObservationPolicy
+                .defaultWatchdog,
         description: String
     ) {
         let regex: NSRegularExpression
