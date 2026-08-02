@@ -1,6 +1,19 @@
+import Foundation
 import XCTest
 
+enum FlowTabUITestSearchSelectionWrapPolicy {
+    static let diagnosticsTransitionWatchdog: TimeInterval = 3
+}
+
 extension FlowTabUITests {
+    func testSearchSelectionWrapWatchdogPolicyCompatibility() {
+        XCTAssertEqual(
+            FlowTabUITestSearchSelectionWrapPolicy
+                .diagnosticsTransitionWatchdog,
+            3
+        )
+    }
+
     func testSearchPanelWrapFromLastResultScrollsBackToFirstResult() throws {
         let launch =
             launchSearchMockApplication(
@@ -35,7 +48,9 @@ extension FlowTabUITests {
                     key: "searchSelectedResult",
                     equals: resultID,
                     decodesPercentEncoding: true,
-                    timeout: 3,
+                    timeout:
+                        FlowTabUITestSearchSelectionWrapPolicy
+                            .diagnosticsTransitionWatchdog,
                     trigger: {
                         app.typeKey(
                             .downArrow,
@@ -70,7 +85,9 @@ extension FlowTabUITests {
                 key: "searchSelectedResult",
                 equals: firstResultID,
                 decodesPercentEncoding: true,
-                timeout: 3,
+                timeout:
+                    FlowTabUITestSearchSelectionWrapPolicy
+                        .diagnosticsTransitionWatchdog,
                 trigger: {
                     app.typeKey(
                         .downArrow,
