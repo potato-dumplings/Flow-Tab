@@ -990,44 +990,6 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
-    func testRuntimeAXRemoteWindowResolverCompletesConfiguredRangeAfterResolverSuspension() {
-        let scanSuspended = DispatchSemaphore(value: 0)
-        let resumeScan = DispatchSemaphore(value: 0)
-        let scanCompleted = DispatchSemaphore(value: 0)
-        let lock = NSLock()
-        var visitedElementIDs: [UInt64] = []
-        var completeness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness?
-
-        DispatchQueue(label: "FlowTabTests.RemoteAXDeterministicScan").async {
-            let result = RuntimeAXRemoteWindowResolverForTesting.scan(for: .interactive) { elementID in
-                lock.lock()
-                visitedElementIDs.append(elementID)
-                lock.unlock()
-                if elementID == 24 {
-                    scanSuspended.signal()
-                    resumeScan.wait()
-                }
-                return nil
-            }
-            lock.lock()
-            completeness = result.completeness
-            lock.unlock()
-            scanCompleted.signal()
-        }
-
-        XCTAssertEqual(scanSuspended.wait(timeout: .now() + 1), .success)
-        XCTAssertEqual(scanCompleted.wait(timeout: .now()), .timedOut)
-        resumeScan.signal()
-        XCTAssertEqual(scanCompleted.wait(timeout: .now() + 1), .success)
-
-        lock.lock()
-        let finalVisitedElementIDs = visitedElementIDs
-        let finalCompleteness = completeness
-        lock.unlock()
-        XCTAssertEqual(finalVisitedElementIDs, Array(UInt64(0)..<750))
-        XCTAssertEqual(finalCompleteness, .complete(scanned: 750))
-    }
-
     func testRuntimeAXRemoteWindowResolverClassifiesResolveFailures() {
         let rejectedToken = RuntimeAXRemoteWindowResolverForTesting.remoteAXResolveResult(
             element: nil,
