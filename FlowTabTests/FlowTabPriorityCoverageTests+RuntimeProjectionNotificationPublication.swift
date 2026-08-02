@@ -638,7 +638,10 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionNotificationPublisherDeliversBackgroundPostsOnMainThread() async {
         let notificationCenter = NotificationCenter()
         let notificationObject = NSObject()
-        let delivered = expectation(description: "Runtime projection update reaches observers")
+        let delivered = expectation(
+            description: "unmetCondition=runtimeProjectionUpdateDeliveredOnMainThread"
+        )
+        delivered.assertForOverFulfill = true
         let observer = notificationCenter.addObserver(
             forName: .runtimeAppSwitcherProjectionDidUpdate,
             object: notificationObject,
@@ -659,7 +662,12 @@ extension FlowTabPriorityCoverageTests {
             )
         }
 
-        await fulfillment(of: [delivered], timeout: 1)
+        await fulfillment(
+            of: [delivered],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .runtimeProjectionMainThreadDelivery
+        )
     }
 
     @MainActor
