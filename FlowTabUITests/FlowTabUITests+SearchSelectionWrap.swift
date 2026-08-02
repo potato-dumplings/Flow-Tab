@@ -2,11 +2,17 @@ import Foundation
 import XCTest
 
 enum FlowTabUITestSearchSelectionWrapPolicy {
+    static let diagnosticsPublicationWatchdog: TimeInterval = 5
     static let diagnosticsTransitionWatchdog: TimeInterval = 3
 }
 
 extension FlowTabUITests {
     func testSearchSelectionWrapWatchdogPolicyCompatibility() {
+        XCTAssertEqual(
+            FlowTabUITestSearchSelectionWrapPolicy
+                .diagnosticsPublicationWatchdog,
+            5
+        )
         XCTAssertEqual(
             FlowTabUITestSearchSelectionWrapPolicy
                 .diagnosticsTransitionWatchdog,
@@ -31,8 +37,18 @@ extension FlowTabUITests {
                 in: app,
                 identifier: Identifier.switcherSummary
             )
+        let diagnosticsPublished =
+            diagnosticsSummary.waitForExistence(
+                timeout:
+                    FlowTabUITestSearchSelectionWrapPolicy
+                        .diagnosticsPublicationWatchdog
+            )
         XCTAssertTrue(
-            diagnosticsSummary.waitForExistence(timeout: 5)
+            diagnosticsPublished,
+            "Search diagnostics summary was not published. "
+                + "expectedExists=true "
+                + "finalExists=\(diagnosticsSummary.exists) "
+                + "identifier=\(diagnosticsSummary.identifier)"
         )
 
         for index in 1...10 {
