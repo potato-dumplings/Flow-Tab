@@ -3,6 +3,7 @@ import XCTest
 
 private enum FlowTabUITestApplicationTerminationPolicy {
     static let watchdogFailureObservationTimeout: TimeInterval = 5
+    static let delayedEvidenceOverrideWatchdog: TimeInterval = 9
 }
 
 protocol FlowTabUITestApplicationTerminationTarget: AnyObject {
@@ -151,6 +152,11 @@ extension FlowTabUITests {
     }
 
     func testApplicationTerminationWaitsForDelayedNotRunningEvidence() {
+        XCTAssertEqual(
+            FlowTabUITestApplicationTerminationPolicy
+                .delayedEvidenceOverrideWatchdog,
+            9
+        )
         let target =
             FlowTabUITestApplicationTerminationTargetStub(
                 initialState: .runningBackground,
@@ -162,14 +168,20 @@ extension FlowTabUITests {
         let evidence = terminateFlowTabUITestApplication(
             target,
             targetDescription: "delayed",
-            timeout: 9
+            timeout:
+                FlowTabUITestApplicationTerminationPolicy
+                    .delayedEvidenceOverrideWatchdog
         )
 
         XCTAssertTrue(evidence.isSatisfied)
         XCTAssertEqual(evidence.waiterCompleted, true)
         XCTAssertEqual(target.waitCallCount, 1)
         XCTAssertEqual(target.lastWaitState, .notRunning)
-        XCTAssertEqual(target.lastWaitTimeout, 9)
+        XCTAssertEqual(
+            target.lastWaitTimeout,
+            FlowTabUITestApplicationTerminationPolicy
+                .delayedEvidenceOverrideWatchdog
+        )
     }
 
     func testApplicationTerminationAcceptsFinalReadbackAfterWaitBoundary() {
