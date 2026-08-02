@@ -14,6 +14,7 @@ extension FlowTabPriorityCoverageTests {
             let expectedQuery = "bro"
             let expectedResultTitles = ["Browser"]
             defer {
+                model.cancelPendingSearchComputation()
                 model.onSearchStateChanged = nil
                 model.onSessionLayoutChanged = nil
             }
@@ -22,7 +23,8 @@ extension FlowTabPriorityCoverageTests {
             XCTAssertTrue(model.enterSearchMode())
 
             let initialSearchPublished = expectation(
-                description: "initial search result published before termination refresh"
+                description:
+                    "unmetCondition=initialSearchComputationPublishedExactQueryResults"
             )
             initialSearchPublished.assertForOverFulfill = true
             var didObserveInitialSearch = false
@@ -45,7 +47,12 @@ extension FlowTabPriorityCoverageTests {
                 cursorPosition: expectedQuery.count
             )
 
-            await fulfillment(of: [initialSearchPublished], timeout: 1.0)
+            await fulfillment(
+                of: [initialSearchPublished],
+                timeout:
+                    FlowTabPriorityCoverageWatchdogPolicy
+                        .searchComputationPublication
+            )
             XCTAssertTrue(model.isSearchActive)
             XCTAssertEqual(model.searchViewState.scope, .app)
             XCTAssertEqual(model.searchViewState.query, expectedQuery)

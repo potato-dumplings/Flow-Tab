@@ -14,6 +14,7 @@ enum FlowTabPriorityCoverageWatchdogPolicy {
     static let committedSearchIndexPublication: TimeInterval = 1
     static let runtimeProjectionMainThreadDelivery: TimeInterval = 1
     static let searchResultScrollPublication: TimeInterval = 1
+    static let searchComputationPublication: TimeInterval = 1
 }
 
 final class FlowTabPriorityCoverageTests: XCTestCase {}
@@ -89,5 +90,14 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(searchResultScrollPublication, 1)
         XCTAssertTrue(searchResultScrollPublication.isFinite)
         XCTAssertGreaterThan(searchResultScrollPublication, 0)
+    }
+
+    func testPriorityCoverageWatchdogPolicyPreservesSearchComputationPublicationBound() {
+        let searchComputationPublication =
+            FlowTabPriorityCoverageWatchdogPolicy.searchComputationPublication
+
+        XCTAssertEqual(searchComputationPublication, 1)
+        XCTAssertTrue(searchComputationPublication.isFinite)
+        XCTAssertGreaterThan(searchComputationPublication, 0)
     }
 }
