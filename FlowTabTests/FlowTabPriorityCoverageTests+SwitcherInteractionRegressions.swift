@@ -214,7 +214,7 @@ extension FlowTabPriorityCoverageTests {
         controller.hideNonPanelWindowsOverride = {}
         let previewRevealCompleted = expectation(
             description:
-                "matching preview-ready evidence reveals panel"
+                "unmetCondition=exactPreviewReadyEvidenceRevealsPanel"
         )
         previewRevealCompleted.assertForOverFulfill =
             true
@@ -223,16 +223,35 @@ extension FlowTabPriorityCoverageTests {
                 .onWindowOnlyPreviewPreparationChanged
         var expectedObservationGeneration: Int?
         var expectedPresentationGeneration: Int?
-        var didObserveReveal = false
+        var observedPreviewCompletionCount = 0
+        var matchingRevealCount = 0
+        var lastObservedEvidence:
+            InitialWindowOnlyPreviewRevealEvidence?
+        var lastObservedWindowIDs: [String] = []
+        var lastObservedImageFlags: [Bool] = []
+        var lastObservedCaptureStates: [String] = []
         model.onWindowOnlyPreviewPreparationChanged = {
+            XCTAssertTrue(Thread.isMainThread)
+            observedPreviewCompletionCount += 1
             controllerPreviewBatchObserver?()
             let owner =
                 controller
                     .initialWindowOnlyPreviewRevealObservationOwner
             let previewSnapshot =
                 model.windowPreviewSnapshotForTesting()
+            let captureStates =
+                model
+                    .previewCaptureStatesForTesting()
+            lastObservedEvidence = owner.lastReadyEvidence
+            lastObservedWindowIDs = previewSnapshot.map(\.id)
+            lastObservedImageFlags =
+                previewSnapshot.map(\.hasImage)
+            lastObservedCaptureStates =
+                captureStates
+                    .values
+                    .map { String(describing: $0) }
+                    .sorted()
             guard
-                !didObserveReveal,
                 let expectedObservationGeneration,
                 let expectedPresentationGeneration,
                 let evidence = owner.lastReadyEvidence,
@@ -250,12 +269,20 @@ extension FlowTabPriorityCoverageTests {
                 controller.panel.alphaValue == 1,
                 model.windowOnlyPreviewCaptureInFlightCount
                     == 0,
-                previewSnapshot.count == windows.count,
-                previewSnapshot.allSatisfy(\.hasImage)
+                previewSnapshot.map(\.id)
+                    == windows.map(\.id),
+                previewSnapshot.allSatisfy(\.hasImage),
+                !captureStates.isEmpty,
+                captureStates.values.allSatisfy({ state in
+                    if case .succeeded = state {
+                        return true
+                    }
+                    return false
+                })
             else {
                 return
             }
-            didObserveReveal = true
+            matchingRevealCount += 1
             previewRevealCompleted.fulfill()
         }
         defer {
@@ -334,6 +361,21 @@ extension FlowTabPriorityCoverageTests {
                 .initialWindowOnlyPreviewRevealObservationOwner
                 .isObserving
         )
+        XCTAssertTrue(
+            controller
+                .initialWindowOnlyPreviewRevealObservationOwner
+                .hasPendingWatchdog
+        )
+        XCTAssertNil(
+            controller
+                .initialWindowOnlyPreviewRevealObservationOwner
+                .lastReadyEvidence
+        )
+        XCTAssertNil(
+            controller
+                .initialWindowOnlyPreviewRevealObservationOwner
+                .lastWatchdogFailure
+        )
         expectedObservationGeneration =
             controller
                 .initialWindowOnlyPreviewRevealObservationOwner
@@ -344,13 +386,25 @@ extension FlowTabPriorityCoverageTests {
         previewBatchRelease.signal()
         await fulfillment(
             of: [previewRevealCompleted],
-            timeout: 1
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .windowPreviewEventDelivery
         )
 
         let evidence =
             controller
                 .initialWindowOnlyPreviewRevealObservationOwner
                 .lastReadyEvidence
+        XCTAssertEqual(
+            observedPreviewCompletionCount,
+            1,
+            "unmetCondition=singleExactPreviewReadyPublication matchingCount=\(matchingRevealCount) lastEvidence=\(String(describing: lastObservedEvidence)) finalWindowIDs=\(lastObservedWindowIDs) finalImageFlags=\(lastObservedImageFlags) finalCaptureStates=\(lastObservedCaptureStates)"
+        )
+        XCTAssertEqual(
+            matchingRevealCount,
+            1,
+            "unmetCondition=exactPreviewReadyPublication lastEvidence=\(String(describing: lastObservedEvidence)) finalWindowIDs=\(lastObservedWindowIDs) finalImageFlags=\(lastObservedImageFlags) finalCaptureStates=\(lastObservedCaptureStates)"
+        )
         XCTAssertEqual(
             evidence?.source,
             .previewBatchCompleted
@@ -374,6 +428,10 @@ extension FlowTabPriorityCoverageTests {
         )
         let finalPreviewSnapshot =
             model.windowPreviewSnapshotForTesting()
+        XCTAssertEqual(
+            finalPreviewSnapshot.map(\.id),
+            windows.map(\.id)
+        )
         XCTAssertTrue(
             finalPreviewSnapshot.allSatisfy(\.hasImage)
         )
