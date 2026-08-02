@@ -283,7 +283,7 @@ final class TabSwitchStressUITestObservationOwner {
 extension FlowTabUITests {
     func testTabSwitchStressCPUAndMemory() throws {
         let options = XCTMeasureOptions()
-        options.iterationCount = 3
+        options.iterationCount = TabSwitchStressUITestPolicy.measurementIterations
 
         measure(
             metrics: [
@@ -308,24 +308,33 @@ extension FlowTabUITests {
                     "--flowtab-ui-mock-runtime",
                     "--flowtab-tab-stress",
                     "--flowtab-tab-stress-duration",
-                    "2",
+                    TabSwitchStressUITestPolicy.workloadDurationArgument,
                     "--flowtab-tab-stress-interval-ms",
-                    "16",
+                    TabSwitchStressUITestPolicy.switchCadenceArgument,
                     "-showPermissionReminder",
                     "NO"
                 ] + route.launchArguments
             )
+            defer { assertTabSwitchStressApplicationCleanup(app) }
             launchFlowTabUITestApplication(app)
-            XCTAssertTrue(
+            let readinessWaitCompleted =
                 waitForFlowTabUITestApplicationToBecomeReady(
                     app,
-                    timeout: 5
+                    timeout: TabSwitchStressUITestPolicy.applicationReadinessWatchdog
                 )
+            let readinessState = app.state
+            XCTAssertEqual(
+                readinessState,
+                .runningForeground,
+                "Tab-switch stress readiness watchdog expired. "
+                    + "waiterCompleted=\(readinessWaitCompleted) "
+                    + "finalState=\(String(describing: readinessState))"
             )
 
             let completed =
                 observation.waitForCompletion(
-                    timeout: 10
+                    timeout:
+                        TabSwitchStressUITestPolicy.completionEvidenceWatchdog
                 )
             XCTAssertNotNil(
                 completed,
@@ -333,23 +342,23 @@ extension FlowTabUITests {
             )
             XCTAssertEqual(
                 completed?.durationNanoseconds,
-                2_000_000_000
+                TabSwitchStressUITestPolicy.workloadDurationNanoseconds
             )
             XCTAssertEqual(
                 completed?.cadenceNanoseconds,
-                16_000_000
+                TabSwitchStressUITestPolicy.switchCadenceNanoseconds
             )
             XCTAssertEqual(
                 completed?.requiredSwitches,
-                125
+                TabSwitchStressUITestPolicy.requiredSwitches
             )
             XCTAssertEqual(
                 completed?.attempts,
-                125
+                TabSwitchStressUITestPolicy.requiredSwitches
             )
             XCTAssertEqual(
                 completed?.switches,
-                125
+                TabSwitchStressUITestPolicy.requiredSwitches
             )
             XCTAssertEqual(
                 completed?.requested,
@@ -367,13 +376,22 @@ extension FlowTabUITests {
             )
             XCTAssertGreaterThanOrEqual(
                 completed?.elapsedNanoseconds ?? 0,
-                2_000_000_000
+                TabSwitchStressUITestPolicy.workloadDurationNanoseconds
             )
-            XCTAssertTrue(
+            let terminationWaitCompleted =
                 app.wait(
                     for: .notRunning,
-                    timeout: 10
+                    timeout: TabSwitchStressUITestPolicy.naturalTerminationWatchdog
                 )
+            let terminationState = app.state
+            XCTAssertEqual(
+                terminationState,
+                .notRunning,
+                "Tab-switch stress natural-termination watchdog "
+                    + "expired. waiterCompleted="
+                    + "\(terminationWaitCompleted) finalState="
+                    + "\(String(describing: terminationState)) "
+                    + observation.diagnosticSummary
             )
         }
     }

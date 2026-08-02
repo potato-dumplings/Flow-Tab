@@ -126,6 +126,7 @@
 		A45E00043D66000100B0D737 /* FlowTabUITests+SearchInputReadinessObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45E00033D66000100B0D737 /* FlowTabUITests+SearchInputReadinessObservationTests.swift */; };
 		A46C00023D74000100B0D737 /* FlowTabUITests+SwitcherSearchConfirmationObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46C00013D74000100B0D737 /* FlowTabUITests+SwitcherSearchConfirmationObservation.swift */; };
 		A46C00043D74000100B0D737 /* FlowTabUITests+SwitcherSearchConfirmationObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46C00033D74000100B0D737 /* FlowTabUITests+SwitcherSearchConfirmationObservationTests.swift */; };
+		A46D00023D75000100B0D737 /* FlowTabUITests+TabSwitchStressEvidencePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46D00013D75000100B0D737 /* FlowTabUITests+TabSwitchStressEvidencePolicy.swift */; };
 		A44600023D4E000100B0D737 /* FlowTabUITests+ScrollingSupportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44600013D4E000100B0D737 /* FlowTabUITests+ScrollingSupportTests.swift */; };
 		A44600043D4E000100B0D737 /* FlowTabUITests+ScrollingHittableElementObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44600033D4E000100B0D737 /* FlowTabUITests+ScrollingHittableElementObservation.swift */; };
 		A44700023D4F000100B0D737 /* FlowTabUITests+ScrollingElementVisibilityObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44700013D4F000100B0D737 /* FlowTabUITests+ScrollingElementVisibilityObservation.swift */; };
@@ -951,6 +952,7 @@
 		A45E00033D66000100B0D737 /* FlowTabUITests+SearchInputReadinessObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SearchInputReadinessObservationTests.swift"; sourceTree = "<group>"; };
 		A46C00013D74000100B0D737 /* FlowTabUITests+SwitcherSearchConfirmationObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherSearchConfirmationObservation.swift"; sourceTree = "<group>"; };
 		A46C00033D74000100B0D737 /* FlowTabUITests+SwitcherSearchConfirmationObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherSearchConfirmationObservationTests.swift"; sourceTree = "<group>"; };
+		A46D00013D75000100B0D737 /* FlowTabUITests+TabSwitchStressEvidencePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+TabSwitchStressEvidencePolicy.swift"; sourceTree = "<group>"; };
 		A44600013D4E000100B0D737 /* FlowTabUITests+ScrollingSupportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ScrollingSupportTests.swift"; sourceTree = "<group>"; };
 		A44600033D4E000100B0D737 /* FlowTabUITests+ScrollingHittableElementObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ScrollingHittableElementObservation.swift"; sourceTree = "<group>"; };
 		A44700013D4F000100B0D737 /* FlowTabUITests+ScrollingElementVisibilityObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ScrollingElementVisibilityObservation.swift"; sourceTree = "<group>"; };
@@ -1330,6 +1332,7 @@
 				A45E00033D66000100B0D737 /* FlowTabUITests+SearchInputReadinessObservationTests.swift */,
 				A46C00013D74000100B0D737 /* FlowTabUITests+SwitcherSearchConfirmationObservation.swift */,
 				A46C00033D74000100B0D737 /* FlowTabUITests+SwitcherSearchConfirmationObservationTests.swift */,
+				A46D00013D75000100B0D737 /* FlowTabUITests+TabSwitchStressEvidencePolicy.swift */,
 				F9A1000136C0000100B0D737 /* FlowTabUITests+ScrollingSupport.swift */,
 				A44600033D4E000100B0D737 /* FlowTabUITests+ScrollingHittableElementObservation.swift */,
 				A44600013D4E000100B0D737 /* FlowTabUITests+ScrollingSupportTests.swift */,
@@ -2357,6 +2360,7 @@
 				A45E00043D66000100B0D737 /* FlowTabUITests+SearchInputReadinessObservationTests.swift in Sources */,
 				A46C00023D74000100B0D737 /* FlowTabUITests+SwitcherSearchConfirmationObservation.swift in Sources */,
 				A46C00043D74000100B0D737 /* FlowTabUITests+SwitcherSearchConfirmationObservationTests.swift in Sources */,
+				A46D00023D75000100B0D737 /* FlowTabUITests+TabSwitchStressEvidencePolicy.swift in Sources */,
 				F9A1000236C0000100B0D737 /* FlowTabUITests+ScrollingSupport.swift in Sources */,
 				A44600043D4E000100B0D737 /* FlowTabUITests+ScrollingHittableElementObservation.swift in Sources */,
 				A44600023D4E000100B0D737 /* FlowTabUITests+ScrollingSupportTests.swift in Sources */,
