@@ -657,6 +657,10 @@ final class SearchSystemTextInputBridgeTestHarness {
         containerView.textView.enclosingScrollView
     }
 
+    var hasKeyboardReadinessTestObserver: Bool {
+        onKeyboardReadinessChanged != nil
+    }
+
     func installInKeyWindow() -> NSWindow {
         installInWindow(makeKey: true)
     }
@@ -706,6 +710,7 @@ final class SearchSystemTextInputBridgeTestHarness {
     }
 
     func closeHostingWindow() {
+        onKeyboardReadinessChanged = nil
         coordinator.detach(textView: containerView.textView)
         if hostingWindow?.firstResponder
             === containerView.textView

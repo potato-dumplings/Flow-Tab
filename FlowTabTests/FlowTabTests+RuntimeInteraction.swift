@@ -5,7 +5,20 @@ import XCTest
 import FlowTabCore
 import Carbon
 
+private enum RuntimeInteractionWatchdogPolicy {
+    static let keyboardReadinessEvent: TimeInterval = 1
+}
+
 extension FlowTabTests {
+    func testRuntimeInteractionWatchdogPolicyPreservesKeyboardReadinessEventBound() {
+        let keyboardReadinessEvent =
+            RuntimeInteractionWatchdogPolicy.keyboardReadinessEvent
+
+        XCTAssertEqual(keyboardReadinessEvent, 1)
+        XCTAssertTrue(keyboardReadinessEvent.isFinite)
+        XCTAssertGreaterThan(keyboardReadinessEvent, 0)
+    }
+
     @MainActor
     func testSearchSystemTextInputBridgeConfiguresVisiblePlainTextResponder() {
         let harness = SearchSystemTextInputBridgeTestHarness()
@@ -52,7 +65,7 @@ extension FlowTabTests {
         let readiness =
             expectation(
                 description:
-                    "exact Search text responder became ready"
+                    "unmetCondition=exactSearchKeyboardReadiness callback"
             )
         let harness = SearchSystemTextInputBridgeTestHarness()
         harness.observeKeyboardReadiness { isReady in
@@ -60,8 +73,17 @@ extension FlowTabTests {
                 readiness.fulfill()
             }
         }
+        XCTAssertTrue(harness.hasKeyboardReadinessTestObserver)
         let window = harness.installInKeyWindow()
-        defer { harness.closeHostingWindow() }
+        defer {
+            harness.closeHostingWindow()
+            XCTAssertFalse(
+                harness.hasKeyboardReadinessTestObserver
+            )
+        }
+
+        XCTAssertTrue(harness.keyboardReadinessChanges.isEmpty)
+        XCTAssertFalse(window.firstResponder === harness.textView)
 
         harness.synchronize(
             query: "",
@@ -69,10 +91,21 @@ extension FlowTabTests {
             isSearchActive: true
         )
 
-        await fulfillment(of: [readiness], timeout: 1)
-        XCTAssertTrue(window.isKeyWindow)
+        await fulfillment(
+            of: [readiness],
+            timeout:
+                RuntimeInteractionWatchdogPolicy
+                    .keyboardReadinessEvent
+        )
+        let readinessEvidence =
+            searchInputKeyboardReadinessEvidence(
+                harness: harness,
+                window: window
+            )
+        XCTAssertTrue(window.isKeyWindow, readinessEvidence)
         XCTAssertTrue(
-            window.firstResponder === harness.textView
+            window.firstResponder === harness.textView,
+            readinessEvidence
         )
         XCTAssertEqual(
             harness.textView.accessibilityIdentifier(),
@@ -80,7 +113,8 @@ extension FlowTabTests {
         )
         XCTAssertEqual(
             harness.keyboardReadinessChanges,
-            [true]
+            [true],
+            readinessEvidence
         )
 
         harness.postHostingWindowDidBecomeKey()
@@ -99,7 +133,7 @@ extension FlowTabTests {
         let readiness =
             expectation(
                 description:
-                    "delayed key-window evidence made Search ready"
+                    "unmetCondition=delayedKeyWindowKeyboardReadiness callback"
             )
         let harness = SearchSystemTextInputBridgeTestHarness()
         harness.observeKeyboardReadiness { isReady in
@@ -107,8 +141,16 @@ extension FlowTabTests {
                 readiness.fulfill()
             }
         }
+        XCTAssertTrue(harness.hasKeyboardReadinessTestObserver)
         let window = harness.installInWindow()
-        defer { harness.closeHostingWindow() }
+        defer {
+            harness.closeHostingWindow()
+            XCTAssertFalse(
+                harness.hasKeyboardReadinessTestObserver
+            )
+        }
+
+        XCTAssertTrue(harness.keyboardReadinessChanges.isEmpty)
 
         harness.synchronize(
             query: "",
@@ -123,15 +165,27 @@ extension FlowTabTests {
         )
 
         harness.makeHostingWindowKey()
-        await fulfillment(of: [readiness], timeout: 1)
+        await fulfillment(
+            of: [readiness],
+            timeout:
+                RuntimeInteractionWatchdogPolicy
+                    .keyboardReadinessEvent
+        )
+        let readinessEvidence =
+            searchInputKeyboardReadinessEvidence(
+                harness: harness,
+                window: window
+            )
 
-        XCTAssertTrue(window.isKeyWindow)
+        XCTAssertTrue(window.isKeyWindow, readinessEvidence)
         XCTAssertTrue(
-            window.firstResponder === harness.textView
+            window.firstResponder === harness.textView,
+            readinessEvidence
         )
         XCTAssertEqual(
             harness.keyboardReadinessChanges,
-            [true]
+            [true],
+            readinessEvidence
         )
     }
 
@@ -617,6 +671,23 @@ extension FlowTabTests {
             of: [mainQueueTurn],
             timeout: 1
         )
+    }
+
+    @MainActor
+    private func searchInputKeyboardReadinessEvidence(
+        harness: SearchSystemTextInputBridgeTestHarness,
+        window: NSWindow
+    ) -> String {
+        let responder = window.firstResponder.map {
+            String(describing: type(of: $0))
+        } ?? "nil"
+        return "unmetCondition=exactSearchKeyboardReadiness "
+            + "finalWindowKey=\(window.isKeyWindow ? 1 : 0) "
+            + "finalResponderMatches="
+            + "\(window.firstResponder === harness.textView ? 1 : 0) "
+            + "finalResponder=\(responder) "
+            + "finalReadinessChanges="
+            + "\(harness.keyboardReadinessChanges)"
     }
 
 }
