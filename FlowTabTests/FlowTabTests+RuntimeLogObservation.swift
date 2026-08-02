@@ -3,7 +3,20 @@ import Foundation
 import XCTest
 @testable import FlowTab
 
+private enum RuntimeLogObservationWatchdogPolicy {
+    static let eventDelivery: TimeInterval = 1
+}
+
 extension FlowTabTests {
+    func testRuntimeLogObservationWatchdogPolicyPreservesEventDeliveryBound() {
+        let eventDelivery =
+            RuntimeLogObservationWatchdogPolicy.eventDelivery
+
+        XCTAssertEqual(eventDelivery, 1)
+        XCTAssertTrue(eventDelivery.isFinite)
+        XCTAssertGreaterThan(eventDelivery, 0)
+    }
+
     func testRuntimeLogStorePublishesMonotonicChangesAndCancelsObservation()
         async throws
     {
@@ -20,7 +33,9 @@ extension FlowTabTests {
         let store = RuntimeLogFileStore(logsDirectoryURL: logsDirectory)
         let recorder = RuntimeLogChangeRecorder()
         let changesPublished = expectation(
-            description: "append, flush, and clear changes published"
+            description:
+                "unmetCondition=runtimeLogChangesPublished "
+                + "expectedKinds=appended,flushed,cleared"
         )
         changesPublished.expectedFulfillmentCount = 3
         let observation = store.observeChanges { change in
@@ -32,17 +47,23 @@ extension FlowTabTests {
         store.append("[00:00:00.000] [INFO] [UnitTest] first")
         _ = await store.readRecentLines(limit: 10, minimumLevel: .debug)
         let clearChange = try await store.clearAndWait()
-        await fulfillment(of: [changesPublished], timeout: 1)
+        await fulfillment(
+            of: [changesPublished],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
 
+        let observedChanges = recorder.changes
         XCTAssertEqual(
-            recorder.changes,
+            observedChanges,
             [
                 RuntimeLogChange(generation: 1, kind: .appended),
                 RuntimeLogChange(generation: 2, kind: .flushed),
                 RuntimeLogChange(generation: 3, kind: .cleared)
-            ]
+            ],
+            "unmetCondition=orderedRuntimeLogChanges "
+                + "finalChanges=\(observedChanges)"
         )
-        XCTAssertEqual(clearChange, recorder.changes.last)
+        XCTAssertEqual(clearChange, observedChanges.last)
 
         observation.cancel()
         store.append("[00:00:00.001] [INFO] [UnitTest] after-cancel")
@@ -74,7 +95,9 @@ extension FlowTabTests {
 
         let viewModel = RuntimeLogLinesViewModel(diagnostics: diagnostics)
         var cancellables: Set<AnyCancellable> = []
-        let initialApplied = expectation(description: "initial snapshot applied")
+        let initialApplied = expectation(
+            description: "unmetCondition=initialRuntimeLogSnapshotApplied"
+        )
         viewModel.$lines
             .filter { $0.contains(where: { $0.contains(initialMarker) }) }
             .prefix(1)
@@ -82,22 +105,41 @@ extension FlowTabTests {
             .store(in: &cancellables)
 
         viewModel.start(minimumLevel: .debug)
-        await fulfillment(of: [initialApplied], timeout: 1)
+        await fulfillment(
+            of: [initialApplied],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
+        XCTAssertTrue(
+            viewModel.lines.contains(where: { $0.contains(initialMarker) }),
+            "unmetCondition=initialRuntimeLogMarkerVisible "
+                + "marker=\(initialMarker) finalLines=\(viewModel.lines)"
+        )
 
-        let appendApplied = expectation(description: "append event applied")
+        let appendApplied = expectation(
+            description: "unmetCondition=appendedRuntimeLogMarkerApplied"
+        )
         viewModel.$lines
             .filter { $0.contains(where: { $0.contains(appendedMarker) }) }
             .prefix(1)
             .sink { _ in appendApplied.fulfill() }
             .store(in: &cancellables)
         store.append("[00:00:00.001] [WARN] [UnitTest] \(appendedMarker)")
-        await fulfillment(of: [appendApplied], timeout: 1)
+        await fulfillment(
+            of: [appendApplied],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
+        XCTAssertTrue(
+            viewModel.lines.contains(where: { $0.contains(appendedMarker) }),
+            "unmetCondition=appendedRuntimeLogMarkerVisible "
+                + "marker=\(appendedMarker) finalLines=\(viewModel.lines)"
+        )
 
         await viewModel.clearStoredLogs(minimumLevel: .debug)
         XCTAssertTrue(viewModel.lines.isEmpty)
 
         let postClearApplied = expectation(
-            description: "subscription remains active after clear"
+            description:
+                "unmetCondition=postClearRuntimeLogMarkerApplied"
         )
         viewModel.$lines
             .filter { $0.contains(where: { $0.contains(postClearMarker) }) }
@@ -105,7 +147,15 @@ extension FlowTabTests {
             .sink { _ in postClearApplied.fulfill() }
             .store(in: &cancellables)
         store.append("[00:00:00.002] [ERROR] [UnitTest] \(postClearMarker)")
-        await fulfillment(of: [postClearApplied], timeout: 1)
+        await fulfillment(
+            of: [postClearApplied],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
+        XCTAssertTrue(
+            viewModel.lines.contains(where: { $0.contains(postClearMarker) }),
+            "unmetCondition=postClearRuntimeLogMarkerVisible "
+                + "marker=\(postClearMarker) finalLines=\(viewModel.lines)"
+        )
 
         viewModel.stop()
     }
@@ -117,10 +167,12 @@ extension FlowTabTests {
         let source = ControlledRuntimeLogLinesSource()
         let viewModel = RuntimeLogLinesViewModel(diagnostics: source)
         let firstReadRequested = expectation(
-            description: "initial read requested after subscription"
+            description:
+                "unmetCondition=initialRuntimeLogReadRequestedAfterSubscription"
         )
         let laterReadRequested = expectation(
-            description: "later generation requests another read"
+            description:
+                "unmetCondition=laterRuntimeLogGenerationReadRequested"
         )
         source.onReadRequested = { requestCount in
             if requestCount == 1 {
@@ -133,7 +185,9 @@ extension FlowTabTests {
 
         var publishedLines: [[String]] = []
         var cancellables: Set<AnyCancellable> = []
-        let freshLinesApplied = expectation(description: "fresh read applied")
+        let freshLinesApplied = expectation(
+            description: "unmetCondition=freshRuntimeLogReadApplied"
+        )
         viewModel.$lines
             .dropFirst()
             .sink { lines in
@@ -145,16 +199,48 @@ extension FlowTabTests {
             .store(in: &cancellables)
 
         viewModel.start(minimumLevel: .debug)
-        await fulfillment(of: [firstReadRequested], timeout: 1)
+        await fulfillment(
+            of: [firstReadRequested],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
+        XCTAssertEqual(
+            source.readRequestCount,
+            1,
+            "unmetCondition=initialRuntimeLogReadRequested "
+                + "finalReadRequestCount=\(source.readRequestCount) "
+                + "hasObserver=\(source.hasObserver)"
+        )
 
         source.emit(RuntimeLogChange(generation: 1, kind: .appended))
         source.completeNextRead(with: ["stale"])
-        await fulfillment(of: [laterReadRequested], timeout: 1)
+        await fulfillment(
+            of: [laterReadRequested],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
+        XCTAssertEqual(
+            source.readRequestCount,
+            2,
+            "unmetCondition=laterRuntimeLogReadRequested "
+                + "finalReadRequestCount=\(source.readRequestCount) "
+                + "hasObserver=\(source.hasObserver)"
+        )
         source.completeNextRead(with: ["fresh"])
-        await fulfillment(of: [freshLinesApplied], timeout: 1)
+        await fulfillment(
+            of: [freshLinesApplied],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
 
-        XCTAssertFalse(publishedLines.contains(["stale"]))
-        XCTAssertEqual(viewModel.lines, ["fresh"])
+        XCTAssertFalse(
+            publishedLines.contains(["stale"]),
+            "unmetCondition=staleRuntimeLogReadRejected "
+                + "finalPublishedLines=\(publishedLines)"
+        )
+        XCTAssertEqual(
+            viewModel.lines,
+            ["fresh"],
+            "unmetCondition=freshRuntimeLogReadVisible "
+                + "finalLines=\(viewModel.lines)"
+        )
         XCTAssertEqual(source.readRequestCount, 2)
 
         source.emit(RuntimeLogChange(generation: 1, kind: .flushed))
