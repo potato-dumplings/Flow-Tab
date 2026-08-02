@@ -137,6 +137,46 @@ extension FlowTabUITests {
         )
     }
 
+    func testHomeWindowProjectionObserverRequiresPostTriggerExactRowEvidence() {
+        var triggerCompleted = false
+        let snapshot = homeWindowProjectionTestSnapshot(
+            rowTitle: "Mail",
+            staticTitles: []
+        )
+        var cancellationCount = 0
+        let owner =
+            FlowTabUITestHomeWindowProjectionObservationOwner(
+                expectation: .rowContaining("Mail"),
+                acceptsEvidence: {
+                    triggerCompleted
+                },
+                observationRegistration: { _ in
+                    FlowTabUITestObservationCancellation {
+                        cancellationCount += 1
+                    }
+                },
+                readback: { snapshot }
+            )
+        owner.start()
+
+        XCTAssertNil(owner.resolvedEvidence)
+        triggerCompleted = true
+        owner.requestReadback(source: .triggerReadback)
+        let evidence = owner.waitForResolution(
+            timeout:
+                FlowTabUITestHomeWindowProjectionTestPolicy
+                    .watchdog
+        )
+
+        XCTAssertEqual(evidence?.source, .triggerReadback)
+        XCTAssertEqual(
+            evidence?.value.row(containing: "Mail")?.element,
+            "row-element-0"
+        )
+        XCTAssertEqual(cancellationCount, 1)
+        owner.cancel()
+    }
+
     func testHomeWindowProjectionObserverLifecycleUnderPressure() {
         for iteration in 0..<FlowTabUITestHomeWindowProjectionTestPolicy
             .pressureIterations

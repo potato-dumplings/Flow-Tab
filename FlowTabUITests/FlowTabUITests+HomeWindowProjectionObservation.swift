@@ -210,6 +210,51 @@ extension FlowTabUITests {
         return row.element
     }
 
+    func performAndWaitForHomeWindowRow(
+        in app: XCUIApplication,
+        title: String,
+        timeout: TimeInterval,
+        trigger: () -> Void
+    ) -> XCUIElement? {
+        var triggerCompleted = false
+        let expectation =
+            FlowTabUITestHomeWindowProjectionExpectation
+                .rowContaining(title)
+        let owner =
+            FlowTabUITestHomeWindowProjectionObservationOwner(
+                expectation: expectation,
+                acceptsEvidence: {
+                    triggerCompleted
+                },
+                readback: {
+                    self.homeWindowProjectionSnapshot(
+                        in: app,
+                        expectation: expectation
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        trigger()
+        triggerCompleted = true
+        owner.requestReadback(source: .triggerReadback)
+
+        guard
+            let row = owner.waitForResolution(
+                timeout: timeout
+            )?.value.row(containing: title)
+        else {
+            XCTFail(
+                "Expected a post-trigger Home window row "
+                    + "containing \(title). "
+                    + owner.diagnosticSummary
+            )
+            return nil
+        }
+        return row.element
+    }
+
     func waitForHomeWindowTitle(
         _ title: String,
         in app: XCUIApplication,

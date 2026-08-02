@@ -4,6 +4,7 @@ import XCTest
 enum FlowTabUITestHomeActivationPolicy {
     static let homeTabNavigationWatchdog: TimeInterval = 10
     static let appRowPublicationWatchdog: TimeInterval = 20
+    static let homeWindowProjectionWatchdog: TimeInterval = 12
 }
 
 extension FlowTabUITests {
@@ -36,6 +37,20 @@ extension FlowTabUITests {
                 .appRowPublicationWatchdog,
             FlowTabUITestHomeActivationPolicy
                 .homeTabNavigationWatchdog
+        )
+        XCTAssertEqual(
+            FlowTabUITestHomeActivationPolicy
+                .homeWindowProjectionWatchdog,
+            12
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeActivationPolicy
+                .homeWindowProjectionWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestHomeActivationPolicy
+                .homeWindowProjectionWatchdog,
+            0
         )
     }
 
@@ -93,10 +108,17 @@ extension FlowTabUITests {
                     + "finalExists=\(homeAppRow.exists) "
                     + "finalHittable=\(homeAppRow.isHittable)"
             )
-            tapElement(homeAppRow)
-
             let targetWindowRow = try XCTUnwrap(
-                waitForHomeWindowRow(in: app, title: targetWindowTitle, timeout: 12),
+                performAndWaitForHomeWindowRow(
+                    in: app,
+                    title: targetWindowTitle,
+                    timeout:
+                        FlowTabUITestHomeActivationPolicy
+                            .homeWindowProjectionWatchdog,
+                    trigger: {
+                        tapElement(homeAppRow)
+                    }
+                ),
                 "FlowTab did not expose a Home window row for \(targetApp.appName) / \(targetWindowTitle)."
             )
             let targetWindowNumber = try XCTUnwrap(
