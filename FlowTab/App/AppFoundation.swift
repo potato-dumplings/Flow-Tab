@@ -108,6 +108,8 @@ enum AppWindowLayout {
 }
 
 enum AppWindowCoordinator {
+    typealias OpenOperation = Task<Void, Never>
+
     static let switcherPanelWindowIdentifier = "flowtab.window.switcher-panel"
     static let homeWindowIdentifier = "flowtab.window.home"
 
@@ -121,19 +123,24 @@ enum AppWindowCoordinator {
     @MainActor
     private static var temporaryRegularActivationGeneration: UInt64 = 0
 
-    static func openHome() {
+    @discardableResult
+    static func openHome() -> OpenOperation {
         open(.home)
     }
 
-    static func openLogs() {
+    @discardableResult
+    static func openLogs() -> OpenOperation {
         open(.logs)
     }
 
-    static func openSettings() {
+    @discardableResult
+    static func openSettings() -> OpenOperation {
         open(.settings)
     }
 
-    private static func open(_ tab: HomeTab) {
+    private static func open(
+        _ tab: HomeTab
+    ) -> OpenOperation {
         Task { @MainActor in
             openInCurrentProcess(tab)
         }

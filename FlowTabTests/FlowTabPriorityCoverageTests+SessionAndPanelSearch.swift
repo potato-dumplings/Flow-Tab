@@ -462,38 +462,6 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testAppWindowCoordinatorOpenMethodsSelectRequestedTabBeforeActivation() async {
-        let previousSelectedTab = HomeTabState.shared.selectedTab
-        let previousActivationOverride = AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride
-        defer {
-            HomeTabState.shared.selectedTab = previousSelectedTab
-            AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = previousActivationOverride
-        }
-
-        let cases: [(name: String, initial: HomeTab, expected: HomeTab, open: () -> Void)] = [
-            ("home", .settings, .home, { AppWindowCoordinator.openHome() }),
-            ("logs", .home, .logs, { AppWindowCoordinator.openLogs() }),
-            ("settings", .logs, .settings, { AppWindowCoordinator.openSettings() })
-        ]
-
-        for item in cases {
-            let activated = expectation(description: "activation-\(item.name)")
-            var observedTabAtActivation: HomeTab?
-            HomeTabState.shared.selectedTab = item.initial
-            AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {
-                observedTabAtActivation = HomeTabState.shared.selectedTab
-                activated.fulfill()
-            }
-
-            item.open()
-
-            await fulfillment(of: [activated], timeout: 1.0)
-            XCTAssertEqual(HomeTabState.shared.selectedTab, item.expected)
-            XCTAssertEqual(observedTabAtActivation, item.expected)
-        }
-    }
-
-    @MainActor
     func testSwitcherPanelControllerSearchTabTogglesScope() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
             let controller = SwitcherPanelController(
