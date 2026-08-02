@@ -2,6 +2,10 @@ import AppKit
 import Foundation
 import XCTest
 
+enum SpaceFixtureAXSuppressionObservationPolicy {
+    static let resolutionWatchdog: TimeInterval = 20
+}
+
 struct SpaceFixtureAXSuppressionUITestRoute:
     Equatable
 {
@@ -121,7 +125,9 @@ final class SpaceFixtureAXSuppressionObservationOwner {
 
     func waitForSuppression(
         route: SpaceFixtureAXSuppressionUITestRoute,
-        timeout: TimeInterval
+        timeout: TimeInterval =
+            SpaceFixtureAXSuppressionObservationPolicy
+                .resolutionWatchdog
     ) -> Bool {
         guard let owner = routeOwners[route.key] else {
             XCTFail(

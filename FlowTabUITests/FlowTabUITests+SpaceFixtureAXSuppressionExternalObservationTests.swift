@@ -10,6 +10,14 @@ private enum
 }
 
 extension FlowTabUITests {
+    func testAXSuppressionObservationPolicyPreservesCompatibleResolutionWatchdog() {
+        XCTAssertEqual(
+            SpaceFixtureAXSuppressionObservationPolicy
+                .resolutionWatchdog,
+            20
+        )
+    }
+
     func testAXSuppressionConsumerRegistersBothObserversBeforeAcceptingSynchronousEvidence() {
         let route = Self.axSuppressionTestRoute()
         var order: [String] = []

@@ -98,8 +98,7 @@ extension FlowTabUITests {
 
         XCTAssertTrue(
             observationOwner.waitForSuppression(
-                route: route,
-                timeout: 20
+                route: route
             )
         )
         XCTAssertTrue(

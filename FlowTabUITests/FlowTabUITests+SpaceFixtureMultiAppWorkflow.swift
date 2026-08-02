@@ -811,8 +811,7 @@ extension FlowTabUITests {
                 XCTAssertTrue(
                     suppressionObservationOwner
                         .waitForSuppression(
-                            route: route,
-                            timeout: 20
+                            route: route
                         ),
                     "\(route.bundleIdentifier) did not publish exact application AX suppression evidence."
                 )
