@@ -1,7 +1,21 @@
 import XCTest
 @testable import FlowTab
 
+private enum InitialPanelOcclusionStalenessLifecycleWatchdogPolicy {
+    static let deinitializationCleanup: TimeInterval = 1
+}
+
 extension FlowTabTests {
+    func testInitialPanelOcclusionStalenessLifecycleWatchdogPolicyPreservesDeinitializationCleanupBound() {
+        let deinitializationCleanup =
+            InitialPanelOcclusionStalenessLifecycleWatchdogPolicy
+                .deinitializationCleanup
+
+        XCTAssertEqual(deinitializationCleanup, 1)
+        XCTAssertTrue(deinitializationCleanup.isFinite)
+        XCTAssertGreaterThan(deinitializationCleanup, 0)
+    }
+
     @MainActor
     func testUITestInitialPanelOcclusionStalenessInstallsAndReleasesEvidence() {
         XCTAssertEqual(
@@ -252,10 +266,15 @@ extension FlowTabTests {
         var phases:
             [FlowTabUITestInitialPanelOcclusionStalenessPhase]
                 = []
+        var cancellationCount = 0
+        var lastCancellationReadback =
+            FlowTabUITestInitialPanelOcclusionReadback
+                .unavailable
         let injectionCancelled = expectation(
             description:
-                "deinit removes the stale occlusion injection"
+                "unmetCondition=deinitCancelsReleaseAndRemovesStaleOcclusionInjection"
         )
+        injectionCancelled.assertForOverFulfill = true
 
         owner?.start(
             policy:
@@ -276,27 +295,59 @@ extension FlowTabTests {
                 )
             },
             cancelInjection: {
-                injectionIsInstalled = false
-                injectionCancelled.fulfill()
-                return Self.panelOcclusionReadback(
-                    installed: false,
-                    visible: false
+                XCTAssertTrue(Thread.isMainThread)
+                XCTAssertTrue(
+                    scheduler.tokens[0].isCancelled
                 )
+                injectionIsInstalled = false
+                cancellationCount += 1
+                lastCancellationReadback =
+                    Self.panelOcclusionReadback(
+                        installed: false,
+                        visible: false
+                    )
+                injectionCancelled.fulfill()
+                return lastCancellationReadback
             },
             onEvidence: {
                 phases.append($0.phase)
             }
         )
         XCTAssertTrue(injectionIsInstalled)
+        XCTAssertTrue(owner?.isActive == true)
+        XCTAssertTrue(owner?.hasPendingRelease == true)
+        XCTAssertEqual(phases, [.installed])
+        XCTAssertEqual(cancellationCount, 0)
+        XCTAssertEqual(
+            lastCancellationReadback,
+            .unavailable
+        )
+        XCTAssertFalse(
+            scheduler.tokens[0].isCancelled
+        )
 
         owner = nil
+        XCTAssertNil(retainedOwner)
 
         await fulfillment(
             of: [injectionCancelled],
-            timeout: 1
+            timeout:
+                InitialPanelOcclusionStalenessLifecycleWatchdogPolicy
+                    .deinitializationCleanup
         )
-        XCTAssertNil(retainedOwner)
         XCTAssertFalse(injectionIsInstalled)
+        XCTAssertEqual(
+            cancellationCount,
+            1,
+            "unmetCondition=singleDeinitializationCleanup finalCancellationCount=\(cancellationCount) finalReadback=\(lastCancellationReadback)"
+        )
+        XCTAssertEqual(
+            lastCancellationReadback,
+            Self.panelOcclusionReadback(
+                installed: false,
+                visible: false
+            )
+        )
         XCTAssertEqual(phases, [.installed])
         XCTAssertTrue(
             scheduler.tokens[0].isCancelled
