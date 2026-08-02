@@ -277,7 +277,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testTerminateSelectedAppBehaviorKeepsAppUntilWorkspaceTerminationArrives() async {
+    func testTerminateSelectedAppBehaviorKeepsAppUntilWorkspaceTerminationArrives() {
         let initialApps = terminateScenarioApps()
         let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
@@ -293,8 +293,12 @@ extension FlowTabTests {
         let terminatedPID = pid_t(42_000)
         model.terminateRequestOverride = { _ in (sent: true, pid: terminatedPID) }
 
-        let layoutRefreshed = expectation(description: "post terminate layout refreshed")
-        model.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
+        var layoutRefreshCount = 0
+        model.onSessionLayoutChanged = { layoutRefreshCount += 1 }
+        defer {
+            model.onSessionLayoutChanged = nil
+            model.cancelSelection()
+        }
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
@@ -308,9 +312,15 @@ extension FlowTabTests {
         XCTAssertEqual(model.pendingTerminateRequest?.appID, terminatedAppID)
         XCTAssertEqual(model.pendingTerminateRequest?.pid, terminatedPID)
         XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
+        XCTAssertEqual(layoutRefreshCount, 0)
 
         XCTAssertTrue(model.handleApplicationTerminated(appID: terminatedAppID, pid: terminatedPID))
-        await fulfillment(of: [layoutRefreshed], timeout: 1.0)
+        XCTAssertEqual(
+            layoutRefreshCount,
+            1,
+            "unmetCondition=terminationLayoutPublished "
+                + "finalLayoutRefreshCount=\(layoutRefreshCount)"
+        )
         XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
         assertRuntimeProjectionSessionRead(
             from: runtimeProjectionService,
@@ -321,7 +331,6 @@ extension FlowTabTests {
         XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
         XCTAssertNil(model.terminatingAppID)
         XCTAssertNil(model.pendingTerminateRequest)
-        model.cancelSelection()
     }
 
     @MainActor
@@ -353,7 +362,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testHandleApplicationTerminatedRefreshesFromRuntimeProjectionWithoutFullSnapshot() async {
+    func testHandleApplicationTerminatedRefreshesFromRuntimeProjectionWithoutFullSnapshot() {
         let initialApps = terminateScenarioApps()
         let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
@@ -367,12 +376,20 @@ extension FlowTabTests {
 
         let refreshedApps = initialApps.filter { $0.id != terminatedAppID }
 
-        let layoutRefreshed = expectation(description: "layout refreshed from runtime projection")
-        model.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
+        var layoutRefreshCount = 0
+        model.onSessionLayoutChanged = { layoutRefreshCount += 1 }
+        defer {
+            model.onSessionLayoutChanged = nil
+            model.cancelSelection()
+        }
 
         XCTAssertTrue(model.handleApplicationTerminated(appID: terminatedAppID, pid: 42_012))
-
-        await fulfillment(of: [layoutRefreshed], timeout: 1.0)
+        XCTAssertEqual(
+            layoutRefreshCount,
+            1,
+            "unmetCondition=terminationLayoutPublished "
+                + "finalLayoutRefreshCount=\(layoutRefreshCount)"
+        )
         assertRuntimeProjectionSessionRead(from: runtimeProjectionService, minimumReadCount: 2)
         XCTAssertEqual(
             runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID),
@@ -500,7 +517,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testTerminateSelectedAppUnitRefreshesOnWorkspaceTerminateAfterPendingRequest() async {
+    func testTerminateSelectedAppUnitRefreshesOnWorkspaceTerminateAfterPendingRequest() {
         let initialApps = terminateScenarioApps()
         let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
@@ -515,11 +532,13 @@ extension FlowTabTests {
 
         model.terminateRequestOverride = { _ in (sent: true, pid: 42_002) }
 
-        let deferredLayoutRefresh = expectation(description: "deferred layout refresh")
         var layoutRefreshCount = 0
         model.onSessionLayoutChanged = {
             layoutRefreshCount += 1
-            deferredLayoutRefresh.fulfill()
+        }
+        defer {
+            model.onSessionLayoutChanged = nil
+            model.cancelSelection()
         }
 
         let result = model.terminateSelectedApp()
@@ -539,10 +558,18 @@ extension FlowTabTests {
         )
         XCTAssertEqual(model.terminatingAppID, terminatedAppID)
 
-        model.handleApplicationTerminated(appID: terminatedAppID, pid: 42_002)
-
-        await fulfillment(of: [deferredLayoutRefresh], timeout: 1.0)
-        XCTAssertEqual(layoutRefreshCount, 1)
+        XCTAssertTrue(
+            model.handleApplicationTerminated(
+                appID: terminatedAppID,
+                pid: 42_002
+            )
+        )
+        XCTAssertEqual(
+            layoutRefreshCount,
+            1,
+            "unmetCondition=terminationLayoutPublished "
+                + "finalLayoutRefreshCount=\(layoutRefreshCount)"
+        )
         XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
         assertRuntimeProjectionSessionRead(
             from: runtimeProjectionService,
@@ -551,7 +578,6 @@ extension FlowTabTests {
         )
         XCTAssertEqual(model.appCount, appsAfterTermination.count)
         XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
-        model.cancelSelection()
     }
 
     private func assertRuntimeProjectionSessionRead(
