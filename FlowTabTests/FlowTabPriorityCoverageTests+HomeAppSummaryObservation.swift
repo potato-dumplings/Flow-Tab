@@ -234,14 +234,35 @@ extension FlowTabPriorityCoverageTests {
             runtimeProjectionService: runtimeProjectionService,
             notificationCenter: notificationCenter
         )
+        defer {
+            owner.stop(reason: "test_teardown")
+        }
+        let expectedSourceGeneration =
+            RuntimeReadModelGeneration(projection: 2)
         let delivered = expectation(
-            description: "Home receives committed projection evidence"
+            description:
+                "unmetCondition=exactHomeSummaryProjectionEvidenceDeliveredOnMainActor"
         )
+        delivered.assertForOverFulfill = true
+        var deliveredEvidence: HomeAppSummaryProjectionObservationEvidence?
         owner.start(reason: "test_background_commit") { evidence in
-            guard evidence.source == .appSwitcherProjectionNotification else {
+            guard
+                evidence.observationGeneration == 1,
+                evidence.readbackCount == 2,
+                evidence.source == .appSwitcherProjectionNotification,
+                evidence.transition == .sourceGenerationAdvanced,
+                evidence.projectionRead.isProjectionBacked,
+                evidence.projectionRead.freshness?.sourceGeneration
+                    == expectedSourceGeneration,
+                evidence.projectionRead.freshness?.isCompleteForScope == true,
+                evidence.projectionRead.summaries.map(\.appID)
+                    == ["com.example.home-observed"],
+                evidence.projectionRead.summaries.map(\.windowCount) == [2]
+            else {
                 return
             }
             XCTAssertTrue(Thread.isMainThread)
+            deliveredEvidence = evidence
             delivered.fulfill()
         }
         runtimeProjectionService.setHomeSummaryProjection(
@@ -258,7 +279,37 @@ extension FlowTabPriorityCoverageTests {
             )
         }
 
-        await fulfillment(of: [delivered], timeout: 1)
+        await fulfillment(
+            of: [delivered],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .homeProjectionEvidenceDelivery
+        )
+        XCTAssertEqual(deliveredEvidence?.observationGeneration, 1)
+        XCTAssertEqual(deliveredEvidence?.readbackCount, 2)
+        XCTAssertEqual(
+            deliveredEvidence?.source,
+            .appSwitcherProjectionNotification
+        )
+        XCTAssertEqual(
+            deliveredEvidence?.transition,
+            .sourceGenerationAdvanced
+        )
+        XCTAssertEqual(
+            deliveredEvidence?.projectionRead.freshness?.sourceGeneration,
+            expectedSourceGeneration
+        )
+        XCTAssertEqual(
+            deliveredEvidence?.projectionRead.summaries.map(\.appID),
+            ["com.example.home-observed"]
+        )
+        XCTAssertEqual(
+            deliveredEvidence?.projectionRead.summaries.map(\.windowCount),
+            [2]
+        )
+        XCTAssertTrue(owner.isObserving)
+        owner.stop(reason: "test_complete")
+        XCTAssertFalse(owner.isObserving)
     }
 
     private func makeObservedHomeSummaryProjection(
