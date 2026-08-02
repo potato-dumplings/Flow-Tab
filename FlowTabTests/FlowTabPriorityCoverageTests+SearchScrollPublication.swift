@@ -24,13 +24,13 @@ extension FlowTabPriorityCoverageTests {
             let model = controller.modelForTesting
             let matchingScrollPublished = expectation(
                 description:
-                    "exact wrap revision requests first Search result"
+                    "unmetCondition=wrappedSearchScrollPublishedForExactRevisionAndResult"
             )
             matchingScrollPublished.assertForOverFulfill =
                 true
             let initialScrollPublished = expectation(
                 description:
-                    "first Search result receives focused revision"
+                    "unmetCondition=initialSearchScrollPublishedForExactRevisionAndResult"
             )
             initialScrollPublished.assertForOverFulfill =
                 true
@@ -107,7 +107,9 @@ extension FlowTabPriorityCoverageTests {
             )
             await fulfillment(
                 of: [initialScrollPublished],
-                timeout: 1
+                timeout:
+                    FlowTabPriorityCoverageWatchdogPolicy
+                        .searchResultScrollPublication
             )
             XCTAssertEqual(
                 model.searchResultScrollRevision,
@@ -154,7 +156,9 @@ extension FlowTabPriorityCoverageTests {
 
             await fulfillment(
                 of: [matchingScrollPublished],
-                timeout: 1
+                timeout:
+                    FlowTabPriorityCoverageWatchdogPolicy
+                        .searchResultScrollPublication
             )
             XCTAssertTrue(
                 observedRequests.contains {
