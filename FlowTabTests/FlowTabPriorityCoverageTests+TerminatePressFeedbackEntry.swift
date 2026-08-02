@@ -144,15 +144,22 @@ extension FlowTabPriorityCoverageTests {
             )
             let controllerLayoutObserver =
                 model.onSessionLayoutChanged
-            let layoutRefreshed = expectation(
-                description:
-                    "workspace termination publishes matching layout"
-            )
-            layoutRefreshed.assertForOverFulfill =
-                true
+            var layoutPublicationCount = 0
+            var lastPublishedAppIDs: [String] = []
+            var lastPublishedSelectedAppID: String?
+            var lastPublishedTerminationAppIDs: [String] = []
             model.onSessionLayoutChanged = {
+                XCTAssertTrue(Thread.isMainThread)
                 controllerLayoutObserver?()
-                layoutRefreshed.fulfill()
+                layoutPublicationCount += 1
+                lastPublishedAppIDs =
+                    model.session?.apps.map(\.id) ?? []
+                lastPublishedSelectedAppID =
+                    model.selectedApp?.id
+                lastPublishedTerminationAppIDs =
+                    runtimeProjectionService
+                        .appTerminationSignalsRecorded()
+                        .map(\.appID)
             }
             defer {
                 model.onSessionLayoutChanged =
@@ -251,6 +258,9 @@ extension FlowTabPriorityCoverageTests {
                     .appTerminationSignalsRecorded()
                     .isEmpty
             )
+            let layoutPublicationBaseline =
+                layoutPublicationCount
+            XCTAssertEqual(layoutPublicationBaseline, 0)
 
             controller
                 .handleWorkspaceApplicationTerminatedForTesting(
@@ -258,9 +268,22 @@ extension FlowTabPriorityCoverageTests {
                     pid: expectedPID
                 )
 
-            await fulfillment(
-                of: [layoutRefreshed],
-                timeout: 1
+            XCTAssertEqual(
+                layoutPublicationCount,
+                layoutPublicationBaseline + 1,
+                "unmetCondition=singleSynchronousTerminationLayoutPublication finalAppIDs=\(lastPublishedAppIDs) finalSelectedAppID=\(lastPublishedSelectedAppID ?? "nil") finalTerminationAppIDs=\(lastPublishedTerminationAppIDs)"
+            )
+            XCTAssertEqual(
+                lastPublishedAppIDs,
+                remainingAppIDs
+            )
+            XCTAssertEqual(
+                lastPublishedSelectedAppID,
+                expectedSelectedAppID
+            )
+            XCTAssertEqual(
+                lastPublishedTerminationAppIDs,
+                [terminatedAppID]
             )
 
             XCTAssertNotNil(model.session)
@@ -280,6 +303,8 @@ extension FlowTabPriorityCoverageTests {
                     .map(\.appID),
                 [terminatedAppID]
             )
+            XCTAssertNil(model.pendingTerminateRequest)
+            XCTAssertNil(model.terminatingAppID)
             assertAppSwitcherProjectionSessionRead(
                 from: runtimeProjectionService,
                 minimumReadCount: 2,
