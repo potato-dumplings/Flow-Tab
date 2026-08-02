@@ -473,6 +473,9 @@ test_search_pressure_owner_uses_observation_contract() {
 
 test_runtime_topology_pressure_owner_uses_observation_contract() {
   local cleanup_body
+  local contract_step
+  local remainder
+  local target_exit_body
 
   /usr/bin/grep -F -q \
     'source "$PROCESS_EXIT_OBSERVATION_PATH"' \
@@ -495,6 +498,45 @@ test_runtime_topology_pressure_owner_uses_observation_contract() {
     'wait_attempt|^[[:space:]]*sleep[[:space:]]+0[.]1([[:space:]]|$)' \
     <<<"$cleanup_body"; then
     fail "runtime-topology cleanup still contains an unnamed attempt cadence"
+  fi
+
+  /usr/bin/grep -F -q \
+    'TARGET_EXIT_COMPLETION_WATCHDOG_MILLISECONDS=30000' \
+    "$RUNTIME_TOPOLOGY_PRESSURE_PATH" \
+    || fail "runtime-topology target-exit watchdog is not named"
+  /usr/bin/grep -F -q \
+    'TARGET_EXIT_COMPLETION_POLL_INTERVAL_SECONDS=0.1' \
+    "$RUNTIME_TOPOLOGY_PRESSURE_PATH" \
+    || fail "runtime-topology target-exit cadence is not named"
+  /usr/bin/grep -F -q \
+    '&& observe_ui_process_tree_completion_after_target_exit' \
+    "$RUNTIME_TOPOLOGY_PRESSURE_PATH" \
+    || fail "runtime-topology sampling does not use exact target-exit evidence"
+  if /usr/bin/grep -E -q \
+    'TARGET_EXIT_GRACE_SECONDS|ui_process_finishes_within_target_exit_grace|elapsed_tenths|grace_tenths' \
+    "$RUNTIME_TOPOLOGY_PRESSURE_PATH"; then
+    fail "runtime-topology target-exit completion retains attempt-count logic"
+  fi
+  target_exit_body="$(
+    /usr/bin/sed -n \
+      '/^observe_ui_process_tree_completion_after_target_exit()/,/^run_ui_test()/p' \
+      "$RUNTIME_TOPOLOGY_PRESSURE_PATH" \
+      | /usr/bin/sed '$d'
+  )"
+  remainder="$target_exit_body"
+  for contract_step in \
+    'flowtab_perf_remember_process_identity "$TEST_PID" "$TEST_START_IDENTITY"' \
+    'capture_test_process_tree_identities' \
+    'flowtab_perf_wait_for_process_identities_exit' \
+    'reap_test_process'; do
+    [[ "$remainder" == *"$contract_step"* ]] \
+      || fail "target-exit owner is missing or reorders: $contract_step"
+    remainder="${remainder#*"$contract_step"}"
+  done
+  if /usr/bin/grep -E -q \
+    'elapsed_tenths|grace_tenths|test_process_is_live|^[[:space:]]*sleep[[:space:]]' \
+    <<<"$target_exit_body"; then
+    fail "target-exit completion still depends on root liveness or elapsed attempts"
   fi
 }
 

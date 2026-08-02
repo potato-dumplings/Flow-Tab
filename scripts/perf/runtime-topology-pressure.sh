@@ -16,6 +16,8 @@ DEFAULT_TEST="FlowTabUITests/FlowTabUITests/testSwitcherPanelOptionTabWindowStat
 TEST_TERMINATION_GRACE_MILLISECONDS=2000
 TEST_KILL_CONFIRMATION_WATCHDOG_MILLISECONDS=2000
 TEST_TERMINATION_POLL_INTERVAL_SECONDS=0.1
+TARGET_EXIT_COMPLETION_WATCHDOG_MILLISECONDS=30000
+TARGET_EXIT_COMPLETION_POLL_INTERVAL_SECONDS=0.1
 
 source "$TARGET_TOOL"
 # shellcheck source=scripts/perf/lib/process-exit-observation.sh
@@ -94,7 +96,6 @@ TARGET_OBSERVATION_COUNT=0
 REJECTED_TRANSIENT_IDENTITY_COUNT=0
 TARGET_TERMINAL_EXIT_OBSERVED=false
 TARGET_TERMINATION_VERDICT="not_observed"
-TARGET_EXIT_GRACE_SECONDS=30
 PREEXISTING_TARGET_IDENTITIES=""
 LAUNCH_REQUEST_MONOTONIC_NS=""
 LAUNCH_REQUEST_EPOCH_SECONDS=""
@@ -627,16 +628,33 @@ target_loss_can_be_terminal() {
   [[ "$IDENTITY_VERDICT" == "identity_match_lost" || "$IDENTITY_VERDICT" == "sample_unavailable" ]]
 }
 
-ui_process_finishes_within_target_exit_grace() {
-  local elapsed_tenths=0
-  local grace_tenths=$((TARGET_EXIT_GRACE_SECONDS * 10))
+observe_ui_process_tree_completion_after_target_exit() {
+  local observation_status=0
 
-  # XCTest tears down the App before xcodebuild finalizes its result bundle.
-  while test_process_is_live && [[ "$elapsed_tenths" -lt "$grace_tenths" ]]; do
-    sleep 0.1
-    elapsed_tenths=$((elapsed_tenths + 1))
-  done
-  ! test_process_is_live
+  FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS=()
+  TEST_PROCESS_IDENTITY_CAPTURE_FAILED=false
+  if [[ -z "$TEST_START_IDENTITY" ]]; then
+    echo "Could not observe UI process-tree completion without the wrapper identity." >&2
+    echo "unmetCondition=processIdentityCaptured pid=${TEST_PID}" >&2
+    echo "targetTerminationVerdict=${TARGET_TERMINATION_VERDICT}" >&2
+    return 2
+  fi
+  flowtab_perf_remember_process_identity "$TEST_PID" "$TEST_START_IDENTITY"
+  capture_test_process_tree_identities
+  if [[ "$TEST_PROCESS_IDENTITY_CAPTURE_FAILED" == true ]]; then
+    echo "targetTerminationVerdict=${TARGET_TERMINATION_VERDICT}" >&2
+    return 2
+  fi
+  flowtab_perf_wait_for_process_identities_exit \
+    "$TARGET_EXIT_COMPLETION_WATCHDOG_MILLISECONDS" \
+    "$TARGET_EXIT_COMPLETION_POLL_INTERVAL_SECONDS" \
+    "${FLOWTAB_PERF_PROCESS_IDENTITY_RECORDS[@]}" \
+    || observation_status=$?
+  if [[ "$observation_status" -ne 0 ]]; then
+    echo "targetTerminationVerdict=${TARGET_TERMINATION_VERDICT}" >&2
+    return "$observation_status"
+  fi
+  reap_test_process
 }
 
 run_ui_test() {
@@ -700,7 +718,8 @@ CURRENT_STAGE="sampling"
 while test_process_is_live; do
   if ! sample_flowtab; then
     TARGET_TERMINATION_VERDICT="$IDENTITY_VERDICT"
-    if target_loss_can_be_terminal && ui_process_finishes_within_target_exit_grace; then
+    if target_loss_can_be_terminal \
+      && observe_ui_process_tree_completion_after_target_exit; then
       TARGET_TERMINAL_EXIT_OBSERVED=true
       IDENTITY_VERDICT="matched"
       break
