@@ -5,6 +5,7 @@ enum FlowTabUITestHomeActivationPolicy {
     static let homeTabNavigationWatchdog: TimeInterval = 10
     static let appRowPublicationWatchdog: TimeInterval = 20
     static let homeWindowProjectionWatchdog: TimeInterval = 12
+    static let exactWindowActivationWatchdog: TimeInterval = 10
 }
 
 extension FlowTabUITests {
@@ -50,6 +51,20 @@ extension FlowTabUITests {
         XCTAssertGreaterThan(
             FlowTabUITestHomeActivationPolicy
                 .homeWindowProjectionWatchdog,
+            0
+        )
+        XCTAssertEqual(
+            FlowTabUITestHomeActivationPolicy
+                .exactWindowActivationWatchdog,
+            10
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeActivationPolicy
+                .exactWindowActivationWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestHomeActivationPolicy
+                .exactWindowActivationWatchdog,
             0
         )
     }
@@ -130,7 +145,9 @@ extension FlowTabUITests {
                     windowNumber: targetWindowNumber,
                     title: targetWindowTitle,
                     app: targetApp,
-                    timeout: 10,
+                    timeout:
+                        FlowTabUITestHomeActivationPolicy
+                            .exactWindowActivationWatchdog,
                     trigger: {
                         targetWindowRow.coordinate(
                             withNormalizedOffset:
