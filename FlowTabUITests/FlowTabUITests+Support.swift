@@ -450,23 +450,19 @@ extension FlowTabUITests {
         let tabQuery = app.buttons.matching(
             identifier: Identifier.settingsTabButton
         )
-        XCTAssertTrue(
-            tapFirstHittable(
-                in: tabQuery,
-                timeout: SupportWatchdog.tabNavigation
-            ),
-            "unmetCondition=settingsTabHittable "
-                + "finalCandidateCount=\(tabQuery.count)"
-        )
         let content = element(
             in: app,
             identifier: Identifier.settingsTabContent
         )
         XCTAssertTrue(
-            content.waitForExistence(
+            tapFirstHittableAndWaitForExistence(
+                in: tabQuery,
+                content: content,
+                contentDescription: Identifier.settingsTabContent,
                 timeout: SupportWatchdog.tabNavigation
             ),
-            "unmetCondition=settingsTabContentExists "
+            "unmetCondition=settingsTabNavigation "
+                + "finalCandidateCount=\(tabQuery.count) "
                 + "finalExists=\(content.exists)"
         )
     }
