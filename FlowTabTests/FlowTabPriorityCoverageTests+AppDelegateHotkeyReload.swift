@@ -98,6 +98,8 @@ extension FlowTabPriorityCoverageTests {
             return evidence.generation == expectedGeneration
                 && evidence.requestID == request.requestID
                 && evidence.matchesConfiguration(of: request)
+                && evidence.commandTabTakeoverActive
+                && evidence.source == "notification_payload"
         }
         registrationPublished.assertForOverFulfill = true
 
@@ -106,7 +108,12 @@ extension FlowTabPriorityCoverageTests {
             object: nil,
             userInfo: request.notificationUserInfo
         )
-        await fulfillment(of: [registrationPublished], timeout: 1)
+        await fulfillment(
+            of: [registrationPublished],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .appDelegateHotkeyRegistrationPublication
+        )
 
         let evidence = appDelegate.latestHotkeyRegistrationEvidence
         XCTAssertEqual(evidence?.generation, expectedGeneration)
@@ -119,6 +126,8 @@ extension FlowTabPriorityCoverageTests {
             evidence?.inAppWindowConfiguration,
             request.inAppWindowConfiguration
         )
+        XCTAssertEqual(evidence?.commandTabTakeoverActive, true)
+        XCTAssertEqual(evidence?.source, "notification_payload")
         let newRecords =
             Array(hotkeyFactory.records.dropFirst(baselineRecordCount))
         XCTAssertEqual(newRecords.count, 2)

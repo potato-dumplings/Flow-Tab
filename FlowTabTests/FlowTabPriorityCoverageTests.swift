@@ -16,6 +16,7 @@ enum FlowTabPriorityCoverageWatchdogPolicy {
     static let searchResultScrollPublication: TimeInterval = 1
     static let searchComputationPublication: TimeInterval = 1
     static let homeProjectionEvidenceDelivery: TimeInterval = 1
+    static let appDelegateHotkeyRegistrationPublication: TimeInterval = 1
 }
 
 final class FlowTabPriorityCoverageTests: XCTestCase {}
@@ -110,5 +111,15 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(homeProjectionEvidenceDelivery, 1)
         XCTAssertTrue(homeProjectionEvidenceDelivery.isFinite)
         XCTAssertGreaterThan(homeProjectionEvidenceDelivery, 0)
+    }
+
+    func testPriorityCoverageWatchdogPolicyPreservesAppDelegateHotkeyRegistrationBound() {
+        let appDelegateHotkeyRegistrationPublication =
+            FlowTabPriorityCoverageWatchdogPolicy
+                .appDelegateHotkeyRegistrationPublication
+
+        XCTAssertEqual(appDelegateHotkeyRegistrationPublication, 1)
+        XCTAssertTrue(appDelegateHotkeyRegistrationPublication.isFinite)
+        XCTAssertGreaterThan(appDelegateHotkeyRegistrationPublication, 0)
     }
 }
