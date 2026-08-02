@@ -81,6 +81,51 @@ extension FlowTabUITests {
         return true
     }
 
+    func tapFirstHittableAndWaitForExistence(
+        in query: XCUIElementQuery,
+        content: XCUIElement,
+        contentDescription: String,
+        timeout: TimeInterval
+    ) -> Bool {
+        let contentObservation =
+            FlowTabUITestConditionObservationOwner(
+                observationRegistration:
+                    FlowTabUITestConditionReadbackScheduler
+                        .mainRunLoopRegistration(
+                            cadence:
+                                FlowTabUITestConditionObservationPolicy
+                                    .xcuiReadbackCadence
+                        ),
+                readback: { content.exists },
+                isSatisfied: { $0 },
+                describe: {
+                    "content=\(contentDescription) exists=\($0)"
+                }
+            )
+        contentObservation.start()
+        defer { contentObservation.cancel() }
+
+        guard tapFirstHittable(in: query, timeout: timeout) else {
+            print(
+                "FlowTab UI navigation trigger watchdog expired. "
+                    + "content=\(contentDescription) "
+                    + "finalCandidateCount=\(query.count)"
+            )
+            return false
+        }
+        guard contentObservation.waitForResolution(
+            timeout: timeout
+        ) != nil
+        else {
+            print(
+                "FlowTab UI navigation content watchdog expired. "
+                    + contentObservation.diagnosticSummary
+            )
+            return false
+        }
+        return true
+    }
+
     func hasHittableElement(
         in query: XCUIElementQuery,
         timeout: TimeInterval

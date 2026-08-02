@@ -26,8 +26,26 @@ extension FlowTabUITests {
             "Home permission-boundary foreground watchdog expired. "
                 + "finalState=\(String(describing: app.state))"
         )
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
+        let homeTabButtons = app.buttons.matching(
+            identifier: Identifier.homeTabButton
+        )
+        let homeContent = element(
+            in: app,
+            identifier: Identifier.homeTabContent
+        )
+        XCTAssertTrue(
+            tapFirstHittableAndWaitForExistence(
+                in: homeTabButtons,
+                content: homeContent,
+                contentDescription: Identifier.homeTabContent,
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .tabNavigation
+            ),
+            "Home permission-boundary navigation watchdog expired. "
+                + "finalCandidateCount=\(homeTabButtons.count) "
+                + "finalContentExists=\(homeContent.exists)"
+        )
 
         let flowTabBundleIdentifier = FlowTabUITestAppIdentity.configured().bundleIdentifier
         let flowTabRowIdentifier =
