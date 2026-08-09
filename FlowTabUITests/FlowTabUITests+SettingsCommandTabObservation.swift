@@ -7,6 +7,7 @@ private enum FlowTabUITestCommandTabTakeoverObservationPolicy {
     static let statusProjectionWatchdog: TimeInterval = 5
     static let takeoverConfigurationLogWatchdog: TimeInterval = 10
     static let switcherTriggerLogWatchdog: TimeInterval = 10
+    static let gracefulTerminationWatchdog: TimeInterval = 8
     static let defaultsSuiteName =
         "io.github.potato-dumplings.flowtab"
     static let markerKey =
@@ -14,6 +15,14 @@ private enum FlowTabUITestCommandTabTakeoverObservationPolicy {
 }
 
 extension FlowTabUITests {
+    func testCommandTabGracefulTerminationPolicyPreservesWatchdog() {
+        XCTAssertEqual(
+            FlowTabUITestCommandTabTakeoverObservationPolicy
+                .gracefulTerminationWatchdog,
+            8
+        )
+    }
+
     func testCommandTabSwitcherTriggerLogPolicyPreservesWatchdog() {
         XCTAssertEqual(
             FlowTabUITestCommandTabTakeoverObservationPolicy
@@ -243,11 +252,62 @@ extension FlowTabUITests {
         }
 
         assertCommandTabTakeoverMarker(expectedValue: false) {
+            let terminationObservation =
+                FlowTabUITestConditionObservationOwner(
+                    observationRegistration:
+                        FlowTabUITestConditionReadbackScheduler
+                            .mainRunLoopRegistration(
+                                cadence:
+                                    FlowTabUITestConditionObservationPolicy
+                                        .xcuiReadbackCadence
+                            ),
+                    readback: { app.state },
+                    isSatisfied: { $0 == .notRunning },
+                    describe: {
+                        "applicationState=\(String(describing: $0))"
+                    }
+                )
+            terminationObservation.start()
+            defer { terminationObservation.cancel() }
+            guard let terminationBaseline =
+                terminationObservation.latestEvidence
+            else {
+                XCTFail(
+                    "Command+Tab takeover App exit has no baseline. "
+                        + terminationObservation.diagnosticSummary
+                )
+                return
+            }
+            let terminationBaselineState = terminationBaseline.value
+            guard
+                terminationBaselineState == .runningForeground
+                    || terminationBaselineState == .runningBackground
+            else {
+                XCTFail(
+                    "Command+Tab takeover App has no running baseline. "
+                        + terminationObservation.diagnosticSummary
+                )
+                return
+            }
+
             app.activate()
             app.typeKey("q", modifierFlags: .command)
-            XCTAssertTrue(
-                app.wait(for: .notRunning, timeout: 8)
+            terminationObservation.requestReadback(
+                source: .triggerReadback
             )
+            guard
+                terminationObservation.waitForResolution(
+                    timeout:
+                        FlowTabUITestCommandTabTakeoverObservationPolicy
+                            .gracefulTerminationWatchdog
+                ) != nil
+            else {
+                XCTFail(
+                    "Command+Tab takeover App exit watchdog expired. "
+                        + terminationObservation.diagnosticSummary
+                )
+                return
+            }
         }
 
         resetHotkeyDefaultsAfterCommandTabTakeoverTest()
