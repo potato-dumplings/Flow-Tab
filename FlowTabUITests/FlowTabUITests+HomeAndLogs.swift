@@ -449,16 +449,20 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        launchFlowTabUITestApplication(relaunchApp)
-        XCTAssertTrue(
-            tapFirstHittable(in: relaunchApp.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5)
-        )
-        XCTAssertFalse(
-            hasHittableElement(
-                in: relaunchApp.buttons.matching(identifier: Identifier.permissionOpenSettings),
-                timeout: 2
+        assertHomePermissionBannerHiddenProjection(
+            in: relaunchApp,
+            targetDescription: "persisted-permission-dismiss"
+        ) {
+            launchFlowTabUITestApplication(relaunchApp)
+            XCTAssertTrue(
+                tapFirstHittable(
+                    in: relaunchApp.buttons.matching(
+                        identifier: Identifier.homeTabButton
+                    ),
+                    timeout: 5
+                )
             )
-        )
+        }
     }
 
     func testLogsPageShowsSeededLogsAndClearRemovesOutput() throws {
