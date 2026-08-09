@@ -373,40 +373,4 @@ extension FlowTabUITests {
         windowTitles.joined(separator: " | ")
     }
 
-    func assertSpaceFixtureWorkflowPermissionsAvailable() -> Bool {
-        let app = makeRealRuntimeFlowTabApp(
-            showsPermissionReminder: true,
-            additionalArguments: []
-        )
-        launchFlowTabUITestApplication(app)
-        defer {
-            if app.state == .runningForeground || app.state == .runningBackground {
-                app.terminate()
-            }
-        }
-
-        return assertSpaceFixtureWorkflowPermissionsAvailable(in: app)
-    }
-
-    func assertSpaceFixtureWorkflowPermissionsAvailable(
-        in app: XCUIApplication
-    ) -> Bool {
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
-        XCTAssertTrue(
-            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10)
-        )
-
-        let openSettingsButtons = app.buttons.matching(identifier: Identifier.permissionOpenSettings)
-        guard openSettingsButtons.firstMatch.waitForExistence(timeout: 2) else { return true }
-
-        XCTAssertTrue(hasHittableElement(in: openSettingsButtons, timeout: 5))
-        XCTAssertTrue(app.buttons.matching(identifier: Identifier.permissionDismiss).firstMatch.waitForExistence(timeout: 5))
-        XCTFail(
-            """
-            Space Fixture workflow requires Accessibility and Screen Recording permissions.
-            FlowTab showed the missing-permissions prompt instead of fixture window data.
-            """
-        )
-        return false
-    }
 }

@@ -40,6 +40,10 @@ final class FlowTabUITests: XCTestCase {
         static let sidebarPermissionStatus = "flowtab.sidebar.permission-status"
         static let sidebarPermissionAccessibility = "flowtab.sidebar.permission.accessibility"
         static let sidebarPermissionScreenCapture = "flowtab.sidebar.permission.screen-capture"
+        static let sidebarPermissionAccessibilityStatus =
+            "\(sidebarPermissionAccessibility).status"
+        static let sidebarPermissionScreenCaptureStatus =
+            "\(sidebarPermissionScreenCapture).status"
         static let permissionBanner = "flowtab.home.permission.banner"
         static let permissionOpenSettings = "flowtab.home.permission.open-settings"
         static let permissionDismiss = "flowtab.home.permission.dismiss"
