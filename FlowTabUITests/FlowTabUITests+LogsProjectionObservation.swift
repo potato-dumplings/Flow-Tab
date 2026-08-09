@@ -12,6 +12,19 @@ struct FlowTabUITestLogsProjectionSnapshot: Equatable {
     let tabContentExists: Bool
     let linesContainerExists: Bool
     let rowIdentifiers: [String]
+    let selectedLevel: String?
+
+    init(
+        tabContentExists: Bool,
+        linesContainerExists: Bool,
+        rowIdentifiers: [String],
+        selectedLevel: String? = nil
+    ) {
+        self.tabContentExists = tabContentExists
+        self.linesContainerExists = linesContainerExists
+        self.rowIdentifiers = rowIdentifiers
+        self.selectedLevel = selectedLevel
+    }
 
     var identifierCounts: [String: Int] {
         rowIdentifiers.reduce(into: [:]) {
@@ -24,6 +37,7 @@ struct FlowTabUITestLogsProjectionSnapshot: Equatable {
     var diagnosticSummary: String {
         "tabContentExists=\(tabContentExists) "
             + "linesContainerExists=\(linesContainerExists) "
+            + "selectedLevel=\(selectedLevel ?? "nil") "
             + "rowCount=\(rowIdentifiers.count) "
             + "identifierCounts="
             + "\(logsIdentifierCountSummary(identifierCounts))"
@@ -34,10 +48,12 @@ struct FlowTabUITestLogsProjectionExpectation: Equatable {
     let rowCount: Int
     let identifierCounts: [String: Int]
     let prohibitedIdentifiers: Set<String>
+    let selectedLevel: String?
 
     init(
         visibleIdentifiers: [String],
-        hiddenIdentifiers: [String]
+        hiddenIdentifiers: [String],
+        selectedLevel: String? = nil
     ) {
         rowCount = visibleIdentifiers.count
         identifierCounts = visibleIdentifiers.reduce(into: [:]) {
@@ -46,6 +62,7 @@ struct FlowTabUITestLogsProjectionExpectation: Equatable {
             counts[identifier, default: 0] += 1
         }
         prohibitedIdentifiers = Set(hiddenIdentifiers)
+        self.selectedLevel = selectedLevel
     }
 
     func isSatisfied(
@@ -57,6 +74,8 @@ struct FlowTabUITestLogsProjectionExpectation: Equatable {
             && snapshot.identifierCounts == identifierCounts
             && Set(snapshot.identifierCounts.keys)
                 .isDisjoint(with: prohibitedIdentifiers)
+            && (selectedLevel == nil
+                || snapshot.selectedLevel == selectedLevel)
     }
 
     var diagnosticSummary: String {
@@ -64,7 +83,8 @@ struct FlowTabUITestLogsProjectionExpectation: Equatable {
             + "identifierCounts="
             + "\(logsIdentifierCountSummary(identifierCounts)) "
             + "prohibitedIdentifiers="
-            + "\(prohibitedIdentifiers.sorted())"
+            + "\(prohibitedIdentifiers.sorted()) "
+            + "selectedLevel=\(selectedLevel ?? "any")"
     }
 }
 
@@ -133,8 +153,20 @@ final class FlowTabUITestLogsProjectionObservationOwner {
         conditionOwner.resolvedEvidence
     }
 
+    var latestEvidence: FlowTabUITestConditionEvidence<
+        FlowTabUITestLogsProjectionSnapshot
+    >? {
+        conditionOwner.latestEvidence
+    }
+
     var diagnosticSummary: String {
         conditionOwner.diagnosticSummary
+    }
+
+    func requestReadback(
+        source: FlowTabUITestConditionObservationSource
+    ) {
+        conditionOwner.requestReadback(source: source)
     }
 
     func cancel() {
@@ -241,5 +273,150 @@ extension FlowTabUITests {
             )
             return
         }
+    }
+
+    func assertLogVisibilityTransition(
+        in app: XCUIApplication,
+        targetDescription: String,
+        initialSelectedLevel: String,
+        initialVisibleIdentifiers: [String],
+        selectedLevel: String,
+        visibleIdentifiers: [String],
+        hiddenIdentifiers: [String],
+        trigger: () -> Void
+    ) {
+        let initialExpectation =
+            FlowTabUITestLogsProjectionExpectation(
+                visibleIdentifiers: initialVisibleIdentifiers,
+                hiddenIdentifiers: [],
+                selectedLevel: initialSelectedLevel
+            )
+        let targetExpectation =
+            FlowTabUITestLogsProjectionExpectation(
+                visibleIdentifiers: visibleIdentifiers,
+                hiddenIdentifiers: hiddenIdentifiers,
+                selectedLevel: selectedLevel
+            )
+        let logsTabContent = element(
+            in: app,
+            identifier: Identifier.logsTabContent
+        )
+        let logsLines = element(
+            in: app,
+            identifier: Identifier.logsLines
+        )
+        let logsLevel = element(
+            in: app,
+            identifier: Identifier.logsLevel
+        )
+        let seededRows = app.descendants(matching: .any)
+            .matching(
+                NSPredicate(
+                    format: "identifier BEGINSWITH %@",
+                    FlowTabUITestLogsProjectionPolicy
+                        .seededRowIdentifierPrefix
+                )
+            )
+        let readback: () ->
+            FlowTabUITestLogsProjectionSnapshot = {
+                let levelExists = logsLevel.exists
+                return FlowTabUITestLogsProjectionSnapshot(
+                    tabContentExists:
+                        logsTabContent.exists,
+                    linesContainerExists:
+                        logsLines.exists,
+                    rowIdentifiers: seededRows
+                        .allElementsBoundByIndex
+                        .map(\.identifier),
+                    selectedLevel: levelExists
+                        ? self.elementStringValue(logsLevel)
+                        : nil
+                )
+            }
+        let baselineOwner =
+            FlowTabUITestLogsProjectionObservationOwner(
+                expectation: initialExpectation,
+                readback: readback
+            )
+        baselineOwner.start()
+        guard
+            baselineOwner.waitForResolution(
+                timeout:
+                    FlowTabUITestLogsProjectionPolicy
+                        .exactProjectionWatchdog
+            ) != nil
+        else {
+            XCTFail(
+                "Logs projection baseline watchdog expired. "
+                    + "target=\(targetDescription) "
+                    + baselineOwner.diagnosticSummary
+            )
+            baselineOwner.cancel()
+            return
+        }
+        baselineOwner.cancel()
+
+        let deferredReadbacks =
+            FlowTabUITestDeferredConditionReadbackRegistration(
+                downstreamRegistration:
+                    FlowTabUITestConditionReadbackScheduler
+                        .mainRunLoopRegistration(
+                            cadence:
+                                FlowTabUITestConditionObservationPolicy
+                                    .xcuiReadbackCadence
+                        )
+            )
+        var triggerDidComplete = false
+        let owner =
+            FlowTabUITestLogsProjectionObservationOwner(
+                expectation: targetExpectation,
+                observationRegistration: {
+                    readback in
+                    deferredReadbacks.register(readback)
+                },
+                acceptsResolution: {
+                    triggerDidComplete
+                },
+                readback: readback
+            )
+        owner.start()
+        defer {
+            owner.cancel()
+            deferredReadbacks.cancel()
+        }
+
+        guard let initialEvidence = owner.latestEvidence,
+              initialEvidence.source == .initialReadback,
+              initialExpectation.isSatisfied(
+                by: initialEvidence.value
+              )
+        else {
+            XCTFail(
+                "Logs projection initial baseline was incomplete. "
+                    + "target=\(targetDescription) "
+                    + "expected{\(initialExpectation.diagnosticSummary)} "
+                    + owner.diagnosticSummary
+            )
+            return
+        }
+        XCTAssertNil(owner.resolvedEvidence)
+
+        trigger()
+        triggerDidComplete = true
+        owner.requestReadback(source: .triggerReadback)
+        if owner.resolvedEvidence == nil {
+            deferredReadbacks.activate()
+        }
+
+        XCTAssertNotNil(
+            owner.waitForResolution(
+                timeout:
+                    FlowTabUITestLogsProjectionPolicy
+                        .exactProjectionWatchdog
+            ),
+            "Logs projection transition watchdog expired. "
+                + "target=\(targetDescription) "
+                + owner.diagnosticSummary
+        )
     }
 }

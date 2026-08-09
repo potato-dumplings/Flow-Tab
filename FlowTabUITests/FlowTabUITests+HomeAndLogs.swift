@@ -524,32 +524,28 @@ extension FlowTabUITests {
         XCTAssertTrue(persistedFingerprints.allSatisfy { diskContentsBeforeClear.contains($0) })
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: Identifier.logsEmptyHint).firstMatch.exists)
 
-        selectOption(in: app, controlIdentifier: Identifier.logsLevel, optionIdentifier: "WARN")
-        assertValue(of: element(in: app, identifier: Identifier.logsLevel), equals: "WARN")
-        XCTAssertTrue(
-            waitForNonExistence(
-                app.descendants(matching: .any).matching(identifier: Identifier.logsSeededDebugLine).firstMatch,
-                timeout: 3
+        assertLogVisibilityTransition(
+            in: app,
+            targetDescription: "seeded-log-level-WARN",
+            initialSelectedLevel: "DEBUG",
+            initialVisibleIdentifiers:
+                expectedSeededLogs.map(\.identifier),
+            selectedLevel: "WARN",
+            visibleIdentifiers: [
+                Identifier.logsSeededWarnLine,
+                Identifier.logsSeededErrorLine
+            ],
+            hiddenIdentifiers: [
+                Identifier.logsSeededDebugLine,
+                Identifier.logsSeededInfoLine
+            ]
+        ) {
+            selectOption(
+                in: app,
+                controlIdentifier: Identifier.logsLevel,
+                optionIdentifier: "WARN"
             )
-        )
-        XCTAssertTrue(
-            waitForNonExistence(
-                app.descendants(matching: .any).matching(identifier: Identifier.logsSeededInfoLine).firstMatch,
-                timeout: 3
-            )
-        )
-        XCTAssertTrue(
-            app.descendants(matching: .any)
-                .matching(identifier: Identifier.logsSeededWarnLine)
-                .firstMatch
-                .waitForExistence(timeout: 5)
-        )
-        XCTAssertTrue(
-            app.descendants(matching: .any)
-                .matching(identifier: Identifier.logsSeededErrorLine)
-                .firstMatch
-                .waitForExistence(timeout: 5)
-        )
+        }
 
         setToggle(diagnosticSessionToggle, to: true)
         let diagnosticSessionStatus = element(

@@ -43,13 +43,15 @@ extension FlowTabUITests {
         let expectation =
             FlowTabUITestLogsProjectionExpectation(
                 visibleIdentifiers: ["info", "warn"],
-                hiddenIdentifiers: ["debug"]
+                hiddenIdentifiers: ["debug"],
+                selectedLevel: "WARN"
             )
         let matchingSnapshot =
             FlowTabUITestLogsProjectionSnapshot(
                 tabContentExists: true,
                 linesContainerExists: true,
-                rowIdentifiers: ["info", "warn"]
+                rowIdentifiers: ["info", "warn"],
+                selectedLevel: "WARN"
             )
         var acceptsResolution = false
         var snapshot = matchingSnapshot
@@ -75,7 +77,8 @@ extension FlowTabUITests {
         snapshot = FlowTabUITestLogsProjectionSnapshot(
             tabContentExists: true,
             linesContainerExists: true,
-            rowIdentifiers: ["info"]
+            rowIdentifiers: ["info"],
+            selectedLevel: "WARN"
         )
         scheduledReadback?(.scheduledReadback)
         XCTAssertNil(owner.resolvedEvidence)
@@ -83,7 +86,8 @@ extension FlowTabUITests {
         snapshot = FlowTabUITestLogsProjectionSnapshot(
             tabContentExists: true,
             linesContainerExists: true,
-            rowIdentifiers: ["info", "debug"]
+            rowIdentifiers: ["info", "debug"],
+            selectedLevel: "WARN"
         )
         scheduledReadback?(.scheduledReadback)
         XCTAssertNil(owner.resolvedEvidence)
@@ -91,7 +95,17 @@ extension FlowTabUITests {
         snapshot = FlowTabUITestLogsProjectionSnapshot(
             tabContentExists: true,
             linesContainerExists: true,
-            rowIdentifiers: ["info", "info"]
+            rowIdentifiers: ["info", "info"],
+            selectedLevel: "WARN"
+        )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = FlowTabUITestLogsProjectionSnapshot(
+            tabContentExists: true,
+            linesContainerExists: true,
+            rowIdentifiers: ["info", "warn"],
+            selectedLevel: "DEBUG"
         )
         scheduledReadback?(.scheduledReadback)
         XCTAssertNil(owner.resolvedEvidence)
@@ -114,13 +128,15 @@ extension FlowTabUITests {
         let expectation =
             FlowTabUITestLogsProjectionExpectation(
                 visibleIdentifiers: ["error"],
-                hiddenIdentifiers: ["debug", "info", "warn"]
+                hiddenIdentifiers: ["debug", "info", "warn"],
+                selectedLevel: "ERROR"
             )
         let matchingSnapshot =
             FlowTabUITestLogsProjectionSnapshot(
                 tabContentExists: true,
                 linesContainerExists: true,
-                rowIdentifiers: ["error"]
+                rowIdentifiers: ["error"],
+                selectedLevel: "ERROR"
             )
 
         for iteration in
@@ -133,7 +149,8 @@ extension FlowTabUITests {
                 : FlowTabUITestLogsProjectionSnapshot(
                     tabContentExists: true,
                     linesContainerExists: false,
-                    rowIdentifiers: []
+                    rowIdentifiers: [],
+                    selectedLevel: "DEBUG"
                 )
             var scheduledReadback:
                 ((FlowTabUITestConditionObservationSource) -> Void)?
@@ -193,7 +210,8 @@ extension FlowTabUITests {
                     return FlowTabUITestLogsProjectionSnapshot(
                         tabContentExists: false,
                         linesContainerExists: false,
-                        rowIdentifiers: []
+                        rowIdentifiers: [],
+                        selectedLevel: nil
                     )
                 }
             )
@@ -210,7 +228,8 @@ extension FlowTabUITests {
                     FlowTabUITestLogsProjectionSnapshot(
                         tabContentExists: true,
                         linesContainerExists: false,
-                        rowIdentifiers: ["debug"]
+                        rowIdentifiers: ["debug"],
+                        selectedLevel: "DEBUG"
                     )
                 }
             )
