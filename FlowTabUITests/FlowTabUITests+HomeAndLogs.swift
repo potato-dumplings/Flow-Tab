@@ -74,24 +74,21 @@ extension FlowTabUITests {
         XCTAssertNotEqual(NSWorkspace.shared.frontmostApplication?.bundleIdentifier, flowTabBundleIdentifier)
 
         let logSnapshot = makeRuntimeLogFileSnapshot()
-        assertStatusItemMainWindowReopens(in: app) {
-            assertTriggerMakesApplicationFrontmost(
-                flowTabBundleIdentifier,
-                timeout: 5,
-                message: "FlowTab should stay foreground after restoring its hidden accessory policy."
-            ) {
-                flowTabStatusItem(in: app).tap()
+        defer { logSnapshot.cancel() }
+        assertStatusItemActivationPolicyTransition(
+            since: logSnapshot
+        ) {
+            assertStatusItemMainWindowReopens(in: app) {
+                assertTriggerMakesApplicationFrontmost(
+                    flowTabBundleIdentifier,
+                    timeout: 5,
+                    message: "FlowTab should stay foreground after restoring its hidden accessory policy."
+                ) {
+                    flowTabStatusItem(in: app).tap()
+                }
             }
         }
 
-        waitForRuntimeLogFiles(
-            containing: [
-                "activationPolicy=regular source=status_item_temporary_activation",
-                "activationPolicy=accessory source=status_item_window_stable"
-            ],
-            since: logSnapshot,
-            timeout: 8
-        )
         XCTAssertEqual(
             NSWorkspace.shared.frontmostApplication?
                 .bundleIdentifier,
