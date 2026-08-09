@@ -70,6 +70,7 @@ final class FlowTabUITests: XCTestCase {
         static let settingsWindowHideMinimizedApps = "flowtab.settings.window.hide-minimized-apps"
         static let settingsSearchEnabled = "flowtab.settings.search.enabled"
         static let settingsSearchDefaultScope = "flowtab.settings.search.default-scope"
+        static let settingsSearchSummary = "flowtab.settings.search.summary"
         static let settingsAppVisibilityManage = "flowtab.settings.app-visibility.manage"
         static let settingsAppVisibilityManager = "flowtab.settings.app-visibility.manager"
         static let settingsAppVisibilityBack = "flowtab.settings.app-visibility.back"

@@ -132,18 +132,9 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-        openSettingsTab(in: app)
-
-        let scopeControl = element(in: app, identifier: Identifier.settingsSearchDefaultScope)
-        XCTAssertTrue(scopeControl.waitForExistence(timeout: 5))
-        assertValue(of: scopeControl, equals: "app")
-        tapElement(scopeControl)
-
-        let windowOption = app.descendants(matching: .any)
-            .matching(identifier: "\(Identifier.settingsSearchDefaultScope).option.window")
-            .firstMatch
-        XCTAssertFalse(windowOption.waitForExistence(timeout: 1))
-        assertValue(of: scopeControl, equals: "app")
+        assertSettingsSearchWindowScopeUnavailable(in: app) {
+            openSettingsTab(in: app)
+        }
     }
 
     func testSettingsAppVisibilityNavigationConvergesFromVisibleState() throws {
