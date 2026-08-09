@@ -571,7 +571,9 @@ final class SwitcherPanelController {
         triggerDirection: CycleDirection = .forward
     ) -> Bool {
         showSearch(direction: triggerDirection)
-        return model.isSearchActive || model.pendingSearchActivationAfterFreshnessBarrier
+        return model.isSearchActive
+            && isPanelPresented
+            && panel.isKeyWindow
     }
 
     @discardableResult

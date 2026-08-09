@@ -676,6 +676,11 @@ extension FlowTabUITests {
                         contents:
                             FlowTabUITestRuntimeLogObservationTestPolicy
                                 .triggerReceiptMarker
+                            + "\nawaiting switcher trigger presentation "
+                            + "generation=4 evidenceGeneration=1 "
+                            + "source=triggerReadback "
+                            + "snapshot{panelPresented=0 panelKey=0 "
+                            + "searchActive=0 searchPending=1}"
                     )
                 }
             )
@@ -710,6 +715,16 @@ extension FlowTabUITests {
             owner.completionDiagnosticSummary.contains(
                 FlowTabUITestRuntimeLogObservationTestPolicy
                     .triggerReceiptMarker
+            )
+        )
+        XCTAssertTrue(
+            owner.completionDiagnosticSummary.contains(
+                "generation=4 evidenceGeneration=1"
+            )
+        )
+        XCTAssertTrue(
+            owner.completionDiagnosticSummary.contains(
+                "searchPending=1"
             )
         )
     }

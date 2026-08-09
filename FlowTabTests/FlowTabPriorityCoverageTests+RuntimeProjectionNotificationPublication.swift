@@ -464,7 +464,7 @@ extension FlowTabPriorityCoverageTests {
                 model: LiveSwitcherModel(runtimeProjectionService: service)
             )
 
-            XCTAssertTrue(controller.presentSearchHotkeySessionForTesting())
+            XCTAssertFalse(controller.presentSearchHotkeySessionForTesting())
             XCTAssertFalse(controller.modelForTesting.isSearchActive)
             XCTAssertFalse(controller.isPanelPresented)
 

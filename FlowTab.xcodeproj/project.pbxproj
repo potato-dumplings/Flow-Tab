@@ -104,6 +104,8 @@
 		A45200023D5A000100B0D737 /* FlowTabUITestInitialSearchActivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45200013D5A000100B0D737 /* FlowTabUITestInitialSearchActivation.swift */; };
 		A45200043D5A000100B0D737 /* FlowTabUITestInitialSearchActivationBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45200033D5A000100B0D737 /* FlowTabUITestInitialSearchActivationBootstrap.swift */; };
 		A45200063D5A000100B0D737 /* FlowTabTests+UITestInitialSearchActivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45200053D5A000100B0D737 /* FlowTabTests+UITestInitialSearchActivation.swift */; };
+		A46B10023D73000100B0D737 /* FlowTabUITestSwitcherTriggerNotificationObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46B10013D73000100B0D737 /* FlowTabUITestSwitcherTriggerNotificationObserver.swift */; };
+		A46B10043D73000100B0D737 /* FlowTabTests+UITestSearchTriggerPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46B10033D73000100B0D737 /* FlowTabTests+UITestSearchTriggerPresentation.swift */; };
 		A45300023D5B000100B0D737 /* FlowTabUITests+WindowLayerPreviewTransitionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45300013D5B000100B0D737 /* FlowTabUITests+WindowLayerPreviewTransitionObservation.swift */; };
 		A45300043D5B000100B0D737 /* FlowTabUITests+WindowLayerPreviewTransitionObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45300033D5B000100B0D737 /* FlowTabUITests+WindowLayerPreviewTransitionObservationTests.swift */; };
 		A45400023D5C000100B0D737 /* FlowTabUITests+SwitcherWindowSelectionTransitionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45400013D5C000100B0D737 /* FlowTabUITests+SwitcherWindowSelectionTransitionObservation.swift */; };
@@ -934,6 +936,8 @@
 		A45200013D5A000100B0D737 /* FlowTabUITestInitialSearchActivation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestInitialSearchActivation.swift; sourceTree = "<group>"; };
 		A45200033D5A000100B0D737 /* FlowTabUITestInitialSearchActivationBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestInitialSearchActivationBootstrap.swift; sourceTree = "<group>"; };
 		A45200053D5A000100B0D737 /* FlowTabTests+UITestInitialSearchActivation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+UITestInitialSearchActivation.swift"; sourceTree = "<group>"; };
+		A46B10013D73000100B0D737 /* FlowTabUITestSwitcherTriggerNotificationObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestSwitcherTriggerNotificationObserver.swift; sourceTree = "<group>"; };
+		A46B10033D73000100B0D737 /* FlowTabTests+UITestSearchTriggerPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+UITestSearchTriggerPresentation.swift"; sourceTree = "<group>"; };
 		A45300013D5B000100B0D737 /* FlowTabUITests+WindowLayerPreviewTransitionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+WindowLayerPreviewTransitionObservation.swift"; sourceTree = "<group>"; };
 		A45300033D5B000100B0D737 /* FlowTabUITests+WindowLayerPreviewTransitionObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+WindowLayerPreviewTransitionObservationTests.swift"; sourceTree = "<group>"; };
 		A45400013D5C000100B0D737 /* FlowTabUITests+SwitcherWindowSelectionTransitionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherWindowSelectionTransitionObservation.swift"; sourceTree = "<group>"; };
@@ -1247,6 +1251,7 @@
 				FFF800063D37000100B0D737 /* FlowTabTests+UITestInitialPresentationPressure.swift */,
 				FFF800073D37000100B0D737 /* UITestInitialPresentationTestSupport.swift */,
 				A45200053D5A000100B0D737 /* FlowTabTests+UITestInitialSearchActivation.swift */,
+				A46B10033D73000100B0D737 /* FlowTabTests+UITestSearchTriggerPresentation.swift */,
 				FFF900023D38000100B0D737 /* FlowTabTests+UITestMockWindowPreviewLatency.swift */,
 				FFFA00023D39000100B0D737 /* FlowTabTests+UITestInitialPanelOcclusionStaleness.swift */,
 				FFFA00033D39000100B0D737 /* FlowTabTests+UITestInitialPanelOcclusionStalenessPressure.swift */,
@@ -1567,6 +1572,7 @@
 				E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */,
 				D1A1B1C42A00000100B0D737 /* FlowTabLaunchTesting.swift */,
 				D1A1B1C12A00000100B0D737 /* FlowTabUITestBootstrapper.swift */,
+				A46B10013D73000100B0D737 /* FlowTabUITestSwitcherTriggerNotificationObserver.swift */,
 				FFD300013D2E000100B0D737 /* FlowTabUITestProjectionAcknowledgement.swift */,
 				A46900013D71000100B0D737 /* FlowTabUITestHomeInitialProjectionApplication.swift */,
 				A45900013D61000100B0D737 /* FlowTabUITestAXSuppressionReadbackEvidence.swift */,
@@ -2092,6 +2098,7 @@
 				A1B2C41A2F73000100B0D737 /* SwitcherSearchCoordinator+Tokenization.swift in Sources */,
 				D1A1B1D42A00000100B0D737 /* FlowTabLaunchTesting.swift in Sources */,
 				D1A1B1D12A00000100B0D737 /* FlowTabUITestBootstrapper.swift in Sources */,
+				A46B10023D73000100B0D737 /* FlowTabUITestSwitcherTriggerNotificationObserver.swift in Sources */,
 				FFD300023D2E000100B0D737 /* FlowTabUITestProjectionAcknowledgement.swift in Sources */,
 				A46900023D71000100B0D737 /* FlowTabUITestHomeInitialProjectionApplication.swift in Sources */,
 				A45900023D61000100B0D737 /* FlowTabUITestAXSuppressionReadbackEvidence.swift in Sources */,
@@ -2268,6 +2275,7 @@
 				FFF801063D37000100B0D737 /* FlowTabTests+UITestInitialPresentationPressure.swift in Sources */,
 				FFF801073D37000100B0D737 /* UITestInitialPresentationTestSupport.swift in Sources */,
 				A45200063D5A000100B0D737 /* FlowTabTests+UITestInitialSearchActivation.swift in Sources */,
+				A46B10043D73000100B0D737 /* FlowTabTests+UITestSearchTriggerPresentation.swift in Sources */,
 				FFF901023D38000100B0D737 /* FlowTabTests+UITestMockWindowPreviewLatency.swift in Sources */,
 				FFFA01023D39000100B0D737 /* FlowTabTests+UITestInitialPanelOcclusionStaleness.swift in Sources */,
 				FFFA01033D39000100B0D737 /* FlowTabTests+UITestInitialPanelOcclusionStalenessPressure.swift in Sources */,
