@@ -3,6 +3,7 @@ import XCTest
 
 private enum FlowTabUITestPermissionObservationPolicy {
     static let settingsInitialProjectionWatchdog: TimeInterval = 5
+    static let homeGrantedProjectionWatchdog: TimeInterval = 2
 }
 
 private struct FlowTabUITestSettingsPermissionInitialProjectionSnapshot:
@@ -48,6 +49,26 @@ private struct FlowTabUITestSettingsPermissionGrantedProjectionSnapshot:
             + "\(accessibilityGrantedStatusExists) "
             + "screenCaptureGrantedStatusExists="
             + "\(screenCaptureGrantedStatusExists)"
+    }
+}
+
+private struct FlowTabUITestHomeGrantedPermissionProjectionSnapshot:
+    Equatable
+{
+    let homeContentExists: Bool
+    let permissionBannerExists: Bool
+    let permissionActionExists: Bool
+
+    var isSatisfied: Bool {
+        homeContentExists
+            && !permissionBannerExists
+            && !permissionActionExists
+    }
+
+    var diagnosticSummary: String {
+        "homeContentExists=\(homeContentExists) "
+            + "permissionBannerExists=\(permissionBannerExists) "
+            + "permissionActionExists=\(permissionActionExists)"
     }
 }
 
@@ -98,6 +119,105 @@ extension FlowTabUITests {
                 "mask=\(mask) \(snapshot.diagnosticSummary)"
             )
         }
+    }
+
+    func testHomeGrantedPermissionProjectionPolicyPreservesWatchdog() {
+        XCTAssertEqual(
+            FlowTabUITestPermissionObservationPolicy
+                .homeGrantedProjectionWatchdog,
+            2
+        )
+        XCTAssertTrue(
+            FlowTabUITestPermissionObservationPolicy
+                .homeGrantedProjectionWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestPermissionObservationPolicy
+                .homeGrantedProjectionWatchdog,
+            0
+        )
+    }
+
+    func testHomeGrantedPermissionProjectionRequiresLoadedContentAndAbsence() {
+        for mask in 0..<8 {
+            let snapshot =
+                FlowTabUITestHomeGrantedPermissionProjectionSnapshot(
+                    homeContentExists: mask & 1 != 0,
+                    permissionBannerExists: mask & 2 != 0,
+                    permissionActionExists: mask & 4 != 0
+                )
+
+            XCTAssertEqual(
+                snapshot.isSatisfied,
+                mask == 1,
+                "mask=\(mask) \(snapshot.diagnosticSummary)"
+            )
+        }
+    }
+
+    func assertHomeGrantedPermissionProjection(
+        in app: XCUIApplication,
+        trigger: () -> Void
+    ) {
+        let homeContent = element(
+            in: app,
+            identifier: Identifier.homeTabContent
+        )
+        let permissionBanner = element(
+            in: app,
+            identifier: Identifier.permissionBanner
+        )
+        let permissionAction = element(
+            in: app,
+            identifier: Identifier.permissionOpenSettings
+        )
+        var triggerCompleted = false
+        let observation =
+            FlowTabUITestConditionObservationOwner(
+                observationRegistration:
+                    FlowTabUITestConditionReadbackScheduler
+                        .mainRunLoopRegistration(
+                            cadence:
+                                FlowTabUITestConditionObservationPolicy
+                                    .xcuiReadbackCadence
+                        ),
+                readback: {
+                    FlowTabUITestHomeGrantedPermissionProjectionSnapshot(
+                        homeContentExists: homeContent.exists,
+                        permissionBannerExists: permissionBanner.exists,
+                        permissionActionExists: permissionAction.exists
+                    )
+                },
+                isSatisfied: {
+                    triggerCompleted && $0.isSatisfied
+                },
+                describe: {
+                    "acceptanceEnabled=\(triggerCompleted) "
+                        + $0.diagnosticSummary
+                }
+            )
+        observation.start()
+        defer { observation.cancel() }
+
+        XCTAssertEqual(
+            observation.latestEvidence?.source,
+            .initialReadback
+        )
+        XCTAssertNil(observation.resolvedEvidence)
+
+        trigger()
+        triggerCompleted = true
+        observation.requestReadback(source: .triggerReadback)
+
+        XCTAssertNotNil(
+            observation.waitForResolution(
+                timeout:
+                    FlowTabUITestPermissionObservationPolicy
+                        .homeGrantedProjectionWatchdog
+            ),
+            "Home granted-permission projection watchdog expired. "
+                + observation.diagnosticSummary
+        )
     }
 
     func testHomePermissionBannerConvergesFromOwnedTCCReadbackEvidence() throws {

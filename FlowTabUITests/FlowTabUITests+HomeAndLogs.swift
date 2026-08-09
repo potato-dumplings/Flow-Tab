@@ -143,12 +143,16 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
-
-        XCTAssertFalse(
-            hasHittableElement(in: app.buttons.matching(identifier: Identifier.permissionOpenSettings), timeout: 2)
-        )
-        XCTAssertFalse(element(in: app, identifier: Identifier.permissionBanner).exists)
+        assertHomeGrantedPermissionProjection(in: app) {
+            XCTAssertTrue(
+                tapFirstHittable(
+                    in: app.buttons.matching(
+                        identifier: Identifier.homeTabButton
+                    ),
+                    timeout: 5
+                )
+            )
+        }
     }
 
     func testHomeColdStartPublishesLiveAppDirectoryWithoutAccessibilityPermission() throws {
