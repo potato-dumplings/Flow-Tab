@@ -10,6 +10,7 @@ private enum FlowTabUITestCommandTabTakeoverObservationPolicy {
     static let gracefulTerminationWatchdog: TimeInterval = 8
     static let cleanupGracefulExitWatchdog: TimeInterval = 6
     static let cleanupForcedExitWatchdog: TimeInterval = 6
+    static let defaultsResetExitWatchdog: TimeInterval = 6
     static let defaultsSuiteName =
         "io.github.potato-dumplings.flowtab"
     static let markerKey =
@@ -17,6 +18,14 @@ private enum FlowTabUITestCommandTabTakeoverObservationPolicy {
 }
 
 extension FlowTabUITests {
+    func testCommandTabDefaultsResetCleanupPolicyPreservesWatchdog() {
+        XCTAssertEqual(
+            FlowTabUITestCommandTabTakeoverObservationPolicy
+                .defaultsResetExitWatchdog,
+            6
+        )
+    }
+
     func testCommandTabCleanupPolicyPreservesCompatibleWatchdogs() {
         XCTAssertEqual(
             FlowTabUITestCommandTabTakeoverObservationPolicy
@@ -413,7 +422,17 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(cleanupApp)
-        cleanupApp.terminate()
-        _ = cleanupApp.wait(for: .notRunning, timeout: 6)
+        let cleanupEvidence = terminateFlowTabUITestApplication(
+            cleanupApp,
+            targetDescription: "Command+Tab defaults-reset App",
+            timeout:
+                FlowTabUITestCommandTabTakeoverObservationPolicy
+                    .defaultsResetExitWatchdog
+        )
+        XCTAssertTrue(
+            cleanupEvidence.isSatisfied,
+            "Command+Tab defaults-reset App cleanup failed. "
+                + cleanupEvidence.diagnosticSummary
+        )
     }
 }
