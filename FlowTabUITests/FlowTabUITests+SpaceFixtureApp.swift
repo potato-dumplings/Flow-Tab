@@ -300,7 +300,6 @@ extension FlowTabUITests {
                 "--staggered-layout"
             ]
         )
-        launchSpaceFixtureApplicationAndWaitForForeground(app)
         defer {
             if app.state == .runningForeground || app.state == .runningBackground {
                 terminateSpaceFixtureApplicationAndWait(
@@ -309,17 +308,22 @@ extension FlowTabUITests {
                 )
             }
         }
-
-        waitForSpaceFixtureWorkflowReadiness(
+        assertSpaceFixtureWindowModePublication(
             in: app,
-            windowCount: 3,
-            titlePrefix: "UITest",
-            fullscreenWindowIndex: nil,
-            readinessTimeout:
-                SpaceFixtureWorkflowReadinessUITestPolicy
-                    .defaultWatchdog
-        )
-        XCTAssertTrue(element(in: app, identifier: "flowtab.spacefixture.window.mode.1").waitForExistence(timeout: 5))
+            windowIndex: 1,
+            expectedLabel: "Standard Window"
+        ) {
+            launchSpaceFixtureApplicationAndWaitForForeground(app)
+            waitForSpaceFixtureWorkflowReadiness(
+                in: app,
+                windowCount: 3,
+                titlePrefix: "UITest",
+                fullscreenWindowIndex: nil,
+                readinessTimeout:
+                    SpaceFixtureWorkflowReadinessUITestPolicy
+                        .defaultWatchdog
+            )
+        }
     }
 
     func testSpaceFixtureAppMarksFullscreenTargetWindowBeforeTransition() throws {
@@ -336,7 +340,6 @@ extension FlowTabUITests {
                 "--staggered-layout"
             ]
         )
-        launchSpaceFixtureApplicationAndWaitForForeground(app)
         defer {
             if app.state == .runningForeground || app.state == .runningBackground {
                 terminateSpaceFixtureApplicationAndWait(
@@ -345,9 +348,13 @@ extension FlowTabUITests {
                 )
             }
         }
-
-        XCTAssertTrue(element(in: app, identifier: "flowtab.spacefixture.window.mode.2").waitForExistence(timeout: 5))
-        XCTAssertEqual(element(in: app, identifier: "flowtab.spacefixture.window.mode.2").label, "Fullscreen Target")
+        assertSpaceFixtureWindowModePublication(
+            in: app,
+            windowIndex: 2,
+            expectedLabel: "Fullscreen Target"
+        ) {
+            launchSpaceFixtureApplicationAndWaitForForeground(app)
+        }
     }
 
     private func expectedSpaceFixtureWorkflowSummary(
