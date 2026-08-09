@@ -5,6 +5,7 @@ private enum FlowTabUITestCommandTabTakeoverObservationPolicy {
     static let markerReadbackCadence: TimeInterval = 0.1
     static let markerWatchdog: TimeInterval = 5
     static let statusProjectionWatchdog: TimeInterval = 5
+    static let takeoverConfigurationLogWatchdog: TimeInterval = 10
     static let defaultsSuiteName =
         "io.github.potato-dumplings.flowtab"
     static let markerKey =
@@ -12,6 +13,14 @@ private enum FlowTabUITestCommandTabTakeoverObservationPolicy {
 }
 
 extension FlowTabUITests {
+    func testCommandTabTakeoverConfigurationLogPolicyPreservesWatchdog() {
+        XCTAssertEqual(
+            FlowTabUITestCommandTabTakeoverObservationPolicy
+                .takeoverConfigurationLogWatchdog,
+            10
+        )
+    }
+
     func testCommandTabTakeoverStatusProjectionPolicyPreservesWatchdog() {
         XCTAssertEqual(
             FlowTabUITestCommandTabTakeoverObservationPolicy
@@ -100,8 +109,33 @@ extension FlowTabUITests {
             return
         }
 
+        let takeoverConfigurationMarkers = [
+            "updated main=Command + Tab",
+            "system Command+Tab shortcuts disabled for FlowTab takeover",
+            "commandTabTakeoverActive=true",
+            "hotkeyReloadNotification sender=AppDelegate main=Command + Tab"
+        ]
+        let takeoverLogBaseline = makeRuntimeLogFileSnapshot()
+        defer { takeoverLogBaseline.cancel() }
+        let takeoverLogObservation =
+            FlowTabUITestRuntimeLogObservationOwner(
+                expectation:
+                    .allMarkers(takeoverConfigurationMarkers),
+                observationRegistration:
+                    takeoverLogBaseline.observationRegistration(),
+                readback: takeoverLogBaseline.makeReadback
+            )
+        takeoverLogObservation.start()
+        defer { takeoverLogObservation.cancel() }
+        guard takeoverLogObservation.resolvedEvidence == nil else {
+            XCTFail(
+                "Command+Tab configuration logs were present at baseline. "
+                    + takeoverLogObservation.diagnosticSummary
+            )
+            return
+        }
+
         assertCommandTabTakeoverMarker(expectedValue: true) {
-            let takeoverLogSnapshot = makeRuntimeLogFileSnapshot()
             selectOption(
                 in: app,
                 controlIdentifier:
@@ -129,16 +163,19 @@ extension FlowTabUITests {
                 equals: "tab"
             )
 
-            waitForRuntimeLogFiles(
-                containing: [
-                    "updated main=Command + Tab",
-                    "system Command+Tab shortcuts disabled for FlowTab takeover",
-                    "commandTabTakeoverActive=true",
-                    "hotkeyReloadNotification sender=AppDelegate main=Command + Tab"
-                ],
-                since: takeoverLogSnapshot,
-                timeout: 10
-            )
+            guard
+                takeoverLogObservation.waitForResolution(
+                    timeout:
+                        FlowTabUITestCommandTabTakeoverObservationPolicy
+                            .takeoverConfigurationLogWatchdog
+                ) != nil
+            else {
+                XCTFail(
+                    "Command+Tab configuration log watchdog expired. "
+                        + takeoverLogObservation.diagnosticSummary
+                )
+                return
+            }
         }
         activeStatusObservation.requestReadback(
             source: .triggerReadback
