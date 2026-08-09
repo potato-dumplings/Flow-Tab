@@ -1,7 +1,68 @@
 import Foundation
 import XCTest
 
+private enum FlowTabUITestPermissionObservationPolicy {
+    static let settingsInitialProjectionWatchdog: TimeInterval = 5
+}
+
+private struct FlowTabUITestSettingsPermissionInitialProjectionSnapshot:
+    Equatable
+{
+    let accessibilityDeniedStatusExists: Bool
+    let screenCaptureDeniedStatusExists: Bool
+    let accessibilityActionExists: Bool
+    let screenCaptureActionExists: Bool
+
+    var isSatisfied: Bool {
+        accessibilityDeniedStatusExists
+            && screenCaptureDeniedStatusExists
+            && accessibilityActionExists
+            && screenCaptureActionExists
+    }
+
+    var diagnosticSummary: String {
+        "accessibilityDeniedStatusExists="
+            + "\(accessibilityDeniedStatusExists) "
+            + "screenCaptureDeniedStatusExists="
+            + "\(screenCaptureDeniedStatusExists) "
+            + "accessibilityActionExists="
+            + "\(accessibilityActionExists) "
+            + "screenCaptureActionExists="
+            + "\(screenCaptureActionExists)"
+    }
+}
+
 extension FlowTabUITests {
+    func testSettingsPermissionInitialProjectionPolicyPreservesWatchdog() {
+        XCTAssertEqual(
+            FlowTabUITestPermissionObservationPolicy
+                .settingsInitialProjectionWatchdog,
+            5
+        )
+    }
+
+    func testSettingsPermissionInitialProjectionRequiresEveryExactElement() {
+        for mask in 0..<16 {
+            let snapshot =
+                FlowTabUITestSettingsPermissionInitialProjectionSnapshot(
+                    accessibilityDeniedStatusExists:
+                        mask & 1 != 0,
+                    screenCaptureDeniedStatusExists:
+                        mask & 2 != 0,
+                    accessibilityActionExists:
+                        mask & 4 != 0,
+                    screenCaptureActionExists:
+                        mask & 8 != 0
+                )
+
+            XCTAssertEqual(
+                snapshot.isSatisfied,
+                mask == 15,
+                "mask=\(mask) \(snapshot.diagnosticSummary)"
+            )
+        }
+    }
+
     func testHomePermissionBannerConvergesFromOwnedTCCReadbackEvidence() throws {
         let stateURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(
@@ -178,14 +239,10 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
-
-        XCTAssertTrue(
-            app.staticTexts["辅助功能权限：未授权"].waitForExistence(timeout: 5)
-        )
-        XCTAssertTrue(
-            app.staticTexts["屏幕录制权限：未授权"].waitForExistence(timeout: 5)
-        )
+        let accessibilityDeniedStatus =
+            app.staticTexts["辅助功能权限：未授权"]
+        let screenCaptureDeniedStatus =
+            app.staticTexts["屏幕录制权限：未授权"]
         let accessibilityAction = element(
             in: app,
             identifier: Identifier.settingsPermissionAccessibilityAction
@@ -194,8 +251,48 @@ extension FlowTabUITests {
             in: app,
             identifier: Identifier.settingsPermissionScreenCaptureAction
         )
-        XCTAssertTrue(accessibilityAction.waitForExistence(timeout: 5))
-        XCTAssertTrue(screenCaptureAction.waitForExistence(timeout: 5))
+        let initialProjectionObservation =
+            FlowTabUITestConditionObservationOwner(
+                observationRegistration:
+                    FlowTabUITestConditionReadbackScheduler
+                        .mainRunLoopRegistration(
+                            cadence:
+                                FlowTabUITestConditionObservationPolicy
+                                    .xcuiReadbackCadence
+                        ),
+                readback: {
+                    FlowTabUITestSettingsPermissionInitialProjectionSnapshot(
+                        accessibilityDeniedStatusExists:
+                            accessibilityDeniedStatus.exists,
+                        screenCaptureDeniedStatusExists:
+                            screenCaptureDeniedStatus.exists,
+                        accessibilityActionExists:
+                            accessibilityAction.exists,
+                        screenCaptureActionExists:
+                            screenCaptureAction.exists
+                    )
+                },
+                isSatisfied: \.isSatisfied,
+                describe: \.diagnosticSummary
+            )
+        initialProjectionObservation.start()
+        defer { initialProjectionObservation.cancel() }
+        openSettingsTab(in: app)
+        initialProjectionObservation.requestReadback(
+            source: .triggerReadback
+        )
+        let initialProjectionEvidence =
+            initialProjectionObservation.waitForResolution(
+                timeout:
+                    FlowTabUITestPermissionObservationPolicy
+                        .settingsInitialProjectionWatchdog
+            )
+        XCTAssertNotNil(
+            initialProjectionEvidence,
+            "Settings permission initial projection watchdog expired. "
+                + initialProjectionObservation.diagnosticSummary
+        )
+        guard initialProjectionEvidence != nil else { return }
 
         let logSnapshot = makeRuntimeLogFileSnapshot()
         tapElement(accessibilityAction)
