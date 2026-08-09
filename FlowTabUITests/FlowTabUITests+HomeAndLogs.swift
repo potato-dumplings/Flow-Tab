@@ -143,7 +143,10 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
-        assertHomeGrantedPermissionProjection(in: app) {
+        assertHomePermissionBannerHiddenProjection(
+            in: app,
+            targetDescription: "granted-permissions"
+        ) {
             XCTAssertTrue(
                 tapFirstHittable(
                     in: app.buttons.matching(
@@ -398,16 +401,20 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        launchFlowTabUITestApplication(relaunchApp)
-        XCTAssertTrue(
-            tapFirstHittable(in: relaunchApp.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5)
-        )
-        XCTAssertFalse(
-            hasHittableElement(
-                in: relaunchApp.buttons.matching(identifier: Identifier.permissionOpenSettings),
-                timeout: 2
+        assertHomePermissionBannerHiddenProjection(
+            in: relaunchApp,
+            targetDescription: "persisted-reminder-toggle"
+        ) {
+            launchFlowTabUITestApplication(relaunchApp)
+            XCTAssertTrue(
+                tapFirstHittable(
+                    in: relaunchApp.buttons.matching(
+                        identifier: Identifier.homeTabButton
+                    ),
+                    timeout: 5
+                )
             )
-        )
+        }
     }
 
     func testPermissionDismissPersistsAcrossRelaunch() throws {

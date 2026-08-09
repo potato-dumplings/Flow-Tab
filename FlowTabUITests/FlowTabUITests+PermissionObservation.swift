@@ -3,7 +3,7 @@ import XCTest
 
 private enum FlowTabUITestPermissionObservationPolicy {
     static let settingsInitialProjectionWatchdog: TimeInterval = 5
-    static let homeGrantedProjectionWatchdog: TimeInterval = 2
+    static let homeHiddenProjectionWatchdog: TimeInterval = 2
 }
 
 private struct FlowTabUITestSettingsPermissionInitialProjectionSnapshot:
@@ -52,23 +52,31 @@ private struct FlowTabUITestSettingsPermissionGrantedProjectionSnapshot:
     }
 }
 
-private struct FlowTabUITestHomeGrantedPermissionProjectionSnapshot:
+private struct FlowTabUITestHomeHiddenPermissionProjectionSnapshot:
     Equatable
 {
+    let applicationState: XCUIApplication.State
     let homeContentExists: Bool
     let permissionBannerExists: Bool
     let permissionActionExists: Bool
 
     var isSatisfied: Bool {
-        homeContentExists
+        applicationIsRunning
+            && homeContentExists
             && !permissionBannerExists
             && !permissionActionExists
     }
 
     var diagnosticSummary: String {
-        "homeContentExists=\(homeContentExists) "
+        "applicationState=\(String(describing: applicationState)) "
+            + "homeContentExists=\(homeContentExists) "
             + "permissionBannerExists=\(permissionBannerExists) "
             + "permissionActionExists=\(permissionActionExists)"
+    }
+
+    private var applicationIsRunning: Bool {
+        applicationState == .runningForeground
+            || applicationState == .runningBackground
     }
 }
 
@@ -121,27 +129,28 @@ extension FlowTabUITests {
         }
     }
 
-    func testHomeGrantedPermissionProjectionPolicyPreservesWatchdog() {
+    func testHomeHiddenPermissionProjectionPolicyPreservesWatchdog() {
         XCTAssertEqual(
             FlowTabUITestPermissionObservationPolicy
-                .homeGrantedProjectionWatchdog,
+                .homeHiddenProjectionWatchdog,
             2
         )
         XCTAssertTrue(
             FlowTabUITestPermissionObservationPolicy
-                .homeGrantedProjectionWatchdog.isFinite
+                .homeHiddenProjectionWatchdog.isFinite
         )
         XCTAssertGreaterThan(
             FlowTabUITestPermissionObservationPolicy
-                .homeGrantedProjectionWatchdog,
+                .homeHiddenProjectionWatchdog,
             0
         )
     }
 
-    func testHomeGrantedPermissionProjectionRequiresLoadedContentAndAbsence() {
+    func testHomeHiddenPermissionProjectionRequiresLoadedContentAndAbsence() {
         for mask in 0..<8 {
             let snapshot =
-                FlowTabUITestHomeGrantedPermissionProjectionSnapshot(
+                FlowTabUITestHomeHiddenPermissionProjectionSnapshot(
+                    applicationState: .runningForeground,
                     homeContentExists: mask & 1 != 0,
                     permissionBannerExists: mask & 2 != 0,
                     permissionActionExists: mask & 4 != 0
@@ -153,10 +162,19 @@ extension FlowTabUITests {
                 "mask=\(mask) \(snapshot.diagnosticSummary)"
             )
         }
+        XCTAssertFalse(
+            FlowTabUITestHomeHiddenPermissionProjectionSnapshot(
+                applicationState: .notRunning,
+                homeContentExists: true,
+                permissionBannerExists: false,
+                permissionActionExists: false
+            ).isSatisfied
+        )
     }
 
-    func assertHomeGrantedPermissionProjection(
+    func assertHomePermissionBannerHiddenProjection(
         in app: XCUIApplication,
+        targetDescription: String,
         trigger: () -> Void
     ) {
         let homeContent = element(
@@ -182,7 +200,19 @@ extension FlowTabUITests {
                                     .xcuiReadbackCadence
                         ),
                 readback: {
-                    FlowTabUITestHomeGrantedPermissionProjectionSnapshot(
+                    let applicationState = app.state
+                    guard applicationState == .runningForeground
+                            || applicationState == .runningBackground
+                    else {
+                        return FlowTabUITestHomeHiddenPermissionProjectionSnapshot(
+                            applicationState: applicationState,
+                            homeContentExists: false,
+                            permissionBannerExists: false,
+                            permissionActionExists: false
+                        )
+                    }
+                    return FlowTabUITestHomeHiddenPermissionProjectionSnapshot(
+                        applicationState: applicationState,
                         homeContentExists: homeContent.exists,
                         permissionBannerExists: permissionBanner.exists,
                         permissionActionExists: permissionAction.exists
@@ -192,7 +222,8 @@ extension FlowTabUITests {
                     triggerCompleted && $0.isSatisfied
                 },
                 describe: {
-                    "acceptanceEnabled=\(triggerCompleted) "
+                    "target=\(targetDescription) "
+                        + "acceptanceEnabled=\(triggerCompleted) "
                         + $0.diagnosticSummary
                 }
             )
@@ -213,9 +244,9 @@ extension FlowTabUITests {
             observation.waitForResolution(
                 timeout:
                     FlowTabUITestPermissionObservationPolicy
-                        .homeGrantedProjectionWatchdog
+                        .homeHiddenProjectionWatchdog
             ),
-            "Home granted-permission projection watchdog expired. "
+            "Home hidden-permission projection watchdog expired. "
                 + observation.diagnosticSummary
         )
     }
