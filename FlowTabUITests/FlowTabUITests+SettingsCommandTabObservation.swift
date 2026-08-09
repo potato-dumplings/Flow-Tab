@@ -4,6 +4,7 @@ import XCTest
 private enum FlowTabUITestCommandTabTakeoverObservationPolicy {
     static let markerReadbackCadence: TimeInterval = 0.1
     static let markerWatchdog: TimeInterval = 5
+    static let statusProjectionWatchdog: TimeInterval = 5
     static let defaultsSuiteName =
         "io.github.potato-dumplings.flowtab"
     static let markerKey =
@@ -11,6 +12,14 @@ private enum FlowTabUITestCommandTabTakeoverObservationPolicy {
 }
 
 extension FlowTabUITests {
+    func testCommandTabTakeoverStatusProjectionPolicyPreservesWatchdog() {
+        XCTAssertEqual(
+            FlowTabUITestCommandTabTakeoverObservationPolicy
+                .statusProjectionWatchdog,
+            5
+        )
+    }
+
     func testSettingsCommandTabTakeoverTriggersSwitcherAndRestoresSystemShortcut() throws {
         let app = makeApp(
             additionalArguments:
@@ -41,6 +50,55 @@ extension FlowTabUITests {
             ),
             equals: "space"
         )
+
+        let activeTakeoverText =
+            "已接管系统 Command + Tab"
+        let activeTakeoverStatus = app.descendants(matching: .any)
+            .matching(
+                NSPredicate(
+                    format:
+                        "identifier == %@ AND (label CONTAINS %@ OR value CONTAINS %@)",
+                    Identifier.settingsHotkeyMainTakeoverStatus,
+                    activeTakeoverText,
+                    activeTakeoverText
+                )
+            )
+            .firstMatch
+        let activeStatusObservation =
+            FlowTabUITestConditionObservationOwner(
+                observationRegistration:
+                    FlowTabUITestConditionReadbackScheduler
+                        .mainRunLoopRegistration(
+                            cadence:
+                                FlowTabUITestConditionObservationPolicy
+                                    .xcuiReadbackCadence
+                        ),
+                readback: { activeTakeoverStatus.exists },
+                isSatisfied: { $0 },
+                describe: {
+                    "identifier="
+                        + Identifier.settingsHotkeyMainTakeoverStatus
+                        + " exists=\($0)"
+                }
+            )
+        activeStatusObservation.start()
+        defer { activeStatusObservation.cancel() }
+        guard let activeStatusBaseline =
+            activeStatusObservation.latestEvidence
+        else {
+            XCTFail(
+                "Command+Tab takeover status has no baseline. "
+                    + activeStatusObservation.diagnosticSummary
+            )
+            return
+        }
+        guard !activeStatusBaseline.value else {
+            XCTFail(
+                "Command+Tab takeover status baseline was already active. "
+                    + activeStatusObservation.diagnosticSummary
+            )
+            return
+        }
 
         assertCommandTabTakeoverMarker(expectedValue: true) {
             let takeoverLogSnapshot = makeRuntimeLogFileSnapshot()
@@ -82,24 +140,21 @@ extension FlowTabUITests {
                 timeout: 10
             )
         }
-
-        let activeTakeoverText =
-            "已接管系统 Command + Tab"
-        let activeTakeoverStatus = app.descendants(matching: .any)
-            .matching(
-                NSPredicate(
-                    format:
-                        "identifier == %@ AND (label CONTAINS %@ OR value CONTAINS %@)",
-                    Identifier.settingsHotkeyMainTakeoverStatus,
-                    activeTakeoverText,
-                    activeTakeoverText
-                )
-            )
-            .firstMatch
-        XCTAssertTrue(
-            activeTakeoverStatus.waitForExistence(timeout: 5),
-            "Expected the settings status to expose active Command+Tab registration evidence."
+        activeStatusObservation.requestReadback(
+            source: .triggerReadback
         )
+        let activeStatusEvidence =
+            activeStatusObservation.waitForResolution(
+                timeout:
+                    FlowTabUITestCommandTabTakeoverObservationPolicy
+                        .statusProjectionWatchdog
+            )
+        XCTAssertNotNil(
+            activeStatusEvidence,
+            "Command+Tab takeover status projection watchdog expired. "
+                + activeStatusObservation.diagnosticSummary
+        )
+        guard activeStatusEvidence != nil else { return }
 
         let triggerLogSnapshot = makeRuntimeLogFileSnapshot()
         app.activate()
