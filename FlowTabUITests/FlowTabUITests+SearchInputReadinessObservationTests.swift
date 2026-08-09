@@ -6,6 +6,18 @@ private enum FlowTabUITestSearchInputReadinessObservationTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testSearchInputReadinessPolicyEnablesPersistedEvidenceChannel() {
+        XCTAssertEqual(
+            FlowTabUITestSearchInputReadinessPolicy
+                .applicationEvidenceLaunchArguments,
+            [
+                "--flowtab-ui-runtime-log-level",
+                "INFO",
+                "--flowtab-ui-enable-verbose-logs"
+            ]
+        )
+    }
+
     func testSearchInputReadinessUsesInitialKeyboardEvidenceReadback() {
         var registrationOrder: [String] = []
         let owner =

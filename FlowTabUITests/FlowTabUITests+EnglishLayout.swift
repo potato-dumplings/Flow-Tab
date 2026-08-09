@@ -7,15 +7,15 @@ extension FlowTabUITests {
                 "--flowtab-ui-reset-defaults",
                 "--flowtab-ui-mock-runtime",
                 "--flowtab-ui-listen-switcher-trigger",
-                "--flowtab-ui-runtime-log-level",
-                "INFO",
                 "--flowtab-ui-ax-trusted",
-                "NO",
+                "YES",
                 "--flowtab-ui-screen-trusted",
                 "NO",
                 "--flowtab-ui-seed-logs",
                 "1"
             ]
+                + FlowTabUITestSearchInputReadinessPolicy
+                    .applicationEvidenceLaunchArguments
         )
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
