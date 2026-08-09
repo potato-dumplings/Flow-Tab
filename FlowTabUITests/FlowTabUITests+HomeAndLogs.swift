@@ -58,10 +58,9 @@ extension FlowTabUITests {
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
         openLogsTab(in: app)
 
-        app.typeKey("w", modifierFlags: .command)
-
-        XCTAssertNotEqual(app.state, .notRunning)
-        XCTAssertFalse(element(in: app, identifier: Identifier.logsTabContent).waitForExistence(timeout: 2))
+        assertStatusItemMainWindowCloses(in: app) {
+            app.typeKey("w", modifierFlags: .command)
+        }
 
         let flowTabBundleIdentifier = FlowTabUITestAppIdentity.configured().bundleIdentifier
         let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
