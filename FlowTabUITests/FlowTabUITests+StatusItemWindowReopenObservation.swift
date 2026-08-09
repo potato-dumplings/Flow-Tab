@@ -1,49 +1,20 @@
 import Foundation
 import XCTest
 
-enum StatusItemWindowCloseUITestPolicy {
-    static let projectionWatchdog: TimeInterval = 6
+enum StatusItemWindowReopenUITestPolicy {
+    static let projectionWatchdog: TimeInterval = 8
 }
 
-enum StatusItemWindowUITestIdentity {
-    static let homeWindowTitle = "FlowTab"
-}
-
-struct StatusItemWindowProjectionSnapshot: Equatable {
-    let applicationState: String
-    let applicationIsRunning: Bool
-    let homeWindowExists: Bool
-    let logsContentExists: Bool
-
-    var isOpenLogsProjection: Bool {
-        applicationIsRunning
-            && homeWindowExists
-            && logsContentExists
-    }
-
-    var isClosedProjection: Bool {
-        applicationIsRunning
-            && homeWindowExists == false
-            && logsContentExists == false
-    }
-
-    var diagnosticSummary: String {
-        "applicationState=\(applicationState) "
-            + "applicationIsRunning=\(applicationIsRunning) "
-            + "homeWindowExists=\(homeWindowExists) "
-            + "logsContentExists=\(logsContentExists) "
-            + "isOpenLogsProjection=\(isOpenLogsProjection) "
-            + "isClosedProjection=\(isClosedProjection)"
-    }
-}
-
-final class StatusItemWindowCloseObservationOwner {
+final class StatusItemWindowReopenObservationOwner {
     private let conditionOwner:
         FlowTabUITestConditionObservationOwner<
             StatusItemWindowProjectionSnapshot
         >
 
     init(
+        acceptsEvidence: @escaping () -> Bool = {
+            true
+        },
         observationRegistration:
             FlowTabUITestConditionObservationRegistration? =
                 FlowTabUITestConditionReadbackScheduler
@@ -52,13 +23,21 @@ final class StatusItemWindowCloseObservationOwner {
                             FlowTabUITestConditionObservationPolicy
                                 .xcuiReadbackCadence
                     ),
-        readback: @escaping () -> StatusItemWindowProjectionSnapshot
+        readback: @escaping () ->
+            StatusItemWindowProjectionSnapshot
     ) {
         conditionOwner = FlowTabUITestConditionObservationOwner(
             observationRegistration: observationRegistration,
             readback: readback,
-            isSatisfied: \.isClosedProjection,
-            describe: \.diagnosticSummary
+            isSatisfied: { snapshot in
+                acceptsEvidence()
+                    && snapshot.isOpenLogsProjection
+            },
+            describe: { snapshot in
+                "expected=openLogs "
+                    + "acceptanceEnabled=\(acceptsEvidence()) "
+                    + snapshot.diagnosticSummary
+            }
         )
     }
 
@@ -102,12 +81,16 @@ final class StatusItemWindowCloseObservationOwner {
 }
 
 extension FlowTabUITests {
-    func assertStatusItemMainWindowCloses(
+    func assertStatusItemMainWindowReopens(
         in app: XCUIApplication,
         trigger: () -> Void
     ) {
-        let observation = makeStatusItemWindowCloseObservation(
-            in: app
+        var triggerCompleted = false
+        let observation = makeStatusItemWindowReopenObservation(
+            in: app,
+            acceptsEvidence: {
+                triggerCompleted
+            }
         )
         observation.start()
         defer { observation.cancel() }
@@ -118,29 +101,31 @@ extension FlowTabUITests {
         )
         XCTAssertTrue(
             observation.latestEvidence?.value
-                .isOpenLogsProjection == true,
-            "Status-item window-close baseline was not the exact open Logs projection. "
+                .isClosedProjection == true,
+            "Status-item window-reopen baseline was not the exact closed projection. "
                 + observation.diagnosticSummary
         )
         XCTAssertNil(observation.resolvedEvidence)
 
         trigger()
+        triggerCompleted = true
         observation.requestReadback(source: .triggerReadback)
 
         XCTAssertNotNil(
             observation.waitForResolution(
                 timeout:
-                    StatusItemWindowCloseUITestPolicy
+                    StatusItemWindowReopenUITestPolicy
                         .projectionWatchdog
             ),
-            "Status-item main-window close watchdog expired. "
+            "Status-item main-window reopen watchdog expired. "
                 + observation.diagnosticSummary
         )
     }
 
-    private func makeStatusItemWindowCloseObservation(
-        in app: XCUIApplication
-    ) -> StatusItemWindowCloseObservationOwner {
+    private func makeStatusItemWindowReopenObservation(
+        in app: XCUIApplication,
+        acceptsEvidence: @escaping () -> Bool
+    ) -> StatusItemWindowReopenObservationOwner {
         let homeWindow = app.windows[
             StatusItemWindowUITestIdentity.homeWindowTitle
         ]
@@ -148,12 +133,13 @@ extension FlowTabUITests {
             in: app,
             identifier: Identifier.logsTabContent
         )
-        return StatusItemWindowCloseObservationOwner(
+        return StatusItemWindowReopenObservationOwner(
+            acceptsEvidence: acceptsEvidence,
             readback: {
                 let applicationState = app.state
                 return StatusItemWindowProjectionSnapshot(
                     applicationState:
-                        self.statusItemWindowCloseStateLabel(
+                        self.statusItemWindowReopenStateLabel(
                             applicationState
                         ),
                     applicationIsRunning:
@@ -166,7 +152,7 @@ extension FlowTabUITests {
         )
     }
 
-    private func statusItemWindowCloseStateLabel(
+    private func statusItemWindowReopenStateLabel(
         _ state: XCUIApplication.State
     ) -> String {
         switch state {

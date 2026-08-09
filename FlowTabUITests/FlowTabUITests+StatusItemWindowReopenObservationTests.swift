@@ -1,73 +1,27 @@
 import Foundation
 import XCTest
 
-private enum StatusItemWindowCloseObservationTestPolicy {
+private enum StatusItemWindowReopenObservationTestPolicy {
     static let watchdog: TimeInterval = 0.01
+    static let delayedReadbacks = 20
     static let pressureIterations = 100
 }
 
 extension FlowTabUITests {
-    func testStatusItemWindowClosePolicyUsesNamedProjectionWatchdog() {
+    func testStatusItemWindowReopenPolicyUsesNamedProjectionWatchdog() {
         XCTAssertEqual(
-            StatusItemWindowCloseUITestPolicy.projectionWatchdog,
-            6
-        )
-        XCTAssertEqual(
-            StatusItemWindowUITestIdentity.homeWindowTitle,
-            "FlowTab"
+            StatusItemWindowReopenUITestPolicy.projectionWatchdog,
+            8
         )
     }
 
-    func testStatusItemWindowCloseSnapshotRequiresExactPersistentStates() {
-        let open = statusItemWindowCloseSnapshot(
-            homeWindowExists: true,
-            logsContentExists: true
-        )
-        XCTAssertTrue(open.isOpenLogsProjection)
-        XCTAssertFalse(open.isClosedProjection)
-
-        let closed = statusItemWindowCloseSnapshot(
-            homeWindowExists: false,
-            logsContentExists: false
-        )
-        XCTAssertFalse(closed.isOpenLogsProjection)
-        XCTAssertTrue(closed.isClosedProjection)
-
-        XCTAssertFalse(
-            statusItemWindowCloseSnapshot(
-                applicationIsRunning: false,
-                homeWindowExists: false,
-                logsContentExists: false
-            ).isClosedProjection
-        )
-        XCTAssertFalse(
-            statusItemWindowCloseSnapshot(
-                applicationIsRunning: false,
-                homeWindowExists: true,
-                logsContentExists: true
-            ).isOpenLogsProjection
-        )
-        XCTAssertFalse(
-            statusItemWindowCloseSnapshot(
-                homeWindowExists: true,
-                logsContentExists: false
-            ).isClosedProjection
-        )
-        XCTAssertFalse(
-            statusItemWindowCloseSnapshot(
-                homeWindowExists: false,
-                logsContentExists: true
-            ).isClosedProjection
-        )
-    }
-
-    func testStatusItemWindowCloseObserverAcceptsInitiallyClosedProjection() {
-        let owner = StatusItemWindowCloseObservationOwner(
+    func testStatusItemWindowReopenObserverAcceptsInitiallyOpenProjection() {
+        let owner = StatusItemWindowReopenObservationOwner(
             observationRegistration: nil,
             readback: {
-                self.statusItemWindowCloseSnapshot(
-                    homeWindowExists: false,
-                    logsContentExists: false
+                self.statusItemWindowReopenSnapshot(
+                    homeWindowExists: true,
+                    logsContentExists: true
                 )
             }
         )
@@ -80,15 +34,19 @@ extension FlowTabUITests {
         )
     }
 
-    func testStatusItemWindowCloseObserverUsesLaterExactEvidenceAndCancels() {
-        var snapshot = statusItemWindowCloseSnapshot(
-            homeWindowExists: true,
-            logsContentExists: true
+    func testStatusItemWindowReopenObserverGatesDelayedEvidenceAndCancels() {
+        var acceptsEvidence = false
+        var snapshot = statusItemWindowReopenSnapshot(
+            homeWindowExists: false,
+            logsContentExists: false
         )
         var readback:
             ((FlowTabUITestConditionObservationSource) -> Void)?
         var cancellationCount = 0
-        let owner = StatusItemWindowCloseObservationOwner(
+        let owner = StatusItemWindowReopenObservationOwner(
+            acceptsEvidence: {
+                acceptsEvidence
+            },
             observationRegistration: { callback in
                 readback = callback
                 return FlowTabUITestObservationCancellation {
@@ -101,24 +59,36 @@ extension FlowTabUITests {
         defer { owner.cancel() }
 
         XCTAssertTrue(
-            owner.latestEvidence?.value.isOpenLogsProjection
+            owner.latestEvidence?.value.isClosedProjection
                 == true
         )
         XCTAssertNil(owner.resolvedEvidence)
 
-        for _ in 0..<20 {
-            snapshot = self.statusItemWindowCloseSnapshot(
-                homeWindowExists: true,
-                logsContentExists: false
+        for index in
+            0..<StatusItemWindowReopenObservationTestPolicy
+                .delayedReadbacks
+        {
+            snapshot = statusItemWindowReopenSnapshot(
+                homeWindowExists: index.isMultiple(of: 2),
+                logsContentExists: index.isMultiple(of: 2) == false
             )
             readback?(.scheduledReadback)
             XCTAssertNil(owner.resolvedEvidence)
         }
 
-        snapshot = statusItemWindowCloseSnapshot(
-            homeWindowExists: false,
-            logsContentExists: false
+        snapshot = statusItemWindowReopenSnapshot(
+            homeWindowExists: true,
+            logsContentExists: true
         )
+        readback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "acceptanceEnabled=false"
+            )
+        )
+
+        acceptsEvidence = true
         readback?(.triggerReadback)
         readback?(.scheduledReadback)
 
@@ -129,19 +99,19 @@ extension FlowTabUITests {
         XCTAssertEqual(cancellationCount, 1)
     }
 
-    func testStatusItemWindowCloseObserverRejectsStaleGenerationsUnderPressure() {
+    func testStatusItemWindowReopenObserverRejectsStaleGenerationsUnderPressure() {
         for _ in
-            0..<StatusItemWindowCloseObservationTestPolicy
+            0..<StatusItemWindowReopenObservationTestPolicy
                 .pressureIterations
         {
-            var snapshot = statusItemWindowCloseSnapshot(
-                homeWindowExists: true,
-                logsContentExists: true
+            var snapshot = statusItemWindowReopenSnapshot(
+                homeWindowExists: false,
+                logsContentExists: false
             )
             var callbacks: [
                 (FlowTabUITestConditionObservationSource) -> Void
             ] = []
-            let owner = StatusItemWindowCloseObservationOwner(
+            let owner = StatusItemWindowReopenObservationOwner(
                 observationRegistration: { callback in
                     callbacks.append(callback)
                     return FlowTabUITestObservationCancellation {}
@@ -153,9 +123,9 @@ extension FlowTabUITests {
             owner.cancel()
             owner.start()
 
-            snapshot = statusItemWindowCloseSnapshot(
-                homeWindowExists: false,
-                logsContentExists: false
+            snapshot = statusItemWindowReopenSnapshot(
+                homeWindowExists: true,
+                logsContentExists: true
             )
             staleReadback(.scheduledReadback)
             XCTAssertNil(owner.resolvedEvidence)
@@ -166,11 +136,11 @@ extension FlowTabUITests {
         }
     }
 
-    func testStatusItemWindowCloseWatchdogReportsFinalEvidence() {
-        let owner = StatusItemWindowCloseObservationOwner(
+    func testStatusItemWindowReopenWatchdogReportsFinalEvidence() {
+        let owner = StatusItemWindowReopenObservationOwner(
             observationRegistration: nil,
             readback: {
-                self.statusItemWindowCloseSnapshot(
+                self.statusItemWindowReopenSnapshot(
                     homeWindowExists: true,
                     logsContentExists: false
                 )
@@ -182,7 +152,7 @@ extension FlowTabUITests {
         XCTAssertNil(
             owner.waitForResolution(
                 timeout:
-                    StatusItemWindowCloseObservationTestPolicy
+                    StatusItemWindowReopenObservationTestPolicy
                         .watchdog
             )
         )
@@ -193,7 +163,12 @@ extension FlowTabUITests {
         )
         XCTAssertTrue(
             owner.diagnosticSummary.contains(
-                "applicationState=runningForeground"
+                "expected=openLogs"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "acceptanceEnabled=true"
             )
         )
         XCTAssertTrue(
@@ -208,7 +183,7 @@ extension FlowTabUITests {
         )
     }
 
-    private func statusItemWindowCloseSnapshot(
+    private func statusItemWindowReopenSnapshot(
         applicationState: String = "runningForeground",
         applicationIsRunning: Bool = true,
         homeWindowExists: Bool,
