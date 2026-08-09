@@ -32,6 +32,25 @@ private struct FlowTabUITestSettingsPermissionInitialProjectionSnapshot:
     }
 }
 
+private struct FlowTabUITestSettingsPermissionGrantedProjectionSnapshot:
+    Equatable
+{
+    let accessibilityGrantedStatusExists: Bool
+    let screenCaptureGrantedStatusExists: Bool
+
+    var isSatisfied: Bool {
+        accessibilityGrantedStatusExists
+            && screenCaptureGrantedStatusExists
+    }
+
+    var diagnosticSummary: String {
+        "accessibilityGrantedStatusExists="
+            + "\(accessibilityGrantedStatusExists) "
+            + "screenCaptureGrantedStatusExists="
+            + "\(screenCaptureGrantedStatusExists)"
+    }
+}
+
 extension FlowTabUITests {
     func testSettingsPermissionInitialProjectionPolicyPreservesWatchdog() {
         XCTAssertEqual(
@@ -58,6 +77,24 @@ extension FlowTabUITests {
             XCTAssertEqual(
                 snapshot.isSatisfied,
                 mask == 15,
+                "mask=\(mask) \(snapshot.diagnosticSummary)"
+            )
+        }
+    }
+
+    func testSettingsPermissionGrantedProjectionRequiresBothExactStatuses() {
+        for mask in 0..<4 {
+            let snapshot =
+                FlowTabUITestSettingsPermissionGrantedProjectionSnapshot(
+                    accessibilityGrantedStatusExists:
+                        mask & 1 != 0,
+                    screenCaptureGrantedStatusExists:
+                        mask & 2 != 0
+                )
+
+            XCTAssertEqual(
+                snapshot.isSatisfied,
+                mask == 3,
                 "mask=\(mask) \(snapshot.diagnosticSummary)"
             )
         }
@@ -294,6 +331,50 @@ extension FlowTabUITests {
         )
         guard initialProjectionEvidence != nil else { return }
 
+        let accessibilityGrantedStatus =
+            app.staticTexts["辅助功能权限：已授权"]
+        let screenCaptureGrantedStatus =
+            app.staticTexts["屏幕录制权限：已授权"]
+        let grantedProjectionObservation =
+            FlowTabUITestConditionObservationOwner(
+                observationRegistration:
+                    FlowTabUITestConditionReadbackScheduler
+                        .mainRunLoopRegistration(
+                            cadence:
+                                FlowTabUITestConditionObservationPolicy
+                                    .xcuiReadbackCadence
+                        ),
+                readback: {
+                    FlowTabUITestSettingsPermissionGrantedProjectionSnapshot(
+                        accessibilityGrantedStatusExists:
+                            accessibilityGrantedStatus.exists,
+                        screenCaptureGrantedStatusExists:
+                            screenCaptureGrantedStatus.exists
+                    )
+                },
+                isSatisfied: \.isSatisfied,
+                describe: \.diagnosticSummary
+            )
+        grantedProjectionObservation.start()
+        defer { grantedProjectionObservation.cancel() }
+        guard let grantedProjectionBaseline =
+            grantedProjectionObservation.latestEvidence
+        else {
+            XCTFail(
+                "Settings permission granted projection has no baseline. "
+                    + grantedProjectionObservation.diagnosticSummary
+            )
+            return
+        }
+        guard !grantedProjectionBaseline.value.isSatisfied else {
+            XCTFail(
+                "Settings permission granted projection baseline was "
+                    + "already satisfied. "
+                    + grantedProjectionObservation.diagnosticSummary
+            )
+            return
+        }
+
         let logSnapshot = makeRuntimeLogFileSnapshot()
         tapElement(accessibilityAction)
         tapElement(screenCaptureAction)
@@ -302,13 +383,21 @@ extension FlowTabUITests {
             screenCaptureTrusted: true,
             to: stateURL
         )
-
-        XCTAssertTrue(
-            app.staticTexts["辅助功能权限：已授权"].waitForExistence(timeout: 6)
+        grantedProjectionObservation.requestReadback(
+            source: .triggerReadback
         )
-        XCTAssertTrue(
-            app.staticTexts["屏幕录制权限：已授权"].waitForExistence(timeout: 6)
+        let grantedProjectionEvidence =
+            grantedProjectionObservation.waitForResolution(
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .permissionStateProjection
+            )
+        XCTAssertNotNil(
+            grantedProjectionEvidence,
+            "Settings permission granted projection watchdog expired. "
+                + grantedProjectionObservation.diagnosticSummary
         )
+        guard grantedProjectionEvidence != nil else { return }
         waitForRuntimeLogFiles(
             containing: [
                 "permission observed target=accessibility source=fallbackReadback",
