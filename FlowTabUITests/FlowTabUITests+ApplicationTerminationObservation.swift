@@ -6,6 +6,10 @@ private enum FlowTabUITestApplicationTerminationPolicy {
     static let delayedEvidenceOverrideWatchdog: TimeInterval = 9
 }
 
+private enum FlowTabUITestApplicationCleanupTestPolicy {
+    static let compatibleWatchdog: TimeInterval = 6
+}
+
 protocol FlowTabUITestApplicationTerminationTarget: AnyObject {
     var state: XCUIApplication.State { get }
 
@@ -66,12 +70,26 @@ struct FlowTabUITestApplicationTerminationEvidence {
     }
 }
 
-func terminateFlowTabUITestApplication(
+struct FlowTabUITestApplicationCleanupEvidence {
+    let gracefulExit: FlowTabUITestApplicationTerminationEvidence
+    let forcedExit: FlowTabUITestApplicationTerminationEvidence?
+
+    var isSatisfied: Bool {
+        forcedExit?.isSatisfied ?? gracefulExit.isSatisfied
+    }
+
+    var diagnosticSummary: String {
+        let forcedSummary = forcedExit?.diagnosticSummary ?? "not-needed"
+        return "graceful{\(gracefulExit.diagnosticSummary)} "
+            + "forced{\(forcedSummary)}"
+    }
+}
+
+func observeFlowTabUITestApplicationTermination(
     _ target: any FlowTabUITestApplicationTerminationTarget,
     targetDescription: String,
-    timeout: TimeInterval =
-        FlowTabUITestApplicationTerminationPolicy
-            .watchdogFailureObservationTimeout
+    timeout: TimeInterval,
+    requestTermination: () -> Void
 ) -> FlowTabUITestApplicationTerminationEvidence {
     let initialState = target.state
     guard initialState != .notRunning else {
@@ -85,7 +103,7 @@ func terminateFlowTabUITestApplication(
         )
     }
 
-    target.terminate()
+    requestTermination()
     let postTriggerState = target.state
     guard postTriggerState != .notRunning else {
         return FlowTabUITestApplicationTerminationEvidence(
@@ -112,7 +130,223 @@ func terminateFlowTabUITestApplication(
     )
 }
 
+func terminateFlowTabUITestApplication(
+    _ target: any FlowTabUITestApplicationTerminationTarget,
+    targetDescription: String,
+    timeout: TimeInterval =
+        FlowTabUITestApplicationTerminationPolicy
+            .watchdogFailureObservationTimeout
+) -> FlowTabUITestApplicationTerminationEvidence {
+    observeFlowTabUITestApplicationTermination(
+        target,
+        targetDescription: targetDescription,
+        timeout: timeout
+    ) {
+        target.terminate()
+    }
+}
+
+func cleanupFlowTabUITestApplication(
+    _ target: any FlowTabUITestApplicationTerminationTarget,
+    targetDescription: String,
+    gracefulTimeout: TimeInterval,
+    forcedTimeout: TimeInterval,
+    requestGracefulTermination: () -> Void
+) -> FlowTabUITestApplicationCleanupEvidence {
+    let gracefulExit = observeFlowTabUITestApplicationTermination(
+        target,
+        targetDescription: "\(targetDescription):graceful",
+        timeout: gracefulTimeout,
+        requestTermination: requestGracefulTermination
+    )
+    guard !gracefulExit.isSatisfied else {
+        return FlowTabUITestApplicationCleanupEvidence(
+            gracefulExit: gracefulExit,
+            forcedExit: nil
+        )
+    }
+
+    let forcedExit = terminateFlowTabUITestApplication(
+        target,
+        targetDescription: "\(targetDescription):forced",
+        timeout: forcedTimeout
+    )
+    return FlowTabUITestApplicationCleanupEvidence(
+        gracefulExit: gracefulExit,
+        forcedExit: forcedExit
+    )
+}
+
 extension FlowTabUITests {
+    func testApplicationCleanupAcceptsAlreadyStoppedInitialState() {
+        let target =
+            FlowTabUITestApplicationTerminationTargetStub(
+                initialState: .notRunning
+            )
+        var gracefulRequestCount = 0
+
+        let evidence = cleanupFlowTabUITestApplication(
+            target,
+            targetDescription: "already-stopped-cleanup",
+            gracefulTimeout:
+                FlowTabUITestApplicationCleanupTestPolicy
+                    .compatibleWatchdog,
+            forcedTimeout:
+                FlowTabUITestApplicationCleanupTestPolicy
+                    .compatibleWatchdog
+        ) {
+            gracefulRequestCount += 1
+        }
+
+        XCTAssertTrue(evidence.isSatisfied)
+        XCTAssertTrue(evidence.gracefulExit.isSatisfied)
+        XCTAssertNil(evidence.forcedExit)
+        XCTAssertEqual(gracefulRequestCount, 0)
+        XCTAssertEqual(target.terminateCallCount, 0)
+        XCTAssertEqual(target.waitCallCount, 0)
+    }
+
+    func testApplicationCleanupAcceptsGracefulExactExit() {
+        let target =
+            FlowTabUITestApplicationTerminationTargetStub(
+                initialState: .runningForeground,
+                postTerminateState: .notRunning
+            )
+
+        let evidence = cleanupFlowTabUITestApplication(
+            target,
+            targetDescription: "graceful-cleanup",
+            gracefulTimeout:
+                FlowTabUITestApplicationCleanupTestPolicy
+                    .compatibleWatchdog,
+            forcedTimeout:
+                FlowTabUITestApplicationCleanupTestPolicy
+                    .compatibleWatchdog
+        ) {
+            target.terminate()
+        }
+
+        XCTAssertTrue(evidence.isSatisfied)
+        XCTAssertTrue(evidence.gracefulExit.isSatisfied)
+        XCTAssertNil(evidence.forcedExit)
+        XCTAssertEqual(target.terminateCallCount, 1)
+        XCTAssertEqual(target.waitCallCount, 0)
+    }
+
+    func testApplicationCleanupEscalatesAfterUnmetGracefulEvidence() {
+        let target =
+            FlowTabUITestApplicationTerminationTargetStub(
+                initialState: .runningBackground,
+                postTerminateState: .notRunning,
+                waitResult: false,
+                postWaitState: .runningBackground
+            )
+        var gracefulRequestCount = 0
+
+        let evidence = cleanupFlowTabUITestApplication(
+            target,
+            targetDescription: "forced-cleanup",
+            gracefulTimeout:
+                FlowTabUITestApplicationCleanupTestPolicy
+                    .compatibleWatchdog,
+            forcedTimeout:
+                FlowTabUITestApplicationCleanupTestPolicy
+                    .compatibleWatchdog
+        ) {
+            gracefulRequestCount += 1
+        }
+
+        XCTAssertTrue(evidence.isSatisfied)
+        XCTAssertFalse(evidence.gracefulExit.isSatisfied)
+        XCTAssertTrue(evidence.forcedExit?.isSatisfied == true)
+        XCTAssertEqual(gracefulRequestCount, 1)
+        XCTAssertEqual(target.terminateCallCount, 1)
+        XCTAssertEqual(target.waitCallCount, 1)
+        XCTAssertEqual(target.lastWaitState, .notRunning)
+        XCTAssertEqual(
+            target.lastWaitTimeout,
+            FlowTabUITestApplicationCleanupTestPolicy
+                .compatibleWatchdog
+        )
+    }
+
+    func testApplicationCleanupWatchdogReportsBothFinalStates() {
+        let target =
+            FlowTabUITestApplicationTerminationTargetStub(
+                initialState: .runningBackground,
+                postTerminateState: .runningBackground,
+                waitResult: false,
+                postWaitState: .runningBackground
+            )
+
+        let evidence = cleanupFlowTabUITestApplication(
+            target,
+            targetDescription: "stuck-cleanup",
+            gracefulTimeout:
+                FlowTabUITestApplicationCleanupTestPolicy
+                    .compatibleWatchdog,
+            forcedTimeout:
+                FlowTabUITestApplicationCleanupTestPolicy
+                    .compatibleWatchdog
+        ) {}
+
+        XCTAssertFalse(evidence.isSatisfied)
+        XCTAssertEqual(target.terminateCallCount, 1)
+        XCTAssertEqual(target.waitCallCount, 2)
+        XCTAssertEqual(
+            evidence.diagnosticSummary,
+            "graceful{target=stuck-cleanup:graceful "
+                + "initialState=runningBackground "
+                + "didRequestTermination=true "
+                + "postTriggerState=runningBackground "
+                + "waiterCompleted=false "
+                + "finalState=runningBackground} "
+                + "forced{target=stuck-cleanup:forced "
+                + "initialState=runningBackground "
+                + "didRequestTermination=true "
+                + "postTriggerState=runningBackground "
+                + "waiterCompleted=false "
+                + "finalState=runningBackground}"
+        )
+    }
+
+    func testApplicationCleanupLifecycleUnderPressure() {
+        for iteration in 0..<100 {
+            let target =
+                FlowTabUITestApplicationTerminationTargetStub(
+                    initialState: .runningBackground,
+                    postTerminateState: .notRunning,
+                    waitResult: false,
+                    postWaitState: .runningBackground
+                )
+
+            let evidence = cleanupFlowTabUITestApplication(
+                target,
+                targetDescription: "cleanup-pressure-\(iteration)",
+                gracefulTimeout:
+                    FlowTabUITestApplicationCleanupTestPolicy
+                        .compatibleWatchdog,
+                forcedTimeout:
+                    FlowTabUITestApplicationCleanupTestPolicy
+                        .compatibleWatchdog
+            ) {
+                if iteration.isMultiple(of: 2) {
+                    target.terminate()
+                }
+            }
+
+            XCTAssertTrue(
+                evidence.isSatisfied,
+                evidence.diagnosticSummary
+            )
+            XCTAssertEqual(target.terminateCallCount, 1)
+            XCTAssertEqual(
+                evidence.forcedExit == nil,
+                iteration.isMultiple(of: 2)
+            )
+        }
+    }
+
     func testApplicationTerminationAcceptsAlreadyStoppedInitialState() {
         let target =
             FlowTabUITestApplicationTerminationTargetStub(

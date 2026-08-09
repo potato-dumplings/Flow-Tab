@@ -8,6 +8,8 @@ private enum FlowTabUITestCommandTabTakeoverObservationPolicy {
     static let takeoverConfigurationLogWatchdog: TimeInterval = 10
     static let switcherTriggerLogWatchdog: TimeInterval = 10
     static let gracefulTerminationWatchdog: TimeInterval = 8
+    static let cleanupGracefulExitWatchdog: TimeInterval = 6
+    static let cleanupForcedExitWatchdog: TimeInterval = 6
     static let defaultsSuiteName =
         "io.github.potato-dumplings.flowtab"
     static let markerKey =
@@ -15,6 +17,19 @@ private enum FlowTabUITestCommandTabTakeoverObservationPolicy {
 }
 
 extension FlowTabUITests {
+    func testCommandTabCleanupPolicyPreservesCompatibleWatchdogs() {
+        XCTAssertEqual(
+            FlowTabUITestCommandTabTakeoverObservationPolicy
+                .cleanupGracefulExitWatchdog,
+            6
+        )
+        XCTAssertEqual(
+            FlowTabUITestCommandTabTakeoverObservationPolicy
+                .cleanupForcedExitWatchdog,
+            6
+        )
+    }
+
     func testCommandTabGracefulTerminationPolicyPreservesWatchdog() {
         XCTAssertEqual(
             FlowTabUITestCommandTabTakeoverObservationPolicy
@@ -54,14 +69,24 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(app)
         defer {
-            if app.state != .notRunning {
+            let cleanupEvidence = cleanupFlowTabUITestApplication(
+                app,
+                targetDescription: "Command+Tab takeover test App",
+                gracefulTimeout:
+                    FlowTabUITestCommandTabTakeoverObservationPolicy
+                        .cleanupGracefulExitWatchdog,
+                forcedTimeout:
+                    FlowTabUITestCommandTabTakeoverObservationPolicy
+                        .cleanupForcedExitWatchdog
+            ) {
                 app.activate()
                 app.typeKey("q", modifierFlags: .command)
-                if !app.wait(for: .notRunning, timeout: 6) {
-                    app.terminate()
-                    _ = app.wait(for: .notRunning, timeout: 6)
-                }
             }
+            XCTAssertTrue(
+                cleanupEvidence.isSatisfied,
+                "Command+Tab takeover App cleanup failed. "
+                    + cleanupEvidence.diagnosticSummary
+            )
         }
         openSettingsTab(in: app)
 
