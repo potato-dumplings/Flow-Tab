@@ -6,6 +6,11 @@ private enum FlowTabUITestPermissionObservationPolicy {
     static let homeHiddenProjectionWatchdog: TimeInterval = 2
 }
 
+enum FlowTabUITestHomePermissionProjectionBaselineRequirement {
+    case unconstrained
+    case visiblePermissionControls
+}
+
 private struct FlowTabUITestSettingsPermissionInitialProjectionSnapshot:
     Equatable
 {
@@ -59,19 +64,29 @@ private struct FlowTabUITestHomeHiddenPermissionProjectionSnapshot:
     let homeContentExists: Bool
     let permissionBannerExists: Bool
     let permissionActionExists: Bool
+    let permissionDismissExists: Bool
 
     var isSatisfied: Bool {
         applicationIsRunning
             && homeContentExists
             && !permissionBannerExists
             && !permissionActionExists
+            && !permissionDismissExists
+    }
+
+    var hasVisiblePermissionControls: Bool {
+        applicationIsRunning
+            && homeContentExists
+            && permissionActionExists
+            && permissionDismissExists
     }
 
     var diagnosticSummary: String {
         "applicationState=\(String(describing: applicationState)) "
             + "homeContentExists=\(homeContentExists) "
             + "permissionBannerExists=\(permissionBannerExists) "
-            + "permissionActionExists=\(permissionActionExists)"
+            + "permissionActionExists=\(permissionActionExists) "
+            + "permissionDismissExists=\(permissionDismissExists)"
     }
 
     private var applicationIsRunning: Bool {
@@ -147,13 +162,14 @@ extension FlowTabUITests {
     }
 
     func testHomeHiddenPermissionProjectionRequiresLoadedContentAndAbsence() {
-        for mask in 0..<8 {
+        for mask in 0..<16 {
             let snapshot =
                 FlowTabUITestHomeHiddenPermissionProjectionSnapshot(
                     applicationState: .runningForeground,
                     homeContentExists: mask & 1 != 0,
                     permissionBannerExists: mask & 2 != 0,
-                    permissionActionExists: mask & 4 != 0
+                    permissionActionExists: mask & 4 != 0,
+                    permissionDismissExists: mask & 8 != 0
                 )
 
             XCTAssertEqual(
@@ -161,20 +177,32 @@ extension FlowTabUITests {
                 mask == 1,
                 "mask=\(mask) \(snapshot.diagnosticSummary)"
             )
+            XCTAssertEqual(
+                snapshot.hasVisiblePermissionControls,
+                mask & 13 == 13,
+                "mask=\(mask) \(snapshot.diagnosticSummary)"
+            )
         }
-        XCTAssertFalse(
+        let stoppedSnapshot =
             FlowTabUITestHomeHiddenPermissionProjectionSnapshot(
                 applicationState: .notRunning,
                 homeContentExists: true,
-                permissionBannerExists: false,
-                permissionActionExists: false
-            ).isSatisfied
+                permissionBannerExists: true,
+                permissionActionExists: true,
+                permissionDismissExists: true
+            )
+        XCTAssertFalse(stoppedSnapshot.isSatisfied)
+        XCTAssertFalse(
+            stoppedSnapshot.hasVisiblePermissionControls
         )
     }
 
     func assertHomePermissionBannerHiddenProjection(
         in app: XCUIApplication,
         targetDescription: String,
+        baselineRequirement:
+            FlowTabUITestHomePermissionProjectionBaselineRequirement =
+                .unconstrained,
         trigger: () -> Void
     ) {
         let homeContent = element(
@@ -189,16 +217,27 @@ extension FlowTabUITests {
             in: app,
             identifier: Identifier.permissionOpenSettings
         )
+        let permissionDismiss = element(
+            in: app,
+            identifier: Identifier.permissionDismiss
+        )
         var triggerCompleted = false
-        let observation =
-            FlowTabUITestConditionObservationOwner(
-                observationRegistration:
+        let deferredReadbacks =
+            FlowTabUITestDeferredConditionReadbackRegistration(
+                downstreamRegistration:
                     FlowTabUITestConditionReadbackScheduler
                         .mainRunLoopRegistration(
                             cadence:
                                 FlowTabUITestConditionObservationPolicy
                                     .xcuiReadbackCadence
-                        ),
+                        )
+            )
+        let observation =
+            FlowTabUITestConditionObservationOwner(
+                observationRegistration: {
+                    readback in
+                    deferredReadbacks.register(readback)
+                },
                 readback: {
                     let applicationState = app.state
                     guard applicationState == .runningForeground
@@ -208,14 +247,16 @@ extension FlowTabUITests {
                             applicationState: applicationState,
                             homeContentExists: false,
                             permissionBannerExists: false,
-                            permissionActionExists: false
+                            permissionActionExists: false,
+                            permissionDismissExists: false
                         )
                     }
                     return FlowTabUITestHomeHiddenPermissionProjectionSnapshot(
                         applicationState: applicationState,
                         homeContentExists: homeContent.exists,
                         permissionBannerExists: permissionBanner.exists,
-                        permissionActionExists: permissionAction.exists
+                        permissionActionExists: permissionAction.exists,
+                        permissionDismissExists: permissionDismiss.exists
                     )
                 },
                 isSatisfied: {
@@ -228,17 +269,31 @@ extension FlowTabUITests {
                 }
             )
         observation.start()
-        defer { observation.cancel() }
+        defer {
+            observation.cancel()
+            deferredReadbacks.cancel()
+        }
 
         XCTAssertEqual(
             observation.latestEvidence?.source,
             .initialReadback
         )
         XCTAssertNil(observation.resolvedEvidence)
+        if baselineRequirement == .visiblePermissionControls {
+            XCTAssertTrue(
+                observation.latestEvidence?.value
+                    .hasVisiblePermissionControls == true,
+                "Home permission control baseline was not visible. "
+                    + observation.diagnosticSummary
+            )
+        }
 
         trigger()
         triggerCompleted = true
         observation.requestReadback(source: .triggerReadback)
+        if observation.resolvedEvidence == nil {
+            deferredReadbacks.activate()
+        }
 
         XCTAssertNotNil(
             observation.waitForResolution(

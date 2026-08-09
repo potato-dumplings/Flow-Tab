@@ -39,6 +39,64 @@ typealias FlowTabUITestConditionObservationRegistration =
         @escaping (FlowTabUITestConditionObservationSource) -> Void
     ) -> FlowTabUITestObservationCancellation?
 
+final class FlowTabUITestDeferredConditionReadbackRegistration {
+    private let downstreamRegistration:
+        FlowTabUITestConditionObservationRegistration
+
+    private var readback:
+        ((FlowTabUITestConditionObservationSource) -> Void)?
+    private var downstreamCancellation:
+        FlowTabUITestObservationCancellation?
+    private var isActivated = false
+    private var isCancelled = true
+
+    init(
+        downstreamRegistration:
+            @escaping FlowTabUITestConditionObservationRegistration
+    ) {
+        self.downstreamRegistration = downstreamRegistration
+    }
+
+    func register(
+        _ readback: @escaping (
+            FlowTabUITestConditionObservationSource
+        ) -> Void
+    ) -> FlowTabUITestObservationCancellation? {
+        cancel()
+        isCancelled = false
+        self.readback = readback
+        return FlowTabUITestObservationCancellation {
+            [weak self] in
+            self?.cancel()
+        }
+    }
+
+    func activate() {
+        guard
+            !isCancelled,
+            !isActivated,
+            let readback
+        else {
+            return
+        }
+        isActivated = true
+        downstreamCancellation =
+            downstreamRegistration(readback)
+    }
+
+    func cancel() {
+        isCancelled = true
+        isActivated = false
+        downstreamCancellation?.cancel()
+        downstreamCancellation = nil
+        readback = nil
+    }
+
+    deinit {
+        cancel()
+    }
+}
+
 final class FlowTabUITestConditionObservationOwner<Value> {
     private let readback: () -> Value
     private let isSatisfied: (Value) -> Bool
