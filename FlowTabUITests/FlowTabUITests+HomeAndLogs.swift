@@ -111,12 +111,24 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
 
-        flowTabStatusMenuQuitItem(
+        let quitItem = flowTabStatusMenuQuitItem(
             in: app,
             openingWith: flowTabStatusItem(in: app)
-        ).tap()
-
-        XCTAssertTrue(app.wait(for: .notRunning, timeout: 8))
+        )
+        let termination =
+            observeFlowTabUITestApplicationTermination(
+                app,
+                targetDescription: "status-item-menu-quit",
+                timeout:
+                    FlowTabUITestApplicationTerminationPolicy
+                        .statusItemMenuQuitWatchdog
+            ) {
+                quitItem.tap()
+            }
+        XCTAssertTrue(
+            termination.isSatisfied,
+            termination.diagnosticSummary
+        )
     }
 
     func testHomePermissionBannerHiddenWhenPermissionsGranted() throws {

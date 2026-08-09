@@ -1,9 +1,10 @@
 import Foundation
 import XCTest
 
-private enum FlowTabUITestApplicationTerminationPolicy {
+enum FlowTabUITestApplicationTerminationPolicy {
     static let watchdogFailureObservationTimeout: TimeInterval = 5
     static let delayedEvidenceOverrideWatchdog: TimeInterval = 9
+    static let statusItemMenuQuitWatchdog: TimeInterval = 8
 }
 
 private enum FlowTabUITestApplicationCleanupTestPolicy {
@@ -178,6 +179,23 @@ func cleanupFlowTabUITestApplication(
 }
 
 extension FlowTabUITests {
+    func testApplicationTerminationPolicyPreservesStatusItemMenuQuitWatchdog() {
+        XCTAssertEqual(
+            FlowTabUITestApplicationTerminationPolicy
+                .statusItemMenuQuitWatchdog,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestApplicationTerminationPolicy
+                .statusItemMenuQuitWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestApplicationTerminationPolicy
+                .statusItemMenuQuitWatchdog,
+            0
+        )
+    }
+
     func testApplicationCleanupAcceptsAlreadyStoppedInitialState() {
         let target =
             FlowTabUITestApplicationTerminationTargetStub(
