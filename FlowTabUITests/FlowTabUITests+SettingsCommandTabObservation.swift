@@ -6,6 +6,7 @@ private enum FlowTabUITestCommandTabTakeoverObservationPolicy {
     static let markerWatchdog: TimeInterval = 5
     static let statusProjectionWatchdog: TimeInterval = 5
     static let takeoverConfigurationLogWatchdog: TimeInterval = 10
+    static let switcherTriggerLogWatchdog: TimeInterval = 10
     static let defaultsSuiteName =
         "io.github.potato-dumplings.flowtab"
     static let markerKey =
@@ -13,6 +14,14 @@ private enum FlowTabUITestCommandTabTakeoverObservationPolicy {
 }
 
 extension FlowTabUITests {
+    func testCommandTabSwitcherTriggerLogPolicyPreservesWatchdog() {
+        XCTAssertEqual(
+            FlowTabUITestCommandTabTakeoverObservationPolicy
+                .switcherTriggerLogWatchdog,
+            10
+        )
+    }
+
     func testCommandTabTakeoverConfigurationLogPolicyPreservesWatchdog() {
         XCTAssertEqual(
             FlowTabUITestCommandTabTakeoverObservationPolicy
@@ -193,17 +202,45 @@ extension FlowTabUITests {
         )
         guard activeStatusEvidence != nil else { return }
 
-        let triggerLogSnapshot = makeRuntimeLogFileSnapshot()
+        let switcherTriggerMarkers = [
+            "hotkeyPressed dir=forward panelVisible=0 action=show",
+            "HotKey Forward"
+        ]
+        let triggerLogBaseline = makeRuntimeLogFileSnapshot()
+        defer { triggerLogBaseline.cancel() }
+        let triggerLogObservation =
+            FlowTabUITestRuntimeLogObservationOwner(
+                expectation:
+                    .allMarkers(switcherTriggerMarkers),
+                observationRegistration:
+                    triggerLogBaseline.observationRegistration(),
+                readback: triggerLogBaseline.makeReadback
+            )
+        triggerLogObservation.start()
+        defer { triggerLogObservation.cancel() }
+        guard triggerLogObservation.resolvedEvidence == nil else {
+            XCTFail(
+                "Command+Tab trigger logs were present at baseline. "
+                    + triggerLogObservation.diagnosticSummary
+            )
+            return
+        }
+
         app.activate()
         app.typeKey(.tab, modifierFlags: .command)
-        waitForRuntimeLogFiles(
-            containing: [
-                "hotkeyPressed dir=forward panelVisible=0 action=show",
-                "HotKey Forward"
-            ],
-            since: triggerLogSnapshot,
-            timeout: 10
-        )
+        guard
+            triggerLogObservation.waitForResolution(
+                timeout:
+                    FlowTabUITestCommandTabTakeoverObservationPolicy
+                        .switcherTriggerLogWatchdog
+            ) != nil
+        else {
+            XCTFail(
+                "Command+Tab trigger log watchdog expired. "
+                    + triggerLogObservation.diagnosticSummary
+            )
+            return
+        }
 
         assertCommandTabTakeoverMarker(expectedValue: false) {
             app.activate()
