@@ -528,15 +528,15 @@ extension FlowTabUITests {
             additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)
         )
         launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
-
-        let showInCommandTabToggle = toggleElement(
+        guard assertSettingsCurrentAppActivationProjectionAfterNavigation(
             in: app,
-            identifier: Identifier.settingsAppearanceShowInCommandTab
-        )
-        XCTAssertTrue(showInCommandTabToggle.waitForExistence(timeout: 6))
-        XCTAssertFalse(toggleIsOn(showInCommandTabToggle))
-        XCTAssertTrue(app.staticTexts["已隐藏 1 个应用"].waitForExistence(timeout: 6))
+            targetDescription: "current-App activation-policy Settings",
+            trigger: {
+                openSettingsTab(in: app)
+            }
+        ) else {
+            return
+        }
 
         guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
             in: app,
