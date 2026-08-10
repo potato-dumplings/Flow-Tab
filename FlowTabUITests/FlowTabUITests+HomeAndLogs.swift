@@ -299,15 +299,16 @@ extension FlowTabUITests {
             return
         }
 
-        let managerSearch = element(
+        guard assertSettingsAppVisibilityQueryProjection(
+            "Mail",
+            targetRowIdentifier: Identifier.settingsAppVisibilityMockMail,
             in: app,
-            identifier: Identifier.settingsAppVisibilitySearch
-        )
-        tapElement(managerSearch)
-        pasteSettingsAppVisibilityQuery("Mail", in: app)
+            targetDescription: "Home hidden-App Search projection"
+        ) else {
+            return
+        }
 
         let mockMailRow = element(in: app, identifier: Identifier.settingsAppVisibilityMockMail)
-        XCTAssertTrue(mockMailRow.waitForExistence(timeout: 6))
         tapElement(mockMailRow)
 
         let showToggle = homeAppVisibilityShowToggle(in: app)

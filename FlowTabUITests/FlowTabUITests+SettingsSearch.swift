@@ -186,15 +186,16 @@ extension FlowTabUITests {
             return
         }
 
-        let managerSearch = element(
+        guard assertSettingsAppVisibilityQueryProjection(
+            "Mail",
+            targetRowIdentifier: Identifier.settingsAppVisibilityMockMail,
             in: settingsApp,
-            identifier: Identifier.settingsAppVisibilitySearch
-        )
-        tapElement(managerSearch)
-        pasteSettingsAppVisibilityQuery("Mail", in: settingsApp)
+            targetDescription: "hidden-App configuration Search projection"
+        ) else {
+            return
+        }
 
         let mockMailRow = element(in: settingsApp, identifier: Identifier.settingsAppVisibilityMockMail)
-        XCTAssertTrue(mockMailRow.waitForExistence(timeout: 6))
         tapElement(mockMailRow)
 
         let showToggle = appVisibilityShowToggle(in: settingsApp)
@@ -297,16 +298,14 @@ extension FlowTabUITests {
             return
         }
 
-        let managerSearch = element(
-            in: app,
-            identifier: Identifier.settingsAppVisibilitySearch
-        )
-        tapElement(managerSearch)
-        pasteSettingsAppVisibilityQuery("ceshi", in: app)
-
         XCTAssertTrue(
-            element(in: app, identifier: Identifier.settingsAppVisibilityChineseTest)
-                .waitForExistence(timeout: 6)
+            assertSettingsAppVisibilityQueryProjection(
+                "ceshi",
+                targetRowIdentifier:
+                    Identifier.settingsAppVisibilityChineseTest,
+                in: app,
+                targetDescription: "pinyin Search projection"
+            )
         )
     }
 
@@ -354,15 +353,16 @@ extension FlowTabUITests {
             return
         }
 
-        let managerSearch = element(
+        guard assertSettingsAppVisibilityQueryProjection(
+            "Mail",
+            targetRowIdentifier: Identifier.settingsAppVisibilityMockMail,
             in: firstLaunchApp,
-            identifier: Identifier.settingsAppVisibilitySearch
-        )
-        tapElement(managerSearch)
-        pasteSettingsAppVisibilityQuery("Mail", in: firstLaunchApp)
+            targetDescription: "stored hidden-App source Search projection"
+        ) else {
+            return
+        }
 
         let mockMailRow = element(in: firstLaunchApp, identifier: Identifier.settingsAppVisibilityMockMail)
-        XCTAssertTrue(mockMailRow.waitForExistence(timeout: 6))
         tapElement(mockMailRow)
 
         let showToggle = appVisibilityShowToggle(in: firstLaunchApp)

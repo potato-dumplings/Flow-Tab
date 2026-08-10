@@ -22,6 +22,43 @@ extension FlowTabTests {
         )
     }
 
+    @MainActor
+    func testAppVisibilityQueryProjectionGenerationTracksCommittedChanges() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
+        let model = AppVisibilityManagerModel(userDefaults: userDefaults)
+        var observedQueries: [String] = []
+        var observedGenerations: [UInt64] = []
+        let queryObservation = model.$query.sink {
+            observedQueries.append($0)
+        }
+        let generationObservation = model.$queryProjectionGeneration.sink {
+            observedGenerations.append($0)
+        }
+        defer {
+            queryObservation.cancel()
+            generationObservation.cancel()
+        }
+
+        XCTAssertEqual(
+            AppVisibilityQueryProjectionAccessibility.identifierPrefix,
+            "flowtab.settings.app-visibility.list.query-generation."
+        )
+        XCTAssertEqual(
+            AppVisibilityQueryProjectionAccessibility.identifier(generation: 0),
+            "flowtab.settings.app-visibility.list.query-generation.0"
+        )
+
+        model.updateQuery("Mail")
+        model.updateQuery("Mail")
+        model.updateQuery("ceshi")
+
+        XCTAssertEqual(model.query, "ceshi")
+        XCTAssertEqual(model.queryProjectionGeneration, 2)
+        XCTAssertEqual(observedQueries, ["", "Mail", "ceshi"])
+        XCTAssertEqual(observedGenerations, [0, 1, 2])
+    }
+
     func testAppVisibilityReloadWatchdogPolicyPreservesEventDeliveryBound() {
         let eventDelivery =
             AppVisibilityReloadWatchdogPolicy.eventDelivery
@@ -131,7 +168,7 @@ extension FlowTabTests {
 
         await withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
             let model = AppVisibilityManagerModel(userDefaults: userDefaults)
-            model.query = "ceshi"
+            model.updateQuery("ceshi")
             let reloadCompleted = expectation(
                 description:
                     "unmetCondition=searchableAppInventoryLoadingTransitionCompleted expectedVisibleAppIDs=com.xxx.test"

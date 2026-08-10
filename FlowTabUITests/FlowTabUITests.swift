@@ -77,6 +77,8 @@ final class FlowTabUITests: XCTestCase {
         static let settingsAppVisibilitySearch = "flowtab.settings.app-visibility.search"
         static let settingsAppVisibilityInventoryReadyMarker =
             "flowtab.settings.app-visibility.inventory.ready"
+        static let settingsAppVisibilityQueryProjectionPrefix =
+            "flowtab.settings.app-visibility.list.query-generation."
         static let settingsAppVisibilityFilterHidden = "flowtab.settings.app-visibility.filter.hidden"
         static let settingsAppVisibilityShowToggle = "flowtab.settings.app-visibility.show-toggle"
         static let settingsAppVisibilityCurrentApp =

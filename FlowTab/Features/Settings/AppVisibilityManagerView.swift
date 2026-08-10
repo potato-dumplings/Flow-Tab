@@ -172,7 +172,10 @@ struct AppVisibilityManagerView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
             AppVisibilitySearchField(
-                text: $model.query,
+                text: Binding(
+                    get: { model.query },
+                    set: model.updateQuery
+                ),
                 placeholder: AppStrings.text(.appVisibilitySearchPlaceholder, language: appLanguage),
                 accessibilityIdentifier: "flowtab.settings.app-visibility.search"
             )
@@ -195,7 +198,10 @@ struct AppVisibilityManagerView: View {
         return FlowSnappedListScrollView(
             rowCount: visibleApps.count,
             rowHeight: Layout.listRowHeight,
-            accessibilityIdentifier: "flowtab.settings.app-visibility.list"
+            accessibilityIdentifier:
+                AppVisibilityQueryProjectionAccessibility.identifier(
+                    generation: model.queryProjectionGeneration
+                )
         ) {
             ForEach(Array(visibleApps.enumerated()), id: \.element.id) { index, app in
                 appRowButton(

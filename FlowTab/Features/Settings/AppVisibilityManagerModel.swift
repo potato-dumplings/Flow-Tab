@@ -11,6 +11,15 @@ enum AppVisibilityInventoryReadiness: String, Equatable {
     }
 }
 
+enum AppVisibilityQueryProjectionAccessibility {
+    static let identifierPrefix =
+        "flowtab.settings.app-visibility.list.query-generation."
+
+    static func identifier(generation: UInt64) -> String {
+        "\(identifierPrefix)\(generation)"
+    }
+}
+
 @MainActor
 final class AppVisibilityManagerModel: ObservableObject {
     enum Filter: String, CaseIterable, Identifiable {
@@ -37,7 +46,8 @@ final class AppVisibilityManagerModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var inventoryReadiness:
         AppVisibilityInventoryReadiness = .idle
-    @Published var query = ""
+    @Published private(set) var query = ""
+    @Published private(set) var queryProjectionGeneration: UInt64 = 0
     @Published var filter: Filter = .all
     @Published var selectedAppID: String?
 
@@ -110,6 +120,12 @@ final class AppVisibilityManagerModel: ObservableObject {
                 self.reloadTask = nil
             }
         }
+    }
+
+    func updateQuery(_ query: String) {
+        guard self.query != query else { return }
+        self.query = query
+        queryProjectionGeneration &+= 1
     }
 
     func setHidden(_ hidden: Bool, for appID: String) {
