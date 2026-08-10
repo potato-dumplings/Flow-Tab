@@ -490,8 +490,9 @@ extension FlowTabUITests {
         XCTAssertTrue(logsTabContent.waitForExistence(timeout: 5))
 
         XCTAssertTrue(element(in: app, identifier: Identifier.logsPrivacyNotice).waitForExistence(timeout: 5))
-        let diagnosticSessionToggle = toggleElement(in: app, identifier: Identifier.logsDiagnosticSession)
-        XCTAssertTrue(diagnosticSessionToggle.waitForExistence(timeout: 5))
+        let diagnosticSessionToggle = element(
+            in: app, identifier: Identifier.logsDiagnosticSession
+        )
 
         let logsLines = app.descendants(matching: .any)
             .matching(identifier: Identifier.logsLines)
@@ -547,19 +548,22 @@ extension FlowTabUITests {
             )
         }
 
-        setToggle(diagnosticSessionToggle, to: true)
-        let diagnosticSessionStatus = element(
+        assertLogsDiagnosticSessionTransition(
             in: app,
-            identifier: Identifier.logsDiagnosticSessionStatus
-        )
-        XCTAssertTrue(diagnosticSessionStatus.waitForExistence(timeout: 5))
-        setToggle(diagnosticSessionToggle, to: false)
-        XCTAssertTrue(
-            waitForNonExistence(
-                diagnosticSessionStatus,
-                timeout: 5
-            )
-        )
+            toggle: diagnosticSessionToggle,
+            targetDescription: "diagnostic-session-activation",
+            from: false, to: true
+        ) {
+            setToggle(diagnosticSessionToggle, to: true)
+        }
+        assertLogsDiagnosticSessionTransition(
+            in: app,
+            toggle: diagnosticSessionToggle,
+            targetDescription: "diagnostic-session-deactivation",
+            from: true, to: false
+        ) {
+            setToggle(diagnosticSessionToggle, to: false)
+        }
 
         XCTAssertTrue(
             tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsClearButton), timeout: 5)
