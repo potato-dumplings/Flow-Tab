@@ -124,6 +124,65 @@ extension FlowTabUITests {
         )
     }
 
+    func testLogsClearProjectionExpectationSupportsSingleInfoBaseline() {
+        let expectation =
+            FlowTabUITestLogsClearProjectionExpectation.populated(
+                selectedLevel: "INFO",
+                visibleIdentifiers: ["info"]
+            )
+        let matching = logsClearProjectionTestSnapshot(
+            isCleared: false,
+            selectedLevel: "INFO",
+            rowIdentifiers: ["info"]
+        )
+
+        XCTAssertTrue(expectation.isSatisfied(by: matching))
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: logsClearProjectionTestSnapshot(
+                    isCleared: false,
+                    selectedLevel: "DEBUG",
+                    rowIdentifiers: ["info"]
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: logsClearProjectionTestSnapshot(
+                    isCleared: false,
+                    selectedLevel: "INFO",
+                    rowIdentifiers: []
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: logsClearProjectionTestSnapshot(
+                    isCleared: false,
+                    selectedLevel: "INFO",
+                    rowIdentifiers: ["info", "info"]
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: logsClearProjectionTestSnapshot(
+                    isCleared: false,
+                    selectedLevel: "INFO",
+                    rowIdentifiers: ["info", "warn"]
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: logsClearProjectionTestSnapshot(
+                    isCleared: true,
+                    selectedLevel: "INFO"
+                )
+            )
+        )
+    }
+
     func testLogsRelaunchProjectionExpectationRequiresLoadedSeedlessState() {
         XCTAssertEqual(
             FlowTabUITestLogsClearProjectionObservationPolicy

@@ -668,21 +668,14 @@ extension FlowTabUITests {
                 .waitForExistence(timeout: 6)
         )
 
-        let seededInfoLine = app.descendants(matching: .any)
-            .matching(identifier: Identifier.logsSeededInfoLine)
-            .firstMatch
-        XCTAssertTrue(seededInfoLine.waitForExistence(timeout: 5))
-        let clearButton = app.buttons
-            .matching(identifier: Identifier.logsClearButton)
-            .firstMatch
-        XCTAssertTrue(clearButton.waitForExistence(timeout: 5))
         app.activate()
-        tapElement(clearButton)
-        XCTAssertTrue(
-            app.descendants(matching: .any)
-                .matching(identifier: Identifier.logsEmptyHint)
-                .firstMatch
-                .waitForExistence(timeout: 5)
+        assertLogsClearTransition(
+            in: app,
+            targetDescription: "live-update-precondition-clear",
+            selectedLevel: "INFO",
+            initialVisibleIdentifiers: [
+                Identifier.logsSeededInfoLine
+            ]
         )
 
         let command = FlowTabUITestSwitcherCommand.runtimeLogProbe
