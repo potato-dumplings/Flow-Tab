@@ -95,10 +95,19 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
+        guard
+            assertSettingsInitialAppearanceProjectionAfterNavigation(
+                in: app,
+                targetDescription: "theme and language visible UI",
+                trigger: {
+                    openSettingsTab(in: app)
+                }
+            )
+        else {
+            return
+        }
 
         let settingsContent = element(in: app, identifier: Identifier.settingsTabContent)
-        XCTAssertTrue(app.staticTexts["外观"].waitForExistence(timeout: 5))
 
         let lightLuminance = try XCTUnwrap(
             performAndWaitForAverageLuminance(

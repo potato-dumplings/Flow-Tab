@@ -113,6 +113,8 @@
 		A48E00043D9A000100B0D737 /* FlowTabUITests+SettingsAppearanceControlsProjectionObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48E00033D9A000100B0D737 /* FlowTabUITests+SettingsAppearanceControlsProjectionObservationTests.swift */; };
 		A48F00023D9B000100B0D737 /* FlowTabUITests+SettingsEnglishAppearanceProjectionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48F00013D9B000100B0D737 /* FlowTabUITests+SettingsEnglishAppearanceProjectionObservation.swift */; };
 		A48F00043D9B000100B0D737 /* FlowTabUITests+SettingsEnglishAppearanceProjectionObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48F00033D9B000100B0D737 /* FlowTabUITests+SettingsEnglishAppearanceProjectionObservationTests.swift */; };
+		A49000023D9C000100B0D737 /* FlowTabUITests+SettingsInitialAppearanceProjectionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A49000013D9C000100B0D737 /* FlowTabUITests+SettingsInitialAppearanceProjectionObservation.swift */; };
+		A49000043D9C000100B0D737 /* FlowTabUITests+SettingsInitialAppearanceProjectionObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A49000033D9C000100B0D737 /* FlowTabUITests+SettingsInitialAppearanceProjectionObservationTests.swift */; };
 		A44E00023D56000100B0D737 /* FlowTabUITests+SwitcherAppProjectionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44E00013D56000100B0D737 /* FlowTabUITests+SwitcherAppProjectionObservation.swift */; };
 		A44E00043D56000100B0D737 /* FlowTabUITests+SwitcherAppProjectionObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44E00033D56000100B0D737 /* FlowTabUITests+SwitcherAppProjectionObservationTests.swift */; };
 		A44F00023D57000100B0D737 /* FlowTabUITests+SwitcherSelectedWindowTitleObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44F00013D57000100B0D737 /* FlowTabUITests+SwitcherSelectedWindowTitleObservation.swift */; };
@@ -989,6 +991,8 @@
 		A48E00033D9A000100B0D737 /* FlowTabUITests+SettingsAppearanceControlsProjectionObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SettingsAppearanceControlsProjectionObservationTests.swift"; sourceTree = "<group>"; };
 		A48F00013D9B000100B0D737 /* FlowTabUITests+SettingsEnglishAppearanceProjectionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SettingsEnglishAppearanceProjectionObservation.swift"; sourceTree = "<group>"; };
 		A48F00033D9B000100B0D737 /* FlowTabUITests+SettingsEnglishAppearanceProjectionObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SettingsEnglishAppearanceProjectionObservationTests.swift"; sourceTree = "<group>"; };
+		A49000013D9C000100B0D737 /* FlowTabUITests+SettingsInitialAppearanceProjectionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SettingsInitialAppearanceProjectionObservation.swift"; sourceTree = "<group>"; };
+		A49000033D9C000100B0D737 /* FlowTabUITests+SettingsInitialAppearanceProjectionObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SettingsInitialAppearanceProjectionObservationTests.swift"; sourceTree = "<group>"; };
 		A44E00013D56000100B0D737 /* FlowTabUITests+SwitcherAppProjectionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherAppProjectionObservation.swift"; sourceTree = "<group>"; };
 		A44E00033D56000100B0D737 /* FlowTabUITests+SwitcherAppProjectionObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherAppProjectionObservationTests.swift"; sourceTree = "<group>"; };
 		A44F00013D57000100B0D737 /* FlowTabUITests+SwitcherSelectedWindowTitleObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherSelectedWindowTitleObservation.swift"; sourceTree = "<group>"; };
@@ -1382,6 +1386,8 @@
 				A48E00033D9A000100B0D737 /* FlowTabUITests+SettingsAppearanceControlsProjectionObservationTests.swift */,
 				A48F00013D9B000100B0D737 /* FlowTabUITests+SettingsEnglishAppearanceProjectionObservation.swift */,
 				A48F00033D9B000100B0D737 /* FlowTabUITests+SettingsEnglishAppearanceProjectionObservationTests.swift */,
+				A49000013D9C000100B0D737 /* FlowTabUITests+SettingsInitialAppearanceProjectionObservation.swift */,
+				A49000033D9C000100B0D737 /* FlowTabUITests+SettingsInitialAppearanceProjectionObservationTests.swift */,
 				F7B8C9D535B8000100B0D737 /* FlowTabUITests+LaunchAtLoginSettings.swift */,
 				B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */,
 				A47A00013D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift */,
@@ -2462,6 +2468,8 @@
 				A48E00043D9A000100B0D737 /* FlowTabUITests+SettingsAppearanceControlsProjectionObservationTests.swift in Sources */,
 				A48F00023D9B000100B0D737 /* FlowTabUITests+SettingsEnglishAppearanceProjectionObservation.swift in Sources */,
 				A48F00043D9B000100B0D737 /* FlowTabUITests+SettingsEnglishAppearanceProjectionObservationTests.swift in Sources */,
+				A49000023D9C000100B0D737 /* FlowTabUITests+SettingsInitialAppearanceProjectionObservation.swift in Sources */,
+				A49000043D9C000100B0D737 /* FlowTabUITests+SettingsInitialAppearanceProjectionObservationTests.swift in Sources */,
 				F7B8C9D635B8000100B0D737 /* FlowTabUITests+LaunchAtLoginSettings.swift in Sources */,
 				B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */,
 				A47A00023D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift in Sources */,
