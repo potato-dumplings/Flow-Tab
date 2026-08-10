@@ -179,6 +179,9 @@ extension FlowTabUITests {
         requiredBundleIdentifiers: Set<String>,
         excludedBundleIdentifiers: Set<String>,
         targetDescription: String,
+        timeout: TimeInterval =
+            FlowTabUITestSwitcherAppProjectionPolicy
+                .postLaunchWatchdog,
         trigger: () -> Void
     ) -> Bool {
         guard
@@ -248,10 +251,8 @@ extension FlowTabUITests {
         if owner.resolvedEvidence == nil {
             deferredReadbacks.activate()
         }
-        guard owner.waitForResolution(
-            timeout: FlowTabUITestSwitcherAppProjectionPolicy
-                .postLaunchWatchdog
-        ) != nil else {
+        guard owner.waitForResolution(timeout: timeout) != nil
+        else {
             XCTFail(
                 "Switcher App projection watchdog expired. "
                     + "target=\(targetDescription) "
@@ -379,7 +380,7 @@ extension FlowTabUITests {
             } ?? []
         return FlowTabUITestSwitcherAppProjectionSnapshot(
             applicationState: .runningForeground,
-            identifier: diagnosticsSummaryElement.identifier,
+            identifier: Identifier.switcherSummary,
             exists: exists,
             rawValue: rawValue,
             entries: entries

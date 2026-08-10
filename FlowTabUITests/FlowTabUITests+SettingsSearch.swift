@@ -3,6 +3,7 @@ import XCTest
 
 private enum FlowTabUITestSettingsSearchWatchdogPolicy {
     static let committedResultProjection: TimeInterval = 8
+    static let userTriggeredAppProjection: TimeInterval = 8
 }
 
 extension FlowTabUITests {
@@ -19,6 +20,20 @@ extension FlowTabUITests {
         XCTAssertGreaterThan(
             FlowTabUITestSettingsSearchWatchdogPolicy
                 .committedResultProjection,
+            0
+        )
+        XCTAssertEqual(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .userTriggeredAppProjection,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .userTriggeredAppProjection.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .userTriggeredAppProjection,
             0
         )
     }
@@ -577,15 +592,27 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
-            .global,
-            traceLabel: "settings-search-user-path"
-        )
         XCTAssertTrue(
-            element(
+            assertInitialSwitcherAppProjectionAfterLaunch(
                 in: app,
-                identifier: Identifier.switcherAppMockMail
-            ).waitForExistence(timeout: 8)
+                requiredBundleIdentifiers: [
+                    "com.flowtab.mock.mail"
+                ],
+                excludedBundleIdentifiers: [],
+                targetDescription:
+                    "Settings Search user-path Switcher",
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .userTriggeredAppProjection,
+                trigger: {
+                    postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                        .global,
+                        traceLabel: "settings-search-user-path"
+                    )
+                }
+            ),
+            "Settings Search user path did not present the exact "
+                + "Mail App projection."
         )
 
         let searchReadiness =
