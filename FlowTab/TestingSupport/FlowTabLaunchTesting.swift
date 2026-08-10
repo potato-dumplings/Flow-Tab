@@ -11,6 +11,10 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-home-initial-projection-application-notification-name"
     static let homeInitialProjectionApplicationReadbackPathArgument =
         "--flowtab-ui-home-initial-projection-application-readback-path"
+    static let initialPresentationResolutionNotificationArgument =
+        "--flowtab-ui-initial-presentation-resolution-notification-name"
+    static let initialPresentationResolutionReadbackPathArgument =
+        "--flowtab-ui-initial-presentation-resolution-readback-path"
     static let axSuppressionReadbackRouteArgument =
         "--flowtab-ui-ax-suppression-readback-route"
     static let tabSwitchStressEvidenceNotificationArgument =
@@ -26,6 +30,8 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-frontmost-bundle-id",
         homeInitialProjectionApplicationRouteArgument,
         homeInitialProjectionApplicationReadbackPathArgument,
+        initialPresentationResolutionNotificationArgument,
+        initialPresentationResolutionReadbackPathArgument,
         "--flowtab-ui-initial-panel-occlusion-stale-ms",
         "--flowtab-ui-listen-switcher-trigger",
         "--flowtab-ui-mock-launch-at-login-service",
@@ -176,6 +182,40 @@ enum FlowTabTestLaunchOptions {
             return nil
         }
         return FlowTabUITestHomeInitialProjectionApplicationRoute(
+            notificationName:
+                Notification.Name(notificationName),
+            readbackURL:
+                URL(
+                    fileURLWithPath: readbackPath,
+                    isDirectory: false
+                )
+                .standardizedFileURL
+        )
+    }
+
+    static var initialPresentationResolutionRoute:
+        FlowTabUITestInitialPresentationResolutionRoute?
+    {
+        guard isRunningUITests,
+              let notificationName = uiTestValue(
+                after:
+                    initialPresentationResolutionNotificationArgument
+              )?.trimmingCharacters(
+                in: .whitespacesAndNewlines
+              ),
+              !notificationName.isEmpty,
+              let readbackPath = uiTestValue(
+                after:
+                    initialPresentationResolutionReadbackPathArgument
+              )?.trimmingCharacters(
+                in: .whitespacesAndNewlines
+              ),
+              !readbackPath.isEmpty,
+              NSString(string: readbackPath).isAbsolutePath
+        else {
+            return nil
+        }
+        return FlowTabUITestInitialPresentationResolutionRoute(
             notificationName:
                 Notification.Name(notificationName),
             readbackURL:

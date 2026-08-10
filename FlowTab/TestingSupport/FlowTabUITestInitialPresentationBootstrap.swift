@@ -35,10 +35,15 @@ extension FlowTabUITestBootstrapper {
         let runtimeProjectionService =
             panelController.modelForTesting
                 .runtimeProjectionService
+        let shouldActivateInitialSearch =
+            FlowTabTestLaunchOptions.entersSearchOnLaunch
+            && panelController.searchFeatureEnabled
         prepareInitialSearchActivationIfNeeded(
             panelController: panelController,
             runtimeProjectionService:
-                runtimeProjectionService
+                runtimeProjectionService,
+            shouldActivateSearch:
+                shouldActivateInitialSearch
         )
         let observationOwner =
             FlowTabUITestInitialPresentationObservationOwner(
@@ -115,7 +120,9 @@ extension FlowTabUITestBootstrapper {
             resolveInitialPresentation(
                 evidence,
                 observationOwner: observationOwner,
-                panelController: panelController
+                panelController: panelController,
+                shouldActivateSearch:
+                    shouldActivateInitialSearch
             )
         } onWatchdog: {
             [weak observationOwner] failure in

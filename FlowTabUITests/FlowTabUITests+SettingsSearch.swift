@@ -24,7 +24,37 @@ extension FlowTabUITests {
         XCTAssertTrue(searchEnabledToggle.waitForExistence(timeout: 5))
         setToggle(searchEnabledToggle, to: false)
         XCTAssertFalse(toggleIsOn(searchEnabledToggle))
-        firstLaunchApp.terminate()
+        let firstTermination = terminateFlowTabUITestApplication(
+            firstLaunchApp,
+            targetDescription: "disabled-Search settings process"
+        )
+        XCTAssertTrue(
+            firstTermination.isSatisfied,
+            "Disabled-Search settings process did not terminate. "
+                + firstTermination.diagnosticSummary
+        )
+
+        let resolutionRoute =
+            FlowTabUITestInitialPresentationResolutionRoute()
+        try resolutionRoute.prepareReadback()
+        let resolutionOwner =
+            FlowTabUITestInitialPresentationResolutionObservationOwner(
+                route: resolutionRoute,
+                expectation:
+                    FlowTabUITestInitialPresentationResolutionExpectation(
+                        requiredItemIDs: [
+                            "com.flowtab.mock.mail"
+                        ],
+                        searchFeatureEnabled: false,
+                        searchIsActive: false,
+                        searchActivationIsPending: false
+                    )
+            )
+        resolutionOwner.start()
+        defer {
+            resolutionOwner.cancel()
+            resolutionRoute.removeReadback()
+        }
 
         let relaunchApp = makeApp(
             additionalArguments: [
@@ -34,13 +64,40 @@ extension FlowTabUITests {
                 "YES",
                 "--flowtab-ui-screen-trusted",
                 "YES"
-            ]
+            ] + resolutionRoute.launchArguments
         )
         launchFlowTabUITestApplication(relaunchApp)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(relaunchApp, timeout: 10))
-
-        XCTAssertTrue(element(in: relaunchApp, identifier: Identifier.switcherAppMockMail).waitForExistence(timeout: 8))
-        XCTAssertFalse(element(in: relaunchApp, identifier: Identifier.switcherSearchInput).exists)
+        guard let resolution =
+                resolutionOwner.waitForResolution(
+                    timeout:
+                        FlowTabUITestInitialPresentationResolutionPolicy
+                            .watchdog
+                )
+        else {
+            XCTFail(
+                "Disabled-Search initial presentation watchdog "
+                    + "expired. "
+                    + resolutionOwner.diagnosticSummary
+            )
+            return
+        }
+        XCTAssertEqual(resolution.sessionMode, "appCycle")
+        XCTAssertFalse(resolution.searchFeatureEnabled)
+        XCTAssertFalse(resolution.searchIsActive)
+        XCTAssertFalse(resolution.searchActivationIsPending)
+        XCTAssertEqual(
+            resolution.postPresentationItemIDs,
+            resolution.candidateItemIDs
+        )
+        let relaunchTermination = terminateFlowTabUITestApplication(
+            relaunchApp,
+            targetDescription: "disabled-Search command process"
+        )
+        XCTAssertTrue(
+            relaunchTermination.isSatisfied,
+            "Disabled-Search command process did not terminate. "
+                + relaunchTermination.diagnosticSummary
+        )
     }
 
     func testSettingsSearchDefaultScopePersistsAndShowsWindowThenAppResults() throws {

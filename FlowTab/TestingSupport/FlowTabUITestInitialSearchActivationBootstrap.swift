@@ -12,11 +12,11 @@ extension FlowTabUITestBootstrapper {
     static func prepareInitialSearchActivationIfNeeded(
         panelController: SwitcherPanelController,
         runtimeProjectionService:
-            any RuntimeProjectionServing
+            any RuntimeProjectionServing,
+        shouldActivateSearch: Bool
     ) {
         stopInitialSearchActivationObservation()
-        guard FlowTabTestLaunchOptions
-                .entersSearchOnLaunch
+        guard shouldActivateSearch
         else {
             return
         }
@@ -48,7 +48,8 @@ extension FlowTabUITestBootstrapper {
             FlowTabUITestInitialPresentationEvidence,
         observationOwner:
             FlowTabUITestInitialPresentationObservationOwner,
-        panelController: SwitcherPanelController
+        panelController: SwitcherPanelController,
+        shouldActivateSearch: Bool
     ) {
         guard initialPresentationObservationOwner
                 === observationOwner
@@ -56,8 +57,7 @@ extension FlowTabUITestBootstrapper {
             return
         }
         initialPresentationObservationOwner = nil
-        guard FlowTabTestLaunchOptions
-                .entersSearchOnLaunch
+        guard shouldActivateSearch
         else {
             stopInitialSearchActivationObservation()
             publishInitialPresentationResolution(
@@ -158,6 +158,10 @@ extension FlowTabUITestBootstrapper {
         searchEvidence:
             FlowTabUITestInitialSearchActivationEvidence? = nil
     ) {
+        publishInitialPresentationResolutionReadbackIfNeeded(
+            evidence,
+            panelController: panelController
+        )
         NotificationCenter.default.post(
             name:
                 .flowTabUITestInitialPresentationDidResolve,
@@ -173,6 +177,38 @@ extension FlowTabUITestBootstrapper {
                 + evidence.logFields
                 + searchFields
         )
+    }
+
+    private static func publishInitialPresentationResolutionReadbackIfNeeded(
+        _ evidence:
+            FlowTabUITestInitialPresentationEvidence,
+        panelController: SwitcherPanelController
+    ) {
+        guard let route =
+                FlowTabTestLaunchOptions
+                    .initialPresentationResolutionRoute
+        else {
+            return
+        }
+        guard let readback =
+                FlowTabUITestInitialPresentationResolutionReadback(
+                    evidence: evidence,
+                    panelController: panelController
+                )
+        else {
+            RuntimeLog.error(
+                "UITest",
+                "initial presentation resolution readback "
+                    + "missing terminal evidence "
+                    + evidence.logFields
+            )
+            return
+        }
+        FlowTabUITestInitialPresentationResolutionTransport
+            .post(
+                readback,
+                route: route
+            )
     }
 }
 
