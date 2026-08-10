@@ -238,7 +238,7 @@ struct AppVisibilityManagerView: View {
 
     private func appRowButton(app: InstalledAppRecord, isLast: Bool) -> some View {
         Button {
-            model.selectedAppID = app.id
+            model.selectApp(app.id)
         } label: {
             AppVisibilityListRow(
                 app: app,
@@ -366,6 +366,13 @@ struct AppVisibilityManagerView: View {
 
             Spacer(minLength: 0)
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(
+            AppVisibilityDetailProjectionAccessibility.identifier(
+                appID: app.id,
+                generation: model.selectionProjectionGeneration
+            )
+        )
     }
 
     private func detailRow(title: String, value: String) -> some View {
@@ -397,11 +404,11 @@ struct AppVisibilityManagerView: View {
     private func resolveSelectionAfterVisibleAppsChange() {
         let visibleApps = model.visibleApps
         guard let selectedAppID = model.selectedAppID else {
-            model.selectedAppID = visibleApps.first?.id
+            model.selectApp(visibleApps.first?.id)
             return
         }
         if !visibleApps.contains(where: { $0.id == selectedAppID }) {
-            model.selectedAppID = visibleApps.first?.id
+            model.selectApp(visibleApps.first?.id)
         }
     }
 }

@@ -99,6 +99,56 @@ extension FlowTabTests {
         XCTAssertEqual(observedGenerations, [0, 1, 2])
     }
 
+    @MainActor
+    func testAppVisibilitySelectionProjectionGenerationTracksCommittedChanges() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
+        let model = AppVisibilityManagerModel(userDefaults: userDefaults)
+        var observedAppIDs: [String?] = []
+        var observedGenerations: [UInt64] = []
+        let selectionObservation = model.$selectedAppID.sink {
+            observedAppIDs.append($0)
+        }
+        let generationObservation = model.$selectionProjectionGeneration.sink {
+            observedGenerations.append($0)
+        }
+        defer {
+            selectionObservation.cancel()
+            generationObservation.cancel()
+        }
+
+        XCTAssertEqual(
+            AppVisibilityDetailProjectionAccessibility.identifierPrefix,
+            "flowtab.settings.app-visibility.detail."
+        )
+        XCTAssertEqual(
+            AppVisibilityDetailProjectionAccessibility.identifierPrefix(
+                appID: "com.example.mail"
+            ),
+            "flowtab.settings.app-visibility.detail.com-example-mail.id-2e85d467.generation."
+        )
+        XCTAssertEqual(
+            AppVisibilityDetailProjectionAccessibility.identifier(
+                appID: "com.example.mail",
+                generation: 1
+            ),
+            "flowtab.settings.app-visibility.detail.com-example-mail.id-2e85d467.generation.1"
+        )
+
+        model.selectApp("com.example.mail")
+        model.selectApp("com.example.mail")
+        model.selectApp(nil)
+        model.selectApp("com.example.browser")
+
+        XCTAssertEqual(model.selectedAppID, "com.example.browser")
+        XCTAssertEqual(model.selectionProjectionGeneration, 3)
+        XCTAssertEqual(
+            observedAppIDs,
+            [nil, "com.example.mail", nil, "com.example.browser"]
+        )
+        XCTAssertEqual(observedGenerations, [0, 1, 2, 3])
+    }
+
     func testAppVisibilityReloadWatchdogPolicyPreservesEventDeliveryBound() {
         let eventDelivery =
             AppVisibilityReloadWatchdogPolicy.eventDelivery
@@ -135,6 +185,7 @@ extension FlowTabTests {
             var lastVisibleAppIDs: [String] = []
             var lastSelectedAppID: String?
             var lastHiddenCount = 0
+            var observedSelectionGenerations: [UInt64] = []
             let loadingObservation = model.$isLoading
                 .sink { isLoading in
                     XCTAssertTrue(Thread.isMainThread)
@@ -156,9 +207,14 @@ extension FlowTabTests {
                     lastHiddenCount = model.hiddenCount
                     reloadCompleted.fulfill()
                 }
+            let selectionGenerationObservation =
+                model.$selectionProjectionGeneration.sink {
+                    observedSelectionGenerations.append($0)
+                }
             defer {
                 loadingObservation.cancel()
                 readinessObservation.cancel()
+                selectionGenerationObservation.cancel()
             }
 
             XCTAssertEqual(observedLoadingStates, [false])
@@ -167,6 +223,7 @@ extension FlowTabTests {
             XCTAssertTrue(lastVisibleAppIDs.isEmpty)
             XCTAssertNil(lastSelectedAppID)
             XCTAssertEqual(lastHiddenCount, 0)
+            XCTAssertEqual(observedSelectionGenerations, [0])
 
             model.reload()
             await fulfillment(
@@ -198,6 +255,8 @@ extension FlowTabTests {
             XCTAssertEqual(model.hiddenCount, 1)
             XCTAssertEqual(model.visibleApps.map(\.id), [missingAppID])
             XCTAssertEqual(model.selectedApp?.id, missingAppID)
+            XCTAssertEqual(model.selectionProjectionGeneration, 1)
+            XCTAssertEqual(observedSelectionGenerations, [0, 1])
         }
     }
 

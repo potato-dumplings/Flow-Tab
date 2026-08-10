@@ -308,10 +308,13 @@ extension FlowTabUITests {
             return
         }
 
-        let mockMailRow = element(in: app, identifier: Identifier.settingsAppVisibilityMockMail)
-        tapElement(mockMailRow)
-
-        let showToggle = homeAppVisibilityShowToggle(in: app)
+        guard let showToggle = settingsAppVisibilityShowToggleAfterSelecting(
+            rowIdentifier: Identifier.settingsAppVisibilityMockMail,
+            in: app,
+            targetDescription: "Home hidden-App detail"
+        ) else {
+            return
+        }
         setToggle(showToggle, to: false)
         XCTAssertFalse(toggleIsOn(showToggle))
 
@@ -788,16 +791,6 @@ extension FlowTabUITests {
             "YES"
         ]
         return arguments
-    }
-
-    private func homeAppVisibilityShowToggle(in app: XCUIApplication) -> XCUIElement {
-        let switchElement = app.switches.firstMatch
-        if switchElement.waitForExistence(timeout: 3) {
-            return switchElement
-        }
-        let checkBox = app.checkBoxes.firstMatch
-        XCTAssertTrue(checkBox.waitForExistence(timeout: 3))
-        return checkBox
     }
 
 }

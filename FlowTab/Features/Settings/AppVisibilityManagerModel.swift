@@ -32,6 +32,19 @@ enum AppVisibilityFilterProjectionAccessibility {
     }
 }
 
+enum AppVisibilityDetailProjectionAccessibility {
+    static let identifierPrefix =
+        "flowtab.settings.app-visibility.detail."
+
+    static func identifierPrefix(appID: String) -> String {
+        "\(identifierPrefix)\(appID.flowTabAccessibilityIdentifierComponent).generation."
+    }
+
+    static func identifier(appID: String, generation: UInt64) -> String {
+        "\(identifierPrefix(appID: appID))\(generation)"
+    }
+}
+
 @MainActor
 final class AppVisibilityManagerModel: ObservableObject {
     enum Filter: String, CaseIterable, Identifiable {
@@ -62,7 +75,8 @@ final class AppVisibilityManagerModel: ObservableObject {
     @Published private(set) var queryProjectionGeneration: UInt64 = 0
     @Published private(set) var filter: Filter = .all
     @Published private(set) var filterProjectionGeneration: UInt64 = 0
-    @Published var selectedAppID: String?
+    @Published private(set) var selectedAppID: String?
+    @Published private(set) var selectionProjectionGeneration: UInt64 = 0
 
     private let inventoryService: AppInventoryService
     private let userDefaults: UserDefaults
@@ -147,6 +161,12 @@ final class AppVisibilityManagerModel: ObservableObject {
         filterProjectionGeneration &+= 1
     }
 
+    func selectApp(_ appID: String?) {
+        guard selectedAppID != appID else { return }
+        selectedAppID = appID
+        selectionProjectionGeneration &+= 1
+    }
+
     func setHidden(_ hidden: Bool, for appID: String) {
         AppVisibilityPreferencesStore.setAppHidden(
             hidden,
@@ -178,7 +198,7 @@ final class AppVisibilityManagerModel: ObservableObject {
         if let selectedAppID, visible.contains(where: { $0.id == selectedAppID }) {
             return
         }
-        selectedAppID = visible.first?.id
+        selectApp(visible.first?.id)
     }
 
     private func matchesFilter(_ app: InstalledAppRecord) -> Bool {

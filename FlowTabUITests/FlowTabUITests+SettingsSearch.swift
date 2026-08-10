@@ -195,10 +195,13 @@ extension FlowTabUITests {
             return
         }
 
-        let mockMailRow = element(in: settingsApp, identifier: Identifier.settingsAppVisibilityMockMail)
-        tapElement(mockMailRow)
-
-        let showToggle = appVisibilityShowToggle(in: settingsApp)
+        guard let showToggle = settingsAppVisibilityShowToggleAfterSelecting(
+            rowIdentifier: Identifier.settingsAppVisibilityMockMail,
+            in: settingsApp,
+            targetDescription: "hidden-App configuration detail"
+        ) else {
+            return
+        }
         setToggle(showToggle, to: false)
         XCTAssertFalse(toggleIsOn(showToggle))
         let settingsTermination = terminateFlowTabUITestApplication(
@@ -284,6 +287,40 @@ extension FlowTabUITests {
         )
     }
 
+    func testSettingsAppVisibilitySelectionPublishesExactDetailToggle() throws {
+        let app = makeApp(
+            additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)
+        )
+        launchFlowTabUITestApplication(app)
+        openSettingsTab(in: app)
+
+        guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
+            in: app,
+            targetDescription: "selected-detail regression inventory"
+        ) else {
+            return
+        }
+        guard assertSettingsAppVisibilityQueryProjection(
+            "Mail",
+            targetRowIdentifier: Identifier.settingsAppVisibilityMockMail,
+            in: app,
+            targetDescription: "selected-detail regression Search projection"
+        ) else {
+            return
+        }
+        guard let showToggle = settingsAppVisibilityShowToggleAfterSelecting(
+            rowIdentifier: Identifier.settingsAppVisibilityMockMail,
+            in: app,
+            targetDescription: "selected-detail regression target"
+        ) else {
+            return
+        }
+
+        XCTAssertTrue(toggleIsOn(showToggle))
+        setToggle(showToggle, to: false)
+        XCTAssertFalse(toggleIsOn(showToggle))
+    }
+
     func testSettingsAppVisibilitySearchUsesSharedPinyinMatching() throws {
         let app = makeApp(
             additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)
@@ -339,9 +376,14 @@ extension FlowTabUITests {
             return
         }
 
-        let currentAppRow = element(in: app, identifier: Identifier.settingsAppVisibilityCurrentApp)
-        tapElement(currentAppRow)
-        XCTAssertFalse(toggleIsOn(appVisibilityShowToggle(in: app)))
+        guard let showToggle = settingsAppVisibilityShowToggleAfterSelecting(
+            rowIdentifier: Identifier.settingsAppVisibilityCurrentApp,
+            in: app,
+            targetDescription: "current-App Hidden detail"
+        ) else {
+            return
+        }
+        XCTAssertFalse(toggleIsOn(showToggle))
     }
 
     func testSettingsAppVisibilityHiddenFilterShowsStoredHiddenAppMissingFromInventory() throws {
@@ -367,10 +409,13 @@ extension FlowTabUITests {
             return
         }
 
-        let mockMailRow = element(in: firstLaunchApp, identifier: Identifier.settingsAppVisibilityMockMail)
-        tapElement(mockMailRow)
-
-        let showToggle = appVisibilityShowToggle(in: firstLaunchApp)
+        guard let showToggle = settingsAppVisibilityShowToggleAfterSelecting(
+            rowIdentifier: Identifier.settingsAppVisibilityMockMail,
+            in: firstLaunchApp,
+            targetDescription: "stored hidden-App source detail"
+        ) else {
+            return
+        }
         setToggle(showToggle, to: false)
         XCTAssertFalse(toggleIsOn(showToggle))
         firstLaunchApp.terminate()
@@ -398,9 +443,16 @@ extension FlowTabUITests {
             return
         }
 
-        let staleHiddenRow = element(in: staleInventoryApp, identifier: Identifier.settingsAppVisibilityMockMail)
-        tapElement(staleHiddenRow)
-        XCTAssertFalse(toggleIsOn(appVisibilityShowToggle(in: staleInventoryApp)))
+        guard let staleShowToggle =
+            settingsAppVisibilityShowToggleAfterSelecting(
+                rowIdentifier: Identifier.settingsAppVisibilityMockMail,
+                in: staleInventoryApp,
+                targetDescription: "stale hidden-App detail"
+            )
+        else {
+            return
+        }
+        XCTAssertFalse(toggleIsOn(staleShowToggle))
     }
 
     private func launchMockSwitcherSearchFromUserPath() -> XCUIApplication {
@@ -474,16 +526,6 @@ extension FlowTabUITests {
             ]
         }
         return arguments
-    }
-
-    private func appVisibilityShowToggle(in app: XCUIApplication) -> XCUIElement {
-        let switchElement = app.switches.firstMatch
-        if switchElement.waitForExistence(timeout: 3) {
-            return switchElement
-        }
-        let checkBox = app.checkBoxes.firstMatch
-        XCTAssertTrue(checkBox.waitForExistence(timeout: 3))
-        return checkBox
     }
 
 }
