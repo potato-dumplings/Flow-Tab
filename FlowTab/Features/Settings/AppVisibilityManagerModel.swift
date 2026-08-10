@@ -1,6 +1,16 @@
 import Foundation
 import FlowTabCore
 
+enum AppVisibilityInventoryReadiness: String, Equatable {
+    case idle
+    case loading
+    case ready
+
+    var accessibilityIdentifier: String {
+        "flowtab.settings.app-visibility.inventory.\(rawValue)"
+    }
+}
+
 @MainActor
 final class AppVisibilityManagerModel: ObservableObject {
     enum Filter: String, CaseIterable, Identifiable {
@@ -25,6 +35,8 @@ final class AppVisibilityManagerModel: ObservableObject {
     @Published private(set) var apps: [InstalledAppRecord] = []
     @Published private(set) var hiddenAppIDs: Set<String>
     @Published private(set) var isLoading = false
+    @Published private(set) var inventoryReadiness:
+        AppVisibilityInventoryReadiness = .idle
     @Published var query = ""
     @Published var filter: Filter = .all
     @Published var selectedAppID: String?
@@ -78,6 +90,7 @@ final class AppVisibilityManagerModel: ObservableObject {
 
     func reload() {
         guard reloadTask == nil else { return }
+        inventoryReadiness = .loading
         isLoading = true
         let service = inventoryService
         reloadTask = Task { [weak self] in
@@ -93,6 +106,7 @@ final class AppVisibilityManagerModel: ObservableObject {
                 )
                 self.resolveSelectionAfterReload()
                 self.isLoading = false
+                self.inventoryReadiness = .ready
                 self.reloadTask = nil
             }
         }

@@ -7,6 +7,21 @@ private enum AppVisibilityReloadWatchdogPolicy {
 }
 
 extension FlowTabTests {
+    func testAppVisibilityInventoryReadinessAccessibilityIdentifiersAreStable() {
+        XCTAssertEqual(
+            AppVisibilityInventoryReadiness.idle.accessibilityIdentifier,
+            "flowtab.settings.app-visibility.inventory.idle"
+        )
+        XCTAssertEqual(
+            AppVisibilityInventoryReadiness.loading.accessibilityIdentifier,
+            "flowtab.settings.app-visibility.inventory.loading"
+        )
+        XCTAssertEqual(
+            AppVisibilityInventoryReadiness.ready.accessibilityIdentifier,
+            "flowtab.settings.app-visibility.inventory.ready"
+        )
+    }
+
     func testAppVisibilityReloadWatchdogPolicyPreservesEventDeliveryBound() {
         let eventDelivery =
             AppVisibilityReloadWatchdogPolicy.eventDelivery
@@ -37,6 +52,8 @@ extension FlowTabTests {
             )
             reloadCompleted.assertForOverFulfill = true
             var observedLoadingStates: [Bool] = []
+            var observedReadinessStates:
+                [AppVisibilityInventoryReadiness] = []
             var completionCount = 0
             var lastVisibleAppIDs: [String] = []
             var lastSelectedAppID: String?
@@ -45,9 +62,13 @@ extension FlowTabTests {
                 .sink { isLoading in
                     XCTAssertTrue(Thread.isMainThread)
                     observedLoadingStates.append(isLoading)
-                    guard Array(
-                        observedLoadingStates.suffix(2)
-                    ) == [true, false]
+                }
+            let readinessObservation = model.$inventoryReadiness
+                .sink { readiness in
+                    XCTAssertTrue(Thread.isMainThread)
+                    observedReadinessStates.append(readiness)
+                    guard Array(observedReadinessStates.suffix(2))
+                        == [.loading, .ready]
                     else {
                         return
                     }
@@ -58,9 +79,13 @@ extension FlowTabTests {
                     lastHiddenCount = model.hiddenCount
                     reloadCompleted.fulfill()
                 }
-            defer { loadingObservation.cancel() }
+            defer {
+                loadingObservation.cancel()
+                readinessObservation.cancel()
+            }
 
             XCTAssertEqual(observedLoadingStates, [false])
+            XCTAssertEqual(observedReadinessStates, [.idle])
             XCTAssertEqual(completionCount, 0)
             XCTAssertTrue(lastVisibleAppIDs.isEmpty)
             XCTAssertNil(lastSelectedAppID)
@@ -75,6 +100,7 @@ extension FlowTabTests {
             )
 
             XCTAssertFalse(model.isLoading)
+            XCTAssertEqual(model.inventoryReadiness, .ready)
             XCTAssertEqual(
                 observedLoadingStates,
                 [false, true, false],
@@ -83,6 +109,10 @@ extension FlowTabTests {
                     + "finalVisibleAppIDs=\(lastVisibleAppIDs) "
                     + "finalSelectedAppID=\(lastSelectedAppID ?? "nil") "
                     + "finalHiddenCount=\(lastHiddenCount)"
+            )
+            XCTAssertEqual(
+                observedReadinessStates,
+                [.idle, .loading, .ready]
             )
             XCTAssertEqual(completionCount, 1)
             XCTAssertEqual(lastHiddenCount, 1)
@@ -108,6 +138,8 @@ extension FlowTabTests {
             )
             reloadCompleted.assertForOverFulfill = true
             var observedLoadingStates: [Bool] = []
+            var observedReadinessStates:
+                [AppVisibilityInventoryReadiness] = []
             var completionCount = 0
             var lastVisibleAppIDs: [String] = []
             var lastSelectedAppID: String?
@@ -115,9 +147,13 @@ extension FlowTabTests {
                 .sink { isLoading in
                     XCTAssertTrue(Thread.isMainThread)
                     observedLoadingStates.append(isLoading)
-                    guard Array(
-                        observedLoadingStates.suffix(2)
-                    ) == [true, false]
+                }
+            let readinessObservation = model.$inventoryReadiness
+                .sink { readiness in
+                    XCTAssertTrue(Thread.isMainThread)
+                    observedReadinessStates.append(readiness)
+                    guard Array(observedReadinessStates.suffix(2))
+                        == [.loading, .ready]
                     else {
                         return
                     }
@@ -127,9 +163,13 @@ extension FlowTabTests {
                     lastSelectedAppID = model.selectedApp?.id
                     reloadCompleted.fulfill()
                 }
-            defer { loadingObservation.cancel() }
+            defer {
+                loadingObservation.cancel()
+                readinessObservation.cancel()
+            }
 
             XCTAssertEqual(observedLoadingStates, [false])
+            XCTAssertEqual(observedReadinessStates, [.idle])
             XCTAssertEqual(completionCount, 0)
             XCTAssertTrue(lastVisibleAppIDs.isEmpty)
             XCTAssertNil(lastSelectedAppID)
@@ -143,6 +183,7 @@ extension FlowTabTests {
             )
 
             XCTAssertFalse(model.isLoading)
+            XCTAssertEqual(model.inventoryReadiness, .ready)
             XCTAssertEqual(
                 observedLoadingStates,
                 [false, true, false],
@@ -150,6 +191,10 @@ extension FlowTabTests {
                     + "finalLoadingStates=\(observedLoadingStates) "
                     + "finalVisibleAppIDs=\(lastVisibleAppIDs) "
                     + "finalSelectedAppID=\(lastSelectedAppID ?? "nil")"
+            )
+            XCTAssertEqual(
+                observedReadinessStates,
+                [.idle, .loading, .ready]
             )
             XCTAssertEqual(completionCount, 1)
             XCTAssertEqual(lastVisibleAppIDs, ["com.xxx.test"])

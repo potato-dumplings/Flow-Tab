@@ -179,15 +179,19 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(settingsApp)
         openSettingsTab(in: settingsApp)
 
-        let manageButton = element(in: settingsApp, identifier: Identifier.settingsAppVisibilityManage)
-        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
-        tapElement(manageButton)
-        XCTAssertTrue(element(in: settingsApp, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+        guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
+            in: settingsApp,
+            targetDescription: "hidden-App configuration inventory"
+        ) else {
+            return
+        }
 
-        let managerSearch = settingsApp.textFields.firstMatch
-        XCTAssertTrue(managerSearch.waitForExistence(timeout: 6))
+        let managerSearch = element(
+            in: settingsApp,
+            identifier: Identifier.settingsAppVisibilitySearch
+        )
         tapElement(managerSearch)
-        settingsApp.typeText("Mail")
+        pasteSettingsAppVisibilityQuery("Mail", in: settingsApp)
 
         let mockMailRow = element(in: settingsApp, identifier: Identifier.settingsAppVisibilityMockMail)
         XCTAssertTrue(mockMailRow.waitForExistence(timeout: 6))
@@ -286,17 +290,19 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         openSettingsTab(in: app)
 
-        let manageButton = element(in: app, identifier: Identifier.settingsAppVisibilityManage)
-        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
-        tapElement(manageButton)
-        XCTAssertTrue(element(in: app, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+        guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
+            in: app,
+            targetDescription: "pinyin Search inventory"
+        ) else {
+            return
+        }
 
-        let managerSearch = app.textFields.firstMatch
-        XCTAssertTrue(managerSearch.waitForExistence(timeout: 6))
+        let managerSearch = element(
+            in: app,
+            identifier: Identifier.settingsAppVisibilitySearch
+        )
         tapElement(managerSearch)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString("ceshi", forType: .string)
-        app.typeKey("v", modifierFlags: .command)
+        pasteSettingsAppVisibilityQuery("ceshi", in: app)
 
         XCTAssertTrue(
             element(in: app, identifier: Identifier.settingsAppVisibilityChineseTest)
@@ -319,10 +325,12 @@ extension FlowTabUITests {
         XCTAssertFalse(toggleIsOn(showInCommandTabToggle))
         XCTAssertTrue(app.staticTexts["已隐藏 1 个应用"].waitForExistence(timeout: 6))
 
-        let manageButton = element(in: app, identifier: Identifier.settingsAppVisibilityManage)
-        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
-        tapElement(manageButton)
-        XCTAssertTrue(element(in: app, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+        guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
+            in: app,
+            targetDescription: "current-App inventory"
+        ) else {
+            return
+        }
 
         tapAppVisibilityHiddenFilter(in: app)
 
@@ -339,15 +347,19 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(firstLaunchApp)
         openSettingsTab(in: firstLaunchApp)
 
-        let manageButton = element(in: firstLaunchApp, identifier: Identifier.settingsAppVisibilityManage)
-        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
-        tapElement(manageButton)
-        XCTAssertTrue(element(in: firstLaunchApp, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+        guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
+            in: firstLaunchApp,
+            targetDescription: "stored hidden-App source inventory"
+        ) else {
+            return
+        }
 
-        let managerSearch = firstLaunchApp.textFields.firstMatch
-        XCTAssertTrue(managerSearch.waitForExistence(timeout: 6))
+        let managerSearch = element(
+            in: firstLaunchApp,
+            identifier: Identifier.settingsAppVisibilitySearch
+        )
         tapElement(managerSearch)
-        firstLaunchApp.typeText("Mail")
+        pasteSettingsAppVisibilityQuery("Mail", in: firstLaunchApp)
 
         let mockMailRow = element(in: firstLaunchApp, identifier: Identifier.settingsAppVisibilityMockMail)
         XCTAssertTrue(mockMailRow.waitForExistence(timeout: 6))
@@ -366,10 +378,12 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(staleInventoryApp)
         openSettingsTab(in: staleInventoryApp)
 
-        let staleManageButton = element(in: staleInventoryApp, identifier: Identifier.settingsAppVisibilityManage)
-        XCTAssertTrue(staleManageButton.waitForExistence(timeout: 6))
-        tapElement(staleManageButton)
-        XCTAssertTrue(element(in: staleInventoryApp, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+        guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
+            in: staleInventoryApp,
+            targetDescription: "stale hidden-App inventory"
+        ) else {
+            return
+        }
 
         tapAppVisibilityHiddenFilter(in: staleInventoryApp)
 

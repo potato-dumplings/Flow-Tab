@@ -111,6 +111,9 @@ struct AppVisibilityManagerView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .accessibilityIdentifier(
+                    model.inventoryReadiness.accessibilityIdentifier
+                )
             }
         }
     }

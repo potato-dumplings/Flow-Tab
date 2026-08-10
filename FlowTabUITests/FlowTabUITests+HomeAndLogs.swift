@@ -292,15 +292,19 @@ extension FlowTabUITests {
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
         openSettingsTab(in: app)
 
-        let manageButton = element(in: app, identifier: Identifier.settingsAppVisibilityManage)
-        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
-        tapElement(manageButton)
-        XCTAssertTrue(element(in: app, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+        guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
+            in: app,
+            targetDescription: "Home hidden-App inventory"
+        ) else {
+            return
+        }
 
-        let managerSearch = app.textFields.firstMatch
-        XCTAssertTrue(managerSearch.waitForExistence(timeout: 6))
+        let managerSearch = element(
+            in: app,
+            identifier: Identifier.settingsAppVisibilitySearch
+        )
         tapElement(managerSearch)
-        app.typeText("Mail")
+        pasteSettingsAppVisibilityQuery("Mail", in: app)
 
         let mockMailRow = element(in: app, identifier: Identifier.settingsAppVisibilityMockMail)
         XCTAssertTrue(mockMailRow.waitForExistence(timeout: 6))
