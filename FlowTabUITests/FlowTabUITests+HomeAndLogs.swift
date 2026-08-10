@@ -658,17 +658,27 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        let logsTabButton = app.buttons
-            .matching(identifier: Identifier.logsTabButton)
-            .firstMatch
-        XCTAssertTrue(logsTabButton.waitForExistence(timeout: 6))
-        tapElement(logsTabButton)
-        XCTAssertTrue(
-            element(in: app, identifier: Identifier.logsTabContent)
-                .waitForExistence(timeout: 6)
-        )
-
-        app.activate()
+        let didResolveInitialLogs =
+            assertLogsPopulatedProjectionAfterNavigation(
+                in: app,
+                targetDescription: "live-update-initial-logs",
+                selectedLevel: "INFO",
+                visibleIdentifiers: [
+                    Identifier.logsSeededInfoLine
+                ]
+            ) {
+                tapFirstHittable(
+                    in: app.buttons.matching(
+                        identifier: Identifier.logsTabButton
+                    ),
+                    timeout:
+                        FlowTabUITestLogsProjectionPolicy
+                            .tabNavigationWatchdog
+                )
+            }
+        guard didResolveInitialLogs else {
+            return
+        }
         assertLogsClearTransition(
             in: app,
             targetDescription: "live-update-precondition-clear",

@@ -183,6 +183,107 @@ extension FlowTabUITests {
         )
     }
 
+    func testLogsPopulatedProjectionObserverUsesPreNavigationEvidence() {
+        let expectation =
+            FlowTabUITestLogsClearProjectionExpectation.populated(
+                selectedLevel: "INFO",
+                visibleIdentifiers: ["info"]
+            )
+        let matching = logsClearProjectionTestSnapshot(
+            isCleared: false,
+            selectedLevel: "INFO",
+            rowIdentifiers: ["info"]
+        )
+        let preNavigation =
+            FlowTabUITestLogsClearProjectionSnapshot(
+                applicationState: .runningForeground,
+                logsContentExists: false,
+                clearButtonExists: false,
+                clearButtonIsHittable: false,
+                linesContainerExists: false,
+                emptyHintExists: false,
+                selectedLevel: nil,
+                seededRowIdentifiers: []
+            )
+        var snapshot = preNavigation
+        var triggerDidComplete = false
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var cancellationCount = 0
+        let owner =
+            FlowTabUITestLogsClearProjectionObservationOwner(
+                expectation: expectation,
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {
+                        cancellationCount += 1
+                    }
+                },
+                acceptsResolution: { triggerDidComplete },
+                readback: { snapshot }
+            )
+        owner.start()
+
+        XCTAssertEqual(owner.latestEvidence?.source, .initialReadback)
+        XCTAssertEqual(owner.latestEvidence?.value, preNavigation)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = matching
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        triggerDidComplete = true
+        owner.requestReadback(source: .triggerReadback)
+        let evidence = owner.waitForResolution(
+            timeout:
+                FlowTabUITestLogsClearProjectionTestPolicy
+                    .watchdog
+        )
+
+        XCTAssertEqual(evidence?.source, .triggerReadback)
+        XCTAssertEqual(evidence?.value, matching)
+        XCTAssertEqual(cancellationCount, 1)
+        owner.cancel()
+    }
+
+    func testLogsPopulatedProjectionObserverSupportsInitiallyMatchingState() {
+        let expectation =
+            FlowTabUITestLogsClearProjectionExpectation.populated(
+                selectedLevel: "INFO",
+                visibleIdentifiers: ["info"]
+            )
+        let matching = logsClearProjectionTestSnapshot(
+            isCleared: false,
+            selectedLevel: "INFO",
+            rowIdentifiers: ["info"]
+        )
+        var triggerDidComplete = false
+        let owner =
+            FlowTabUITestLogsClearProjectionObservationOwner(
+                expectation: expectation,
+                observationRegistration: nil,
+                acceptsResolution: { triggerDidComplete },
+                readback: { matching }
+            )
+        owner.start()
+
+        XCTAssertEqual(owner.latestEvidence?.source, .initialReadback)
+        XCTAssertEqual(owner.latestEvidence?.value, matching)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        triggerDidComplete = true
+        owner.requestReadback(source: .triggerReadback)
+        let evidence = owner.waitForResolution(
+            timeout:
+                FlowTabUITestLogsClearProjectionTestPolicy
+                    .watchdog
+        )
+
+        XCTAssertEqual(evidence?.source, .triggerReadback)
+        XCTAssertEqual(evidence?.value, matching)
+        owner.cancel()
+    }
+
     func testLogsRelaunchProjectionExpectationRequiresLoadedSeedlessState() {
         XCTAssertEqual(
             FlowTabUITestLogsClearProjectionObservationPolicy

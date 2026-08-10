@@ -228,6 +228,90 @@ final class FlowTabUITestLogsClearProjectionObservationOwner {
 }
 
 extension FlowTabUITests {
+    @discardableResult
+    func assertLogsPopulatedProjectionAfterNavigation(
+        in app: XCUIApplication,
+        targetDescription: String,
+        selectedLevel: String,
+        visibleIdentifiers: [String],
+        trigger: () -> Bool
+    ) -> Bool {
+        let expectation =
+            FlowTabUITestLogsClearProjectionExpectation.populated(
+                selectedLevel: selectedLevel,
+                visibleIdentifiers: visibleIdentifiers
+            )
+        let elements = logsClearProjectionElements(in: app)
+        let readback = logsClearProjectionReadback(
+            in: app,
+            elements: elements
+        )
+        let deferredReadbacks =
+            FlowTabUITestDeferredConditionReadbackRegistration(
+                downstreamRegistration:
+                    FlowTabUITestConditionReadbackScheduler
+                        .mainRunLoopRegistration(
+                            cadence:
+                                FlowTabUITestConditionObservationPolicy
+                                    .xcuiReadbackCadence
+                        )
+            )
+        var triggerDidComplete = false
+        let owner =
+            FlowTabUITestLogsClearProjectionObservationOwner(
+                expectation: expectation,
+                observationRegistration: { callback in
+                    deferredReadbacks.register(callback)
+                },
+                acceptsResolution: { triggerDidComplete },
+                readback: readback
+            )
+        owner.start()
+        defer {
+            owner.cancel()
+            deferredReadbacks.cancel()
+        }
+
+        guard owner.latestEvidence?.source == .initialReadback else {
+            XCTFail(
+                "Logs navigation initial readback was unavailable. "
+                    + "target=\(targetDescription) "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+        XCTAssertNil(owner.resolvedEvidence)
+
+        let triggerSucceeded = trigger()
+        triggerDidComplete = true
+        owner.requestReadback(source: .triggerReadback)
+        guard triggerSucceeded else {
+            XCTFail(
+                "Logs navigation trigger watchdog expired. "
+                    + "target=\(targetDescription) "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+        if owner.resolvedEvidence == nil {
+            deferredReadbacks.activate()
+        }
+
+        guard owner.waitForResolution(
+            timeout:
+                FlowTabUITestLogsProjectionPolicy
+                    .exactProjectionWatchdog
+        ) != nil else {
+            XCTFail(
+                "Logs populated projection watchdog expired. "
+                    + "target=\(targetDescription) "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+        return true
+    }
+
     func assertLogsClearTransition(
         in app: XCUIApplication,
         targetDescription: String,
