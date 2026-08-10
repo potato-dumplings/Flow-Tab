@@ -53,6 +53,188 @@ extension FlowTabUITests {
                 + resultID
                     .flowTabUITestAccessibilityIdentifierComponent
         )
+        XCTAssertEqual(
+            searchResultIdentifiers(
+                inDiagnosticsProjection: rawProjection
+            ),
+            [
+                "window:com.example.chrome#123",
+                "app:com.example.chrome"
+            ]
+        )
+    }
+
+    func testSwitcherSearchResultObserverRequiresCommittedVisibleRow() {
+        let expectation =
+            FlowTabUITestSwitcherSearchResultExpectation
+                .committedResultRow(
+                    scope: "app",
+                    query: "Mail",
+                    resultID: "app:com.example.mail",
+                    rowIdentifier: "search.app.mail"
+                )
+        var acceptsEvidence = false
+        var snapshot =
+            FlowTabUITestSwitcherSearchResultSnapshot(
+                results: [],
+                resultsScope: "app",
+                resultsQuery: "",
+                committedResultIDs: []
+            )
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        let owner =
+            FlowTabUITestSwitcherSearchResultObservationOwner(
+                expectation: expectation,
+                acceptsEvidence: {
+                    acceptsEvidence
+                },
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: {
+                    snapshot
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        acceptsEvidence = true
+        snapshot =
+            FlowTabUITestSwitcherSearchResultSnapshot(
+                results: [],
+                resultsScope: "window",
+                resultsQuery: "Mail",
+                committedResultIDs: [
+                    "app:com.example.mail"
+                ],
+                observedRowIdentifier: "search.app.mail",
+                observedRowExists: true,
+                applicationState: .runningForeground
+            )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot =
+            FlowTabUITestSwitcherSearchResultSnapshot(
+                results: [],
+                resultsScope: "app",
+                resultsQuery: "Mail",
+                committedResultIDs: [
+                    "app:com.example.mail"
+                ],
+                observedRowIdentifier: "search.app.mail",
+                observedRowExists: true,
+                applicationState: .runningBackground
+            )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot =
+            FlowTabUITestSwitcherSearchResultSnapshot(
+                results: [],
+                resultsScope: "app",
+                resultsQuery: "Mail",
+                committedResultIDs: [
+                    "app:com.example.mail"
+                ],
+                observedRowIdentifier: "search.app.mail",
+                observedRowExists: false,
+                applicationState: .runningForeground
+            )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot =
+            FlowTabUITestSwitcherSearchResultSnapshot(
+                results: [],
+                resultsScope: "app",
+                resultsQuery: "Mail",
+                committedResultIDs: [
+                    "app:com.example.mail"
+                ],
+                observedRowIdentifier: "search.app.mail",
+                observedRowExists: true,
+                applicationState: .runningForeground
+            )
+        owner.requestReadback(source: .triggerReadback)
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .triggerReadback
+        )
+        XCTAssertTrue(
+            expectation.hasCommittedIdentity(
+                in: owner.resolvedEvidence?.value
+                    ?? switcherSearchResultTestSnapshot([])
+            )
+        )
+    }
+
+    func testSwitcherSearchResultVisibleRowSchedulingOnlyChangesCompletionTime() {
+        let expectation =
+            FlowTabUITestSwitcherSearchResultExpectation
+                .committedResultRow(
+                    scope: "window",
+                    query: "Inbox",
+                    resultID: "window:mail#inbox",
+                    rowIdentifier: "search.window.inbox"
+                )
+        var snapshot =
+            FlowTabUITestSwitcherSearchResultSnapshot(
+                results: [],
+                resultsScope: "window",
+                resultsQuery: "Inbox",
+                committedResultIDs: [
+                    "window:mail#inbox"
+                ],
+                observedRowIdentifier: nil,
+                observedRowExists: false,
+                applicationState: .runningForeground
+            )
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        let owner =
+            FlowTabUITestSwitcherSearchResultObservationOwner(
+                expectation: expectation,
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: {
+                    snapshot
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertNil(owner.resolvedEvidence)
+        snapshot =
+            FlowTabUITestSwitcherSearchResultSnapshot(
+                results: [],
+                resultsScope: "window",
+                resultsQuery: "Inbox",
+                committedResultIDs: [
+                    "window:mail#inbox"
+                ],
+                observedRowIdentifier:
+                    "search.window.inbox",
+                observedRowExists: true,
+                applicationState: .runningForeground
+            )
+        XCTAssertNil(owner.resolvedEvidence)
+        scheduledReadback?(.scheduledReadback)
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .scheduledReadback
+        )
+        XCTAssertEqual(
+            owner.resolvedEvidence?.value
+                .observedRowIdentifier,
+            "search.window.inbox"
+        )
     }
 
     func testSwitcherSearchResultObserverAcceptsMatchingInitialWindow() {
@@ -520,25 +702,28 @@ extension FlowTabUITests {
         }
     }
 
-    func testSwitcherSearchResultWatchdogReportsFinalProjection() {
+    func testSwitcherSearchResultRowWatchdogReportsFinalProjection() {
         let owner =
             FlowTabUITestSwitcherSearchResultObservationOwner(
                 expectation:
-                    .matchingWindow(
-                        title: "Report",
-                        appName: "Browser"
+                    .committedResultRow(
+                        scope: "app",
+                        query: "Mail",
+                        resultID: "app:com.example.mail",
+                        rowIdentifier: "search.app.mail"
                     ),
                 observationRegistration: nil,
                 readback: {
-                    self.switcherSearchResultTestSnapshot(
-                        [
-                            self.switcherSearchResultTestObservation(
-                                resultID: "window:7",
-                                title: "Draft",
-                                appName: "Browser",
-                                appID: "com.example.browser"
-                            )
-                        ]
+                    FlowTabUITestSwitcherSearchResultSnapshot(
+                        results: [],
+                        resultsScope: "app",
+                        resultsQuery: "Mail",
+                        committedResultIDs: [
+                            "app:com.example.mail"
+                        ],
+                        observedRowIdentifier: nil,
+                        observedRowExists: false,
+                        applicationState: .runningForeground
                     )
                 }
             )
@@ -558,7 +743,12 @@ extension FlowTabUITests {
             )
         )
         XCTAssertTrue(
-            owner.diagnosticSummary.contains("title=Draft")
+            owner.diagnosticSummary.contains(
+                "resultID=app:com.example.mail"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains("rowExists=false")
         )
     }
 

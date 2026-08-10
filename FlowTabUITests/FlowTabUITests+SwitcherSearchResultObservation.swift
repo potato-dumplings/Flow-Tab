@@ -78,15 +78,29 @@ struct FlowTabUITestSwitcherSearchResultSnapshot: Equatable {
     let results: [SwitcherSearchWindowResultObservation]
     let resultsScope: String?
     let resultsQuery: String?
+    let committedResultIDs: [String]
+    let observedRowIdentifier: String?
+    let observedRowExists: Bool
+    let applicationState: XCUIApplication.State?
 
     init(
         results: [SwitcherSearchWindowResultObservation],
         resultsScope: String? = nil,
-        resultsQuery: String? = nil
+        resultsQuery: String? = nil,
+        committedResultIDs: [String]? = nil,
+        observedRowIdentifier: String? = nil,
+        observedRowExists: Bool = false,
+        applicationState: XCUIApplication.State? = nil
     ) {
         self.results = results
         self.resultsScope = resultsScope
         self.resultsQuery = resultsQuery
+        self.committedResultIDs =
+            committedResultIDs
+                ?? results.compactMap(\.resultID)
+        self.observedRowIdentifier = observedRowIdentifier
+        self.observedRowExists = observedRowExists
+        self.applicationState = applicationState
     }
 
     var diagnosticSummary: String {
@@ -96,6 +110,10 @@ struct FlowTabUITestSwitcherSearchResultSnapshot: Equatable {
             .joined(separator: " | ")
         return "scope=\(resultsScope ?? "nil") "
             + "query=\(resultsQuery ?? "nil") "
+            + "resultIDs=\(committedResultIDs) "
+            + "rowIdentifier=\(observedRowIdentifier ?? "nil") "
+            + "rowExists=\(observedRowExists) "
+            + "appState=\(String(describing: applicationState)) "
             + "count=\(results.count) "
             + "results=[\(resultSummary)]"
     }
@@ -121,6 +139,12 @@ enum FlowTabUITestSwitcherSearchResultExpectation:
         query: String,
         identifierFragment: String?,
         expectedCount: Int
+    )
+    case committedResultRow(
+        scope: String,
+        query: String,
+        resultID: String,
+        rowIdentifier: String
     )
 
     func matchingResult(
@@ -182,7 +206,41 @@ enum FlowTabUITestSwitcherSearchResultExpectation:
                 && countMatches
         case .exactWindowIdentifiers:
             return matchingIdentifiers(in: snapshot) != nil
+        case let .committedResultRow(
+            scope,
+            query,
+            resultID,
+            rowIdentifier
+        ):
+            return snapshot.resultsScope == scope
+                && snapshot.resultsQuery == query
+                && snapshot.committedResultIDs.contains(
+                    resultID
+                )
+                && snapshot.observedRowIdentifier
+                    == rowIdentifier
+                && snapshot.observedRowExists
+                && snapshot.applicationState
+                    == .runningForeground
         }
+    }
+
+    func hasCommittedIdentity(
+        in snapshot: FlowTabUITestSwitcherSearchResultSnapshot
+    ) -> Bool {
+        guard
+            case let .committedResultRow(
+                scope,
+                query,
+                resultID,
+                _
+            ) = self
+        else {
+            return false
+        }
+        return snapshot.resultsScope == scope
+            && snapshot.resultsQuery == query
+            && snapshot.committedResultIDs.contains(resultID)
     }
 
     func matchingIdentifiers(
@@ -246,6 +304,15 @@ enum FlowTabUITestSwitcherSearchResultExpectation:
                 + "query=\(query) "
                 + "fragment=\(identifierFragment ?? "<any>") "
                 + "count=\(expectedCount)"
+        case let .committedResultRow(
+            scope,
+            query,
+            resultID,
+            rowIdentifier
+        ):
+            return "committedResultRow scope=\(scope) "
+                + "query=\(query) resultID=\(resultID) "
+                + "rowIdentifier=\(rowIdentifier)"
         }
     }
 }
@@ -385,8 +452,46 @@ extension FlowTabUITests {
             }
     }
 
+    func searchResultIdentifiers(
+        inDiagnosticsProjection rawValue: String
+    ) -> [String] {
+        guard !rawValue.isEmpty, rawValue != "inactive" else {
+            return []
+        }
+
+        var seenResultIDs: Set<String> = []
+        return rawValue
+            .split(
+                separator: "|",
+                omittingEmptySubsequences: true
+            )
+            .compactMap { entry in
+                let fields = entry.split(
+                    separator: ",",
+                    omittingEmptySubsequences: false
+                )
+                guard fields.count == 6,
+                      fields[1] == "app"
+                        || fields[1] == "window"
+                else {
+                    return nil
+                }
+                let rawResultID = String(fields[0])
+                let resultID =
+                    rawResultID.removingPercentEncoding
+                        ?? rawResultID
+                guard !resultID.isEmpty,
+                      seenResultIDs.insert(resultID).inserted
+                else {
+                    return nil
+                }
+                return resultID
+            }
+    }
+
     func committedSwitcherSearchResultSnapshot(
-        in app: XCUIApplication
+        in app: XCUIApplication,
+        targetRowIdentifier: String? = nil
     ) -> FlowTabUITestSwitcherSearchResultSnapshot {
         let diagnosticsSummary = element(
             in: app,
@@ -403,19 +508,34 @@ extension FlowTabUITests {
         let rawQuery = diagnostics.values[
             "searchResultsQuery"
         ]
+        let rawResults =
+            diagnostics.values["searchResults"] ?? ""
+        let targetRow = targetRowIdentifier.map {
+            element(in: app, identifier: $0)
+        }
+        let targetRowExists = targetRow?.exists == true
         return FlowTabUITestSwitcherSearchResultSnapshot(
             results:
                 searchWindowResultObservations(
                     inDiagnosticsProjection:
-                        diagnostics.values["searchResults"]
-                            ?? ""
+                        rawResults
                 ),
             resultsScope:
                 diagnostics.values["searchResultsScope"],
             resultsQuery:
                 rawQuery.map {
                     $0.removingPercentEncoding ?? $0
-                }
+                },
+            committedResultIDs:
+                searchResultIdentifiers(
+                    inDiagnosticsProjection: rawResults
+                ),
+            observedRowIdentifier:
+                targetRowExists
+                    ? targetRow?.identifier
+                    : nil,
+            observedRowExists: targetRowExists,
+            applicationState: app.state
         )
     }
 

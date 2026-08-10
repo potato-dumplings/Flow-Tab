@@ -1,7 +1,28 @@
 import AppKit
 import XCTest
 
+private enum FlowTabUITestSettingsSearchWatchdogPolicy {
+    static let committedResultProjection: TimeInterval = 8
+}
+
 extension FlowTabUITests {
+    func testSettingsSearchWatchdogPolicyCompatibility() {
+        XCTAssertEqual(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .committedResultProjection,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .committedResultProjection.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .committedResultProjection,
+            0
+        )
+    }
+
     func testSettingsSearchDisabledPreventsAutoSearchLaunchEntry() throws {
         let firstLaunchApp = makeApp(
             additionalArguments: [
@@ -122,10 +143,24 @@ extension FlowTabUITests {
         firstLaunchApp.terminate()
 
         let windowSearchApp = launchMockSwitcherSearchFromUserPath()
-        windowSearchApp.typeText("Inbox")
         XCTAssertTrue(
-            element(in: windowSearchApp, identifier: Identifier.switcherSearchWindowMockMailInbox)
-                .waitForExistence(timeout: 8)
+            performAndWaitForCommittedSearchResultRow(
+                in: windowSearchApp,
+                scope: "window",
+                query: "Inbox",
+                resultID:
+                    "window:com.flowtab.mock.mail#mock-mail-inbox",
+                rowIdentifier:
+                    Identifier.switcherSearchWindowMockMailInbox,
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .committedResultProjection,
+                trigger: {
+                    windowSearchApp.typeText("Inbox")
+                }
+            ),
+            "Window-scope Search did not publish the exact "
+                + "committed Inbox result row."
         )
         windowSearchApp.terminate()
 
@@ -146,10 +181,23 @@ extension FlowTabUITests {
         settingsRelaunchApp.terminate()
 
         let appSearchApp = launchMockSwitcherSearchFromUserPath()
-        appSearchApp.typeText("Mail")
         XCTAssertTrue(
-            element(in: appSearchApp, identifier: Identifier.switcherSearchAppMockMail)
-                .waitForExistence(timeout: 8)
+            performAndWaitForCommittedSearchResultRow(
+                in: appSearchApp,
+                scope: "app",
+                query: "Mail",
+                resultID: "app:com.flowtab.mock.mail",
+                rowIdentifier:
+                    Identifier.switcherSearchAppMockMail,
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .committedResultProjection,
+                trigger: {
+                    appSearchApp.typeText("Mail")
+                }
+            ),
+            "App-scope Search did not publish the exact "
+                + "committed Mail result row."
         )
     }
 
