@@ -107,8 +107,11 @@ final class FlowTabUITests: XCTestCase {
         static let statusItem = "flowtab.status-item"
         static let statusItemQuit = "flowtab.status-item.quit"
         static let switcherSummary = "flowtab.testing.switcher.summary"
-        static let switcherAppMockBrowser = "flowtab.switcher.app.\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
-        static let switcherAppMockMail = "flowtab.switcher.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
+        static let switcherAppPrefix = "flowtab.switcher.app."
+        static let switcherAppMockBrowser =
+            "\(switcherAppPrefix)\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
+        static let switcherAppMockMail =
+            "\(switcherAppPrefix)\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherAppMockManyWindows = "flowtab.switcher.app.\("com.flowtab.mock.many-windows".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherAppMockMinimizedNotes = "flowtab.switcher.app.\("com.flowtab.mock.minimized-notes".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherAppWeChat = "flowtab.switcher.app.\("com.tencent.xinWeChat".flowTabUITestAccessibilityIdentifierComponent)"

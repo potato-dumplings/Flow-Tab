@@ -1,6 +1,10 @@
 import Foundation
 import XCTest
 
+enum FlowTabUITestSwitcherAppProjectionPolicy {
+    static let postLaunchWatchdog: TimeInterval = 10
+}
+
 struct FlowTabUITestSwitcherAppProjectionEntry: Equatable {
     let rawValue: String
     let bundleIdentifier: String
@@ -31,6 +35,7 @@ struct FlowTabUITestSwitcherAppProjectionEntry: Equatable {
 struct FlowTabUITestSwitcherAppProjectionSnapshot:
     Equatable
 {
+    let applicationState: XCUIApplication.State
     let identifier: String
     let exists: Bool
     let rawValue: String?
@@ -41,7 +46,8 @@ struct FlowTabUITestSwitcherAppProjectionSnapshot:
             .sorted { $0.rawValue < $1.rawValue }
             .map(\.diagnosticSummary)
             .joined(separator: " | ")
-        return "identifier=\(identifier) "
+        return "applicationState=\(String(describing: applicationState)) "
+            + "identifier=\(identifier) "
             + "exists=\(exists) "
             + "entries=[\(entrySummary)] "
             + "raw=\(rawValue ?? "nil")"
@@ -53,12 +59,16 @@ enum FlowTabUITestSwitcherAppProjectionExpectation:
 {
     case exactEntry(String)
     case bundleIdentifier(String)
+    case bundleIdentifiers(required: Set<String>, excluded: Set<String>)
 
     func isSatisfied(
         by snapshot:
             FlowTabUITestSwitcherAppProjectionSnapshot
     ) -> Bool {
-        guard snapshot.exists else {
+        guard
+            snapshot.applicationState == .runningForeground,
+            snapshot.exists
+        else {
             return false
         }
         switch self {
@@ -70,6 +80,10 @@ enum FlowTabUITestSwitcherAppProjectionExpectation:
             return snapshot.entries.contains {
                 $0.bundleIdentifier == expectedBundleID
             }
+        case let .bundleIdentifiers(required, excluded):
+            let observed = Set(snapshot.entries.map(\.bundleIdentifier))
+            return required.isSubset(of: observed)
+                && observed.isDisjoint(with: excluded)
         }
     }
 
@@ -79,6 +93,9 @@ enum FlowTabUITestSwitcherAppProjectionExpectation:
             return "exactEntry=\(expectedEntry)"
         case let .bundleIdentifier(expectedBundleID):
             return "bundleID=\(expectedBundleID)"
+        case let .bundleIdentifiers(required, excluded):
+            return "requiredBundleIDs=\(required.sorted()) "
+                + "excludedBundleIDs=\(excluded.sorted())"
         }
     }
 }
@@ -100,15 +117,20 @@ final class FlowTabUITestSwitcherAppProjectionObservationOwner {
                             FlowTabUITestConditionObservationPolicy
                                 .xcuiReadbackCadence
                     ),
+        acceptsResolution: @escaping () -> Bool = { true },
         readback: @escaping () ->
             FlowTabUITestSwitcherAppProjectionSnapshot
     ) {
         conditionOwner = FlowTabUITestConditionObservationOwner(
             observationRegistration: observationRegistration,
             readback: readback,
-            isSatisfied: expectation.isSatisfied(by:),
+            isSatisfied: {
+                acceptsResolution()
+                    && expectation.isSatisfied(by: $0)
+            },
             describe: { snapshot in
                 "expected{\(expectation.diagnosticSummary)} "
+                    + "acceptsResolution=\(acceptsResolution()) "
                     + snapshot.diagnosticSummary
             }
         )
@@ -132,8 +154,18 @@ final class FlowTabUITestSwitcherAppProjectionObservationOwner {
         conditionOwner.resolvedEvidence
     }
 
+    var latestEvidence: FlowTabUITestConditionEvidence<
+        FlowTabUITestSwitcherAppProjectionSnapshot
+    >? {
+        conditionOwner.latestEvidence
+    }
+
     var diagnosticSummary: String {
         conditionOwner.diagnosticSummary
+    }
+
+    func requestReadback(source: FlowTabUITestConditionObservationSource) {
+        conditionOwner.requestReadback(source: source)
     }
 
     func cancel() {
@@ -142,6 +174,137 @@ final class FlowTabUITestSwitcherAppProjectionObservationOwner {
 }
 
 extension FlowTabUITests {
+    func assertInitialSwitcherAppProjectionAfterLaunch(
+        in app: XCUIApplication,
+        requiredBundleIdentifiers: Set<String>,
+        excludedBundleIdentifiers: Set<String>,
+        targetDescription: String,
+        trigger: () -> Void
+    ) -> Bool {
+        guard
+            !requiredBundleIdentifiers.isEmpty,
+            requiredBundleIdentifiers.isDisjoint(
+                with: excludedBundleIdentifiers
+            )
+        else {
+            XCTFail(
+                "Switcher App projection target identity was invalid. "
+                    + "target=\(targetDescription) "
+                    + "required=\(requiredBundleIdentifiers.sorted()) "
+                    + "excluded=\(excludedBundleIdentifiers.sorted())"
+            )
+            return false
+        }
+
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        let deferredReadbacks =
+            FlowTabUITestDeferredConditionReadbackRegistration(
+                downstreamRegistration:
+                    FlowTabUITestConditionReadbackScheduler
+                        .mainRunLoopRegistration(
+                            cadence:
+                                FlowTabUITestConditionObservationPolicy
+                                    .xcuiReadbackCadence
+                        )
+            )
+        var triggerDidComplete = false
+        let owner = FlowTabUITestSwitcherAppProjectionObservationOwner(
+            expectation: .bundleIdentifiers(
+                required: requiredBundleIdentifiers,
+                excluded: excludedBundleIdentifiers
+            ),
+            observationRegistration: { callback in
+                deferredReadbacks.register(callback)
+            },
+            acceptsResolution: { triggerDidComplete },
+            readback: {
+                self.switcherAppProjectionSnapshot(
+                    in: app,
+                    diagnosticsSummaryElement: diagnosticsSummary
+                )
+            }
+        )
+        owner.start()
+        defer {
+            owner.cancel()
+            deferredReadbacks.cancel()
+        }
+
+        guard owner.latestEvidence?.source == .initialReadback else {
+            XCTFail(
+                "Switcher App projection initial readback was unavailable. "
+                    + "target=\(targetDescription) "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+
+        trigger()
+        triggerDidComplete = true
+        owner.requestReadback(source: .triggerReadback)
+        if owner.resolvedEvidence == nil {
+            deferredReadbacks.activate()
+        }
+        guard owner.waitForResolution(
+            timeout: FlowTabUITestSwitcherAppProjectionPolicy
+                .postLaunchWatchdog
+        ) != nil else {
+            XCTFail(
+                "Switcher App projection watchdog expired. "
+                    + "target=\(targetDescription) "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+
+        let requiredRowIdentifiers = Set(
+            requiredBundleIdentifiers.map(switcherAppRowIdentifier)
+        )
+        let excludedRowIdentifiers = Set(
+            excludedBundleIdentifiers.map(switcherAppRowIdentifier)
+        )
+        let targetRowIdentifiers =
+            requiredRowIdentifiers.union(excludedRowIdentifiers)
+        let visibleTargetRowIdentifiers = Set(
+            app.descendants(matching: .any)
+                .matching(
+                    NSPredicate(
+                        format: "identifier IN %@",
+                        targetRowIdentifiers.sorted()
+                    )
+                )
+                .allElementsBoundByIndex
+                .map(\.identifier)
+        )
+        guard
+            requiredRowIdentifiers.isSubset(
+                of: visibleTargetRowIdentifiers
+            ),
+            visibleTargetRowIdentifiers.isDisjoint(
+                with: excludedRowIdentifiers
+            )
+        else {
+            XCTFail(
+                "Switcher App rows disagreed with the committed projection. "
+                    + "target=\(targetDescription) "
+                    + "requiredRows=\(requiredRowIdentifiers.sorted()) "
+                    + "excludedRows=\(excludedRowIdentifiers.sorted()) "
+                    + "visibleTargetRows=\(visibleTargetRowIdentifiers.sorted()) "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+        return true
+    }
+
+    func switcherAppRowIdentifier(_ bundleIdentifier: String) -> String {
+        Identifier.switcherAppPrefix
+            + bundleIdentifier.flowTabUITestAccessibilityIdentifierComponent
+    }
+
     func waitForSwitcherAppsSummary(
         _ diagnosticsSummaryElement: XCUIElement,
         toContain expectedEntry: String,
@@ -215,10 +378,37 @@ extension FlowTabUITests {
                 )
             } ?? []
         return FlowTabUITestSwitcherAppProjectionSnapshot(
+            applicationState: .runningForeground,
             identifier: diagnosticsSummaryElement.identifier,
             exists: exists,
             rawValue: rawValue,
             entries: entries
+        )
+    }
+
+    private func switcherAppProjectionSnapshot(
+        in app: XCUIApplication,
+        diagnosticsSummaryElement: XCUIElement
+    ) -> FlowTabUITestSwitcherAppProjectionSnapshot {
+        let applicationState = app.state
+        guard applicationState == .runningForeground else {
+            return FlowTabUITestSwitcherAppProjectionSnapshot(
+                applicationState: applicationState,
+                identifier: Identifier.switcherSummary,
+                exists: false,
+                rawValue: nil,
+                entries: []
+            )
+        }
+        let snapshot = switcherAppProjectionSnapshot(
+            diagnosticsSummaryElement
+        )
+        return FlowTabUITestSwitcherAppProjectionSnapshot(
+            applicationState: applicationState,
+            identifier: snapshot.identifier,
+            exists: snapshot.exists,
+            rawValue: snapshot.rawValue,
+            entries: snapshot.entries
         )
     }
 }

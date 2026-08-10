@@ -7,6 +7,25 @@ private enum FlowTabUITestSwitcherAppProjectionTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testSwitcherAppProjectionPolicyPreservesPostLaunchBound() {
+        XCTAssertEqual(
+            FlowTabUITestSwitcherAppProjectionPolicy.postLaunchWatchdog,
+            10
+        )
+        XCTAssertTrue(
+            FlowTabUITestSwitcherAppProjectionPolicy
+                .postLaunchWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSwitcherAppProjectionPolicy.postLaunchWatchdog,
+            0
+        )
+        XCTAssertEqual(
+            switcherAppRowIdentifier("com.flowtab.mock.browser"),
+            "flowtab.switcher.app.com-flowtab-mock-browser.id-5034d04b"
+        )
+    }
+
     func testSwitcherAppProjectionParsesBundleAndWindowCount() {
         let entry = FlowTabUITestSwitcherAppProjectionEntry(
             rawValue: "com.example.browser:2"
@@ -57,6 +76,96 @@ extension FlowTabUITests {
             order,
             ["register", "readback", "cancel"]
         )
+    }
+
+    func testSwitcherAppProjectionRequiresAtomicIncludedAndExcludedApps() {
+        let expectation =
+            FlowTabUITestSwitcherAppProjectionExpectation.bundleIdentifiers(
+                required: ["com.example.browser"],
+                excluded: ["com.example.mail"]
+            )
+
+        XCTAssertTrue(
+            expectation.isSatisfied(
+                by: switcherAppProjectionTestSnapshot(
+                    ["com.example.browser:2", "com.example.notes:1"]
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: switcherAppProjectionTestSnapshot(
+                    ["com.example.notes:1"]
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: switcherAppProjectionTestSnapshot(
+                    ["com.example.browser:2", "com.example.mail:1"]
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: switcherAppProjectionTestSnapshot(
+                    ["com.example.browser.backup:2"]
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: switcherAppProjectionTestSnapshot(
+                    ["com.example.browser:2"],
+                    applicationState: .runningBackground
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: switcherAppProjectionTestSnapshot(
+                    ["com.example.browser:2"],
+                    exists: false
+                )
+            )
+        )
+    }
+
+    func testSwitcherAppProjectionGatesPostLaunchResolution() {
+        let matching = switcherAppProjectionTestSnapshot(
+            ["com.example.browser:2"]
+        )
+        var triggerDidComplete = false
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var cancellationCount = 0
+        let owner = FlowTabUITestSwitcherAppProjectionObservationOwner(
+            expectation: .bundleIdentifiers(
+                required: ["com.example.browser"],
+                excluded: ["com.example.mail"]
+            ),
+            observationRegistration: { callback in
+                scheduledReadback = callback
+                return FlowTabUITestObservationCancellation {
+                    cancellationCount += 1
+                }
+            },
+            acceptsResolution: { triggerDidComplete },
+            readback: { matching }
+        )
+        owner.start()
+
+        XCTAssertNil(owner.resolvedEvidence)
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        triggerDidComplete = true
+        owner.requestReadback(source: .triggerReadback)
+
+        XCTAssertEqual(owner.resolvedEvidence?.source, .triggerReadback)
+        XCTAssertEqual(owner.resolvedEvidence?.value, matching)
+        XCTAssertEqual(cancellationCount, 1)
+        owner.cancel()
     }
 
     func testSwitcherAppProjectionWaitsForBundleEntry() {
@@ -203,11 +312,14 @@ extension FlowTabUITests {
         let owner =
             FlowTabUITestSwitcherAppProjectionObservationOwner(
                 expectation:
-                    .exactEntry("com.example.browser:2"),
+                    .bundleIdentifiers(
+                        required: ["com.example.browser"],
+                        excluded: ["com.example.mail"]
+                    ),
                 observationRegistration: nil,
                 readback: {
                     self.switcherAppProjectionTestSnapshot(
-                        ["com.example.browser:1"]
+                        ["com.example.mail:1"]
                     )
                 }
             )
@@ -228,23 +340,36 @@ extension FlowTabUITests {
         )
         XCTAssertTrue(
             owner.diagnosticSummary.contains(
-                "com.example.browser:1"
+                "com.example.mail:1"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "requiredBundleIDs=[\"com.example.browser\"]"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "excludedBundleIDs=[\"com.example.mail\"]"
             )
         )
     }
 
     private func switcherAppProjectionTestSnapshot(
-        _ rawEntries: [String]
+        _ rawEntries: [String],
+        applicationState: XCUIApplication.State = .runningForeground,
+        exists: Bool = true
     ) -> FlowTabUITestSwitcherAppProjectionSnapshot {
         FlowTabUITestSwitcherAppProjectionSnapshot(
+            applicationState: applicationState,
             identifier: "switcher-summary",
-            exists: true,
-            rawValue: rawEntries.joined(separator: "|"),
-            entries: rawEntries.map {
+            exists: exists,
+            rawValue: exists ? rawEntries.joined(separator: "|") : nil,
+            entries: exists ? rawEntries.map {
                 FlowTabUITestSwitcherAppProjectionEntry(
                     rawValue: $0
                 )
-            }
+            } : []
         )
     }
 }

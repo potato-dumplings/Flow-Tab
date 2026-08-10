@@ -217,15 +217,17 @@ extension FlowTabUITests {
         let switcherApp = makeApp(
             additionalArguments: appVisibilityRuntimeArguments(opensSwitcher: true)
         )
-        launchFlowTabUITestApplication(switcherApp)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(switcherApp, timeout: 10))
-        XCTAssertTrue(element(in: switcherApp, identifier: Identifier.switcherAppMockBrowser).waitForExistence(timeout: 8))
-        XCTAssertTrue(
-            waitForNonExistence(
-                element(in: switcherApp, identifier: Identifier.switcherAppMockMail),
-                timeout: 2
-            )
-        )
+        guard assertInitialSwitcherAppProjectionAfterLaunch(
+            in: switcherApp,
+            requiredBundleIdentifiers: ["com.flowtab.mock.browser"],
+            excludedBundleIdentifiers: ["com.flowtab.mock.mail"],
+            targetDescription: "hidden-App Switcher relaunch projection",
+            trigger: {
+                launchFlowTabUITestApplication(switcherApp)
+            }
+        ) else {
+            return
+        }
         let switcherTermination = terminateFlowTabUITestApplication(
             switcherApp,
             targetDescription: "app visibility switcher verification"
