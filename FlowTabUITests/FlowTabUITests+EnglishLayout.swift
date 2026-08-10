@@ -21,17 +21,25 @@ extension FlowTabUITests {
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
 
         openSettingsTab(in: app)
-        selectOption(in: app, controlIdentifier: Identifier.settingsAppearanceAppLanguage, optionIdentifier: "en")
-        assertValue(of: element(in: app, identifier: Identifier.settingsAppearanceAppLanguage), equals: "en")
-
-        let accessibilityButton = element(in: app, identifier: Identifier.settingsPermissionAccessibilityAction)
-        let screenCaptureButton = element(in: app, identifier: Identifier.settingsPermissionScreenCaptureAction)
-        XCTAssertTrue(accessibilityButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(screenCaptureButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(accessibilityButton.isHittable)
-        XCTAssertTrue(screenCaptureButton.isHittable)
-        XCTAssertLessThanOrEqual(accessibilityButton.frame.height, 36)
-        XCTAssertLessThanOrEqual(screenCaptureButton.frame.height, 36)
+        assertSettingsPermissionActionProjection(
+            in: app,
+            targetDescription: "English primary permission actions"
+        ) {
+            selectOption(
+                in: app,
+                controlIdentifier:
+                    Identifier.settingsAppearanceAppLanguage,
+                optionIdentifier: "en"
+            )
+            assertValue(
+                of: element(
+                    in: app,
+                    identifier:
+                        Identifier.settingsAppearanceAppLanguage
+                ),
+                equals: "en"
+            )
+        }
 
         openLogsTab(in: app)
         XCTAssertTrue(app.staticTexts["Start a 15-minute diagnostic session"].exists)
@@ -64,17 +72,29 @@ extension FlowTabUITests {
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
 
         openSettingsTab(in: app)
-        selectOption(in: app, controlIdentifier: Identifier.settingsAppearanceAppLanguage, optionIdentifier: "en")
-        assertValue(of: element(in: app, identifier: Identifier.settingsAppearanceAppLanguage), equals: "en")
-
-        let accessibilityButton = element(in: app, identifier: Identifier.settingsPermissionAccessibilityAction)
-        let screenCaptureButton = element(in: app, identifier: Identifier.settingsPermissionScreenCaptureAction)
-        XCTAssertTrue(accessibilityButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(screenCaptureButton.waitForExistence(timeout: 5))
-        XCTAssertEqual(accessibilityButton.label, "Manage Accessibility permission")
-        XCTAssertEqual(screenCaptureButton.label, "Manage Screen Recording permission")
-        XCTAssertLessThanOrEqual(accessibilityButton.frame.height, 36)
-        XCTAssertLessThanOrEqual(screenCaptureButton.frame.height, 36)
+        assertSettingsPermissionActionProjection(
+            in: app,
+            expectedAccessibilityLabel:
+                "Manage Accessibility permission",
+            expectedScreenCaptureLabel:
+                "Manage Screen Recording permission",
+            targetDescription: "English granted permission actions"
+        ) {
+            selectOption(
+                in: app,
+                controlIdentifier:
+                    Identifier.settingsAppearanceAppLanguage,
+                optionIdentifier: "en"
+            )
+            assertValue(
+                of: element(
+                    in: app,
+                    identifier:
+                        Identifier.settingsAppearanceAppLanguage
+                ),
+                equals: "en"
+            )
+        }
     }
 
     func testTerminalContentPreviewPermissionControlIsAbsent() throws {
