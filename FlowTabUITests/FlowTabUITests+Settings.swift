@@ -161,15 +161,17 @@ extension FlowTabUITests {
             maximumDarkLuminance
         )
 
-        selectOption(in: app, controlIdentifier: Identifier.settingsAppearanceAppLanguage, optionIdentifier: "en")
-        assertValue(of: element(in: app, identifier: Identifier.settingsAppearanceAppLanguage), equals: "en")
-        let pageSubtitle = app.staticTexts["Display, hotkeys, and permissions"]
-        XCTAssertTrue(pageSubtitle.waitForExistence(timeout: 5))
-        assertSettingsPageSubtitleIsVisible(pageSubtitle, below: app.staticTexts["Settings"])
-        XCTAssertTrue(app.staticTexts["Appearance"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Theme mode"].waitForExistence(timeout: 5))
-        XCTAssertTrue(
-            waitForNonExistence(app.staticTexts["基础显示设置、快捷键与权限"], timeout: 2)
+        guard let englishAppearance =
+            assertSettingsEnglishAppearanceProjectionAfterSelectingEnglish(
+                in: app,
+                targetDescription: "theme and language visible UI"
+            )
+        else {
+            return
+        }
+        assertSettingsPageSubtitleIsVisible(
+            englishAppearance.pageSubtitle,
+            below: englishAppearance.pageTitle
         )
     }
 
