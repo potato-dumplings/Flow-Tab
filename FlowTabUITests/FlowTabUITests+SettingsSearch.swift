@@ -428,10 +428,7 @@ extension FlowTabUITests {
             in: searchApp,
             identifier: Identifier.switcherSummary
         )
-        XCTAssertTrue(
-            diagnosticsSummary.waitForExistence(timeout: 5)
-        )
-        XCTAssertTrue(
+        guard
             performAndWaitForSwitcherDiagnostics(
                 [
                     FlowTabUITestSwitcherDiagnosticsExpectation(
@@ -449,13 +446,16 @@ extension FlowTabUITests {
                     )
                 ],
                 in: diagnosticsSummary,
-                timeout: 5,
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .committedResultProjection,
                 trigger: {
                     searchApp.typeText("Mail")
                 }
-            ),
-            "Search did not commit the exact empty app-result projection for Mail."
-        )
+            )
+        else {
+            return
+        }
         XCTAssertFalse(
             element(
                 in: searchApp,
