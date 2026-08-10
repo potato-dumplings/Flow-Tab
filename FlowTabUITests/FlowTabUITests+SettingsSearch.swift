@@ -5,6 +5,7 @@ private enum FlowTabUITestSettingsSearchWatchdogPolicy {
     static let committedResultProjection: TimeInterval = 8
     static let userTriggeredAppProjection: TimeInterval = 8
     static let applicationForeground: TimeInterval = 10
+    static let searchEnabledToggleProjection: TimeInterval = 5
 }
 
 extension FlowTabUITests {
@@ -51,6 +52,20 @@ extension FlowTabUITests {
                 .applicationForeground,
             0
         )
+        XCTAssertEqual(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .searchEnabledToggleProjection,
+            5
+        )
+        XCTAssertTrue(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .searchEnabledToggleProjection.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .searchEnabledToggleProjection,
+            0
+        )
     }
 
     func testSettingsSearchDisabledPreventsAutoSearchLaunchEntry() throws {
@@ -71,8 +86,10 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(firstLaunchApp)
         openSettingsTab(in: firstLaunchApp)
 
-        let searchEnabledToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsSearchEnabled)
-        XCTAssertTrue(searchEnabledToggle.waitForExistence(timeout: 5))
+        let searchEnabledToggle = requireSettingsSearchEnabledToggle(
+            in: firstLaunchApp,
+            scenario: "disabled initial launch"
+        )
         setToggle(searchEnabledToggle, to: false)
         XCTAssertFalse(toggleIsOn(searchEnabledToggle))
         let firstTermination = terminateFlowTabUITestApplication(
@@ -164,8 +181,10 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(firstLaunchApp)
         openSettingsTab(in: firstLaunchApp)
 
-        let searchEnabledToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsSearchEnabled)
-        XCTAssertTrue(searchEnabledToggle.waitForExistence(timeout: 5))
+        let searchEnabledToggle = requireSettingsSearchEnabledToggle(
+            in: firstLaunchApp,
+            scenario: "persisted default scope initial launch"
+        )
         setToggle(searchEnabledToggle, to: true)
 
         selectOption(in: firstLaunchApp, controlIdentifier: Identifier.settingsSearchDefaultScope, optionIdentifier: "window")
@@ -244,8 +263,10 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(firstLaunchApp)
         openSettingsTab(in: firstLaunchApp)
 
-        let searchEnabledToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsSearchEnabled)
-        XCTAssertTrue(searchEnabledToggle.waitForExistence(timeout: 5))
+        let searchEnabledToggle = requireSettingsSearchEnabledToggle(
+            in: firstLaunchApp,
+            scenario: "scope switching initial launch"
+        )
         setToggle(searchEnabledToggle, to: true)
 
         selectOption(in: firstLaunchApp, controlIdentifier: Identifier.settingsSearchDefaultScope, optionIdentifier: "app")
@@ -667,6 +688,47 @@ extension FlowTabUITests {
             observedBy: searchReadiness
         )
         return app
+    }
+
+    private func requireSettingsSearchEnabledToggle(
+        in app: XCUIApplication,
+        scenario: String
+    ) -> XCUIElement {
+        let toggle = element(
+            in: app,
+            identifier: Identifier.settingsSearchEnabled
+        )
+        let wasInitiallyPresent = toggle.exists
+        let waiterSatisfied = wasInitiallyPresent
+            || toggle.waitForExistence(
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .searchEnabledToggleProjection
+            )
+        let finalExists = toggle.exists
+        let finalElementType = finalExists
+            ? String(describing: toggle.elementType)
+            : "unavailable"
+        let finalHittable = finalExists
+            ? String(toggle.isHittable)
+            : "unavailable"
+        let finalValue = finalExists
+            ? String(describing: toggle.value)
+            : "unavailable"
+        XCTAssertTrue(
+            waiterSatisfied && finalExists,
+            "Settings Search enabled-toggle projection watchdog expired. "
+                + "scenario=\(scenario) "
+                + "expectedIdentifier=\(Identifier.settingsSearchEnabled) "
+                + "appState=\(String(describing: app.state)) "
+                + "initialExists=\(wasInitiallyPresent) "
+                + "waiterSatisfied=\(waiterSatisfied) "
+                + "finalExists=\(finalExists) "
+                + "finalElementType=\(finalElementType) "
+                + "finalHittable=\(finalHittable) "
+                + "finalValue=\(finalValue)"
+        )
+        return toggle
     }
 
     private func appVisibilityRuntimeArguments(
