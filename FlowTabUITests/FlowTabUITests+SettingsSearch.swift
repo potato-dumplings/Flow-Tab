@@ -4,7 +4,7 @@ import XCTest
 private enum FlowTabUITestSettingsSearchWatchdogPolicy {
     static let committedResultProjection: TimeInterval = 8
     static let userTriggeredAppProjection: TimeInterval = 8
-    static let userPathApplicationForeground: TimeInterval = 10
+    static let applicationForeground: TimeInterval = 10
 }
 
 extension FlowTabUITests {
@@ -39,16 +39,16 @@ extension FlowTabUITests {
         )
         XCTAssertEqual(
             FlowTabUITestSettingsSearchWatchdogPolicy
-                .userPathApplicationForeground,
+                .applicationForeground,
             10
         )
         XCTAssertTrue(
             FlowTabUITestSettingsSearchWatchdogPolicy
-                .userPathApplicationForeground.isFinite
+                .applicationForeground.isFinite
         )
         XCTAssertGreaterThan(
             FlowTabUITestSettingsSearchWatchdogPolicy
-                .userPathApplicationForeground,
+                .applicationForeground,
             0
         )
     }
@@ -266,7 +266,21 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        let becameForeground =
+            waitForFlowTabUITestApplicationToBecomeReady(
+                app,
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .applicationForeground,
+                traceLabel:
+                    "settings-search-permission-scope-readiness"
+            )
+        XCTAssertTrue(
+            becameForeground,
+            "Settings Search permission-scope application readiness "
+                + "watchdog expired. expectedState=runningForeground "
+                + "finalState=\(String(describing: app.state))"
+        )
         assertSettingsSearchWindowScopeUnavailable(in: app) {
             openSettingsTab(in: app)
         }
@@ -611,7 +625,7 @@ extension FlowTabUITests {
                 app,
                 timeout:
                     FlowTabUITestSettingsSearchWatchdogPolicy
-                        .userPathApplicationForeground,
+                        .applicationForeground,
                 traceLabel:
                     "settings-search-user-path-readiness"
             )
