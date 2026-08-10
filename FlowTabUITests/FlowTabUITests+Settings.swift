@@ -18,15 +18,21 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
+        guard let controls =
+            assertSettingsAppearanceControlsProjectionAfterNavigation(
+                in: app,
+                targetDescription: "Appearance toggle mutation",
+                trigger: {
+                    openSettingsTab(in: app)
+                }
+            )
+        else {
+            return
+        }
 
-        let showShortcutHintToggle = toggleElement(in: app, identifier: Identifier.settingsAppearanceShowShortcutHint)
-        let showInCommandTabToggle = toggleElement(in: app, identifier: Identifier.settingsAppearanceShowInCommandTab)
-        XCTAssertTrue(showShortcutHintToggle.waitForExistence(timeout: 5))
-        XCTAssertTrue(showInCommandTabToggle.waitForExistence(timeout: 5))
+        let showShortcutHintToggle = controls.shortcutHintToggle
+        let showInCommandTabToggle = controls.currentAppToggle
         XCTAssertFalse(toggleIsOn(showInCommandTabToggle))
-        XCTAssertTrue(app.staticTexts["像普通应用一样显示"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["关闭后，当前应用将仅作为菜单栏辅助应用运行。"].waitForExistence(timeout: 5))
 
         let targetShortcutHint = !toggleIsOn(showShortcutHintToggle)
         let targetShowInCommandTab = !toggleIsOn(showInCommandTabToggle)
