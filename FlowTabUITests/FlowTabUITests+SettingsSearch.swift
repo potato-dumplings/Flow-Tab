@@ -316,14 +316,6 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         openSettingsTab(in: app)
 
-        let manager = element(
-            in: app,
-            identifier: Identifier.settingsAppVisibilityManager
-        )
-        let manageButton = element(
-            in: app,
-            identifier: Identifier.settingsAppVisibilityManage
-        )
         guard assertSettingsAppVisibilityManagerProjectionAfterNavigation(
             in: app,
             targetDescription: "visible-state App Visibility manager"
@@ -331,15 +323,12 @@ extension FlowTabUITests {
             return
         }
 
-        let backButton = element(
+        guard assertSettingsAppVisibilityRootProjectionAfterBackNavigation(
             in: app,
-            identifier: Identifier.settingsAppVisibilityBack
-        )
-        XCTAssertTrue(backButton.waitForExistence(timeout: 6))
-        tapElement(backButton)
-
-        XCTAssertTrue(waitForNonExistence(manager, timeout: 6))
-        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
+            targetDescription: "visible-state Settings root"
+        ) else {
+            return
+        }
     }
 
     func testSettingsAppVisibilityHidesMockAppFromSwitcherAndSearch() throws {

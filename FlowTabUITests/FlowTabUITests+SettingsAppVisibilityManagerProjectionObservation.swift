@@ -33,24 +33,59 @@ struct FlowTabUITestSettingsAppVisibilityManagerProjectionSnapshot:
 struct FlowTabUITestSettingsAppVisibilityManagerProjectionExpectation:
     Equatable
 {
-    let expectedManagerTitle: String?
+    enum Target: Equatable {
+        case manager(expectedTitle: String?)
+        case settingsRoot
+    }
+
+    let target: Target
 
     init(expectedManagerTitle: String? = nil) {
-        self.expectedManagerTitle = expectedManagerTitle
+        target = .manager(expectedTitle: expectedManagerTitle)
+    }
+
+    private init(target: Target) {
+        self.target = target
+    }
+
+    static var settingsRoot: Self {
+        Self(target: .settingsRoot)
+    }
+
+    var diagnosticSummary: String {
+        switch target {
+        case let .manager(expectedTitle):
+            return "target=manager expectedManagerTitle="
+                + String(reflecting: expectedTitle)
+        case .settingsRoot:
+            return "target=settingsRoot"
+        }
     }
 
     func isSatisfied(
         by snapshot:
             FlowTabUITestSettingsAppVisibilityManagerProjectionSnapshot
     ) -> Bool {
-        snapshot.applicationState == .runningForeground
-            && snapshot.settingsContentExists
-            && !snapshot.manageActionExists
-            && snapshot.managerExists
-            && snapshot.backActionExists
-            && snapshot.backActionIsHittable
-            && (expectedManagerTitle == nil
-                || snapshot.expectedManagerTitleExists)
+        guard snapshot.applicationState == .runningForeground,
+              snapshot.settingsContentExists
+        else {
+            return false
+        }
+        switch target {
+        case let .manager(expectedTitle):
+            return !snapshot.manageActionExists
+                && snapshot.managerExists
+                && snapshot.backActionExists
+                && snapshot.backActionIsHittable
+                && (expectedTitle == nil
+                    || snapshot.expectedManagerTitleExists)
+        case .settingsRoot:
+            return snapshot.manageActionExists
+                && snapshot.manageActionIsHittable
+                && !snapshot.managerExists
+                && !snapshot.backActionExists
+                && !snapshot.backActionIsHittable
+        }
     }
 }
 
@@ -85,8 +120,8 @@ final class
                     && expectation.isSatisfied(by: $0)
             },
             describe: { snapshot in
-                "expectedManagerTitle="
-                    + "\(String(reflecting: expectation.expectedManagerTitle)) "
+                expectation.diagnosticSummary
+                    + " "
                     + "acceptsResolution=\(acceptsResolution()) "
                     + snapshot.diagnosticSummary
             }
@@ -235,6 +270,102 @@ extension FlowTabUITests {
         ) != nil else {
             XCTFail(
                 "App Visibility manager projection watchdog expired. "
+                    + "target=\(targetDescription) "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+        return true
+    }
+
+    @discardableResult
+    func assertSettingsAppVisibilityRootProjectionAfterBackNavigation(
+        in app: XCUIApplication,
+        targetDescription: String
+    ) -> Bool {
+        let elements =
+            settingsAppVisibilityManagerProjectionElements(
+                in: app,
+                expectedManagerTitle: nil
+            )
+        let deferredReadbacks =
+            FlowTabUITestDeferredConditionReadbackRegistration(
+                downstreamRegistration:
+                    FlowTabUITestConditionReadbackScheduler
+                        .mainRunLoopRegistration(
+                            cadence:
+                                FlowTabUITestConditionObservationPolicy
+                                    .xcuiReadbackCadence
+                        )
+            )
+        var backAttemptDidComplete = false
+        let owner =
+            FlowTabUITestSettingsAppVisibilityManagerProjectionObservationOwner(
+                expectation: .settingsRoot,
+                observationRegistration: { callback in
+                    deferredReadbacks.register(callback)
+                },
+                acceptsResolution: {
+                    backAttemptDidComplete
+                },
+                readback:
+                    settingsAppVisibilityManagerProjectionReadback(
+                        in: app,
+                        elements: elements
+                    )
+            )
+        owner.start()
+        defer {
+            owner.cancel()
+            deferredReadbacks.cancel()
+        }
+
+        guard let initialEvidence = owner.latestEvidence,
+              initialEvidence.source == .initialReadback,
+              FlowTabUITestSettingsAppVisibilityManagerProjectionExpectation()
+                .isSatisfied(by: initialEvidence.value)
+        else {
+            XCTFail(
+                "App Visibility Back navigation initial manager "
+                    + "projection was unavailable. "
+                    + "target=\(targetDescription) "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+
+        let backActionQuery = app.buttons.matching(
+            identifier: Identifier.settingsAppVisibilityBack
+        )
+        let triggerSucceeded = tapFirstHittable(
+            in: backActionQuery,
+            timeout:
+                FlowTabUITestSettingsAppVisibilityManagerProjectionPolicy
+                    .watchdog
+        )
+        backAttemptDidComplete = true
+        owner.requestReadback(source: .triggerReadback)
+        if owner.resolvedEvidence != nil {
+            return true
+        }
+        guard triggerSucceeded else {
+            XCTFail(
+                "App Visibility Back trigger watchdog expired. "
+                    + "target=\(targetDescription) "
+                    + "finalCandidateCount=\(backActionQuery.count) "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+
+        deferredReadbacks.activate()
+        guard owner.waitForResolution(
+            timeout:
+                FlowTabUITestSettingsAppVisibilityManagerProjectionPolicy
+                    .watchdog
+        ) != nil else {
+            XCTFail(
+                "App Visibility Settings-root projection watchdog expired. "
                     + "target=\(targetDescription) "
                     + owner.diagnosticSummary
             )
