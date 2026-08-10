@@ -447,23 +447,9 @@ extension FlowTabUITests {
         toggleElement(in: app, identifier: Identifier.permissionReminderSwitch)
     }
     func openSettingsTab(in app: XCUIApplication) {
-        let tabQuery = app.buttons.matching(
-            identifier: Identifier.settingsTabButton
-        )
-        let content = element(
+        _ = assertSidebarTabProjectionAfterNavigation(
             in: app,
-            identifier: Identifier.settingsTabContent
-        )
-        XCTAssertTrue(
-            tapFirstHittableAndWaitForExistence(
-                in: tabQuery,
-                content: content,
-                contentDescription: Identifier.settingsTabContent,
-                timeout: SupportWatchdog.tabNavigation
-            ),
-            "unmetCondition=settingsTabNavigation "
-                + "finalCandidateCount=\(tabQuery.count) "
-                + "finalExists=\(content.exists)"
+            target: .settings
         )
     }
     func openLogsTab(in app: XCUIApplication) {
