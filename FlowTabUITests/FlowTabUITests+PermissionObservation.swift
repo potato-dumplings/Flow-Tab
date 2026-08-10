@@ -455,6 +455,66 @@ extension FlowTabUITests {
         )
     }
 
+    @discardableResult
+    func assertInitialDeniedSettingsPermissionProjection(
+        in app: XCUIApplication,
+        trigger: () -> Void,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> Bool {
+        let accessibilityDeniedStatus =
+            app.staticTexts["辅助功能权限：未授权"]
+        let screenCaptureDeniedStatus =
+            app.staticTexts["屏幕录制权限：未授权"]
+        let accessibilityAction = element(
+            in: app,
+            identifier: Identifier.settingsPermissionAccessibilityAction
+        )
+        let screenCaptureAction = element(
+            in: app,
+            identifier: Identifier.settingsPermissionScreenCaptureAction
+        )
+        let observation = FlowTabUITestConditionObservationOwner(
+            observationRegistration:
+                FlowTabUITestConditionReadbackScheduler
+                    .mainRunLoopRegistration(
+                        cadence:
+                            FlowTabUITestConditionObservationPolicy
+                                .xcuiReadbackCadence
+                    ),
+            readback: {
+                FlowTabUITestSettingsPermissionInitialProjectionSnapshot(
+                    accessibilityDeniedStatusExists:
+                        accessibilityDeniedStatus.exists,
+                    screenCaptureDeniedStatusExists:
+                        screenCaptureDeniedStatus.exists,
+                    accessibilityActionExists: accessibilityAction.exists,
+                    screenCaptureActionExists: screenCaptureAction.exists
+                )
+            },
+            isSatisfied: \.isSatisfied,
+            describe: \.diagnosticSummary
+        )
+        observation.start()
+        defer { observation.cancel() }
+
+        trigger()
+        observation.requestReadback(source: .triggerReadback)
+        let evidence = observation.waitForResolution(
+            timeout:
+                FlowTabUITestPermissionObservationPolicy
+                    .settingsInitialProjectionWatchdog
+        )
+        XCTAssertNotNil(
+            evidence,
+            "Settings permission initial projection watchdog expired. "
+                + observation.diagnosticSummary,
+            file: file,
+            line: line
+        )
+        return evidence != nil
+    }
+
     func testSettingsPermissionRequestsConvergeFromTCCReadbackEvidence() throws {
         let stateURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(
@@ -482,10 +542,12 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        let accessibilityDeniedStatus =
-            app.staticTexts["辅助功能权限：未授权"]
-        let screenCaptureDeniedStatus =
-            app.staticTexts["屏幕录制权限：未授权"]
+        let initialProjectionSatisfied =
+            assertInitialDeniedSettingsPermissionProjection(in: app) {
+                openSettingsTab(in: app)
+            }
+        guard initialProjectionSatisfied else { return }
+
         let accessibilityAction = element(
             in: app,
             identifier: Identifier.settingsPermissionAccessibilityAction
@@ -494,48 +556,6 @@ extension FlowTabUITests {
             in: app,
             identifier: Identifier.settingsPermissionScreenCaptureAction
         )
-        let initialProjectionObservation =
-            FlowTabUITestConditionObservationOwner(
-                observationRegistration:
-                    FlowTabUITestConditionReadbackScheduler
-                        .mainRunLoopRegistration(
-                            cadence:
-                                FlowTabUITestConditionObservationPolicy
-                                    .xcuiReadbackCadence
-                        ),
-                readback: {
-                    FlowTabUITestSettingsPermissionInitialProjectionSnapshot(
-                        accessibilityDeniedStatusExists:
-                            accessibilityDeniedStatus.exists,
-                        screenCaptureDeniedStatusExists:
-                            screenCaptureDeniedStatus.exists,
-                        accessibilityActionExists:
-                            accessibilityAction.exists,
-                        screenCaptureActionExists:
-                            screenCaptureAction.exists
-                    )
-                },
-                isSatisfied: \.isSatisfied,
-                describe: \.diagnosticSummary
-            )
-        initialProjectionObservation.start()
-        defer { initialProjectionObservation.cancel() }
-        openSettingsTab(in: app)
-        initialProjectionObservation.requestReadback(
-            source: .triggerReadback
-        )
-        let initialProjectionEvidence =
-            initialProjectionObservation.waitForResolution(
-                timeout:
-                    FlowTabUITestPermissionObservationPolicy
-                        .settingsInitialProjectionWatchdog
-            )
-        XCTAssertNotNil(
-            initialProjectionEvidence,
-            "Settings permission initial projection watchdog expired. "
-                + initialProjectionObservation.diagnosticSummary
-        )
-        guard initialProjectionEvidence != nil else { return }
 
         let accessibilityGrantedStatus =
             app.staticTexts["辅助功能权限：已授权"]

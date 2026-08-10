@@ -282,14 +282,9 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
-
-        XCTAssertTrue(
-            element(in: app, identifier: Identifier.settingsPermissionAccessibilityAction).waitForExistence(timeout: 5)
-        )
-        XCTAssertTrue(
-            element(in: app, identifier: Identifier.settingsPermissionScreenCaptureAction).waitForExistence(timeout: 5)
-        )
+        assertInitialDeniedSettingsPermissionProjection(in: app) {
+            openSettingsTab(in: app)
+        }
     }
 
     func testSettingsSimplifiedChinesePermissionStatusesAreVisible() throws {
@@ -304,10 +299,9 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-        openSettingsTab(in: app)
-
-        XCTAssertTrue(app.staticTexts["辅助功能权限：未授权"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["屏幕录制权限：未授权"].waitForExistence(timeout: 5))
+        assertInitialDeniedSettingsPermissionProjection(in: app) {
+            openSettingsTab(in: app)
+        }
     }
 
     func testSettingsHotkeySelectionsPersistAcrossRelaunch() throws {
