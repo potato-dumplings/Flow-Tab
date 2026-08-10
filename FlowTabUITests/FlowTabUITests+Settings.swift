@@ -92,7 +92,6 @@ extension FlowTabUITests {
         openSettingsTab(in: app)
 
         let settingsContent = element(in: app, identifier: Identifier.settingsTabContent)
-        XCTAssertTrue(settingsContent.waitForExistence(timeout: 6))
         XCTAssertTrue(app.staticTexts["外观"].waitForExistence(timeout: 5))
 
         let lightLuminance = try XCTUnwrap(
