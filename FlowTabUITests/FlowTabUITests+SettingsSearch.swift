@@ -4,6 +4,7 @@ import XCTest
 private enum FlowTabUITestSettingsSearchWatchdogPolicy {
     static let committedResultProjection: TimeInterval = 8
     static let userTriggeredAppProjection: TimeInterval = 8
+    static let userPathApplicationForeground: TimeInterval = 10
 }
 
 extension FlowTabUITests {
@@ -34,6 +35,20 @@ extension FlowTabUITests {
         XCTAssertGreaterThan(
             FlowTabUITestSettingsSearchWatchdogPolicy
                 .userTriggeredAppProjection,
+            0
+        )
+        XCTAssertEqual(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .userPathApplicationForeground,
+            10
+        )
+        XCTAssertTrue(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .userPathApplicationForeground.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .userPathApplicationForeground,
             0
         )
     }
@@ -591,7 +606,21 @@ extension FlowTabUITests {
                     .applicationEvidenceLaunchArguments
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        let becameForeground =
+            waitForFlowTabUITestApplicationToBecomeReady(
+                app,
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .userPathApplicationForeground,
+                traceLabel:
+                    "settings-search-user-path-readiness"
+            )
+        XCTAssertTrue(
+            becameForeground,
+            "Settings Search user-path application readiness "
+                + "watchdog expired. expectedState=runningForeground "
+                + "finalState=\(String(describing: app.state))"
+        )
         XCTAssertTrue(
             assertInitialSwitcherAppProjectionAfterLaunch(
                 in: app,
