@@ -146,18 +146,20 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         openSettingsTab(in: app)
 
-        let manageButton = element(
-            in: app,
-            identifier: Identifier.settingsAppVisibilityManage
-        )
-        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
-        tapElement(manageButton)
-
         let manager = element(
             in: app,
             identifier: Identifier.settingsAppVisibilityManager
         )
-        XCTAssertTrue(manager.waitForExistence(timeout: 6))
+        let manageButton = element(
+            in: app,
+            identifier: Identifier.settingsAppVisibilityManage
+        )
+        guard assertSettingsAppVisibilityManagerProjectionAfterNavigation(
+            in: app,
+            targetDescription: "visible-state App Visibility manager"
+        ) else {
+            return
+        }
 
         let backButton = element(
             in: app,

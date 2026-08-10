@@ -45,12 +45,13 @@ extension FlowTabUITests {
         XCTAssertTrue(app.staticTexts["Start a 15-minute diagnostic session"].exists)
 
         openSettingsTab(in: app)
-        let manageButton = element(in: app, identifier: Identifier.settingsAppVisibilityManage)
-        XCTAssertTrue(manageButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(manageButton.isHittable)
-        manageButton.click()
-        XCTAssertTrue(element(in: app, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
-        XCTAssertTrue(app.staticTexts["App Visibility"].waitForExistence(timeout: 5))
+        guard assertSettingsAppVisibilityManagerProjectionAfterNavigation(
+            in: app,
+            expectedManagerTitle: "App Visibility",
+            targetDescription: "English primary App Visibility manager"
+        ) else {
+            return
+        }
 
         postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.search, traceLabel: "english-layout.search")
         XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
