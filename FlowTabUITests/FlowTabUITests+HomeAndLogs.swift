@@ -30,14 +30,14 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
 
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
-
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsTabButton), timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.logsTabContent).waitForExistence(timeout: 5))
-
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.settingsTabButton), timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.settingsTabContent).waitForExistence(timeout: 5))
+        for target in FlowTabUITestSidebarTabProjectionTarget.allCases {
+            guard assertSidebarTabProjectionAfterNavigation(
+                in: app,
+                target: target
+            ) else {
+                return
+            }
+        }
     }
 
     func testStatusItemReopensLastSelectedTabAfterWindowClose() throws {
