@@ -403,7 +403,23 @@ extension FlowTabUITests {
         let searchReadiness =
             prepareInitialFlowTabSearchInputReadiness()
         launchFlowTabUITestApplication(searchApp)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(searchApp, timeout: 10))
+        let becameForeground =
+            waitForFlowTabUITestApplicationToBecomeReady(
+                searchApp,
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .applicationForeground,
+                traceLabel:
+                    "settings-app-visibility-hidden-search-readiness"
+            )
+        guard becameForeground else {
+            XCTFail(
+                "Hidden-App Search application readiness watchdog "
+                    + "expired. expectedState=runningForeground "
+                    + "finalState=\(String(describing: searchApp.state))"
+            )
+            return
+        }
         _ = requireInitialFlowTabSearchInput(
             in: searchApp,
             observedBy: searchReadiness
