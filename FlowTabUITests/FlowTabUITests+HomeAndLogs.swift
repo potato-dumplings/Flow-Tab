@@ -714,15 +714,14 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        openLogsTab(in: app)
-
-        let openDirectoryButton = app.buttons[Identifier.logsOpenDirectoryButton]
-        XCTAssertTrue(openDirectoryButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(openDirectoryButton.isHittable)
-
-        let clearLogsButton = app.buttons[Identifier.logsClearButton]
-        XCTAssertTrue(clearLogsButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(clearLogsButton.isHittable)
+        let didResolveLogsActions =
+            assertLogsActionProjectionAfterNavigation(
+                in: app,
+                targetDescription: "logs-action-buttons"
+            )
+        guard didResolveLogsActions else {
+            return
+        }
     }
 
     private func configuredHomeWindowRecencyWorkflow() throws -> SpaceFixtureResolvedWorkflow {
