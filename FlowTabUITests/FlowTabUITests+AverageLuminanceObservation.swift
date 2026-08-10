@@ -2,6 +2,10 @@ import AppKit
 import Foundation
 import XCTest
 
+enum FlowTabUITestAverageLuminanceObservationPolicy {
+    static let settingsThemeTransitionWatchdog: TimeInterval = 5
+}
+
 struct FlowTabUITestAverageLuminanceSnapshot: Equatable {
     let identifier: String
     let exists: Bool
@@ -91,7 +95,7 @@ extension FlowTabUITests {
     func performAndWaitForAverageLuminance(
         of element: XCUIElement,
         expectedDescription: String,
-        timeout: TimeInterval,
+        watchdog: TimeInterval,
         trigger: () -> Void,
         matching predicate: @escaping (CGFloat) -> Bool
     ) -> CGFloat? {
@@ -118,7 +122,7 @@ extension FlowTabUITests {
 
         guard
             let evidence = owner.waitForResolution(
-                timeout: timeout
+                timeout: watchdog
             )
         else {
             XCTFail(

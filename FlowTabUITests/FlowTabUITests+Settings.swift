@@ -108,12 +108,15 @@ extension FlowTabUITests {
         }
 
         let settingsContent = element(in: app, identifier: Identifier.settingsTabContent)
+        let themeTransitionWatchdog =
+            FlowTabUITestAverageLuminanceObservationPolicy
+                .settingsThemeTransitionWatchdog
 
         let lightLuminance = try XCTUnwrap(
             performAndWaitForAverageLuminance(
                 of: settingsContent,
                 expectedDescription: "greater than 0.45",
-                timeout: 5,
+                watchdog: themeTransitionWatchdog,
                 trigger: {
                     self.selectOption(
                         in: app,
@@ -142,7 +145,7 @@ extension FlowTabUITests {
                 of: settingsContent,
                 expectedDescription:
                     "less than \(maximumDarkLuminance)",
-                timeout: 5,
+                watchdog: themeTransitionWatchdog,
                 trigger: {
                     self.selectOption(
                         in: app,

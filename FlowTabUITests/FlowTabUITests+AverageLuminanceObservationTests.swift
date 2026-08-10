@@ -7,6 +7,15 @@ private enum FlowTabUITestAverageLuminanceTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testAverageLuminancePolicyUsesNamedThemeTransitionWatchdog() {
+        let watchdog =
+            FlowTabUITestAverageLuminanceObservationPolicy
+                .settingsThemeTransitionWatchdog
+        XCTAssertEqual(watchdog, 5)
+        XCTAssertTrue(watchdog.isFinite)
+        XCTAssertGreaterThan(watchdog, 0)
+    }
+
     func testAverageLuminanceObserverAcceptsMatchingInitialReadback() {
         var order: [String] = []
         let owner =
