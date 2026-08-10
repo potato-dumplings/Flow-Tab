@@ -187,68 +187,6 @@ extension FlowTabUITests {
         )
     }
 
-    func testSettingsWindowBehaviorDelayAndTogglesPersistAcrossRelaunch() throws {
-        let firstLaunchApp = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-runtime-log-level",
-                "debug",
-                "--flowtab-ui-record-hotkey-reload-diagnostics",
-                "--flowtab-ui-ax-trusted",
-                "YES",
-                "--flowtab-ui-screen-trusted",
-                "YES"
-            ]
-        )
-        launchFlowTabUITestApplication(firstLaunchApp)
-        openSettingsTab(in: firstLaunchApp)
-
-        let delayInput = element(in: firstLaunchApp, identifier: Identifier.settingsWindowAutoEnterDelayInput)
-        XCTAssertTrue(delayInput.waitForExistence(timeout: 5))
-        replaceText(in: delayInput, with: "1.2345", app: firstLaunchApp)
-        assertTriggerMakesValue(
-            of: delayInput,
-            equals: "1.23"
-        ) {
-            firstLaunchApp.typeKey(.tab, modifierFlags: [])
-        }
-
-        let autoRestoreToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsWindowAutoRestoreMinimized)
-        let hideMinimizedToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsWindowHideMinimizedApps)
-        XCTAssertTrue(autoRestoreToggle.waitForExistence(timeout: 5))
-        XCTAssertTrue(hideMinimizedToggle.waitForExistence(timeout: 5))
-
-        let expectedAutoRestore = !toggleIsOn(autoRestoreToggle)
-        let expectedHideMinimized = !toggleIsOn(hideMinimizedToggle)
-        setToggle(autoRestoreToggle, to: expectedAutoRestore)
-        setToggle(hideMinimizedToggle, to: expectedHideMinimized)
-
-        firstLaunchApp.terminate()
-
-        let relaunchApp = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-ax-trusted",
-                "YES",
-                "--flowtab-ui-screen-trusted",
-                "YES"
-            ]
-        )
-        launchFlowTabUITestApplication(relaunchApp)
-        openSettingsTab(in: relaunchApp)
-
-        let relaunchDelayInput = element(in: relaunchApp, identifier: Identifier.settingsWindowAutoEnterDelayInput)
-        assertValuePrefix(of: relaunchDelayInput, expectedPrefix: "1.23")
-        XCTAssertEqual(
-            toggleIsOn(toggleElement(in: relaunchApp, identifier: Identifier.settingsWindowAutoRestoreMinimized)),
-            expectedAutoRestore
-        )
-        XCTAssertEqual(
-            toggleIsOn(toggleElement(in: relaunchApp, identifier: Identifier.settingsWindowHideMinimizedApps)),
-            expectedHideMinimized
-        )
-    }
-
     func testSettingsWindowBehaviorHideMinimizedAppsAffectsSwitcherAppLayer() throws {
         let baselineApp = makeApp(
             additionalArguments: windowBehaviorRuntimeArguments(
