@@ -124,6 +124,157 @@ extension FlowTabUITests {
         )
     }
 
+    func testLogsRelaunchProjectionExpectationRequiresLoadedSeedlessState() {
+        XCTAssertEqual(
+            FlowTabUITestLogsClearProjectionObservationPolicy
+                .relaunchProjectionWatchdog,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestLogsClearProjectionObservationPolicy
+                .relaunchProjectionWatchdog.isFinite
+        )
+        XCTAssertGreaterThanOrEqual(
+            FlowTabUITestLogsClearProjectionObservationPolicy
+                .relaunchProjectionWatchdog,
+            FlowTabUITestLogsClearProjectionObservationPolicy
+                .projectionWatchdog
+        )
+
+        let expectation =
+            FlowTabUITestLogsClearProjectionExpectation
+                .reloadedWithoutSeededRows(
+                    selectedLevel: "DEBUG"
+                )
+        let loadedLines = logsClearProjectionTestSnapshot(
+            isCleared: false,
+            selectedLevel: "DEBUG"
+        )
+        let loadedEmpty = logsClearProjectionTestSnapshot(
+            isCleared: true,
+            selectedLevel: "DEBUG"
+        )
+
+        XCTAssertTrue(expectation.isSatisfied(by: loadedLines))
+        XCTAssertTrue(expectation.isSatisfied(by: loadedEmpty))
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: logsClearProjectionTestSnapshot(
+                    isCleared: true,
+                    applicationState: .notRunning,
+                    selectedLevel: "DEBUG"
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: logsClearProjectionTestSnapshot(
+                    isCleared: true,
+                    emptyHintExists: false,
+                    selectedLevel: "DEBUG"
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: logsClearProjectionTestSnapshot(
+                    isCleared: false,
+                    emptyHintExists: true,
+                    selectedLevel: "DEBUG"
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: logsClearProjectionTestSnapshot(
+                    isCleared: false,
+                    selectedLevel: "DEBUG",
+                    rowIdentifiers: ["warn"]
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: logsClearProjectionTestSnapshot(
+                    isCleared: false,
+                    selectedLevel: "WARN"
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: logsClearProjectionTestSnapshot(
+                    isCleared: false,
+                    clearButtonIsHittable: false,
+                    selectedLevel: "DEBUG"
+                )
+            )
+        )
+    }
+
+    func testLogsRelaunchProjectionOwnerUsesPrelaunchEvidence() {
+        let expectation =
+            FlowTabUITestLogsClearProjectionExpectation
+                .reloadedWithoutSeededRows(
+                    selectedLevel: "DEBUG"
+                )
+        let matching = logsClearProjectionTestSnapshot(
+            isCleared: false,
+            selectedLevel: "DEBUG"
+        )
+        var snapshot = logsClearProjectionTestSnapshot(
+            isCleared: true,
+            applicationState: .notRunning,
+            selectedLevel: "DEBUG"
+        )
+        var triggerDidComplete = false
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var cancellationCount = 0
+        let owner =
+            FlowTabUITestLogsClearProjectionObservationOwner(
+                expectation: expectation,
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {
+                        cancellationCount += 1
+                    }
+                },
+                acceptsResolution: { triggerDidComplete },
+                readback: { snapshot }
+            )
+        owner.start()
+
+        XCTAssertEqual(owner.latestEvidence?.source, .initialReadback)
+        XCTAssertTrue(
+            owner.latestEvidence?.value.isNotRunningBaseline
+                == true
+        )
+        XCTAssertNil(owner.resolvedEvidence)
+
+        triggerDidComplete = true
+        snapshot = logsClearProjectionTestSnapshot(
+            isCleared: true,
+            emptyHintExists: false,
+            selectedLevel: "DEBUG"
+        )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = matching
+        owner.requestReadback(source: .triggerReadback)
+        let evidence = owner.waitForResolution(
+            timeout:
+                FlowTabUITestLogsClearProjectionTestPolicy
+                    .watchdog
+        )
+
+        XCTAssertEqual(evidence?.source, .triggerReadback)
+        XCTAssertEqual(evidence?.value, matching)
+        XCTAssertEqual(cancellationCount, 1)
+        owner.cancel()
+    }
+
     func testLogsClearProjectionObserverRequiresPostTriggerEvidence() {
         let expectation =
             FlowTabUITestLogsClearProjectionExpectation.cleared(
@@ -311,7 +462,19 @@ extension FlowTabUITests {
         selectedLevel: String = "WARN",
         rowIdentifiers: [String] = []
     ) -> FlowTabUITestLogsClearProjectionSnapshot {
-        FlowTabUITestLogsClearProjectionSnapshot(
+        guard applicationState == .runningForeground else {
+            return FlowTabUITestLogsClearProjectionSnapshot(
+                applicationState: applicationState,
+                logsContentExists: false,
+                clearButtonExists: false,
+                clearButtonIsHittable: false,
+                linesContainerExists: false,
+                emptyHintExists: false,
+                selectedLevel: nil,
+                seededRowIdentifiers: []
+            )
+        }
+        return FlowTabUITestLogsClearProjectionSnapshot(
             applicationState: applicationState,
             logsContentExists: logsContentExists,
             clearButtonExists: clearButtonExists,

@@ -577,7 +577,11 @@ extension FlowTabUITests {
         let clearedDiskContents = runtimeLogContents()
         XCTAssertTrue(persistedFingerprints.allSatisfy { !clearedDiskContents.contains($0) })
 
-        app.terminate()
+        let sourceTermination = terminateFlowTabUITestApplication(
+            app,
+            targetDescription: "logs-clear-persistence-source"
+        )
+        XCTAssertTrue(sourceTermination.isSatisfied, sourceTermination.diagnosticSummary)
         let relaunchedApp = makeApp(
             additionalArguments: [
                 "--flowtab-ui-runtime-log-level",
@@ -586,18 +590,13 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        launchFlowTabUITestApplication(relaunchedApp)
-        openLogsTab(in: relaunchedApp)
-
-        for expectedSeededLog in expectedSeededLogs {
-            XCTAssertTrue(
-                waitForNonExistence(
-                    relaunchedApp.descendants(matching: .any)
-                        .matching(identifier: expectedSeededLog.identifier)
-                        .firstMatch,
-                    timeout: 3
-                )
-            )
+        assertLogsClearPersistenceAfterRelaunch(
+            in: relaunchedApp,
+            targetDescription: "seeded-logs-cleared-after-relaunch",
+            selectedLevel: "DEBUG"
+        ) {
+            launchFlowTabUITestApplication(relaunchedApp)
+            openLogsTab(in: relaunchedApp)
         }
         let relaunchedDiskContents = runtimeLogContents()
         XCTAssertTrue(persistedFingerprints.allSatisfy { !relaunchedDiskContents.contains($0) })
