@@ -76,6 +76,8 @@
 		A44300083D4B000100B0D737 /* FlowTabUITests+LogsDiagnosticSessionObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44300073D4B000100B0D737 /* FlowTabUITests+LogsDiagnosticSessionObservationTests.swift */; };
 		A44300123D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44300113D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservation.swift */; };
 		A44300143D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44300133D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservationTests.swift */; };
+		A44300163D4B000100B0D737 /* FlowTabUITests+LogsRuntimeDeliveryObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44300153D4B000100B0D737 /* FlowTabUITests+LogsRuntimeDeliveryObservation.swift */; };
+		A44300183D4B000100B0D737 /* FlowTabUITests+LogsRuntimeDeliveryObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44300173D4B000100B0D737 /* FlowTabUITests+LogsRuntimeDeliveryObservationTests.swift */; };
 		A44400023D4C000100B0D737 /* FlowTabUITests+RuntimeLogFileObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44400013D4C000100B0D737 /* FlowTabUITests+RuntimeLogFileObservation.swift */; };
 		A44400043D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44400033D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservation.swift */; };
 		A44400063D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44400053D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservationTests.swift */; };
@@ -924,6 +926,8 @@
 		A44300073D4B000100B0D737 /* FlowTabUITests+LogsDiagnosticSessionObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+LogsDiagnosticSessionObservationTests.swift"; sourceTree = "<group>"; };
 		A44300113D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+LogsClearProjectionObservation.swift"; sourceTree = "<group>"; };
 		A44300133D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+LogsClearProjectionObservationTests.swift"; sourceTree = "<group>"; };
+		A44300153D4B000100B0D737 /* FlowTabUITests+LogsRuntimeDeliveryObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+LogsRuntimeDeliveryObservation.swift"; sourceTree = "<group>"; };
+		A44300173D4B000100B0D737 /* FlowTabUITests+LogsRuntimeDeliveryObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+LogsRuntimeDeliveryObservationTests.swift"; sourceTree = "<group>"; };
 		A44400013D4C000100B0D737 /* FlowTabUITests+RuntimeLogFileObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+RuntimeLogFileObservation.swift"; sourceTree = "<group>"; };
 		A44400033D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+RuntimeLogObservation.swift"; sourceTree = "<group>"; };
 		A44400053D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+RuntimeLogObservationTests.swift"; sourceTree = "<group>"; };
@@ -1336,6 +1340,8 @@
 				A44300073D4B000100B0D737 /* FlowTabUITests+LogsDiagnosticSessionObservationTests.swift */,
 				A44300113D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservation.swift */,
 				A44300133D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservationTests.swift */,
+				A44300153D4B000100B0D737 /* FlowTabUITests+LogsRuntimeDeliveryObservation.swift */,
+				A44300173D4B000100B0D737 /* FlowTabUITests+LogsRuntimeDeliveryObservationTests.swift */,
 				A44400013D4C000100B0D737 /* FlowTabUITests+RuntimeLogFileObservation.swift */,
 				A44400033D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservation.swift */,
 				A44400053D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservationTests.swift */,
@@ -2387,6 +2393,8 @@
 				A44300083D4B000100B0D737 /* FlowTabUITests+LogsDiagnosticSessionObservationTests.swift in Sources */,
 				A44300123D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservation.swift in Sources */,
 				A44300143D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservationTests.swift in Sources */,
+				A44300163D4B000100B0D737 /* FlowTabUITests+LogsRuntimeDeliveryObservation.swift in Sources */,
+				A44300183D4B000100B0D737 /* FlowTabUITests+LogsRuntimeDeliveryObservationTests.swift in Sources */,
 				A44400023D4C000100B0D737 /* FlowTabUITests+RuntimeLogFileObservation.swift in Sources */,
 				A44400043D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservation.swift in Sources */,
 				A44400063D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservationTests.swift in Sources */,

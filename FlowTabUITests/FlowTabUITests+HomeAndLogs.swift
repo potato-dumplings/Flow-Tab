@@ -687,16 +687,17 @@ extension FlowTabUITests {
 
         let command = FlowTabUITestSwitcherCommand.runtimeLogProbe
         let expectedMarker = "runtime log observation probe"
-        let deliveredLogLine = app.staticTexts
-            .matching(NSPredicate(format: "label CONTAINS %@", expectedMarker))
-            .firstMatch
-
-        postFlowTabUITestSwitcherCommand(
-            command,
-            traceLabel: "logs.live-update"
-        )
-
-        XCTAssertTrue(deliveredLogLine.waitForExistence(timeout: 5))
+        assertLogsRuntimeDelivery(
+            in: app,
+            targetDescription: "runtime-log-probe",
+            selectedLevel: "INFO",
+            marker: expectedMarker
+        ) {
+            postFlowTabUITestSwitcherCommand(
+                command,
+                traceLabel: "logs.live-update"
+            )
+        }
     }
 
     func testLogsTabShowsActionButtons() throws {
