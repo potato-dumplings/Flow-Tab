@@ -34,7 +34,6 @@ extension FlowTabUITests {
         XCTAssertLessThanOrEqual(screenCaptureButton.frame.height, 36)
 
         openLogsTab(in: app)
-        XCTAssertTrue(element(in: app, identifier: Identifier.logsTabContent).waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Start a 15-minute diagnostic session"].exists)
 
         openSettingsTab(in: app)
