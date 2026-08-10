@@ -467,27 +467,9 @@ extension FlowTabUITests {
         )
     }
     func openLogsTab(in app: XCUIApplication) {
-        let tabQuery = app.buttons.matching(
-            identifier: Identifier.logsTabButton
-        )
-        XCTAssertTrue(
-            tapFirstHittable(
-                in: tabQuery,
-                timeout: SupportWatchdog.tabNavigation
-            ),
-            "unmetCondition=logsTabHittable "
-                + "finalCandidateCount=\(tabQuery.count)"
-        )
-        let content = element(
+        _ = assertSidebarTabProjectionAfterNavigation(
             in: app,
-            identifier: Identifier.logsTabContent
-        )
-        XCTAssertTrue(
-            content.waitForExistence(
-                timeout: SupportWatchdog.tabNavigation
-            ),
-            "unmetCondition=logsTabContentExists "
-                + "finalExists=\(content.exists)"
+            target: .logs
         )
     }
     func element(in app: XCUIApplication, identifier: String) -> XCUIElement {
