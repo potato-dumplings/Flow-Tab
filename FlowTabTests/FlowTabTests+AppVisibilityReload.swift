@@ -59,6 +59,46 @@ extension FlowTabTests {
         XCTAssertEqual(observedGenerations, [0, 1, 2])
     }
 
+    @MainActor
+    func testAppVisibilityFilterProjectionGenerationTracksCommittedChanges() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
+        let model = AppVisibilityManagerModel(userDefaults: userDefaults)
+        var observedFilters: [AppVisibilityManagerModel.Filter] = []
+        var observedGenerations: [UInt64] = []
+        let filterObservation = model.$filter.sink {
+            observedFilters.append($0)
+        }
+        let generationObservation = model.$filterProjectionGeneration.sink {
+            observedGenerations.append($0)
+        }
+        defer {
+            filterObservation.cancel()
+            generationObservation.cancel()
+        }
+
+        XCTAssertEqual(
+            AppVisibilityFilterProjectionAccessibility.identifierPrefix,
+            "flowtab.settings.app-visibility.filter-projection."
+        )
+        XCTAssertEqual(
+            AppVisibilityFilterProjectionAccessibility.identifier(
+                filterRawValue: "all",
+                generation: 0
+            ),
+            "flowtab.settings.app-visibility.filter-projection.all.generation.0"
+        )
+
+        model.updateFilter(.hidden)
+        model.updateFilter(.hidden)
+        model.updateFilter(.running)
+
+        XCTAssertEqual(model.filter, .running)
+        XCTAssertEqual(model.filterProjectionGeneration, 2)
+        XCTAssertEqual(observedFilters, [.all, .hidden, .running])
+        XCTAssertEqual(observedGenerations, [0, 1, 2])
+    }
+
     func testAppVisibilityReloadWatchdogPolicyPreservesEventDeliveryBound() {
         let eventDelivery =
             AppVisibilityReloadWatchdogPolicy.eventDelivery
@@ -82,7 +122,7 @@ extension FlowTabTests {
 
         await withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
             let model = AppVisibilityManagerModel(userDefaults: userDefaults)
-            model.filter = .hidden
+            model.updateFilter(.hidden)
             let reloadCompleted = expectation(
                 description:
                     "unmetCondition=hiddenAppInventoryLoadingTransitionCompleted expectedVisibleAppIDs=\(missingAppID)"

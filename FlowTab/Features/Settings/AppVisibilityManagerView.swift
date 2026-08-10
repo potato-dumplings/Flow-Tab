@@ -139,13 +139,19 @@ struct AppVisibilityManagerView: View {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .stroke(borderColor, lineWidth: 1)
         )
-        .accessibilityIdentifier("flowtab.settings.app-visibility.filter")
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(
+            AppVisibilityFilterProjectionAccessibility.identifier(
+                filterRawValue: model.filter.rawValue,
+                generation: model.filterProjectionGeneration
+            )
+        )
     }
 
     private func filterButton(_ filter: AppVisibilityManagerModel.Filter) -> some View {
         let isSelected = model.filter == filter
         return Button {
-            model.filter = filter
+            model.updateFilter(filter)
         } label: {
             Text(filter.title(language: appLanguage))
                 .font(.system(size: 12, weight: isSelected ? .medium : .regular))

@@ -80,6 +80,10 @@ final class FlowTabUITests: XCTestCase {
         static let settingsAppVisibilityQueryProjectionPrefix =
             "flowtab.settings.app-visibility.list.query-generation."
         static let settingsAppVisibilityFilterHidden = "flowtab.settings.app-visibility.filter.hidden"
+        static let settingsAppVisibilityFilterProjectionPrefix =
+            "flowtab.settings.app-visibility.filter-projection."
+        static let settingsAppVisibilityHiddenFilterProjectionPrefix =
+            "flowtab.settings.app-visibility.filter-projection.hidden.generation."
         static let settingsAppVisibilityShowToggle = "flowtab.settings.app-visibility.show-toggle"
         static let settingsAppVisibilityCurrentApp =
             "flowtab.settings.app-visibility.app.\(FlowTabUITestAppIdentity.configured().bundleIdentifier.flowTabUITestAccessibilityIdentifierComponent)"

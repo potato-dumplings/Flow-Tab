@@ -331,10 +331,15 @@ extension FlowTabUITests {
             return
         }
 
-        tapAppVisibilityHiddenFilter(in: app)
+        guard assertSettingsAppVisibilityHiddenFilterProjection(
+            targetRowIdentifier: Identifier.settingsAppVisibilityCurrentApp,
+            in: app,
+            targetDescription: "current-App Hidden filter projection"
+        ) else {
+            return
+        }
 
         let currentAppRow = element(in: app, identifier: Identifier.settingsAppVisibilityCurrentApp)
-        XCTAssertTrue(currentAppRow.waitForExistence(timeout: 6))
         tapElement(currentAppRow)
         XCTAssertFalse(toggleIsOn(appVisibilityShowToggle(in: app)))
     }
@@ -385,10 +390,15 @@ extension FlowTabUITests {
             return
         }
 
-        tapAppVisibilityHiddenFilter(in: staleInventoryApp)
+        guard assertSettingsAppVisibilityHiddenFilterProjection(
+            targetRowIdentifier: Identifier.settingsAppVisibilityMockMail,
+            in: staleInventoryApp,
+            targetDescription: "stale hidden-App filter projection"
+        ) else {
+            return
+        }
 
         let staleHiddenRow = element(in: staleInventoryApp, identifier: Identifier.settingsAppVisibilityMockMail)
-        XCTAssertTrue(staleHiddenRow.waitForExistence(timeout: 6))
         tapElement(staleHiddenRow)
         XCTAssertFalse(toggleIsOn(appVisibilityShowToggle(in: staleInventoryApp)))
     }
@@ -476,21 +486,4 @@ extension FlowTabUITests {
         return checkBox
     }
 
-    private func tapAppVisibilityHiddenFilter(in app: XCUIApplication) {
-        let hiddenSegment = element(in: app, identifier: Identifier.settingsAppVisibilityFilterHidden)
-        if hiddenSegment.waitForExistence(timeout: 3) {
-            tapElement(hiddenSegment)
-            return
-        }
-
-        let hiddenChinese = app.buttons["已隐藏"].firstMatch
-        if hiddenChinese.waitForExistence(timeout: 2) {
-            tapElement(hiddenChinese)
-            return
-        }
-
-        let hiddenEnglish = app.buttons["Hidden"].firstMatch
-        XCTAssertTrue(hiddenEnglish.waitForExistence(timeout: 4))
-        tapElement(hiddenEnglish)
-    }
 }
