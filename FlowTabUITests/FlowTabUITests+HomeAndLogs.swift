@@ -479,51 +479,47 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-
-        XCTAssertTrue(
-            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsTabButton), timeout: 5)
-        )
-
-        let logsTabContent = app.descendants(matching: .any)
-            .matching(identifier: Identifier.logsTabContent)
-            .firstMatch
-        XCTAssertTrue(logsTabContent.waitForExistence(timeout: 5))
-
-        XCTAssertTrue(element(in: app, identifier: Identifier.logsPrivacyNotice).waitForExistence(timeout: 5))
-        let diagnosticSessionToggle = element(
-            in: app, identifier: Identifier.logsDiagnosticSession
-        )
-
-        let logsLines = app.descendants(matching: .any)
-            .matching(identifier: Identifier.logsLines)
-            .firstMatch
-        XCTAssertTrue(logsLines.waitForExistence(timeout: 8))
         let expectedSeededLogs: [(identifier: String, marker: String)] = [
             (Identifier.logsSeededDebugLine, "seeded-debug-log-1"),
             (Identifier.logsSeededInfoLine, "seeded-info-log-2"),
             (Identifier.logsSeededWarnLine, "seeded-warn-log-3"),
             (Identifier.logsSeededErrorLine, "seeded-error-log-4")
         ]
-        var persistedFingerprints: [String] = []
-        for expectedSeededLog in expectedSeededLogs {
-            let line = app.descendants(matching: .any)
-                .matching(identifier: expectedSeededLog.identifier)
-                .firstMatch
-            XCTAssertTrue(
-                line.waitForExistence(timeout: 8),
-                "Missing seeded log row: \(expectedSeededLog.identifier)"
-            )
-            let lineValue = (line.value as? String) ?? line.label
-            XCTAssertFalse(lineValue.contains(expectedSeededLog.marker))
-            XCTAssertTrue(lineValue.contains("message.type=structured"))
-            XCTAssertTrue(lineValue.contains("message.fingerprint="))
-            let fingerprintSuffix = lineValue.components(separatedBy: "message.fingerprint=").dropFirst().first
-            let fingerprint = fingerprintSuffix?.split(separator: " ").first.map(String.init)
-            persistedFingerprints.append(try XCTUnwrap(fingerprint))
+        let persistedFingerprints = try XCTUnwrap(
+            assertSeededLogsProjection(
+                in: app,
+                targetDescription: "initial-redacted-seeded-logs",
+                selectedLevel: "DEBUG",
+                expectedRows: expectedSeededLogs.map {
+                    FlowTabUITestSeededLogProjectionExpectation(
+                        identifier: $0.identifier,
+                        cleartextMarker: $0.marker
+                    )
+                }
+            ) {
+                tapFirstHittable(
+                    in: app.buttons.matching(
+                        identifier: Identifier.logsTabButton
+                    ),
+                    timeout:
+                        FlowTabUITestLogsProjectionPolicy
+                            .tabNavigationWatchdog
+                )
+            }
+        )
+        let diagnosticSessionToggle = element(
+            in: app,
+            identifier: Identifier.logsDiagnosticSession
+        )
+        XCTAssertEqual(
+            persistedFingerprints.count,
+            expectedSeededLogs.count
+        )
+        for fingerprint in persistedFingerprints {
+            XCTAssertFalse(fingerprint.isEmpty)
         }
         let diskContentsBeforeClear = runtimeLogContents()
         XCTAssertTrue(persistedFingerprints.allSatisfy { diskContentsBeforeClear.contains($0) })
-        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: Identifier.logsEmptyHint).firstMatch.exists)
 
         assertLogVisibilityTransition(
             in: app,

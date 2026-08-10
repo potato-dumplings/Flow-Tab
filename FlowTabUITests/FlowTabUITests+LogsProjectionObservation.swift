@@ -88,6 +88,135 @@ struct FlowTabUITestLogsProjectionExpectation: Equatable {
     }
 }
 
+struct FlowTabUITestSeededLogProjectionExpectation: Equatable {
+    let identifier: String
+    let cleartextMarker: String
+}
+
+struct FlowTabUITestSeededLogProjectionRowSnapshot: Equatable {
+    let identifier: String
+    let content: String
+
+    var hasStructuredMessageMetadata: Bool {
+        content.contains("message.type=structured")
+    }
+
+    var fingerprint: String? {
+        guard let markerRange = content.range(of: "message.fingerprint=") else {
+            return nil
+        }
+        let suffix = content[markerRange.upperBound...]
+        let fingerprint = suffix.prefix {
+            !$0.isWhitespace
+        }
+        guard !fingerprint.isEmpty else { return nil }
+        return String(fingerprint)
+    }
+
+    var diagnosticSummary: String {
+        "identifier=\(identifier) "
+            + "contentLength=\(content.count) "
+            + "hasStructuredMessageMetadata="
+            + "\(hasStructuredMessageMetadata) "
+            + "fingerprint=\(fingerprint ?? "nil")"
+    }
+}
+
+struct FlowTabUITestSeededLogsProjectionSnapshot: Equatable {
+    let applicationState: XCUIApplication.State
+    let logsContentExists: Bool
+    let privacyNoticeExists: Bool
+    let linesContainerExists: Bool
+    let emptyHintExists: Bool
+    let selectedLevel: String?
+    let rows: [FlowTabUITestSeededLogProjectionRowSnapshot]
+
+    var identifierCounts: [String: Int] {
+        rows.reduce(into: [:]) { counts, row in
+            counts[row.identifier, default: 0] += 1
+        }
+    }
+
+    var diagnosticSummary: String {
+        let rowSummary = rows
+            .map(\.diagnosticSummary)
+            .joined(separator: ";")
+        return "applicationState="
+            + "\(String(describing: applicationState)) "
+            + "logsContentExists=\(logsContentExists) "
+            + "privacyNoticeExists=\(privacyNoticeExists) "
+            + "linesContainerExists=\(linesContainerExists) "
+            + "emptyHintExists=\(emptyHintExists) "
+            + "selectedLevel=\(selectedLevel ?? "nil") "
+            + "identifierCounts="
+            + "\(logsIdentifierCountSummary(identifierCounts)) "
+            + "rows=[\(rowSummary)]"
+    }
+}
+
+struct FlowTabUITestSeededLogsProjectionExpectation: Equatable {
+    let selectedLevel: String
+    let rows: [FlowTabUITestSeededLogProjectionExpectation]
+
+    var identifierCounts: [String: Int] {
+        rows.reduce(into: [:]) { counts, row in
+            counts[row.identifier, default: 0] += 1
+        }
+    }
+
+    func fingerprints(
+        in snapshot: FlowTabUITestSeededLogsProjectionSnapshot
+    ) -> [String]? {
+        guard
+            snapshot.applicationState == .runningForeground,
+            snapshot.logsContentExists,
+            snapshot.privacyNoticeExists,
+            snapshot.linesContainerExists,
+            !snapshot.emptyHintExists,
+            snapshot.selectedLevel == selectedLevel,
+            snapshot.rows.count == rows.count,
+            snapshot.identifierCounts == identifierCounts
+        else {
+            return nil
+        }
+
+        let snapshotsByIdentifier = Dictionary(
+            grouping: snapshot.rows, by: \.identifier
+        )
+        var fingerprints: [String] = []
+        for expectedRow in rows {
+            guard
+                let matchingRows =
+                    snapshotsByIdentifier[expectedRow.identifier],
+                matchingRows.count == 1,
+                let matchingRow = matchingRows.first,
+                !matchingRow.content.contains(
+                    expectedRow.cleartextMarker
+                ),
+                matchingRow.hasStructuredMessageMetadata,
+                let fingerprint = matchingRow.fingerprint
+            else {
+                return nil
+            }
+            fingerprints.append(fingerprint)
+        }
+        return fingerprints
+    }
+
+    func isSatisfied(
+        by snapshot: FlowTabUITestSeededLogsProjectionSnapshot
+    ) -> Bool {
+        fingerprints(in: snapshot) != nil
+    }
+
+    var diagnosticSummary: String {
+        "selectedLevel=\(selectedLevel) "
+            + "identifierCounts="
+            + "\(logsIdentifierCountSummary(identifierCounts)) "
+            + "requiresRedactedStructuredFingerprint=true"
+    }
+}
+
 private func logsIdentifierCountSummary(
     _ counts: [String: Int]
 ) -> String {
@@ -174,7 +303,255 @@ final class FlowTabUITestLogsProjectionObservationOwner {
     }
 }
 
+final class FlowTabUITestSeededLogsProjectionObservationOwner {
+    private let conditionOwner:
+        FlowTabUITestConditionObservationOwner<
+            FlowTabUITestSeededLogsProjectionSnapshot
+        >
+
+    init(
+        expectation:
+            FlowTabUITestSeededLogsProjectionExpectation,
+        observationRegistration:
+            FlowTabUITestConditionObservationRegistration? =
+                FlowTabUITestConditionReadbackScheduler
+                    .mainRunLoopRegistration(
+                        cadence:
+                            FlowTabUITestConditionObservationPolicy
+                                .xcuiReadbackCadence
+                    ),
+        acceptsResolution: @escaping () -> Bool = { true },
+        readback: @escaping () ->
+            FlowTabUITestSeededLogsProjectionSnapshot
+    ) {
+        conditionOwner = FlowTabUITestConditionObservationOwner(
+            observationRegistration: observationRegistration,
+            readback: readback,
+            isSatisfied: {
+                acceptsResolution()
+                    && expectation.isSatisfied(by: $0)
+            },
+            describe: { snapshot in
+                "acceptsResolution=\(acceptsResolution()) "
+                    + "expected{\(expectation.diagnosticSummary)} "
+                    + "observed{\(snapshot.diagnosticSummary)}"
+            }
+        )
+    }
+
+    func start() {
+        conditionOwner.start()
+    }
+
+    func waitForResolution(
+        timeout: TimeInterval
+    ) -> FlowTabUITestConditionEvidence<
+        FlowTabUITestSeededLogsProjectionSnapshot
+    >? {
+        conditionOwner.waitForResolution(timeout: timeout)
+    }
+
+    var resolvedEvidence: FlowTabUITestConditionEvidence<
+        FlowTabUITestSeededLogsProjectionSnapshot
+    >? {
+        conditionOwner.resolvedEvidence
+    }
+
+    var latestEvidence: FlowTabUITestConditionEvidence<
+        FlowTabUITestSeededLogsProjectionSnapshot
+    >? {
+        conditionOwner.latestEvidence
+    }
+
+    var diagnosticSummary: String {
+        conditionOwner.diagnosticSummary
+    }
+
+    func requestReadback(
+        source: FlowTabUITestConditionObservationSource
+    ) {
+        conditionOwner.requestReadback(source: source)
+    }
+
+    func cancel() {
+        conditionOwner.cancel()
+    }
+}
+
+private struct FlowTabUITestSeededLogsProjectionElements {
+    let logsContent: XCUIElement
+    let privacyNotice: XCUIElement
+    let linesContainer: XCUIElement
+    let emptyHint: XCUIElement
+    let logsLevel: XCUIElement
+    let seededRows: XCUIElementQuery
+}
+
 extension FlowTabUITests {
+    func assertSeededLogsProjection(
+        in app: XCUIApplication,
+        targetDescription: String,
+        selectedLevel: String,
+        expectedRows:
+            [FlowTabUITestSeededLogProjectionExpectation],
+        trigger: () -> Bool
+    ) -> [String]? {
+        let expectation =
+            FlowTabUITestSeededLogsProjectionExpectation(
+                selectedLevel: selectedLevel,
+                rows: expectedRows
+            )
+        let elements = seededLogsProjectionElements(in: app)
+        let readback = seededLogsProjectionReadback(
+            in: app,
+            elements: elements
+        )
+        let deferredReadbacks =
+            FlowTabUITestDeferredConditionReadbackRegistration(
+                downstreamRegistration:
+                    FlowTabUITestConditionReadbackScheduler
+                        .mainRunLoopRegistration(
+                            cadence:
+                                FlowTabUITestConditionObservationPolicy
+                                    .xcuiReadbackCadence
+                        )
+            )
+        var triggerDidComplete = false
+        let owner =
+            FlowTabUITestSeededLogsProjectionObservationOwner(
+                expectation: expectation,
+                observationRegistration: { callback in
+                    deferredReadbacks.register(callback)
+                },
+                acceptsResolution: { triggerDidComplete },
+                readback: readback
+            )
+        owner.start()
+        defer {
+            owner.cancel()
+            deferredReadbacks.cancel()
+        }
+
+        guard owner.latestEvidence?.source == .initialReadback else {
+            XCTFail(
+                "Seeded Logs initial readback was unavailable. "
+                    + "target=\(targetDescription) "
+                    + owner.diagnosticSummary
+            )
+            return nil
+        }
+        XCTAssertNil(owner.resolvedEvidence)
+
+        let triggerSucceeded = trigger()
+        triggerDidComplete = true
+        owner.requestReadback(source: .triggerReadback)
+        if owner.resolvedEvidence == nil {
+            deferredReadbacks.activate()
+        }
+        guard triggerSucceeded else {
+            XCTFail(
+                "Seeded Logs navigation trigger failed. "
+                    + "target=\(targetDescription) "
+                    + owner.diagnosticSummary
+            )
+            return nil
+        }
+
+        guard
+            let evidence = owner.waitForResolution(
+                timeout:
+                    FlowTabUITestLogsProjectionPolicy
+                        .exactProjectionWatchdog
+            ),
+            let fingerprints = expectation.fingerprints(
+                in: evidence.value
+            )
+        else {
+            XCTFail(
+                "Seeded Logs projection watchdog expired. "
+                    + "target=\(targetDescription) "
+                    + owner.diagnosticSummary
+            )
+            return nil
+        }
+        return fingerprints
+    }
+
+    private func seededLogsProjectionElements(
+        in app: XCUIApplication
+    ) -> FlowTabUITestSeededLogsProjectionElements {
+        FlowTabUITestSeededLogsProjectionElements(
+            logsContent: element(
+                in: app,
+                identifier: Identifier.logsTabContent
+            ),
+            privacyNotice: element(
+                in: app,
+                identifier: Identifier.logsPrivacyNotice
+            ),
+            linesContainer: element(
+                in: app,
+                identifier: Identifier.logsLines
+            ),
+            emptyHint: element(
+                in: app,
+                identifier: Identifier.logsEmptyHint
+            ),
+            logsLevel: element(
+                in: app,
+                identifier: Identifier.logsLevel
+            ),
+            seededRows: app.descendants(matching: .any)
+                .matching(
+                    NSPredicate(
+                        format: "identifier BEGINSWITH %@",
+                        FlowTabUITestLogsProjectionPolicy
+                            .seededRowIdentifierPrefix
+                    )
+                )
+        )
+    }
+
+    private func seededLogsProjectionReadback(
+        in app: XCUIApplication,
+        elements: FlowTabUITestSeededLogsProjectionElements
+    ) -> () -> FlowTabUITestSeededLogsProjectionSnapshot {
+        {
+            let applicationState = app.state
+            guard applicationState == .runningForeground else {
+                return FlowTabUITestSeededLogsProjectionSnapshot(
+                    applicationState: applicationState,
+                    logsContentExists: false,
+                    privacyNoticeExists: false,
+                    linesContainerExists: false,
+                    emptyHintExists: false,
+                    selectedLevel: nil,
+                    rows: []
+                )
+            }
+            let logsLevelExists = elements.logsLevel.exists
+            let rowSnapshots = elements.seededRows
+                .allElementsBoundByIndex
+                .map { row in
+                    FlowTabUITestSeededLogProjectionRowSnapshot(
+                        identifier: row.identifier,
+                        content: (row.value as? String) ?? row.label
+                    )
+                }
+            return FlowTabUITestSeededLogsProjectionSnapshot(
+                applicationState: applicationState,
+                logsContentExists: elements.logsContent.exists,
+                privacyNoticeExists: elements.privacyNotice.exists,
+                linesContainerExists: elements.linesContainer.exists,
+                emptyHintExists: elements.emptyHint.exists,
+                selectedLevel: logsLevelExists
+                    ? self.elementStringValue(elements.logsLevel)
+                    : nil,
+                rows: rowSnapshots
+            )
+        }
+    }
+
     func assertLogVisibility(
         at logLevel: String,
         visibleIdentifiers: [String],
