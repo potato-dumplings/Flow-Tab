@@ -565,14 +565,14 @@ extension FlowTabUITests {
             setToggle(diagnosticSessionToggle, to: false)
         }
 
-        XCTAssertTrue(
-            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsClearButton), timeout: 5)
+        assertLogsClearTransition(
+            in: app,
+            targetDescription: "seeded-logs-clear",
+            selectedLevel: "WARN",
+            initialVisibleIdentifiers: [
+                Identifier.logsSeededWarnLine, Identifier.logsSeededErrorLine
+            ]
         )
-
-        let logsEmptyHint = app.descendants(matching: .any)
-            .matching(identifier: Identifier.logsEmptyHint)
-            .firstMatch
-        XCTAssertTrue(logsEmptyHint.waitForExistence(timeout: 5))
 
         let clearedDiskContents = runtimeLogContents()
         XCTAssertTrue(persistedFingerprints.allSatisfy { !clearedDiskContents.contains($0) })
