@@ -1,7 +1,28 @@
 import AppKit
 import XCTest
 
+enum FlowTabUITestSettingsQuitHotkeyWatchdogPolicy {
+    static let runtimeCompletion: TimeInterval = 10
+}
+
 extension FlowTabUITests {
+    func testSettingsQuitHotkeyWatchdogPolicyPreservesCompatibleRuntimeCompletionBound() {
+        XCTAssertEqual(
+            FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                .runtimeCompletion,
+            10
+        )
+        XCTAssertTrue(
+            FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                .runtimeCompletion.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                .runtimeCompletion,
+            0
+        )
+    }
+
     func testSettingsAppearanceTogglesCanBeChanged() throws {
         let app = makeApp(
             additionalArguments: [
@@ -551,13 +572,15 @@ extension FlowTabUITests {
                 continue
             }
             let app = launch.application
+            defer { app.terminate() }
             let selectedAppID = launch.resolution.selectedAppID
             let selectedTile = element(
                 in: app,
                 identifier: switcherAppRowIdentifier(selectedAppID)
             )
 
-            let logSnapshot = makeRuntimeLogFileSnapshot()
+            let completionBaseline = makeRuntimeLogFileSnapshot()
+            defer { completionBaseline.cancel() }
             typeHotkey(
                 in: app,
                 key: item.triggerKey,
@@ -570,11 +593,13 @@ extension FlowTabUITests {
                     "appID=\(selectedAppID) sent=true",
                     "terminate post-refresh reason=workspace_notification appID=\(selectedAppID)"
                 ],
-                since: logSnapshot,
-                timeout: 10
+                since: completionBaseline,
+                timeout:
+                    FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                        .runtimeCompletion
             )
+            completionBaseline.cancel()
             XCTAssertTrue(waitForNonExistence(selectedTile, timeout: 6))
-            app.terminate()
         }
     }
 
