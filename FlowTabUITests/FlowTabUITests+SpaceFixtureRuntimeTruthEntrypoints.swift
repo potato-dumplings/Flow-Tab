@@ -102,7 +102,7 @@ extension FlowTabUITests {
                 waitForActiveSpaceWorkflowCGWindow(
                     title: fullscreenTitle,
                     app: targetApp,
-                    timeout: 4
+                    timeout: FlowTabUITestRuntimeTruthWatchdogPolicy.optionTabInitialWindowStateTopology
                 ),
                 "Option+Tab first window-state phase must open from the fullscreen sibling's Space."
             )
