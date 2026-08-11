@@ -42,6 +42,8 @@ extension FlowTabUITests {
             )
 
             let activationLogSnapshot = makeRuntimeLogFileSnapshot()
+            defer { activationLogSnapshot.cancel() }
+
             let dismissalOwner =
                 FlowTabUITestElementNonExistenceObservationOwner(
                     elementIdentifier:
@@ -311,7 +313,9 @@ extension FlowTabUITests {
         waitForRuntimeLogFiles(
             matching: #"window-request appID=\#(escapedAppID) pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) title=\#(escapedTitle)[^\n]*ax=0[^\n]*sticky=false source=nil publicAXRecovery=1"#,
             since: snapshot,
-            timeout: 8,
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .spaceBackedWindowRequestPublication,
             description: "space-backed CG-only window request source"
         )
     }
