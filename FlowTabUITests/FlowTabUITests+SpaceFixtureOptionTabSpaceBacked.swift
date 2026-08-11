@@ -328,7 +328,9 @@ extension FlowTabUITests {
         waitForRuntimeLogFiles(
             matching: #"focus-attempt route=cg result=[a-zA-Z]+ pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) targetCG=\#(selection.windowNumber)"#,
             since: snapshot,
-            timeout: 8,
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .spaceBackedCGActivationRoutePublication,
             description: "space-backed CG-only activation route"
         )
     }
