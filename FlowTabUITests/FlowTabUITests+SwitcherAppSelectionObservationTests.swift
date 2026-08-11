@@ -108,10 +108,76 @@ extension FlowTabUITests {
         XCTAssertNil(owner.resolvedEvidence)
 
         snapshot = switcherAppSelectionTestSnapshot(
+            logSuffix:
+                switcherAppSelectionAppliedLogSuffix,
+            appProjectionEntries: []
+        )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = switcherAppSelectionTestSnapshot(
+            logSuffix:
+                switcherAppSelectionAppliedLogSuffix,
+            appProjectionEntries: [
+                switcherAppSelectionTestBundleIdentifier
+                    + ":3"
+            ]
+        )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = switcherAppSelectionTestSnapshot(
+            logSuffix:
+                switcherAppSelectionAppliedLogSuffix,
+            appProjectionEntries: [
+                switcherAppSelectionTestBundleIdentifier
+                    + ".backup:2"
+            ]
+        )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = switcherAppSelectionTestSnapshot(
             logSuffix: switcherAppSelectionAppliedLogSuffix
         )
         scheduledReadback?(.scheduledReadback)
         XCTAssertNotNil(owner.resolvedEvidence)
+    }
+
+    func testSwitcherAppSelectionAcceptsTopologyDependentBundleCount() {
+        var eventReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var snapshot = switcherAppSelectionTestSnapshot()
+        let owner = switcherAppSelectionTestOwner(
+            appProjectionExpectation:
+                .bundleIdentifier(
+                    switcherAppSelectionTestBundleIdentifier
+                ),
+            observationRegistration: { callback in
+                eventReadback = callback
+                return FlowTabUITestObservationCancellation {}
+            },
+            readback: { snapshot }
+        )
+        owner.start()
+        defer { owner.cancel() }
+
+        snapshot = switcherAppSelectionTestSnapshot(
+            logSuffix:
+                switcherAppSelectionAppliedLogSuffix,
+            appProjectionEntries: [
+                switcherAppSelectionTestBundleIdentifier
+                    + ":17"
+            ]
+        )
+        eventReadback?(.notificationReadback)
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.value
+                .diagnostics.values["apps"],
+            switcherAppSelectionTestBundleIdentifier
+                + ":17"
+        )
     }
 
     func testSwitcherAppSelectionSlowSchedulingOnlyDelaysResolution() {
@@ -238,6 +304,17 @@ extension FlowTabUITests {
         )
         XCTAssertTrue(
             owner.diagnosticSummary.contains(
+                "expectedAppProjection={exactEntry="
+                    + switcherAppSelectionTestProjectionEntry
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "observedAppProjection={"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
                 "source=watchdogReadback"
             )
         )
@@ -257,7 +334,13 @@ private extension FlowTabUITests {
             + switcherAppSelectionTestBundleIdentifier
     }
 
+    var switcherAppSelectionTestProjectionEntry: String {
+        switcherAppSelectionTestBundleIdentifier + ":2"
+    }
+
     func switcherAppSelectionTestOwner(
+        appProjectionExpectation:
+            FlowTabUITestSwitcherAppProjectionExpectation? = nil,
         observationRegistration:
             FlowTabUITestConditionObservationRegistration?,
         readback: @escaping () ->
@@ -266,6 +349,11 @@ private extension FlowTabUITests {
         FlowTabUITestSwitcherAppSelectionObservationOwner(
             bundleIdentifier:
                 switcherAppSelectionTestBundleIdentifier,
+            appProjectionExpectation:
+                appProjectionExpectation
+                    ?? .exactEntry(
+                        switcherAppSelectionTestProjectionEntry
+                    ),
             observationRegistration:
                 observationRegistration,
             readback: readback
@@ -274,7 +362,8 @@ private extension FlowTabUITests {
 
     func switcherAppSelectionTestSnapshot(
         logSuffix: String? = nil,
-        selectedBundleIdentifier: String? = nil
+        selectedBundleIdentifier: String? = nil,
+        appProjectionEntries: [String]? = nil
     ) -> FlowTabUITestSwitcherAppSelectionSnapshot {
         let selectedBundleIdentifier =
             selectedBundleIdentifier
@@ -282,6 +371,11 @@ private extension FlowTabUITests {
         let logContents = logSuffix.map {
             "[00:00:00.000] [INFO] [UITest] \($0)\n"
         } ?? ""
+        let appProjectionEntries =
+            appProjectionEntries
+                ?? [switcherAppSelectionTestProjectionEntry]
+        let appsValue =
+            appProjectionEntries.joined(separator: "|")
         return FlowTabUITestSwitcherAppSelectionSnapshot(
             runtimeLog:
                 FlowTabUITestRuntimeLogSnapshot(
@@ -296,9 +390,12 @@ private extension FlowTabUITests {
                     exists: true,
                     rawValue:
                         "selected="
-                            + selectedBundleIdentifier,
+                            + selectedBundleIdentifier
+                            + ";apps="
+                            + appsValue,
                     values: [
-                        "selected": selectedBundleIdentifier
+                        "selected": selectedBundleIdentifier,
+                        "apps": appsValue
                     ]
                 )
         )

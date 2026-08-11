@@ -83,9 +83,14 @@ extension FlowTabUITests {
             _ = try performAndWaitForSwitcherAppSelection(
                 in: app,
                 bundleIdentifier: targetApp.identity.bundleIdentifier,
+                appProjectionExpectation:
+                    .exactEntry(
+                        targetApp.identity.bundleIdentifier
+                            + ":1"
+                    ),
                 timeout:
                     FlowTabUITestRuntimeTruthWatchdogPolicy
-                        .switcherAppSelectionApplication,
+                        .switcherAppSelectionProjectionApplication,
                 trigger: {
                     try FlowTabUITestSwitcherCommandPayload.write(
                         targetApp.identity.bundleIdentifier
@@ -96,18 +101,6 @@ extension FlowTabUITests {
                             "option.provisionalHidden.selectApp"
                     )
                 }
-            )
-            XCTAssertTrue(
-                waitForSwitcherAppsSummary(
-                    diagnosticsSummary,
-                    toContain: "\(targetApp.identity.bundleIdentifier):1",
-                    timeout: 4
-                ),
-                """
-                Option+Tab switcher did not count only the AX-backed user window for \(targetApp.appName).
-
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
             )
 
             let advanceEvidenceSnapshot =

@@ -54,6 +54,50 @@ struct FlowTabUITestSwitcherAppProjectionSnapshot:
     }
 }
 
+struct FlowTabUITestSwitcherAppProjectionReadback:
+    Equatable
+{
+    let identifier: String
+    let exists: Bool
+    let rawValue: String?
+    let entries: [FlowTabUITestSwitcherAppProjectionEntry]
+
+    init(
+        diagnostics:
+            FlowTabUITestSwitcherDiagnosticsSnapshot
+    ) {
+        identifier = diagnostics.identifier
+        exists = diagnostics.exists
+        rawValue = diagnostics.values["apps"]
+        entries = rawValue?.split(separator: "|").map {
+            FlowTabUITestSwitcherAppProjectionEntry(
+                rawValue: String($0)
+            )
+        } ?? []
+    }
+
+    init(
+        snapshot:
+            FlowTabUITestSwitcherAppProjectionSnapshot
+    ) {
+        identifier = snapshot.identifier
+        exists = snapshot.exists
+        rawValue = snapshot.rawValue
+        entries = snapshot.entries
+    }
+
+    var diagnosticSummary: String {
+        let entrySummary = entries
+            .sorted { $0.rawValue < $1.rawValue }
+            .map(\.diagnosticSummary)
+            .joined(separator: " | ")
+        return "identifier=\(identifier) "
+            + "exists=\(exists) "
+            + "entries=[\(entrySummary)] "
+            + "raw=\(rawValue ?? "nil")"
+    }
+}
+
 enum FlowTabUITestSwitcherAppProjectionExpectation:
     Equatable
 {
@@ -65,23 +109,32 @@ enum FlowTabUITestSwitcherAppProjectionExpectation:
         by snapshot:
             FlowTabUITestSwitcherAppProjectionSnapshot
     ) -> Bool {
-        guard
-            snapshot.applicationState == .runningForeground,
-            snapshot.exists
-        else {
+        guard snapshot.applicationState == .runningForeground else {
             return false
         }
+        return isSatisfied(
+            by: FlowTabUITestSwitcherAppProjectionReadback(
+                snapshot: snapshot
+            )
+        )
+    }
+
+    func isSatisfied(
+        by readback:
+            FlowTabUITestSwitcherAppProjectionReadback
+    ) -> Bool {
+        guard readback.exists else { return false }
         switch self {
         case let .exactEntry(expectedEntry):
-            return snapshot.entries.contains {
+            return readback.entries.contains {
                 $0.rawValue == expectedEntry
             }
         case let .bundleIdentifier(expectedBundleID):
-            return snapshot.entries.contains {
+            return readback.entries.contains {
                 $0.bundleIdentifier == expectedBundleID
             }
         case let .bundleIdentifiers(required, excluded):
-            let observed = Set(snapshot.entries.map(\.bundleIdentifier))
+            let observed = Set(readback.entries.map(\.bundleIdentifier))
             return required.isSubset(of: observed)
                 && observed.isDisjoint(with: excluded)
         }

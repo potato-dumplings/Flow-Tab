@@ -15,6 +15,8 @@ struct FlowTabUITestSwitcherAppSelectionExpectation:
     Equatable
 {
     let bundleIdentifier: String
+    let appProjectionExpectation:
+        FlowTabUITestSwitcherAppProjectionExpectation
 
     var appliedLogSuffix: String {
         "select app command applied appID="
@@ -29,15 +31,30 @@ struct FlowTabUITestSwitcherAppSelectionExpectation:
             && selectedAppExpectation.isSatisfied(
                 by: snapshot.diagnostics
             )
+            && appProjectionExpectation.isSatisfied(
+                by:
+                    FlowTabUITestSwitcherAppProjectionReadback(
+                        diagnostics: snapshot.diagnostics
+                    )
+            )
     }
 
     func diagnosticSummary(
         for snapshot:
             FlowTabUITestSwitcherAppSelectionSnapshot
     ) -> String {
-        "appliedMarkerPresent="
+        let appProjection =
+            FlowTabUITestSwitcherAppProjectionReadback(
+                diagnostics: snapshot.diagnostics
+            )
+        return "appliedMarkerPresent="
             + "\(hasAppliedLogMarker(in: snapshot.runtimeLog)) "
             + "expectedAppliedSuffix=\(appliedLogSuffix) "
+            + "expectedAppProjection={"
+            + appProjectionExpectation.diagnosticSummary
+            + "} observedAppProjection={"
+            + appProjection.diagnosticSummary
+            + "} "
             + snapshot.diagnosticSummary
     }
 
@@ -69,6 +86,8 @@ final class FlowTabUITestSwitcherAppSelectionObservationOwner {
 
     init(
         bundleIdentifier: String,
+        appProjectionExpectation:
+            FlowTabUITestSwitcherAppProjectionExpectation,
         observationRegistration:
             FlowTabUITestConditionObservationRegistration?,
         readback: @escaping () ->
@@ -76,7 +95,9 @@ final class FlowTabUITestSwitcherAppSelectionObservationOwner {
     ) {
         let expectation =
             FlowTabUITestSwitcherAppSelectionExpectation(
-                bundleIdentifier: bundleIdentifier
+                bundleIdentifier: bundleIdentifier,
+                appProjectionExpectation:
+                    appProjectionExpectation
             )
         conditionOwner =
             FlowTabUITestConditionObservationOwner(
@@ -119,6 +140,8 @@ extension FlowTabUITests {
     func performAndWaitForSwitcherAppSelection(
         in app: XCUIApplication,
         bundleIdentifier: String,
+        appProjectionExpectation:
+            FlowTabUITestSwitcherAppProjectionExpectation,
         timeout: TimeInterval,
         trigger: () throws -> Void
     ) rethrows -> Bool {
@@ -130,6 +153,8 @@ extension FlowTabUITests {
         let owner =
             FlowTabUITestSwitcherAppSelectionObservationOwner(
                 bundleIdentifier: bundleIdentifier,
+                appProjectionExpectation:
+                    appProjectionExpectation,
                 observationRegistration:
                     logBaseline.observationRegistration(),
                 readback: {
@@ -139,7 +164,7 @@ extension FlowTabUITests {
                         diagnostics:
                             self.switcherDiagnosticsSnapshot(
                                 diagnosticsSummary,
-                                keys: ["selected"]
+                                keys: ["selected", "apps"]
                             )
                     )
                 }

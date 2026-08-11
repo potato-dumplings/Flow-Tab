@@ -421,12 +421,25 @@ extension FlowTabUITests {
         logFlowTabUITestTrace(
             "[\(traceLabel).selectWorkflowApp.direct] target=\(workflowApp.identity.bundleIdentifier) selected=\(switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected"))"
         )
+        let appProjectionExpectation:
+            FlowTabUITestSwitcherAppProjectionExpectation =
+                allowsNoisyCGSiblings
+                    ? .bundleIdentifier(
+                        workflowApp.identity.bundleIdentifier
+                    )
+                    : .exactEntry(
+                        switcherAppStripSummary(
+                            for: workflowApp
+                        )
+                    )
         _ = try performAndWaitForSwitcherAppSelection(
             in: app,
             bundleIdentifier: workflowApp.identity.bundleIdentifier,
+            appProjectionExpectation:
+                appProjectionExpectation,
             timeout:
                 FlowTabUITestRuntimeTruthWatchdogPolicy
-                    .switcherAppSelectionApplication,
+                    .switcherAppSelectionProjectionApplication,
             trigger: {
                 try FlowTabUITestSwitcherCommandPayload.write(
                     workflowApp.identity.bundleIdentifier
@@ -437,34 +450,6 @@ extension FlowTabUITests {
                 )
             }
         )
-        if allowsNoisyCGSiblings {
-            XCTAssertTrue(
-                waitForSwitcherAppEntry(
-                    diagnosticsSummary,
-                    bundleIdentifier: workflowApp.identity.bundleIdentifier,
-                    timeout: 4
-                ),
-                """
-                Option+Tab switcher did not include \(workflowApp.appName) after selecting it.
-
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-        } else {
-            XCTAssertTrue(
-                waitForSwitcherAppsSummary(
-                    diagnosticsSummary,
-                    toContain: switcherAppStripSummary(for: workflowApp),
-                    timeout: 4
-                ),
-                """
-                Option+Tab switcher did not include \(workflowApp.appName) after selecting it.
-
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-        }
-
         XCTAssertTrue(
             enterSwitcherPreview(
                 workflowApp,
