@@ -2,13 +2,14 @@ import XCTest
 
 private enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
     static let optionTabAppClickDismissal: TimeInterval = 2
-    static let compatibleBounds = [optionTabAppClickDismissal]
+    static let controlTabWindowClickDismissal: TimeInterval = 2
+    static let compatibleBounds = [optionTabAppClickDismissal, controlTabWindowClickDismissal]
 }
 
 extension FlowTabUITests {
     func testSwitcherAndSearchWatchdogPolicyPreservesCompatibleBounds() {
         let policies = FlowTabUITestSwitcherAndSearchWatchdogPolicy.compatibleBounds
-        XCTAssertEqual(policies, [2])
+        XCTAssertEqual(policies, [2, 2])
         XCTAssertTrue(policies.allSatisfy { $0.isFinite && $0 > 0 })
     }
 
@@ -335,11 +336,11 @@ extension FlowTabUITests {
         )
         XCTAssertTrue(secondaryWindow.waitForExistence(timeout: 5))
 
-        secondaryWindow.tap()
-
-        XCTAssertTrue(
-            waitForNonExistence(diagnosticsSummary, timeout: 2),
-            "Clicking a Control+Tab window card should commit the window and close the panel immediately."
+        assertElementDoesNotExistAfterTrigger(
+            diagnosticsSummary,
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.controlTabWindowClickDismissal,
+            description: "Control+Tab window-card click presentation dismissal",
+            trigger: { secondaryWindow.tap() }
         )
     }
 
