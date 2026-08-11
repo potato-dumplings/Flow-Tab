@@ -2,6 +2,8 @@ import XCTest
 
 private enum FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy {
     static let foregroundReadiness: TimeInterval = 10
+    static let controlTabDiagnostics: TimeInterval = 5
+    static let compatibleBounds = [foregroundReadiness, controlTabDiagnostics]
 }
 
 private enum FlowTabUITestDelayedWindowLayerEntryEvidence {
@@ -17,13 +19,9 @@ private enum FlowTabUITestDelayedWindowLayerEntryEvidence {
 
 extension FlowTabUITests {
     func testSwitcherInteractionRegressionWatchdogPolicyPreservesCompatibleBound() {
-        let foregroundReadiness =
-            FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy
-                .foregroundReadiness
-        XCTAssertEqual(foregroundReadiness, 10)
-        XCTAssertTrue(
-            foregroundReadiness.isFinite && foregroundReadiness > 0
-        )
+        let policies = FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy.compatibleBounds
+        XCTAssertEqual(policies, [10, 5])
+        XCTAssertTrue(policies.allSatisfy { $0.isFinite && $0 > 0 })
     }
 
     func testHomeAndFreshOptionTabUseSameRuntimeAppOrder() throws {
@@ -98,10 +96,10 @@ extension FlowTabUITests {
                             .watchdog
                 )?.value,
             let homeOrder = homeRowProjection.identifiersByAscendingFrame?
-                .compactMap { identifier in
+                .compactMap({ identifier in
                     expectedHomeRows.firstIndex { $0.identifier == identifier }
                     .map { appIDs[$0] }
-                },
+                }),
             homeOrder.count == appIDs.count
         else {
             XCTFail(
@@ -183,7 +181,9 @@ extension FlowTabUITests {
                         )
                     ],
                     in: diagnosticsSummary,
-                    timeout: 5,
+                    timeout:
+                        FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy
+                            .controlTabDiagnostics,
                     trigger: {
                         app.typeKey(
                             .tab,
