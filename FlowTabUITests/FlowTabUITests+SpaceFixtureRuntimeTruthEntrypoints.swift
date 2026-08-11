@@ -312,30 +312,29 @@ extension FlowTabUITests {
             )
             logWorkflowSpaceObservation("\(traceLabel).afterStandardConfirm", app: targetApp)
 
-            searchInput = relaunchWindowSearch(app, traceLabel: traceLabel)
-            diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            assertWindowSearchDataUsesWorkflowWindowCount(
-                for: targetApp,
-                in: app,
-                diagnosticsSummary: diagnosticsSummary,
-                stage: "before second search query",
-                allowsNoisyCGSiblings: allowsNoisyCGSiblings
-            )
-            assertWindowSearchUsesCommittedGenerationIndex(
-                in: app,
-                diagnosticsSummary: diagnosticsSummary,
-                stage: "before second search query"
-            )
-            logWorkflowSpaceObservation("\(traceLabel).afterSecondSearchReady", app: targetApp)
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: standardSelection.windowNumber,
-                    title: standardTitle,
-                    app: targetApp,
-                    timeout: 4
-                ),
-                "Window search second phase must open from the normal sibling's Space."
-            )
+            searchInput = try relaunchWindowSearchAndWaitForFrontmostWorkflowWindow(
+                windowNumber: standardSelection.windowNumber,
+                title: standardTitle,
+                app: targetApp,
+                traceLabel: "\(traceLabel).secondSearch"
+            ) {
+                let relaunchedSearchInput = relaunchWindowSearch(app, traceLabel: traceLabel)
+                diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
+                assertWindowSearchDataUsesWorkflowWindowCount(
+                    for: targetApp,
+                    in: app,
+                    diagnosticsSummary: diagnosticsSummary,
+                    stage: "before second search query",
+                    allowsNoisyCGSiblings: allowsNoisyCGSiblings
+                )
+                assertWindowSearchUsesCommittedGenerationIndex(
+                    in: app,
+                    diagnosticsSummary: diagnosticsSummary,
+                    stage: "before second search query"
+                )
+                logWorkflowSpaceObservation("\(traceLabel).afterSecondSearchReady", app: targetApp)
+                return relaunchedSearchInput
+            }
             let fullscreenSelection = try searchAndSelectWorkflowWindow(
                 title: fullscreenTitle,
                 app: targetApp,
@@ -386,30 +385,31 @@ extension FlowTabUITests {
 
         for (index, phase) in phases.enumerated() {
             if index > 0 {
-                searchInput = relaunchWindowSearch(app, traceLabel: traceLabel)
-                let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-                assertWindowSearchDataUsesWorkflowWindowCount(
-                    for: targetApp,
-                    in: app,
-                    diagnosticsSummary: diagnosticsSummary,
-                    stage: "before \(phase.trace) search query",
-                    allowsNoisyCGSiblings: true
+                let previousSelection = try XCTUnwrap(
+                    currentSelection,
+                    "Noisy Window Search relaunch requires the preceding exact window selection."
                 )
-                assertWindowSearchUsesCommittedGenerationIndex(
-                    in: app,
-                    diagnosticsSummary: diagnosticsSummary,
-                    stage: "before \(phase.trace) search query"
-                )
-                if let currentSelection {
-                    XCTAssertTrue(
-                        waitForExactFrontmostWorkflowCGWindow(
-                            windowNumber: currentSelection.windowNumber,
-                            title: currentSelection.title,
-                            app: targetApp,
-                            timeout: 4
-                        ),
-                        "Noisy window search \(phase.trace) phase must reopen from \(currentSelection.title)."
+                searchInput = try relaunchWindowSearchAndWaitForFrontmostWorkflowWindow(
+                    windowNumber: previousSelection.windowNumber,
+                    title: previousSelection.title,
+                    app: targetApp,
+                    traceLabel: "\(traceLabel).relaunch.\(phase.trace)"
+                ) {
+                    let relaunchedSearchInput = relaunchWindowSearch(app, traceLabel: traceLabel)
+                    let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
+                    assertWindowSearchDataUsesWorkflowWindowCount(
+                        for: targetApp,
+                        in: app,
+                        diagnosticsSummary: diagnosticsSummary,
+                        stage: "before \(phase.trace) search query",
+                        allowsNoisyCGSiblings: true
                     )
+                    assertWindowSearchUsesCommittedGenerationIndex(
+                        in: app,
+                        diagnosticsSummary: diagnosticsSummary,
+                        stage: "before \(phase.trace) search query"
+                    )
+                    return relaunchedSearchInput
                 }
             }
 
