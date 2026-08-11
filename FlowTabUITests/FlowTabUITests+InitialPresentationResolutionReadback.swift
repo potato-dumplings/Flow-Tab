@@ -124,6 +124,7 @@ struct FlowTabUITestInitialPresentationResolutionReadback:
 
 struct FlowTabUITestInitialPresentationResolutionExpectation {
     let requiredItemIDs: Set<String>
+    let excludedItemIDs: Set<String>
     let searchFeatureEnabled: Bool
     let searchIsActive: Bool
     let searchActivationIsPending: Bool
@@ -132,6 +133,7 @@ struct FlowTabUITestInitialPresentationResolutionExpectation {
         by readback:
             FlowTabUITestInitialPresentationResolutionReadback
     ) -> Bool {
+        let candidateItemIDs = Set(readback.candidateItemIDs)
         let acceptedSources: Set<String> = [
             "initialReadback",
             "readinessRequestReadback",
@@ -149,8 +151,9 @@ struct FlowTabUITestInitialPresentationResolutionExpectation {
                 readback.candidateSourceGeneration,
               candidateGeneration.projection > 0,
               requiredItemIDs.isSubset(
-                of: Set(readback.candidateItemIDs)
+                of: candidateItemIDs
               ),
+              excludedItemIDs.isDisjoint(with: candidateItemIDs),
               readback.didPresent,
               readback.sessionItemIDs
                 == readback.candidateItemIDs,
@@ -177,6 +180,82 @@ struct FlowTabUITestInitialPresentationResolutionExpectation {
             return false
         }
         return true
+    }
+}
+
+extension FlowTabUITests {
+    @discardableResult
+    func assertInitialSwitcherPresentationResolution(
+        additionalArguments: [String],
+        expectation:
+            FlowTabUITestInitialPresentationResolutionExpectation,
+        targetDescription: String
+    ) throws ->
+        FlowTabUITestInitialPresentationResolutionReadback?
+    {
+        let route = FlowTabUITestInitialPresentationResolutionRoute()
+        try route.prepareReadback()
+        let owner =
+            FlowTabUITestInitialPresentationResolutionObservationOwner(
+                route: route,
+                expectation: expectation
+            )
+        owner.start()
+        defer {
+            owner.cancel()
+            route.removeReadback()
+        }
+
+        let app = makeApp(
+            additionalArguments:
+                additionalArguments + route.launchArguments
+        )
+        defer { app.terminate() }
+        launchFlowTabUITestApplication(app)
+
+        guard let resolution = owner.waitForResolution(
+            timeout:
+                FlowTabUITestInitialPresentationResolutionPolicy
+                    .watchdog
+        ) else {
+            XCTFail(
+                "Initial Switcher presentation watchdog expired. "
+                    + "target=\(targetDescription) "
+                    + "required="
+                    + "[\(expectation.requiredItemIDs.sorted().joined(separator: ","))] "
+                    + "excluded="
+                    + "[\(expectation.excludedItemIDs.sorted().joined(separator: ","))] "
+                    + owner.diagnosticSummary
+            )
+            return nil
+        }
+
+        let candidateItemIDs = Set(resolution.candidateItemIDs)
+        XCTAssertTrue(
+            expectation.requiredItemIDs.isSubset(of: candidateItemIDs),
+            resolution.diagnosticSummary
+        )
+        XCTAssertTrue(
+            expectation.excludedItemIDs.isDisjoint(
+                with: candidateItemIDs
+            ),
+            resolution.diagnosticSummary
+        )
+        XCTAssertEqual(
+            resolution.sessionItemIDs,
+            resolution.candidateItemIDs,
+            resolution.diagnosticSummary
+        )
+        XCTAssertTrue(
+            resolution.panelIsPresented,
+            resolution.diagnosticSummary
+        )
+        XCTAssertEqual(
+            resolution.sessionMode,
+            "appCycle",
+            resolution.diagnosticSummary
+        )
+        return resolution
     }
 }
 

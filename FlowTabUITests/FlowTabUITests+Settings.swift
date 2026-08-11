@@ -190,72 +190,23 @@ extension FlowTabUITests {
     func testSettingsWindowBehaviorDefaultIncludesMinimizedAppsInInitialSwitcher()
         throws
     {
-        let baselineRequiredItemIDs: Set<String> = [
-            "com.flowtab.mock.mail",
-            "com.flowtab.mock.minimized-notes"
-        ]
-        let baselineResolutionRoute =
-            FlowTabUITestInitialPresentationResolutionRoute()
-        try baselineResolutionRoute.prepareReadback()
-        let baselineResolutionOwner =
-            FlowTabUITestInitialPresentationResolutionObservationOwner(
-                route: baselineResolutionRoute,
-                expectation:
-                    FlowTabUITestInitialPresentationResolutionExpectation(
-                        requiredItemIDs: baselineRequiredItemIDs,
-                        searchFeatureEnabled: true,
-                        searchIsActive: false,
-                        searchActivationIsPending: false
-                    )
-            )
-        baselineResolutionOwner.start()
-        defer {
-            baselineResolutionOwner.cancel()
-            baselineResolutionRoute.removeReadback()
-        }
-
-        let baselineApp = makeApp(
+        try assertInitialSwitcherPresentationResolution(
             additionalArguments: windowBehaviorRuntimeArguments(
                 resetDefaults: true,
                 opensSwitcher: true
-            )
-                + baselineResolutionRoute.launchArguments
-        )
-        defer { baselineApp.terminate() }
-        launchFlowTabUITestApplication(baselineApp)
-        guard let baselineResolution =
-                baselineResolutionOwner.waitForResolution(
-                    timeout:
-                        FlowTabUITestInitialPresentationResolutionPolicy
-                            .watchdog
-                )
-        else {
-            XCTFail(
-                "Hide-minimized baseline initial presentation watchdog "
-                    + "expired. "
-                    + baselineResolutionOwner.diagnosticSummary
-            )
-            return
-        }
-        XCTAssertTrue(
-            baselineRequiredItemIDs.isSubset(
-                of: Set(baselineResolution.candidateItemIDs)
             ),
-            baselineResolution.diagnosticSummary
-        )
-        XCTAssertEqual(
-            baselineResolution.sessionItemIDs,
-            baselineResolution.candidateItemIDs,
-            baselineResolution.diagnosticSummary
-        )
-        XCTAssertTrue(
-            baselineResolution.panelIsPresented,
-            baselineResolution.diagnosticSummary
-        )
-        XCTAssertEqual(
-            baselineResolution.sessionMode,
-            "appCycle",
-            baselineResolution.diagnosticSummary
+            expectation:
+                FlowTabUITestInitialPresentationResolutionExpectation(
+                    requiredItemIDs: [
+                        "com.flowtab.mock.mail",
+                        "com.flowtab.mock.minimized-notes"
+                    ],
+                    excludedItemIDs: [],
+                    searchFeatureEnabled: true,
+                    searchIsActive: false,
+                    searchActivationIsPending: false
+                ),
+            targetDescription: "hide-minimized baseline"
         )
     }
 
@@ -278,17 +229,20 @@ extension FlowTabUITests {
         }
         settingsApp.terminate()
 
-        let filteredApp = makeApp(
-            additionalArguments: windowBehaviorRuntimeArguments(opensSwitcher: true)
-        )
-        launchFlowTabUITestApplication(filteredApp)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(filteredApp, timeout: 10))
-        XCTAssertTrue(element(in: filteredApp, identifier: Identifier.switcherAppMockMail).waitForExistence(timeout: 8))
-        XCTAssertTrue(
-            waitForNonExistence(
-                element(in: filteredApp, identifier: Identifier.switcherAppMockMinimizedNotes),
-                timeout: 2
-            )
+        try assertInitialSwitcherPresentationResolution(
+            additionalArguments:
+                windowBehaviorRuntimeArguments(opensSwitcher: true),
+            expectation:
+                FlowTabUITestInitialPresentationResolutionExpectation(
+                    requiredItemIDs: ["com.flowtab.mock.mail"],
+                    excludedItemIDs: [
+                        "com.flowtab.mock.minimized-notes"
+                    ],
+                    searchFeatureEnabled: true,
+                    searchIsActive: false,
+                    searchActivationIsPending: false
+                ),
+            targetDescription: "hide-minimized filtered projection"
         )
     }
 

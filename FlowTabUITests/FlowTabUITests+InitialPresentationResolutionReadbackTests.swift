@@ -107,6 +107,42 @@ extension FlowTabUITests {
         )
     }
 
+    func testInitialPresentationResolutionExpectationRequiresExcludedItemsAbsentFromCompleteProjection() {
+        let expectation =
+            FlowTabUITestInitialPresentationResolutionExpectation(
+                requiredItemIDs: ["com.flowtab.mock.mail"],
+                excludedItemIDs: [
+                    "com.flowtab.mock.minimized-notes"
+                ],
+                searchFeatureEnabled: false,
+                searchIsActive: false,
+                searchActivationIsPending: false
+            )
+
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: matchingInitialPresentationResolutionReadback(
+                    candidateItemIDs: [
+                        "com.flowtab.mock.mail",
+                        "com.flowtab.mock.minimized-notes"
+                    ]
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: matchingInitialPresentationResolutionReadback(
+                    candidateProjectionIsComplete: false
+                )
+            )
+        )
+        XCTAssertTrue(
+            expectation.isSatisfied(
+                by: matchingInitialPresentationResolutionReadback()
+            )
+        )
+    }
+
     func testInitialPresentationResolutionReadbackCancellationAndWatchdogDiagnostics()
         throws
     {
@@ -203,6 +239,7 @@ extension FlowTabUITests {
     {
         FlowTabUITestInitialPresentationResolutionExpectation(
             requiredItemIDs: ["com.flowtab.mock.mail"],
+            excludedItemIDs: [],
             searchFeatureEnabled: false,
             searchIsActive: false,
             searchActivationIsPending: false
@@ -211,7 +248,12 @@ extension FlowTabUITests {
 
     private func matchingInitialPresentationResolutionReadback(
         baselineMode: String = "global",
-        searchFeatureEnabled: Bool = false
+        searchFeatureEnabled: Bool = false,
+        candidateProjectionIsComplete: Bool = true,
+        candidateItemIDs: [String] = [
+            "com.flowtab.mock.mail",
+            "com.flowtab.mock.browser"
+        ]
     ) -> FlowTabUITestInitialPresentationResolutionReadback {
         let candidateGeneration =
             FlowTabUITestInitialPresentationResolutionReadback
@@ -231,27 +273,19 @@ extension FlowTabUITests {
             baselineSourceGeneration: candidateGeneration,
             candidateMode: "global",
             candidateProjectionIsPresent: true,
-            candidateProjectionIsComplete: true,
+            candidateProjectionIsComplete:
+                candidateProjectionIsComplete,
             candidateSourceGeneration: candidateGeneration,
             candidateProcessIdentifier: nil,
-            candidateItemIDs: [
-                "com.flowtab.mock.mail",
-                "com.flowtab.mock.browser"
-            ],
+            candidateItemIDs: candidateItemIDs,
             didPresent: true,
-            sessionItemIDs: [
-                "com.flowtab.mock.mail",
-                "com.flowtab.mock.browser"
-            ],
+            sessionItemIDs: candidateItemIDs,
             attemptSearchIsActiveOrPending: false,
             postPresentationMode: "global",
             postPresentationSourceGeneration:
                 candidateGeneration,
             postPresentationProcessIdentifier: nil,
-            postPresentationItemIDs: [
-                "com.flowtab.mock.mail",
-                "com.flowtab.mock.browser"
-            ],
+            postPresentationItemIDs: candidateItemIDs,
             panelIsPresented: true,
             sessionMode: "appCycle",
             searchFeatureEnabled: searchFeatureEnabled,

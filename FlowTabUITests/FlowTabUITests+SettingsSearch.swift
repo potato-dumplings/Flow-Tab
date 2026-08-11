@@ -113,6 +113,7 @@ extension FlowTabUITests {
                         requiredItemIDs: [
                             "com.flowtab.mock.mail"
                         ],
+                        excludedItemIDs: [],
                         searchFeatureEnabled: false,
                         searchIsActive: false,
                         searchActivationIsPending: false
