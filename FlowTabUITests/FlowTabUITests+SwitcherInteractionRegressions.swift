@@ -1,5 +1,9 @@
 import XCTest
 
+private enum FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy {
+    static let foregroundReadiness: TimeInterval = 10
+}
+
 private enum FlowTabUITestDelayedWindowLayerEntryEvidence {
     static let prewarmBeforeEntryPattern =
         #"\[AutoEnter\] pending targetAppID="#
@@ -12,6 +16,16 @@ private enum FlowTabUITestDelayedWindowLayerEntryEvidence {
 }
 
 extension FlowTabUITests {
+    func testSwitcherInteractionRegressionWatchdogPolicyPreservesCompatibleBound() {
+        let foregroundReadiness =
+            FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy
+                .foregroundReadiness
+        XCTAssertEqual(foregroundReadiness, 10)
+        XCTAssertTrue(
+            foregroundReadiness.isFinite && foregroundReadiness > 0
+        )
+    }
+
     func testHomeAndFreshOptionTabUseSameRuntimeAppOrder() throws {
         let app = makeApp(
             additionalArguments: [
@@ -28,7 +42,10 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertSwitcherInteractionApplicationIsForegroundReady(
+            app,
+            scenario: "Home and fresh Option+Tab runtime order"
+        )
         XCTAssertTrue(
             tapFirstHittable(
                 in: app.buttons.matching(identifier: Identifier.homeTabButton),
@@ -105,7 +122,10 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertSwitcherInteractionApplicationIsForegroundReady(
+            app,
+            scenario: "first physical Control+Tab gesture"
+        )
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let secondaryWindowID =
@@ -181,7 +201,10 @@ extension FlowTabUITests {
     func testOptionTabDelayedWindowLayerEntryShowsPrewarmedPreviewAtTransition() throws {
         let app = makeDelayedWindowLayerEntryApp()
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertSwitcherInteractionApplicationIsForegroundReady(
+            app,
+            scenario: "delayed Option+Tab window-layer entry"
+        )
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let firstWindowID =
@@ -234,7 +257,10 @@ extension FlowTabUITests {
     func testOptionTabDelayedWindowLayerEntryRepeatedPresentationPressure() throws {
         let app = makeDelayedWindowLayerEntryApp()
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertSwitcherInteractionApplicationIsForegroundReady(
+            app,
+            scenario: "delayed Option+Tab repeated-presentation Pressure"
+        )
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let firstWindowID =
@@ -287,6 +313,28 @@ extension FlowTabUITests {
                 "Delayed-entry pressure iteration \(iteration) must release its presentation owner."
             )
         }
+    }
+
+    private func assertSwitcherInteractionApplicationIsForegroundReady(
+        _ app: XCUIApplication,
+        scenario: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let becameReady = waitForFlowTabUITestApplicationToBecomeReady(
+            app,
+            timeout:
+                FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy
+                    .foregroundReadiness
+        )
+        XCTAssertTrue(
+            becameReady,
+            "\(scenario) foreground readiness watchdog expired. "
+                + "unmetCondition=runningForeground "
+                + "finalState=\(String(describing: app.state))",
+            file: file,
+            line: line
+        )
     }
 
     private func makeDelayedWindowLayerEntryApp() -> XCUIApplication {
