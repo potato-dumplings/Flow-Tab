@@ -2,15 +2,22 @@ import XCTest
 
 private enum FlowTabUITestNoisyOptionTabPolicy {
     static let exactPreviewProjectionWatchdog: TimeInterval = 8
+    static let switcherDismissalWatchdog: TimeInterval = 4
 }
 
 extension FlowTabUITests {
     func testNoisyOptionTabPolicyUsesNamedWatchdogs() {
-        let watchdog =
+        let watchdogs = [
             FlowTabUITestNoisyOptionTabPolicy
-                .exactPreviewProjectionWatchdog
-        XCTAssertEqual(watchdog, 8)
-        XCTAssertTrue(watchdog.isFinite && watchdog > 0)
+                .exactPreviewProjectionWatchdog,
+            FlowTabUITestNoisyOptionTabPolicy
+                .switcherDismissalWatchdog
+        ]
+        XCTAssertEqual(watchdogs[0], 8)
+        XCTAssertEqual(watchdogs[1], 4)
+        XCTAssertTrue(
+            watchdogs.allSatisfy { $0.isFinite && $0 > 0 }
+        )
     }
 
     func runNoisyOptionTabWindowStateRoundTrip(
@@ -124,11 +131,11 @@ extension FlowTabUITests {
             )
 
             let topologyLogSnapshot = makeRuntimeLogFileSnapshot()
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
-                .confirm,
-                traceLabel: "\(traceLabel).confirm.\(phase.trace)"
+            confirmNoisyOptionTabSelectionAndWaitForDismissal(
+                diagnosticsSummary,
+                traceLabel: "\(traceLabel).confirm.\(phase.trace)",
+                phaseTrace: phase.trace
             )
-            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
             XCTAssertTrue(
                 waitForExactFrontmostWorkflowCGWindow(
                     windowNumber: selection.windowNumber,
@@ -159,6 +166,46 @@ extension FlowTabUITests {
             expectedCurrentSelection = selection
             logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
         }
+    }
+
+    private func confirmNoisyOptionTabSelectionAndWaitForDismissal(
+        _ diagnosticsSummary: XCUIElement,
+        traceLabel: String,
+        phaseTrace: String
+    ) {
+        let dismissalOwner =
+            FlowTabUITestElementNonExistenceObservationOwner(
+                elementIdentifier: diagnosticsSummary.identifier,
+                readback: { diagnosticsSummary.exists }
+            )
+        dismissalOwner.start()
+        defer { dismissalOwner.cancel() }
+
+        postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+            .confirm,
+            traceLabel: traceLabel
+        )
+        dismissalOwner.markTriggerCompleted()
+
+        guard
+            let dismissalEvidence =
+                dismissalOwner.waitForResolution(
+                    timeout:
+                        FlowTabUITestNoisyOptionTabPolicy
+                            .switcherDismissalWatchdog
+                )
+        else {
+            XCTFail(
+                "Noisy Option+Tab \(phaseTrace) switcher dismissal "
+                    + "watchdog expired. "
+                    + dismissalOwner.diagnosticSummary
+            )
+            return
+        }
+        XCTAssertFalse(
+            dismissalEvidence.value.exists,
+            "Noisy Option+Tab \(phaseTrace) must dismiss the exact switcher diagnostics element."
+        )
     }
 
     private func assertNoisyOptionTabFilteredCGOnlyArtifactSource(
