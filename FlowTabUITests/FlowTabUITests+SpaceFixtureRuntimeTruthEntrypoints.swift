@@ -40,8 +40,8 @@ extension FlowTabUITests {
         )
         let fullscreenTitle = try XCTUnwrap(fullscreenWindowTitle(in: targetApp))
         let standardTitle = try XCTUnwrap(firstStandardWorkflowWindowTitle(in: targetApp))
-        var runtimeLogSnapshot = makeRuntimeLogFileSnapshot()
-
+        let runtimeLogSnapshot = makeRuntimeLogFileSnapshot()
+        defer { runtimeLogSnapshot.cancel() }
         try runRealSpaceFixtureWorkflow(
             workflow,
             flowTabAdditionalArguments: runtimeTruthSwitcherLaunchArguments(),

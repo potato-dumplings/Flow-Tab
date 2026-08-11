@@ -5,6 +5,7 @@ private enum FlowTabUITestNoisyOptionTabPolicy {
     static let switcherDismissalWatchdog: TimeInterval = 4
     static let exactSelectedWindowActivationWatchdog: TimeInterval = 12
     static let postConfirmReconciliationWatchdog: TimeInterval = 12
+    static let preConfirmEvidenceWatchdog: TimeInterval = 8
 }
 
 extension FlowTabUITests {
@@ -13,12 +14,14 @@ extension FlowTabUITests {
             FlowTabUITestNoisyOptionTabPolicy.exactPreviewProjectionWatchdog,
             FlowTabUITestNoisyOptionTabPolicy.switcherDismissalWatchdog,
             FlowTabUITestNoisyOptionTabPolicy.exactSelectedWindowActivationWatchdog,
-            FlowTabUITestNoisyOptionTabPolicy.postConfirmReconciliationWatchdog
+            FlowTabUITestNoisyOptionTabPolicy.postConfirmReconciliationWatchdog,
+            FlowTabUITestNoisyOptionTabPolicy.preConfirmEvidenceWatchdog
         ]
         XCTAssertEqual(watchdogs[0], 8)
         XCTAssertEqual(watchdogs[1], 4)
         XCTAssertEqual(watchdogs[2], 12)
         XCTAssertEqual(watchdogs[3], 12)
+        XCTAssertEqual(watchdogs[4], 8)
         XCTAssertTrue(
             watchdogs.allSatisfy { $0.isFinite && $0 > 0 }
         )
@@ -226,7 +229,7 @@ extension FlowTabUITests {
         waitForRuntimeLogFiles(
             matching: #"Chrome Fixture filtered-fullscreen-((sibling|host)-artifacts stage=(pre-dedupe|presentation)|duplicate-surfaces stage=presentation-final) dropped=[1-9][0-9]*"#,
             since: snapshot,
-            timeout: 8,
+            timeout: FlowTabUITestNoisyOptionTabPolicy.preConfirmEvidenceWatchdog,
             description: "Noisy Chrome Fixture filtered CG-only/fullscreen artifact or duplicate surface source"
         )
     }
@@ -241,7 +244,7 @@ extension FlowTabUITests {
         waitForRuntimeLogFiles(
             matching: #"window-entries app=Chrome Fixture .*id=cg:[0-9]+:\#(selection.windowNumber):title=\#(escapedTitle)[^\n]*source=stickyBinding:spaceEvidence=(observed|inferredFromTopology)"#,
             since: snapshot,
-            timeout: 8,
+            timeout: FlowTabUITestNoisyOptionTabPolicy.preConfirmEvidenceWatchdog,
             description: "sticky window-layer source for selected Noisy Option+Tab \(phaseTrace) window"
         )
     }
