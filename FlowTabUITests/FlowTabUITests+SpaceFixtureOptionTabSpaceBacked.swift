@@ -124,6 +124,7 @@ extension FlowTabUITests {
             flowTabLaunchTraceLabel: "option.provisionalHidden"
         ) { _, app in
             assertHiddenProvisionalCGOnlyRuntimeLog(appName: targetApp.appName, since: runtimeLogSnapshot)
+            runtimeLogSnapshot.cancel()
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
 
             _ = try performAndWaitForSwitcherAppSelection(
@@ -350,7 +351,9 @@ extension FlowTabUITests {
         waitForRuntimeLogFiles(
             matching: #"\#(escapedAppName) hidden-provisional-cg windows=1"#,
             since: snapshot,
-            timeout: 8,
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .provisionalHiddenProjectionPublication,
             description: "desktop provisional CG-only hidden from window layer"
         )
     }
