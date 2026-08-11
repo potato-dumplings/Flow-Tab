@@ -303,16 +303,14 @@ extension FlowTabUITests {
                 traceLabel: traceLabel
             )
 
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.searchConfirm, traceLabel: "\(traceLabel).confirmStandard")
-            XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: standardSelection.windowNumber,
-                    title: standardTitle,
-                    app: targetApp,
-                    timeout: 12
-                )
+            confirmWindowSearchSelectionAndWaitForActivation(
+                windowNumber: standardSelection.windowNumber,
+                title: standardTitle,
+                app: targetApp,
+                activationWatchdog: FlowTabUITestRuntimeTruthWatchdogPolicy.windowSearchConfirmedWindowActivation,
+                traceLabel: "\(traceLabel).confirmStandard"
             )
+            XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
             logWorkflowSpaceObservation("\(traceLabel).afterStandardConfirm", app: targetApp)
 
             searchInput = relaunchWindowSearch(app, traceLabel: traceLabel)
@@ -346,16 +344,14 @@ extension FlowTabUITests {
                 traceLabel: traceLabel
             )
 
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.searchConfirm, traceLabel: "\(traceLabel).confirmFullscreen")
-            XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: fullscreenSelection.windowNumber,
-                    title: fullscreenSelection.title,
-                    app: targetApp,
-                    timeout: 12
-                )
+            confirmWindowSearchSelectionAndWaitForActivation(
+                windowNumber: fullscreenSelection.windowNumber,
+                title: fullscreenSelection.title,
+                app: targetApp,
+                activationWatchdog: FlowTabUITestRuntimeTruthWatchdogPolicy.windowSearchConfirmedWindowActivation,
+                traceLabel: "\(traceLabel).confirmFullscreen"
             )
+            XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
             logWorkflowSpaceObservation("\(traceLabel).afterFullscreenConfirm", app: targetApp)
         }
     }
@@ -426,20 +422,14 @@ extension FlowTabUITests {
                 traceLabel: "\(traceLabel).\(phase.trace)"
             )
 
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
-                .searchConfirm,
+            confirmWindowSearchSelectionAndWaitForActivation(
+                windowNumber: selection.windowNumber,
+                title: phase.title,
+                app: targetApp,
+                activationWatchdog: FlowTabUITestRuntimeTruthWatchdogPolicy.windowSearchConfirmedWindowActivation,
                 traceLabel: "\(traceLabel).confirm.\(phase.trace)"
             )
             XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: selection.windowNumber,
-                    title: phase.title,
-                    app: targetApp,
-                    timeout: 12
-                ),
-                "Noisy window search must activate the exact \(phase.title) CG window selected in \(phase.trace)."
-            )
             currentSelection = selection
             logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
         }
