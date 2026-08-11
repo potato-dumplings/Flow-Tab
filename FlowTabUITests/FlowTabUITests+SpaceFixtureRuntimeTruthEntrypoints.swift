@@ -303,14 +303,13 @@ extension FlowTabUITests {
                 traceLabel: traceLabel
             )
 
-            confirmWindowSearchSelectionAndWaitForActivation(
+            confirmWindowSearchSelectionAndWaitForEvidence(
                 windowNumber: standardSelection.windowNumber,
                 title: standardTitle,
                 app: targetApp,
-                activationWatchdog: FlowTabUITestRuntimeTruthWatchdogPolicy.windowSearchConfirmedWindowActivation,
+                searchInput: searchInput,
                 traceLabel: "\(traceLabel).confirmStandard"
             )
-            XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
             logWorkflowSpaceObservation("\(traceLabel).afterStandardConfirm", app: targetApp)
 
             searchInput = relaunchWindowSearch(app, traceLabel: traceLabel)
@@ -344,14 +343,13 @@ extension FlowTabUITests {
                 traceLabel: traceLabel
             )
 
-            confirmWindowSearchSelectionAndWaitForActivation(
+            confirmWindowSearchSelectionAndWaitForEvidence(
                 windowNumber: fullscreenSelection.windowNumber,
                 title: fullscreenSelection.title,
                 app: targetApp,
-                activationWatchdog: FlowTabUITestRuntimeTruthWatchdogPolicy.windowSearchConfirmedWindowActivation,
+                searchInput: searchInput,
                 traceLabel: "\(traceLabel).confirmFullscreen"
             )
-            XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
             logWorkflowSpaceObservation("\(traceLabel).afterFullscreenConfirm", app: targetApp)
         }
     }
@@ -422,14 +420,13 @@ extension FlowTabUITests {
                 traceLabel: "\(traceLabel).\(phase.trace)"
             )
 
-            confirmWindowSearchSelectionAndWaitForActivation(
+            confirmWindowSearchSelectionAndWaitForEvidence(
                 windowNumber: selection.windowNumber,
                 title: phase.title,
                 app: targetApp,
-                activationWatchdog: FlowTabUITestRuntimeTruthWatchdogPolicy.windowSearchConfirmedWindowActivation,
+                searchInput: searchInput,
                 traceLabel: "\(traceLabel).confirm.\(phase.trace)"
             )
-            XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
             currentSelection = selection
             logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
         }
