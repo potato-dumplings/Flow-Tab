@@ -412,11 +412,17 @@ extension FlowTabUITests {
                 hotkeyEffectArguments(resetDefaults: true)
         )
         launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
 
         let controlIdentifier = Identifier.settingsHotkeyMainKey
-        let control = element(in: app, identifier: controlIdentifier)
-        XCTAssertTrue(control.waitForExistence(timeout: 6))
+        guard
+            let control = waitForSettingsControl(
+                in: app,
+                identifier: controlIdentifier,
+                trigger: { openSettingsTab(in: app) }
+            )
+        else {
+            return
+        }
         let controlFrame = control.frame
         let visibleMaxX =
             NSScreen.main?.visibleFrame.maxX ?? controlFrame.maxX
