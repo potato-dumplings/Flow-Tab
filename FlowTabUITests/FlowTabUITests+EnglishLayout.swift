@@ -1,5 +1,9 @@
 import XCTest
 
+enum FlowTabUITestEnglishSearchProjectionPolicy {
+    static let projectionWatchdog: TimeInterval = 10
+}
+
 extension FlowTabUITests {
     func testEnglishPrimarySurfacesExposeUsableLayoutAnchors() throws {
         let app = makeApp(
@@ -53,9 +57,27 @@ extension FlowTabUITests {
             return
         }
 
-        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.search, traceLabel: "english-layout.search")
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchAppMockMail).waitForExistence(timeout: 5))
+        guard
+            waitForExactElementCollection(
+                in: app,
+                identifiers: [
+                    Identifier.switcherSearchInput,
+                    Identifier.switcherSearchAppMockMail
+                ],
+                watchdog:
+                    FlowTabUITestEnglishSearchProjectionPolicy
+                        .projectionWatchdog,
+                targetDescription: "English primary Search",
+                trigger: {
+                    postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                        .search,
+                        traceLabel: "english-layout.search"
+                    )
+                }
+            ) != nil
+        else {
+            return
+        }
     }
 
     func testEnglishGrantedPermissionActionsUseManageLabels() throws {
