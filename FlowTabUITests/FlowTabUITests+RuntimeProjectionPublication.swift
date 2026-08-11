@@ -106,7 +106,7 @@ extension FlowTabUITests {
                 observedBy: readiness
             )
 
-            XCTAssertNotNil(
+            let result =
                 performAndWaitForCommittedSearchWindowResult(
                     in: app,
                     scope: "window",
@@ -120,7 +120,7 @@ extension FlowTabUITests {
                         app.typeText(targetWindowTitle)
                     }
                 )
-            )
+            XCTAssertNotNil(result)
         }
     }
 }

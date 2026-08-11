@@ -552,14 +552,22 @@ extension FlowTabUITests {
         in app: XCUIApplication,
         traceLabel: String
     ) throws -> RuntimeTruthWindowSelection {
-        try postFlowTabUITestSwitcherSearchQueryAndWaitForDelivery(title, traceLabel: "\(traceLabel).query")
-
         let result = try XCTUnwrap(
-            waitForSearchWindowResult(
+            try performAndWaitForCommittedSearchWindowResult(
                 in: app,
+                scope: "window",
+                query: title,
                 title: title,
                 appName: workflowApp.appName,
-                timeout: 8
+                timeout:
+                    FlowTabUITestRuntimeTruthWatchdogPolicy
+                        .windowSearchQueryProjectionPublication,
+                trigger: {
+                    try self.postFlowTabUITestSwitcherSearchQueryAndWaitForDelivery(
+                        title,
+                        traceLabel: "\(traceLabel).query"
+                    )
+                }
             )
         )
         let windowNumber = try XCTUnwrap(
