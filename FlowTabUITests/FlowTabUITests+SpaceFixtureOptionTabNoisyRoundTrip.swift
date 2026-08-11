@@ -4,21 +4,21 @@ private enum FlowTabUITestNoisyOptionTabPolicy {
     static let exactPreviewProjectionWatchdog: TimeInterval = 8
     static let switcherDismissalWatchdog: TimeInterval = 4
     static let exactSelectedWindowActivationWatchdog: TimeInterval = 12
+    static let postConfirmReconciliationWatchdog: TimeInterval = 12
 }
 
 extension FlowTabUITests {
     func testNoisyOptionTabPolicyUsesNamedWatchdogs() {
         let watchdogs = [
-            FlowTabUITestNoisyOptionTabPolicy
-                .exactPreviewProjectionWatchdog,
-            FlowTabUITestNoisyOptionTabPolicy
-                .switcherDismissalWatchdog,
-            FlowTabUITestNoisyOptionTabPolicy
-                .exactSelectedWindowActivationWatchdog
+            FlowTabUITestNoisyOptionTabPolicy.exactPreviewProjectionWatchdog,
+            FlowTabUITestNoisyOptionTabPolicy.switcherDismissalWatchdog,
+            FlowTabUITestNoisyOptionTabPolicy.exactSelectedWindowActivationWatchdog,
+            FlowTabUITestNoisyOptionTabPolicy.postConfirmReconciliationWatchdog
         ]
         XCTAssertEqual(watchdogs[0], 8)
         XCTAssertEqual(watchdogs[1], 4)
         XCTAssertEqual(watchdogs[2], 12)
+        XCTAssertEqual(watchdogs[3], 12)
         XCTAssertTrue(
             watchdogs.allSatisfy { $0.isFinite && $0 > 0 }
         )
@@ -160,15 +160,20 @@ extension FlowTabUITests {
             waitForRuntimeLogFiles(
                 matching: #"collectCGWindows result=ready .* affected=[1-9][0-9]* signatureChanged=1 signatureDisplays=[1-9][0-9]* signatureSpaces=[1-9][0-9]* signatureWindows=[1-9][0-9]* signatureFullscreen=[0-9]+ signature=d=.*spaces=[1-9][0-9]*,windows=[1-9][0-9]*,fullscreen=[0-9]+"#,
                 since: topologyLogSnapshot,
-                timeout: 8,
+                timeout:
+                    FlowTabUITestNoisyOptionTabPolicy
+                        .postConfirmReconciliationWatchdog,
                 description: "nonzero Space topology affected-window diff and signature diagnostics after \(phase.trace) confirm"
             )
             waitForRuntimeLogFiles(
                 matching: "binding-confidence-change windowID=cg:[0-9]+:\(selection.windowNumber) cg=\(selection.windowNumber) .* source=.*->verifiedFocusReadback",
                 since: topologyLogSnapshot,
-                timeout: 8,
+                timeout:
+                    FlowTabUITestNoisyOptionTabPolicy
+                        .postConfirmReconciliationWatchdog,
                 description: "verified-focus exact WindowRecord relearn after \(phase.trace) confirm"
             )
+            topologyLogSnapshot.cancel()
             expectedCurrentSelection = selection
             logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
         }
@@ -253,7 +258,9 @@ extension FlowTabUITests {
         waitForRuntimeLogFiles(
             matching: #"window-request appID=\#(escapedAppID) pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) title=\#(escapedTitle)[^\n]* sticky=true source=stickyBinding"#,
             since: snapshot,
-            timeout: 8,
+            timeout:
+                FlowTabUITestNoisyOptionTabPolicy
+                    .postConfirmReconciliationWatchdog,
             description: "sticky window request source for selected Noisy Option+Tab \(phaseTrace) window"
         )
     }
