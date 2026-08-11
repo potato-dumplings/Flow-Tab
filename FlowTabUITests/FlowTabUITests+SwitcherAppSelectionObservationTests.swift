@@ -144,6 +144,41 @@ extension FlowTabUITests {
         XCTAssertNotNil(owner.resolvedEvidence)
     }
 
+    func testSwitcherAppSelectionRequiresDiagnosticsPublication() {
+        var eventReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var snapshot = switcherAppSelectionTestSnapshot(
+            logSuffix:
+                switcherAppSelectionAppliedLogSuffix,
+            diagnosticsExists: false
+        )
+        let owner = switcherAppSelectionTestOwner(
+            observationRegistration: { callback in
+                eventReadback = callback
+                return FlowTabUITestObservationCancellation {}
+            },
+            readback: { snapshot }
+        )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertNil(owner.resolvedEvidence)
+        snapshot = switcherAppSelectionTestSnapshot(
+            logSuffix:
+                switcherAppSelectionAppliedLogSuffix
+        )
+        eventReadback?(.notificationReadback)
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .notificationReadback
+        )
+        XCTAssertTrue(
+            owner.resolvedEvidence?.value
+                .diagnostics.exists == true
+        )
+    }
+
     func testSwitcherAppSelectionAcceptsTopologyDependentBundleCount() {
         var eventReadback:
             ((FlowTabUITestConditionObservationSource) -> Void)?
@@ -273,7 +308,9 @@ extension FlowTabUITests {
     }
 
     func testSwitcherAppSelectionWatchdogReportsFinalEvidence() {
-        let snapshot = switcherAppSelectionTestSnapshot()
+        let snapshot = switcherAppSelectionTestSnapshot(
+            diagnosticsExists: false
+        )
         let owner = switcherAppSelectionTestOwner(
             observationRegistration: { _ in nil },
             readback: { snapshot }
@@ -291,6 +328,11 @@ extension FlowTabUITests {
         XCTAssertTrue(
             owner.diagnosticSummary.contains(
                 "appliedMarkerPresent=false"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "diagnosticsPublished=false"
             )
         )
         XCTAssertTrue(
@@ -363,7 +405,8 @@ private extension FlowTabUITests {
     func switcherAppSelectionTestSnapshot(
         logSuffix: String? = nil,
         selectedBundleIdentifier: String? = nil,
-        appProjectionEntries: [String]? = nil
+        appProjectionEntries: [String]? = nil,
+        diagnosticsExists: Bool = true
     ) -> FlowTabUITestSwitcherAppSelectionSnapshot {
         let selectedBundleIdentifier =
             selectedBundleIdentifier
@@ -387,7 +430,7 @@ private extension FlowTabUITests {
             diagnostics:
                 FlowTabUITestSwitcherDiagnosticsSnapshot(
                     identifier: "flowtab.testing.switcher.summary",
-                    exists: true,
+                    exists: diagnosticsExists,
                     rawValue:
                         "selected="
                             + selectedBundleIdentifier

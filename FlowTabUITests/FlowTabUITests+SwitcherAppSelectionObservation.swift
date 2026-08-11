@@ -27,7 +27,8 @@ struct FlowTabUITestSwitcherAppSelectionExpectation:
         by snapshot:
             FlowTabUITestSwitcherAppSelectionSnapshot
     ) -> Bool {
-        hasAppliedLogMarker(in: snapshot.runtimeLog)
+        snapshot.diagnostics.exists
+            && hasAppliedLogMarker(in: snapshot.runtimeLog)
             && selectedAppExpectation.isSatisfied(
                 by: snapshot.diagnostics
             )
@@ -47,7 +48,9 @@ struct FlowTabUITestSwitcherAppSelectionExpectation:
             FlowTabUITestSwitcherAppProjectionReadback(
                 diagnostics: snapshot.diagnostics
             )
-        return "appliedMarkerPresent="
+        return "diagnosticsPublished="
+            + "\(snapshot.diagnostics.exists) "
+            + "appliedMarkerPresent="
             + "\(hasAppliedLogMarker(in: snapshot.runtimeLog)) "
             + "expectedAppliedSuffix=\(appliedLogSuffix) "
             + "expectedAppProjection={"

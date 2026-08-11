@@ -78,7 +78,6 @@ extension FlowTabUITests {
             }
         ) { _, app in
             logWorkflowSpaceObservation("\(traceLabel).beforeTrigger", app: targetApp)
-            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: traceLabel)
             var diagnosticsSummary = try assertGlobalSwitcherWindowStateReady(
                 for: targetApp,
                 in: app,
@@ -413,13 +412,23 @@ extension FlowTabUITests {
         for workflowApp: SpaceFixtureResolvedWorkflow.App,
         in app: XCUIApplication,
         traceLabel: String,
-        allowsNoisyCGSiblings: Bool = false
+        allowsNoisyCGSiblings: Bool = false,
+        globalTriggerTraceLabel: String? = nil
     ) throws -> XCUIElement {
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+        let diagnosticsBaseline =
+            switcherDiagnosticsSnapshot(
+                diagnosticsSummary,
+                keys: ["selected"]
+            )
 
         logFlowTabUITestTrace(
-            "[\(traceLabel).selectWorkflowApp.direct] target=\(workflowApp.identity.bundleIdentifier) selected=\(switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected"))"
+            "[\(traceLabel).selectWorkflowApp.direct] "
+                + "target="
+                + workflowApp.identity.bundleIdentifier
+                + " baseline={"
+                + diagnosticsBaseline.diagnosticSummary
+                + "}"
         )
         let appProjectionExpectation:
             FlowTabUITestSwitcherAppProjectionExpectation =
@@ -439,8 +448,14 @@ extension FlowTabUITests {
                 appProjectionExpectation,
             timeout:
                 FlowTabUITestRuntimeTruthWatchdogPolicy
-                    .switcherAppSelectionProjectionApplication,
+                    .switcherDiagnosticsAppSelectionProjectionApplication,
             trigger: {
+                postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                    .global,
+                    traceLabel:
+                        globalTriggerTraceLabel
+                            ?? traceLabel
+                )
                 try FlowTabUITestSwitcherCommandPayload.write(
                     workflowApp.identity.bundleIdentifier
                 )
@@ -607,12 +622,13 @@ extension FlowTabUITests {
         allowsNoisyCGSiblings: Bool = false
     ) throws -> XCUIElement {
         XCTAssertTrue(app.state == .runningForeground || app.state == .runningBackground)
-        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: "\(traceLabel).relaunch")
         return try assertGlobalSwitcherWindowStateReady(
             for: workflowApp,
             in: app,
             traceLabel: traceLabel,
-            allowsNoisyCGSiblings: allowsNoisyCGSiblings
+            allowsNoisyCGSiblings: allowsNoisyCGSiblings,
+            globalTriggerTraceLabel:
+                "\(traceLabel).relaunch"
         )
     }
 

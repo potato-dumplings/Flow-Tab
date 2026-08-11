@@ -22,7 +22,6 @@ extension FlowTabUITests {
                 appName: targetApp.appName,
                 since: runtimeLogSnapshot
             )
-            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: "option.spaceBacked")
             let diagnosticsSummary = try assertGlobalSwitcherWindowStateReady(
                 for: targetApp,
                 in: app,
@@ -76,9 +75,7 @@ extension FlowTabUITests {
             flowTabLaunchTraceLabel: "option.provisionalHidden"
         ) { _, app in
             assertHiddenProvisionalCGOnlyRuntimeLog(appName: targetApp.appName, since: runtimeLogSnapshot)
-            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: "option.provisionalHidden")
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
 
             _ = try performAndWaitForSwitcherAppSelection(
                 in: app,
@@ -90,8 +87,13 @@ extension FlowTabUITests {
                     ),
                 timeout:
                     FlowTabUITestRuntimeTruthWatchdogPolicy
-                        .switcherAppSelectionProjectionApplication,
+                        .switcherDiagnosticsAppSelectionProjectionApplication,
                 trigger: {
+                    postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                        .global,
+                        traceLabel:
+                            "option.provisionalHidden"
+                    )
                     try FlowTabUITestSwitcherCommandPayload.write(
                         targetApp.identity.bundleIdentifier
                     )
