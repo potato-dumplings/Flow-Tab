@@ -590,23 +590,22 @@ extension FlowTabUITests {
             result.resultID,
             "Search result \(result.identifier) did not expose a stable result id."
         )
-        try postFlowTabUITestSelectSearchResultAndWaitForDelivery(
+        _ = try performAndWaitForWindowSearchResultSelection(
+            in: app,
             resultID: resultID,
-            traceLabel: "\(traceLabel).selectSearchResult"
-        )
-
-        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        XCTAssertTrue(
-            waitForSwitcherDiagnostics(
-                diagnosticsSummary,
-                key: "searchSelectedResult", equals: resultID,
-                decodesPercentEncoding: true, timeout: 2
-            ),
-            """
-            Search result command did not select \(resultID).
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .windowSearchResultSelectionApplication,
+            trigger: {
+                try FlowTabUITestSwitcherCommandPayload.write(
+                    resultID
+                )
+                postFlowTabUITestSwitcherCommand(
+                    .selectSearchResult,
+                    traceLabel:
+                        "\(traceLabel).selectSearchResult"
+                )
+            }
         )
     }
 
