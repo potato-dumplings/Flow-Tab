@@ -228,7 +228,7 @@ extension FlowTabUITests {
                         self.waitForWorkflowSpaceContainingCGWindow(
                             title: fullscreenTitle,
                             app: targetApp,
-                            timeout: 12
+                            timeout: FlowTabUITestRuntimeTruthWatchdogPolicy.windowSearchInitialTopology
                         ),
                         "Window search noisy roundtrip must start on a Space containing the fullscreen sibling."
                     )
@@ -237,7 +237,7 @@ extension FlowTabUITests {
                         self.waitForFrontmostWorkflowSpaceCGWindow(
                             title: fullscreenTitle,
                             app: targetApp,
-                            timeout: 12
+                            timeout: FlowTabUITestRuntimeTruthWatchdogPolicy.windowSearchInitialTopology
                         ),
                         "Window search roundtrip must start with the fullscreen sibling frontmost."
                     )
