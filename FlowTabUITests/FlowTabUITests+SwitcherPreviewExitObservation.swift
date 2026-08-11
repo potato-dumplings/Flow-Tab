@@ -73,6 +73,27 @@ extension FlowTabUITests {
         in app: XCUIApplication,
         diagnostics: XCUIElement
     ) -> Bool {
+        enterSwitcherPreview(
+            workflowApp,
+            diagnostics: diagnostics,
+            timeout:
+                SwitcherPreviewTransitionPolicy
+                    .transitionWatchdog
+        ) {
+            app.typeKey(
+                .downArrow,
+                modifierFlags: []
+            )
+        }
+    }
+
+    func enterSwitcherPreview(
+        _ workflowApp:
+            SpaceFixtureResolvedWorkflow.App,
+        diagnostics: XCUIElement,
+        timeout: TimeInterval,
+        trigger: () -> Void
+    ) -> Bool {
         let baselineSnapshot =
             switcherDiagnosticsSnapshot(
                 diagnostics,
@@ -107,13 +128,10 @@ extension FlowTabUITests {
             expectedBundleIdentifier:
                 expectedBundleIdentifier,
             operation: "entry",
-            diagnostics: diagnostics
-        ) {
-            app.typeKey(
-                .downArrow,
-                modifierFlags: []
-            )
-        }
+            diagnostics: diagnostics,
+            timeout: timeout,
+            trigger: trigger
+        )
     }
 
     func requireActiveSwitcherPreview(
@@ -191,7 +209,10 @@ extension FlowTabUITests {
             expectedBundleIdentifier:
                 expectedBundleIdentifier,
             operation: "exit",
-            diagnostics: diagnostics
+            diagnostics: diagnostics,
+            timeout:
+                SwitcherPreviewTransitionPolicy
+                    .transitionWatchdog
         ) {
             app.typeKey(
                 .upArrow,
@@ -206,6 +227,7 @@ extension FlowTabUITests {
         expectedBundleIdentifier: String,
         operation: String,
         diagnostics: XCUIElement,
+        timeout: TimeInterval,
         trigger: () -> Void
     ) -> Bool {
         var triggerCompleted = false
@@ -233,9 +255,7 @@ extension FlowTabUITests {
 
         guard
             owner.waitForResolution(
-                timeout:
-                    SwitcherPreviewTransitionPolicy
-                        .transitionWatchdog
+                timeout: timeout
             ) != nil
         else {
             XCTFail(

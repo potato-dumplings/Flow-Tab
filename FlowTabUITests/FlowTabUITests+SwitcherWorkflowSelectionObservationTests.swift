@@ -309,6 +309,61 @@ extension FlowTabUITests {
         XCTAssertEqual(cancellationCount, 1)
     }
 
+    func testSwitcherWindowCycleEntryResolvesFromExactTriggerReadback() {
+        let bundleIdentifier = "com.example.notes"
+        let baseline =
+            FlowTabUITestSwitcherSelectionState(
+                selectedBundleIdentifier: bundleIdentifier,
+                mode: "appCycle"
+            )
+        var acceptsEvidence = false
+        var cancellationCount = 0
+        let owner =
+            FlowTabUITestSwitcherSelectionTransitionObservationOwner(
+                transition:
+                    .enterWindowCycle(from: baseline),
+                acceptsEvidence: {
+                    acceptsEvidence
+                },
+                observationRegistration: { _ in
+                    FlowTabUITestObservationCancellation {
+                        cancellationCount += 1
+                    }
+                },
+                readback: {
+                    self.switcherSelectionTestSnapshot(
+                        selected: bundleIdentifier,
+                        mode:
+                            "windowCycle("
+                            + bundleIdentifier
+                            + ")"
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertNil(owner.resolvedEvidence)
+        acceptsEvidence = true
+        owner.requestReadback(source: .triggerReadback)
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .triggerReadback
+        )
+        XCTAssertEqual(
+            owner.resolvedEvidence?.value.values,
+            [
+                "selected": bundleIdentifier,
+                "mode":
+                    "windowCycle("
+                    + bundleIdentifier
+                    + ")"
+            ]
+        )
+        XCTAssertEqual(cancellationCount, 1)
+    }
+
     func testSwitcherSelectionTransitionScheduledLatencyOnlyDelaysResolution() {
         let baseline =
             FlowTabUITestSwitcherSelectionState(

@@ -466,22 +466,22 @@ extension FlowTabUITests {
         }
 
         XCTAssertTrue(
-            performAndWaitForSwitcherDiagnostics(
-                diagnosticsSummary,
-                key: "mode",
-                hasPrefix: "windowCycle",
-                timeout: 4,
+            enterSwitcherPreview(
+                workflowApp,
+                diagnostics: diagnosticsSummary,
+                timeout:
+                    FlowTabUITestRuntimeTruthWatchdogPolicy
+                        .switcherWindowCycleEntry,
                 trigger: {
                     self.logWorkflowSpaceObservation(
                         "\(traceLabel).beforeEnterWindowState",
                         app: workflowApp
                     )
-                    self
-                        .postFlowTabUITestSwitcherCommandAndWaitForDelivery(
-                            .advanceDown,
-                            traceLabel:
-                                "\(traceLabel).enterWindowState"
-                        )
+                    postFlowTabUITestSwitcherCommand(
+                        .advanceDown,
+                        traceLabel:
+                            "\(traceLabel).enterWindowState"
+                    )
                     self.logWorkflowSpaceObservation(
                         "\(traceLabel).afterEnterWindowState",
                         app: workflowApp
@@ -493,12 +493,6 @@ extension FlowTabUITests {
 
             \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
             """
-        )
-        assertSwitcherSelectedApp(
-            workflowApp,
-            in: app,
-            diagnosticsSummary: diagnosticsSummary,
-            stage: "after entering Option+Tab window state"
         )
         if allowsNoisyCGSiblings {
             XCTAssertTrue(
@@ -528,28 +522,6 @@ extension FlowTabUITests {
             )
         }
         return diagnosticsSummary
-    }
-
-    private func assertSwitcherSelectedApp(
-        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
-        in app: XCUIApplication,
-        diagnosticsSummary: XCUIElement,
-        stage: String
-    ) {
-        XCTAssertTrue(
-            waitForSwitcherDiagnostics(
-                diagnosticsSummary,
-                key: "selected",
-                equals: workflowApp.identity.bundleIdentifier,
-                timeout: 4
-            ),
-            """
-            Option+Tab selected the wrong app \(stage). Expected \
-            \(workflowApp.identity.bundleIdentifier).
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
     }
 
     private func searchAndSelectWorkflowWindow(
