@@ -251,25 +251,15 @@ extension FlowTabUITests {
             logWorkflowSpaceObservation("\(traceLabel).beforeTrigger", app: targetApp)
             let readiness =
                 prepareWindowSearchPresentationReadiness(
-                    in: app
+                    in: app,
+                    workflowApp: targetApp,
+                    allowsNoisyCGSiblings:
+                        allowsNoisyCGSiblings
                 )
             postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.search, traceLabel: traceLabel)
             var searchInput = requireWindowSearchPresentation(
                 in: app,
                 observedBy: readiness
-            )
-            var diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            assertWindowSearchDataUsesWorkflowWindowCount(
-                for: targetApp,
-                in: app,
-                diagnosticsSummary: diagnosticsSummary,
-                stage: "before first search query",
-                allowsNoisyCGSiblings: allowsNoisyCGSiblings
-            )
-            assertWindowSearchUsesCommittedGenerationIndex(
-                in: app,
-                diagnosticsSummary: diagnosticsSummary,
-                stage: "before first search query"
             )
             logWorkflowSpaceObservation("\(traceLabel).afterSearchReady", app: targetApp)
             XCTAssertTrue(
@@ -320,19 +310,12 @@ extension FlowTabUITests {
                 app: targetApp,
                 traceLabel: "\(traceLabel).secondSearch"
             ) {
-                let relaunchedSearchInput = relaunchWindowSearch(app, traceLabel: traceLabel)
-                diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-                assertWindowSearchDataUsesWorkflowWindowCount(
-                    for: targetApp,
-                    in: app,
-                    diagnosticsSummary: diagnosticsSummary,
-                    stage: "before second search query",
-                    allowsNoisyCGSiblings: allowsNoisyCGSiblings
-                )
-                assertWindowSearchUsesCommittedGenerationIndex(
-                    in: app,
-                    diagnosticsSummary: diagnosticsSummary,
-                    stage: "before second search query"
+                let relaunchedSearchInput = relaunchWindowSearch(
+                    app,
+                    workflowApp: targetApp,
+                    allowsNoisyCGSiblings:
+                        allowsNoisyCGSiblings,
+                    traceLabel: traceLabel
                 )
                 logWorkflowSpaceObservation("\(traceLabel).afterSecondSearchReady", app: targetApp)
                 return relaunchedSearchInput
@@ -397,19 +380,11 @@ extension FlowTabUITests {
                     app: targetApp,
                     traceLabel: "\(traceLabel).relaunch.\(phase.trace)"
                 ) {
-                    let relaunchedSearchInput = relaunchWindowSearch(app, traceLabel: traceLabel)
-                    let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-                    assertWindowSearchDataUsesWorkflowWindowCount(
-                        for: targetApp,
-                        in: app,
-                        diagnosticsSummary: diagnosticsSummary,
-                        stage: "before \(phase.trace) search query",
-                        allowsNoisyCGSiblings: true
-                    )
-                    assertWindowSearchUsesCommittedGenerationIndex(
-                        in: app,
-                        diagnosticsSummary: diagnosticsSummary,
-                        stage: "before \(phase.trace) search query"
+                    let relaunchedSearchInput = relaunchWindowSearch(
+                        app,
+                        workflowApp: targetApp,
+                        allowsNoisyCGSiblings: true,
+                        traceLabel: traceLabel
                     )
                     return relaunchedSearchInput
                 }
@@ -571,80 +546,6 @@ extension FlowTabUITests {
         )
     }
 
-    private func assertWindowSearchDataUsesWorkflowWindowCount(
-        for workflowApp: SpaceFixtureResolvedWorkflow.App,
-        in app: XCUIApplication,
-        diagnosticsSummary: XCUIElement,
-        stage: String,
-        allowsNoisyCGSiblings: Bool = false
-    ) {
-        XCTAssertTrue(
-            waitForSwitcherSearchResultSet(
-                diagnosticsSummary,
-                appID:
-                    workflowApp.identity.bundleIdentifier,
-                expectedTitles:
-                    Set(workflowApp.expectedWindowTitles),
-                expectedCount:
-                    allowsNoisyCGSiblings
-                        ? nil
-                        : workflowApp.windowCount,
-                timeout: 4
-            ),
-            """
-            Window search committed index exposed the wrong window rows for \
-            \(workflowApp.appName) \(stage). Expected titles \
-            \(workflowApp.expectedWindowTitles.sorted())\(allowsNoisyCGSiblings ? "" : " count=\(workflowApp.windowCount)").
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-    }
-
-    private func assertWindowSearchUsesCommittedGenerationIndex(
-        in app: XCUIApplication,
-        diagnosticsSummary: XCUIElement,
-        stage: String
-    ) {
-        XCTAssertTrue(
-            waitForSwitcherDiagnostics(
-                [
-                    FlowTabUITestSwitcherDiagnosticsExpectation(
-                        key: "searchIndexReadiness",
-                        expectedValue:
-                            "committedGenerationValidated"
-                    ),
-                    FlowTabUITestSwitcherDiagnosticsExpectation(
-                        key: "searchIndexResultState",
-                        expectedValue:
-                            "committedGenerationResult"
-                    ),
-                    FlowTabUITestSwitcherDiagnosticsExpectation(
-                        key: "searchIndexDegraded",
-                        expectedValue: "0"
-                    ),
-                    FlowTabUITestSwitcherDiagnosticsExpectation(
-                        key:
-                            "searchIndexCoversCurrentGeneration",
-                        expectedValue: "1"
-                    ),
-                    FlowTabUITestSwitcherDiagnosticsExpectation(
-                        key:
-                            "searchFreshnessBarrierRequested",
-                        expectedValue: "0"
-                    )
-                ],
-                in: diagnosticsSummary,
-                timeout: 4
-            ),
-            """
-            Window search did not read a committed-generation Search index \(stage).
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-    }
-
     private func searchAndSelectWorkflowWindow(
         title: String,
         app workflowApp: SpaceFixtureResolvedWorkflow.App,
@@ -763,11 +664,19 @@ extension FlowTabUITests {
         )
     }
 
-    private func relaunchWindowSearch(_ app: XCUIApplication, traceLabel: String) -> XCUIElement {
+    private func relaunchWindowSearch(
+        _ app: XCUIApplication,
+        workflowApp: SpaceFixtureResolvedWorkflow.App,
+        allowsNoisyCGSiblings: Bool,
+        traceLabel: String
+    ) -> XCUIElement {
         XCTAssertTrue(app.state == .runningForeground || app.state == .runningBackground)
         let readiness =
             prepareWindowSearchPresentationReadiness(
-                in: app
+                in: app,
+                workflowApp: workflowApp,
+                allowsNoisyCGSiblings:
+                    allowsNoisyCGSiblings
             )
         postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.search, traceLabel: "\(traceLabel).relaunch")
         return requireWindowSearchPresentation(
