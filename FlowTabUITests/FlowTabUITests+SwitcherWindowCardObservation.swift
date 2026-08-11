@@ -181,6 +181,7 @@ extension FlowTabUITests {
         expectedTitles: [String],
         excludedTitles: [String] = [],
         previousWindowCardIdentifiers: Set<String> = [],
+        requiresEmptyInitialSnapshot: Bool = false,
         timeout: TimeInterval,
         trigger: () -> Void
     ) -> [SwitcherWindowCardObservation] {
@@ -209,6 +210,15 @@ extension FlowTabUITests {
             )
         owner.start()
         defer { owner.cancel() }
+        if requiresEmptyInitialSnapshot,
+            owner.latestSnapshot?.cards.isEmpty != true
+        {
+            XCTFail(
+                "Switcher window-card baseline mismatch; "
+                    + "expectedCardCount=0. "
+                    + owner.diagnosticSummary
+            )
+        }
 
         trigger()
         triggerCompleted = true
