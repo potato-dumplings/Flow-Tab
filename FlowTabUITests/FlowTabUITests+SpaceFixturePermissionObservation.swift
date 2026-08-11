@@ -222,13 +222,22 @@ extension FlowTabUITests {
         )
         guard readinessSatisfied else { return false }
 
-        let navigationSatisfied = tapFirstHittable(
-            in: app.buttons.matching(
-                identifier: Identifier.homeTabButton
-            ),
-            timeout: 10
+        let homeButtons = app.buttons.matching(
+            identifier: Identifier.homeTabButton
         )
-        XCTAssertTrue(navigationSatisfied)
+        let navigationSatisfied = tapFirstHittable(
+            in: homeButtons,
+            timeout:
+                FlowTabUITestSupportWatchdogPolicy
+                    .spaceFixtureNavigation
+        )
+        XCTAssertTrue(
+            navigationSatisfied,
+            "Space Fixture permission-preflight Home navigation trigger "
+                + "watchdog expired. "
+                + "identifier=\(Identifier.homeTabButton) "
+                + "finalCandidateCount=\(homeButtons.count)"
+        )
         guard navigationSatisfied else { return false }
 
         observation.requestReadback(source: .triggerReadback)

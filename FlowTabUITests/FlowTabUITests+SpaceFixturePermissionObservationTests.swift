@@ -220,6 +220,12 @@ extension FlowTabUITests {
         )
     }
 
+    func testSpaceFixturePermissionPreflightResolvesExactGrantedProjection() {
+        XCTAssertTrue(
+            assertSpaceFixtureWorkflowPermissionsAvailable()
+        )
+    }
+
     func testHomePermissionStatusPublishesExactGrantedAccessibilityEvidence() {
         let app = makeApp(
             additionalArguments: [
