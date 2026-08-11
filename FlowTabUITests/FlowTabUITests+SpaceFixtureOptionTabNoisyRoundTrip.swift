@@ -1,6 +1,18 @@
 import XCTest
 
+private enum FlowTabUITestNoisyOptionTabPolicy {
+    static let exactPreviewProjectionWatchdog: TimeInterval = 8
+}
+
 extension FlowTabUITests {
+    func testNoisyOptionTabPolicyUsesNamedWatchdogs() {
+        let watchdog =
+            FlowTabUITestNoisyOptionTabPolicy
+                .exactPreviewProjectionWatchdog
+        XCTAssertEqual(watchdog, 8)
+        XCTAssertTrue(watchdog.isFinite && watchdog > 0)
+    }
+
     func runNoisyOptionTabWindowStateRoundTrip(
         app: XCUIApplication,
         targetApp: SpaceFixtureResolvedWorkflow.App,
@@ -77,7 +89,9 @@ extension FlowTabUITests {
                 waitForSwitcherPreviewTitles(
                     diagnosticsSummary,
                     toExactlyMatch: targetApp.expectedWindowTitles,
-                    timeout: 8
+                    timeout:
+                        FlowTabUITestNoisyOptionTabPolicy
+                            .exactPreviewProjectionWatchdog
                 ),
                 """
                 Noisy Option+Tab \(phase.trace) phase must expose exactly the four user windows.
