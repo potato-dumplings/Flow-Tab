@@ -3,6 +3,7 @@ import XCTest
 
 private enum FlowTabUITestSystemAppMRUPolicy {
     static let appOrderWatchdog: TimeInterval = 10
+    static let appRankBootstrapLogWatchdog: TimeInterval = 10
     static let switcherDismissalWatchdog: TimeInterval = 4
 }
 
@@ -41,10 +42,17 @@ extension FlowTabUITests {
     func testSystemAppMRUPolicyUsesNamedWatchdogs() {
         let policies = [
             FlowTabUITestSystemAppMRUPolicy.appOrderWatchdog,
+            FlowTabUITestSystemAppMRUPolicy
+                .appRankBootstrapLogWatchdog,
             FlowTabUITestSystemAppMRUPolicy.switcherDismissalWatchdog
         ]
         XCTAssertEqual(
             FlowTabUITestSystemAppMRUPolicy.appOrderWatchdog,
+            10
+        )
+        XCTAssertEqual(
+            FlowTabUITestSystemAppMRUPolicy
+                .appRankBootstrapLogWatchdog,
             10
         )
         XCTAssertEqual(
@@ -87,7 +95,9 @@ extension FlowTabUITests {
             waitForRuntimeLogFiles(
                 containing: ["collectAppRank", "bootstrapFallback=0"],
                 since: initialLaunchLogSnapshot,
-                timeout: 10
+                timeout:
+                    FlowTabUITestSystemAppMRUPolicy
+                        .appRankBootstrapLogWatchdog
             )
 
             terminateFlowTabUITestApplicationAndWait(
@@ -126,7 +136,9 @@ extension FlowTabUITests {
             waitForRuntimeLogFiles(
                 containing: ["collectAppRank", "bootstrapFallback=0"],
                 since: relaunchedLogSnapshot,
-                timeout: 10
+                timeout:
+                    FlowTabUITestSystemAppMRUPolicy
+                        .appRankBootstrapLogWatchdog
             )
 
             for iteration in 1...10 {
