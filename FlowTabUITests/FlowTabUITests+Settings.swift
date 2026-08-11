@@ -455,10 +455,10 @@ extension FlowTabUITests {
     func testSettingsLanguageDropdownUsesLiveIntrinsicWidth() throws {
         let app = makeApp(additionalArguments: hotkeyEffectArguments(resetDefaults: true))
         launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
-
-        let language = element(in: app, identifier: Identifier.settingsAppearanceAppLanguage)
-        XCTAssertTrue(language.waitForExistence(timeout: 6))
+        guard let language = waitForSettingsControl(
+            in: app, identifier: Identifier.settingsAppearanceAppLanguage,
+            trigger: { openSettingsTab(in: app) }
+        ) else { return }
         XCTAssertGreaterThanOrEqual(language.frame.width, 100)
         XCTAssertLessThan(language.frame.width, 120)
     }
