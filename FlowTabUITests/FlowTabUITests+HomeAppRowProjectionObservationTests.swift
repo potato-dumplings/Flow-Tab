@@ -107,6 +107,73 @@ extension FlowTabUITests {
         )
     }
 
+    func testHomeRuntimeOrderProjectionPolicyPreservesCumulativeBound() {
+        XCTAssertEqual(
+            FlowTabUITestHomeRuntimeOrderProjectionPolicy.watchdog,
+            36
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeRuntimeOrderProjectionPolicy
+                .watchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestHomeRuntimeOrderProjectionPolicy.watchdog,
+            0
+        )
+    }
+
+    func testHomeAppRowProjectionCapturesOrderWithoutConstrainingValues() {
+        let expectation = FlowTabUITestHomeAppRowProjectionExpectation(
+            rows: [
+                .init(
+                    identifier:
+                        FlowTabUITestHomeAppRowProjectionTestFixture
+                            .mailIdentifier,
+                    value: nil
+                ),
+                .init(
+                    identifier:
+                        FlowTabUITestHomeAppRowProjectionTestFixture
+                            .browserIdentifier,
+                    value: nil
+                )
+            ],
+            frameOrder: .unconstrained
+        )
+        let snapshot =
+            FlowTabUITestHomeAppRowProjectionTestFixture.snapshot(
+                mailValue: "5w",
+                mailFrameMinY: 200,
+                browserValue: "1w hidden",
+                browserFrameMinY: 100
+            )
+
+        XCTAssertTrue(expectation.isSatisfied(by: snapshot))
+        XCTAssertEqual(
+            snapshot.identifiersByAscendingFrame,
+            [
+                FlowTabUITestHomeAppRowProjectionTestFixture
+                    .browserIdentifier,
+                FlowTabUITestHomeAppRowProjectionTestFixture
+                    .mailIdentifier
+            ]
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by:
+                    FlowTabUITestHomeAppRowProjectionTestFixture
+                        .snapshot(browserExists: false)
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by:
+                    FlowTabUITestHomeAppRowProjectionTestFixture
+                        .snapshot(mailFrameMinY: .nan)
+            )
+        )
+    }
+
     func testHomeAppRowPositionRequiresExactRowsWithinAccuracy() {
         let expectation =
             FlowTabUITestHomeAppRowProjectionTestFixture

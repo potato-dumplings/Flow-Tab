@@ -46,30 +46,6 @@ extension FlowTabUITests {
             app,
             scenario: "Home and fresh Option+Tab runtime order"
         )
-        let homeTabButtons = app.buttons.matching(
-            identifier: Identifier.homeTabButton
-        )
-        let homeTabButton = homeTabButtons.firstMatch
-        let homeContent = element(
-            in: app,
-            identifier: Identifier.homeTabContent
-        )
-        XCTAssertTrue(
-            tapFirstHittableAndWaitForExistence(
-                in: homeTabButtons,
-                content: homeContent,
-                contentDescription: Identifier.homeTabContent,
-                timeout:
-                    FlowTabUITestSupportWatchdogPolicy
-                        .tabNavigation
-            ),
-            "Home runtime-order navigation watchdog expired. "
-                + "candidateCount=\(homeTabButtons.count) "
-                + "firstExists=\(homeTabButton.exists) "
-                + "firstHittable=\(homeTabButton.isHittable) "
-                + "contentExists=\(homeContent.exists)"
-        )
-
         let appIDs = [
             "com.flowtab.mock.mail",
             "com.flowtab.mock.browser",
@@ -78,21 +54,62 @@ extension FlowTabUITests {
             "com.xxx.csgo",
             "com.flowtab.mock.file-transfer-assistant",
         ]
-        let homeRows = appIDs.map { appID in
-            (
-                appID,
-                element(
-                    in: app,
-                    identifier: "flowtab.home.app.\(appID.flowTabUITestAccessibilityIdentifierComponent)"
-                )
+        let expectedHomeRows = appIDs.map {
+            FlowTabUITestHomeAppRowProjectionExpectation.Row(
+                identifier: "flowtab.home.app."
+                    + $0.flowTabUITestAccessibilityIdentifierComponent,
+                value: nil
             )
         }
-        for (_, row) in homeRows {
-            XCTAssertTrue(row.waitForExistence(timeout: 6))
+        var acceptsHomeRowEvidence = false
+        let homeRowObservation = makeHomeAppRowProjectionObservation(
+            in: app,
+            rows: expectedHomeRows,
+            frameOrder: .unconstrained,
+            acceptsEvidence: { acceptsHomeRowEvidence }
+        )
+        homeRowObservation.start()
+        defer { homeRowObservation.cancel() }
+
+        let homeTabButtons = app.buttons.matching(identifier: Identifier.homeTabButton)
+        let homeContent = element(in: app, identifier: Identifier.homeTabContent)
+        let navigationSatisfied =
+            tapFirstHittableAndWaitForExistence(
+                in: homeTabButtons,
+                content: homeContent,
+                contentDescription: Identifier.homeTabContent,
+                timeout: FlowTabUITestSupportWatchdogPolicy.tabNavigation
+            )
+        XCTAssertTrue(
+            navigationSatisfied,
+            "Home runtime-order navigation watchdog expired. "
+                + "candidateCount=\(homeTabButtons.count) "
+                + "contentExists=\(homeContent.exists)"
+        )
+
+        guard navigationSatisfied else { return }
+        acceptsHomeRowEvidence = true
+        homeRowObservation.requestReadback(source: .triggerReadback)
+        guard
+            let homeRowProjection =
+                homeRowObservation.waitForResolution(
+                    timeout:
+                        FlowTabUITestHomeRuntimeOrderProjectionPolicy
+                            .watchdog
+                )?.value,
+            let homeOrder = homeRowProjection.identifiersByAscendingFrame?
+                .compactMap { identifier in
+                    expectedHomeRows.firstIndex { $0.identifier == identifier }
+                    .map { appIDs[$0] }
+                },
+            homeOrder.count == appIDs.count
+        else {
+            XCTFail(
+                "Home runtime-order projection watchdog expired. "
+                    + homeRowObservation.diagnosticSummary
+            )
+            return
         }
-        let homeOrder = homeRows
-            .sorted { $0.1.frame.minY < $1.1.frame.minY }
-            .map(\.0)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         app.activate()

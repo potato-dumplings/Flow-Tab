@@ -10,13 +10,31 @@ enum FlowTabUITestHomeAppliedRowProjectionPolicy {
     static let positionAccuracy: Double = 1
 }
 
+enum FlowTabUITestHomeRuntimeOrderProjectionPolicy {
+    static let watchdog: TimeInterval = 36
+}
+
 struct FlowTabUITestHomeAppRowProjectionExpectation: Equatable {
+    enum FrameOrder: String, Equatable {
+        case expectationOrder
+        case unconstrained
+    }
+
     struct Row: Equatable {
         let identifier: String
-        let value: String
+        let value: String?
     }
 
     let rows: [Row]
+    let frameOrder: FrameOrder
+
+    init(
+        rows: [Row],
+        frameOrder: FrameOrder = .expectationOrder
+    ) {
+        self.rows = rows
+        self.frameOrder = frameOrder
+    }
 
     func isSatisfied(
         by snapshot: FlowTabUITestHomeAppRowProjectionSnapshot
@@ -29,13 +47,18 @@ struct FlowTabUITestHomeAppRowProjectionExpectation: Equatable {
         for (expected, actual) in zip(rows, snapshot.rows) {
             guard actual.identifier == expected.identifier,
                   actual.exists,
-                  actual.value == expected.value,
                   let frameMinY = actual.frameMinY,
                   frameMinY.isFinite
             else {
                 return false
             }
-            if let previousFrameMinY,
+            if let expectedValue = expected.value,
+               actual.value != expectedValue
+            {
+                return false
+            }
+            if frameOrder == .expectationOrder,
+               let previousFrameMinY,
                previousFrameMinY >= frameMinY
             {
                 return false
@@ -46,10 +69,12 @@ struct FlowTabUITestHomeAppRowProjectionExpectation: Equatable {
     }
 
     var diagnosticSummary: String {
-        rows.map {
-            "identifier=\($0.identifier) value=\($0.value)"
-        }
-        .joined(separator: ";")
+        "frameOrder=\(frameOrder.rawValue) "
+            + rows.map {
+                "identifier=\($0.identifier) "
+                    + "expectedValue=\($0.value ?? "any")"
+            }
+            .joined(separator: ";")
     }
 }
 
@@ -77,6 +102,22 @@ struct FlowTabUITestHomeAppRowProjectionSnapshot: Equatable {
                 + "frameMinY=\($0.frameMinY.map { String($0) } ?? "nil")"
         }
         .joined(separator: ";")
+    }
+
+    var identifiersByAscendingFrame: [String]? {
+        let positionedRows = rows.compactMap { row -> (String, Double)? in
+            guard row.exists,
+                  let frameMinY = row.frameMinY,
+                  frameMinY.isFinite
+            else {
+                return nil
+            }
+            return (row.identifier, frameMinY)
+        }
+        guard positionedRows.count == rows.count else { return nil }
+        return positionedRows
+            .sorted { $0.1 < $1.1 }
+            .map(\.0)
     }
 }
 
@@ -221,6 +262,9 @@ extension FlowTabUITests {
         in app: XCUIApplication,
         rows:
             [FlowTabUITestHomeAppRowProjectionExpectation.Row],
+        frameOrder:
+            FlowTabUITestHomeAppRowProjectionExpectation.FrameOrder =
+                .expectationOrder,
         acceptsEvidence: @escaping () -> Bool = {
             true
         },
@@ -245,7 +289,8 @@ extension FlowTabUITests {
         return FlowTabUITestHomeAppRowProjectionObservationOwner(
             expectation:
                 FlowTabUITestHomeAppRowProjectionExpectation(
-                    rows: rows
+                    rows: rows,
+                    frameOrder: frameOrder
                 ),
             acceptsEvidence: acceptsEvidence,
             acceptsSnapshot: acceptsSnapshot,
