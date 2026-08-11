@@ -75,6 +75,40 @@ extension FlowTabUITests {
         XCTAssertEqual(cancellationCount, 1)
     }
 
+    func testElementNonExistenceObservationSlowSchedulingOnlyDelaysResolution() {
+        var exists = true
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        let owner =
+            FlowTabUITestElementNonExistenceObservationOwner(
+                elementIdentifier: "target",
+                scheduledRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: { exists }
+            )
+        owner.start()
+        defer { owner.cancel() }
+        owner.markTriggerCompleted()
+
+        for _ in 0..<5 {
+            scheduledReadback?(.scheduledReadback)
+            XCTAssertNil(owner.resolvedEvidence)
+        }
+
+        exists = false
+        scheduledReadback?(.scheduledReadback)
+        let evidence = owner.waitForResolution(
+            timeout:
+                FlowTabUITestElementNonExistenceObservationTestPolicy
+                    .watchdog
+        )
+
+        XCTAssertEqual(evidence?.source, .scheduledReadback)
+        XCTAssertEqual(evidence?.value.exists, false)
+    }
+
     func testElementNonExistenceObservationCancellationRejectsLateReadback() {
         var exists = true
         var scheduledReadback:

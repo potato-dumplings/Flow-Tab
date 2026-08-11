@@ -462,6 +462,7 @@
 		B23012012FC2000100B0D737 /* FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23002012FC2000100B0D737 /* FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift */; };
 		B24012012FC3000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabNoisyRoundTrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24002012FC3000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabNoisyRoundTrip.swift */; };
 		B24112012FC3000100B0D737 /* FlowTabUITests+RuntimeTruthWatchdogPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24102012FC3000100B0D737 /* FlowTabUITests+RuntimeTruthWatchdogPolicy.swift */; };
+		B24212012FC3000100B0D737 /* FlowTabUITests+OptionTabConfirmationObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24202012FC3000100B0D737 /* FlowTabUITests+OptionTabConfirmationObservation.swift */; };
 		B25012012FC4000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabSpaceBacked.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25002012FC4000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabSpaceBacked.swift */; };
 		B1C2D3E42F74000100B0D737 /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E32F74000100B0D737 /* AppLocalization.swift */; };
 		C20000012FBD000100B0D737 /* HomeWindowActivationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000112FBD000100B0D737 /* HomeWindowActivationController.swift */; };
@@ -829,6 +830,7 @@
 		B23002012FC2000100B0D737 /* FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift"; sourceTree = "<group>"; };
 		B24002012FC3000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabNoisyRoundTrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureOptionTabNoisyRoundTrip.swift"; sourceTree = "<group>"; };
 		B24102012FC3000100B0D737 /* FlowTabUITests+RuntimeTruthWatchdogPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+RuntimeTruthWatchdogPolicy.swift"; sourceTree = "<group>"; };
+		B24202012FC3000100B0D737 /* FlowTabUITests+OptionTabConfirmationObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+OptionTabConfirmationObservation.swift"; sourceTree = "<group>"; };
 		B25002012FC4000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabSpaceBacked.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureOptionTabSpaceBacked.swift"; sourceTree = "<group>"; };
 		B1C2D3E32F74000100B0D737 /* AppLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocalization.swift; sourceTree = "<group>"; };
 		C20000112FBD000100B0D737 /* HomeWindowActivationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeWindowActivationController.swift; sourceTree = "<group>"; };
@@ -1562,6 +1564,7 @@
 				B23002012FC2000100B0D737 /* FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift */,
 				B24002012FC3000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabNoisyRoundTrip.swift */,
 				B24102012FC3000100B0D737 /* FlowTabUITests+RuntimeTruthWatchdogPolicy.swift */,
+				B24202012FC3000100B0D737 /* FlowTabUITests+OptionTabConfirmationObservation.swift */,
 				B25002012FC4000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabSpaceBacked.swift */,
 				F50000172FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift */,
 				F50000182FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsAssertions.swift */,
@@ -2651,6 +2654,7 @@
 				B23012012FC2000100B0D737 /* FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift in Sources */,
 				B24012012FC3000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabNoisyRoundTrip.swift in Sources */,
 				B24112012FC3000100B0D737 /* FlowTabUITests+RuntimeTruthWatchdogPolicy.swift in Sources */,
+				B24212012FC3000100B0D737 /* FlowTabUITests+OptionTabConfirmationObservation.swift in Sources */,
 				B25012012FC4000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabSpaceBacked.swift in Sources */,
 				F50001162FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift in Sources */,
 				F50001172FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsAssertions.swift in Sources */,
