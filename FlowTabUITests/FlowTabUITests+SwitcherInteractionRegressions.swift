@@ -114,18 +114,19 @@ extension FlowTabUITests {
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         app.activate()
         XCUIElement.perform(withKeyModifiers: .option) {
-            app.typeKey(.tab, modifierFlags: .option)
-
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 5))
-            let switcherOrder = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "apps"
+            XCTAssertTrue(
+                performAndWaitForSwitcherAppProjection(
+                    diagnosticsSummary,
+                    expectation: .orderedBundleIdentifiers(homeOrder),
+                    timeout:
+                        FlowTabUITestSwitcherAppProjectionPolicy
+                            .runtimeOrderWatchdog,
+                    trigger: {
+                        app.typeKey(.tab, modifierFlags: .option)
+                    }
+                ),
+                "Fresh Option+Tab must publish the Home runtime App order."
             )
-            .split(separator: "|")
-            .compactMap { entry in
-                entry.split(separator: ":", maxSplits: 1).first.map(String.init)
-            }
-            XCTAssertEqual(switcherOrder, homeOrder)
         }
     }
 

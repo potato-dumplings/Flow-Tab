@@ -26,6 +26,21 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherAppProjectionRuntimeOrderPolicyPreservesCompatibleBound() {
+        XCTAssertEqual(
+            FlowTabUITestSwitcherAppProjectionPolicy.runtimeOrderWatchdog,
+            5
+        )
+        XCTAssertTrue(
+            FlowTabUITestSwitcherAppProjectionPolicy
+                .runtimeOrderWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSwitcherAppProjectionPolicy.runtimeOrderWatchdog,
+            0
+        )
+    }
+
     func testSwitcherAppProjectionParsesBundleAndWindowCount() {
         let entry = FlowTabUITestSwitcherAppProjectionEntry(
             rawValue: "com.example.browser:2"
@@ -43,6 +58,49 @@ extension FlowTabUITests {
             FlowTabUITestSwitcherAppProjectionEntry(
                 rawValue: "com.example.browser:unknown"
             ).windowCount
+        )
+    }
+
+    func testSwitcherAppProjectionRequiresExactBundleIdentifierOrder() {
+        let expectation =
+            FlowTabUITestSwitcherAppProjectionExpectation
+                .orderedBundleIdentifiers(
+                    ["com.example.browser", "com.example.mail"]
+                )
+
+        XCTAssertTrue(
+            expectation.isSatisfied(
+                by: switcherAppProjectionTestSnapshot(
+                    [
+                        "com.example.browser:99",
+                        "com.example.mail:unknown"
+                    ]
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: switcherAppProjectionTestSnapshot(
+                    ["com.example.mail:1", "com.example.browser:2"]
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: switcherAppProjectionTestSnapshot(
+                    ["com.example.browser:99"]
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: switcherAppProjectionTestSnapshot(
+                    [
+                        "com.example.browser.backup:99",
+                        "com.example.mail:1"
+                    ]
+                )
+            )
         )
     }
 

@@ -3,6 +3,7 @@ import XCTest
 
 enum FlowTabUITestSwitcherAppProjectionPolicy {
     static let postLaunchWatchdog: TimeInterval = 10
+    static let runtimeOrderWatchdog: TimeInterval = 5
 }
 
 struct FlowTabUITestSwitcherAppProjectionEntry: Equatable {
@@ -104,6 +105,7 @@ enum FlowTabUITestSwitcherAppProjectionExpectation:
     case exactEntry(String)
     case bundleIdentifier(String)
     case bundleIdentifiers(required: Set<String>, excluded: Set<String>)
+    case orderedBundleIdentifiers([String])
 
     func isSatisfied(
         by snapshot:
@@ -137,6 +139,9 @@ enum FlowTabUITestSwitcherAppProjectionExpectation:
             let observed = Set(readback.entries.map(\.bundleIdentifier))
             return required.isSubset(of: observed)
                 && observed.isDisjoint(with: excluded)
+        case let .orderedBundleIdentifiers(expectedBundleIDs):
+            return readback.entries.map(\.bundleIdentifier)
+                == expectedBundleIDs
         }
     }
 
@@ -149,6 +154,8 @@ enum FlowTabUITestSwitcherAppProjectionExpectation:
         case let .bundleIdentifiers(required, excluded):
             return "requiredBundleIDs=\(required.sorted()) "
                 + "excludedBundleIDs=\(excluded.sorted())"
+        case let .orderedBundleIdentifiers(expectedBundleIDs):
+            return "orderedBundleIDs=\(expectedBundleIDs)"
         }
     }
 }
@@ -382,6 +389,40 @@ extension FlowTabUITests {
                 .bundleIdentifier(bundleIdentifier),
             timeout: timeout
         )
+    }
+
+    func performAndWaitForSwitcherAppProjection(
+        _ diagnosticsSummaryElement: XCUIElement,
+        expectation:
+            FlowTabUITestSwitcherAppProjectionExpectation,
+        timeout: TimeInterval,
+        trigger: () -> Void
+    ) -> Bool {
+        var triggerCompleted = false
+        let owner = FlowTabUITestSwitcherAppProjectionObservationOwner(
+            expectation: expectation,
+            acceptsResolution: { triggerCompleted },
+            readback: {
+                self.switcherAppProjectionSnapshot(
+                    diagnosticsSummaryElement
+                )
+            }
+        )
+        owner.start()
+        defer { owner.cancel() }
+
+        trigger()
+        triggerCompleted = true
+        owner.requestReadback(source: .triggerReadback)
+
+        guard owner.waitForResolution(timeout: timeout) != nil else {
+            XCTFail(
+                "Switcher app projection watchdog expired. "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+        return true
     }
 
     private func waitForSwitcherAppProjection(
