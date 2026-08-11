@@ -118,17 +118,17 @@ extension FlowTabUITests {
                 diagnosticsSummary: diagnosticsSummary,
                 traceLabel: traceLabel
             )
-
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "\(traceLabel).confirmStandard")
-            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
             XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
+                triggerAndWaitForFrontmostWorkflowWindow(
                     windowNumber: standardSelection.windowNumber,
                     title: standardTitle,
                     app: targetApp,
-                    timeout: 12
-                )
+                    timeout: FlowTabUITestRuntimeTruthWatchdogPolicy.optionTabConfirmedWindowActivation
+                ) {
+                    postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "\(traceLabel).confirmStandard")
+                }
             )
+            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
             logWorkflowSpaceObservation("\(traceLabel).afterStandardConfirm", app: targetApp)
 
             diagnosticsSummary = try relaunchGlobalSwitcher(
@@ -169,17 +169,17 @@ extension FlowTabUITests {
                 diagnosticsSummary: diagnosticsSummary,
                 traceLabel: traceLabel
             )
-
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "\(traceLabel).confirmFullscreen")
-            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
             XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
+                triggerAndWaitForFrontmostWorkflowWindow(
                     windowNumber: fullscreenSelection.windowNumber,
                     title: targetFullscreenTitle,
                     app: targetApp,
-                    timeout: 12
-                )
+                    timeout: FlowTabUITestRuntimeTruthWatchdogPolicy.optionTabConfirmedWindowActivation
+                ) {
+                    postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "\(traceLabel).confirmFullscreen")
+                }
             )
+            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
             logWorkflowSpaceObservation("\(traceLabel).afterFullscreenConfirm", app: targetApp)
         }
     }
