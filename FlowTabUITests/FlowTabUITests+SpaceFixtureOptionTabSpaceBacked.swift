@@ -17,6 +17,8 @@ extension FlowTabUITests {
             },
             flowTabLaunchTraceLabel: "option.spaceBacked"
         ) { _, app in
+            defer { runtimeLogSnapshot.cancel() }
+
             waitForSpaceBackedWindowLayerProjection(
                 title: targetTitle,
                 appName: targetApp.appName,
@@ -273,7 +275,9 @@ extension FlowTabUITests {
         waitForRuntimeLogFiles(
             matching: #"window-entries app=\#(escapedAppName) .*title=\#(escapedTitle)[^\n]*ax=0[^\n]*sticky=0[^\n]*source=nil:spaceEvidence=(observed|inferredFromTopology|inferredFromFullscreenGeometry):publicAXRecovery=1"#,
             since: snapshot,
-            timeout: 8,
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .spaceBackedWindowLayerProjectionPublication,
             description: "space-backed CG-only window-layer projection before switcher trigger"
         )
     }
