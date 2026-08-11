@@ -5,7 +5,8 @@ private enum FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy {
     static let controlTabDiagnostics: TimeInterval = 5
     static let controlTabSelectedPreview: TimeInterval = 5
     static let controlTabWindowCards: TimeInterval = 5
-    static let compatibleBounds = [foregroundReadiness, controlTabDiagnostics, controlTabSelectedPreview, controlTabWindowCards]
+    static let delayedPresentationDismissal: TimeInterval = 5
+    static let compatibleBounds = [foregroundReadiness, controlTabDiagnostics, controlTabSelectedPreview, controlTabWindowCards, delayedPresentationDismissal]
 }
 
 private enum FlowTabUITestDelayedWindowLayerEntryEvidence {
@@ -22,7 +23,7 @@ private enum FlowTabUITestDelayedWindowLayerEntryEvidence {
 extension FlowTabUITests {
     func testSwitcherInteractionRegressionWatchdogPolicyPreservesCompatibleBound() {
         let policies = FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy.compatibleBounds
-        XCTAssertEqual(policies, [10, 5, 5, 5])
+        XCTAssertEqual(policies, [10, 5, 5, 5, 5])
         XCTAssertTrue(policies.allSatisfy { $0.isFinite && $0 > 0 })
     }
 
@@ -338,13 +339,13 @@ extension FlowTabUITests {
                         .prewarmBeforeEntryDescription
             )
 
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
-                .confirm,
-                traceLabel: "\(traceLabel).confirm"
-            )
-            XCTAssertTrue(
-                waitForNonExistence(diagnosticsSummary, timeout: 5),
-                "Delayed-entry pressure iteration \(iteration) must release its presentation owner."
+            assertElementDoesNotExistAfterTrigger(
+                diagnosticsSummary,
+                timeout: FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy.delayedPresentationDismissal,
+                description: "Delayed-entry pressure iteration \(iteration) presentation dismissal",
+                trigger: {
+                    postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "\(traceLabel).confirm")
+                }
             )
         }
     }
@@ -395,5 +396,4 @@ extension FlowTabUITests {
             ]
         )
     }
-
 }

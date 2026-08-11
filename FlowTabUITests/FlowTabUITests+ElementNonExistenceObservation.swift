@@ -1,4 +1,5 @@
 import Foundation
+import XCTest
 
 private enum FlowTabUITestElementNonExistencePhase: String {
     case initialReadback
@@ -117,5 +118,45 @@ final class FlowTabUITestElementNonExistenceObservationOwner {
 
     func cancel() {
         conditionOwner.cancel()
+    }
+}
+
+extension FlowTabUITests {
+    func assertElementDoesNotExistAfterTrigger(
+        _ element: XCUIElement,
+        timeout: TimeInterval,
+        description: String,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        trigger: () -> Void
+    ) {
+        let observation =
+            FlowTabUITestElementNonExistenceObservationOwner(
+                elementIdentifier: element.identifier,
+                readback: { element.exists }
+            )
+        observation.start()
+        defer { observation.cancel() }
+
+        if observation.latestEvidence?.value.exists != true {
+            XCTFail(
+                "\(description) baseline mismatch; expectedExists=1. "
+                    + observation.diagnosticSummary,
+                file: file,
+                line: line
+            )
+        }
+
+        trigger()
+        observation.markTriggerCompleted()
+        guard observation.waitForResolution(timeout: timeout) != nil else {
+            XCTFail(
+                "\(description) watchdog expired. "
+                    + observation.diagnosticSummary,
+                file: file,
+                line: line
+            )
+            return
+        }
     }
 }
