@@ -6,6 +6,7 @@ enum FlowTabUITestRuntimeTruthWatchdogPolicy {
     static let optionTabInitialWindowStateTopology: TimeInterval = 4
     static let optionTabConfirmedWindowActivation: TimeInterval = 12
     static let optionTabSwitcherDismissal: TimeInterval = 4
+    static let optionTabRelaunchWindowTopology: TimeInterval = 4
 }
 
 extension FlowTabUITests {
@@ -33,5 +34,11 @@ extension FlowTabUITests {
                 .optionTabSwitcherDismissal
         XCTAssertEqual(switcherDismissal, 4)
         XCTAssertTrue(switcherDismissal.isFinite && switcherDismissal > 0)
+
+        let relaunchWindowTopology =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .optionTabRelaunchWindowTopology
+        XCTAssertEqual(relaunchWindowTopology, 4)
+        XCTAssertTrue(relaunchWindowTopology.isFinite && relaunchWindowTopology > 0)
     }
 }

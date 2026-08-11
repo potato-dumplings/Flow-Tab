@@ -129,22 +129,16 @@ extension FlowTabUITests {
             )
             logWorkflowSpaceObservation("\(traceLabel).afterStandardConfirm", app: targetApp)
 
-            diagnosticsSummary = try relaunchGlobalSwitcher(
+            diagnosticsSummary = try relaunchGlobalSwitcherAndWaitForFrontmostWorkflowWindow(
                 app,
                 for: targetApp,
+                windowNumber: standardSelection.windowNumber,
+                title: standardTitle,
                 traceLabel: traceLabel,
-                allowsNoisyCGSiblings: allowsNoisyCGSiblings
+                allowsNoisyCGSiblings: allowsNoisyCGSiblings,
+                activationWatchdog: FlowTabUITestRuntimeTruthWatchdogPolicy.optionTabRelaunchWindowTopology
             )
             logWorkflowSpaceObservation("\(traceLabel).afterSecondWindowStateReady", app: targetApp)
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: standardSelection.windowNumber,
-                    title: standardTitle,
-                    app: targetApp,
-                    timeout: 4
-                ),
-                "Option+Tab second window-state phase must open from the normal sibling's Space."
-            )
             assertSwitcherSelectedWindowTitle(
                 standardTitle,
                 in: app,
