@@ -3,6 +3,7 @@ import XCTest
 
 enum FlowTabUITestSettingsQuitHotkeyWatchdogPolicy {
     static let runtimeCompletion: TimeInterval = 10
+    static let selectedRowDisappearance: TimeInterval = 6
 }
 
 extension FlowTabUITests {
@@ -19,6 +20,23 @@ extension FlowTabUITests {
         XCTAssertGreaterThan(
             FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
                 .runtimeCompletion,
+            0
+        )
+    }
+
+    func testSettingsQuitHotkeyWatchdogPolicyPreservesCompatibleSelectedRowDisappearanceBound() {
+        XCTAssertEqual(
+            FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                .selectedRowDisappearance,
+            6
+        )
+        XCTAssertTrue(
+            FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                .selectedRowDisappearance.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                .selectedRowDisappearance,
             0
         )
     }
@@ -574,10 +592,19 @@ extension FlowTabUITests {
             let app = launch.application
             defer { app.terminate() }
             let selectedAppID = launch.resolution.selectedAppID
+            let selectedRowIdentifier =
+                switcherAppRowIdentifier(selectedAppID)
             let selectedTile = element(
                 in: app,
-                identifier: switcherAppRowIdentifier(selectedAppID)
+                identifier: selectedRowIdentifier
             )
+            let disappearanceOwner =
+                FlowTabUITestElementNonExistenceObservationOwner(
+                    elementIdentifier: selectedRowIdentifier,
+                    readback: { selectedTile.exists }
+                )
+            disappearanceOwner.start()
+            defer { disappearanceOwner.cancel() }
 
             let completionBaseline = makeRuntimeLogFileSnapshot()
             defer { completionBaseline.cancel() }
@@ -586,6 +613,7 @@ extension FlowTabUITests {
                 key: item.triggerKey,
                 modifier: "option"
             )
+            disappearanceOwner.markTriggerCompleted()
             waitForRuntimeLogFiles(
                 containing: [
                     "mock terminate request appID=\(selectedAppID)",
@@ -599,7 +627,23 @@ extension FlowTabUITests {
                         .runtimeCompletion
             )
             completionBaseline.cancel()
-            XCTAssertTrue(waitForNonExistence(selectedTile, timeout: 6))
+            guard
+                let disappearanceEvidence =
+                    disappearanceOwner.waitForResolution(
+                        timeout:
+                            FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                                .selectedRowDisappearance
+                    )
+            else {
+                XCTFail(
+                    "Selected App row disappearance watchdog expired. "
+                        + "selectedAppID=\(selectedAppID) "
+                        + disappearanceOwner.diagnosticSummary
+                )
+                continue
+            }
+            XCTAssertFalse(disappearanceEvidence.value.exists)
+            disappearanceOwner.cancel()
         }
     }
 
