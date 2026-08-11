@@ -578,88 +578,6 @@ extension FlowTabUITests {
         }
     }
 
-    func testSettingsInAppHotkeyExplicitAndFallbackMatrixStartsFocusedWindowSession() throws {
-        let cases: [(
-            rawSelections: [(control: String, option: String)],
-            expectedValues: [(control: String, value: String)],
-            triggerModifier: String,
-            triggerKey: String,
-            expectedInAppShortcut: String
-        )] = [
-            (
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "space"),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "space"),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
-                "option",
-                "b",
-                "Option + B"
-            ),
-            (
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "b"),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "b"),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "control"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
-                "control",
-                "b",
-                "Control + B"
-            )
-        ]
-
-        for item in cases {
-            configureHotkeysThroughSettings(
-                rawSelections: item.rawSelections,
-                expectedValues: item.expectedValues,
-                expectedLogMarkers: [
-                    "inApp=\(item.expectedInAppShortcut)",
-                    "hotkeyReloadNotification sender=AppDelegate"
-                ]
-            )
-
-            let app = makeApp(
-                additionalArguments: hotkeyEffectArguments() + [
-                    "--flowtab-ui-mock-runtime-variant",
-                    "focused-current-app"
-                ]
-            )
-            launchFlowTabUITestApplication(app)
-            XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-            let logSnapshot = makeRuntimeLogFileSnapshot()
-            app.activate()
-            typeHotkey(in: app, key: item.triggerKey, modifier: item.triggerModifier)
-            waitForRuntimeLogFiles(
-                containing: [
-                    "inAppHotkeyPressed dir=forward panelVisible=0 action=show",
-                    "presentationRecovery trigger=in_app_show action=trackInitialVisibility",
-                    "InApp Window Forward"
-                ],
-                since: logSnapshot
-            )
-            app.terminate()
-        }
-    }
-
     func hotkeyEffectArguments(resetDefaults: Bool = false) -> [String] {
         var arguments: [String] = []
         if resetDefaults {
@@ -707,7 +625,7 @@ extension FlowTabUITests {
         return arguments
     }
 
-    private func configureHotkeysThroughSettings(
+    func configureHotkeysThroughSettings(
         rawSelections: [(control: String, option: String)],
         expectedValues: [(control: String, value: String)],
         expectedLogMarkers: [String]
@@ -727,7 +645,7 @@ extension FlowTabUITests {
         app.terminate()
     }
 
-    private func typeHotkey(in app: XCUIApplication, key: String, modifier: String) {
+    func typeHotkey(in app: XCUIApplication, key: String, modifier: String) {
         let modifierFlags = modifierFlags(for: modifier)
         switch key {
         case "space":
