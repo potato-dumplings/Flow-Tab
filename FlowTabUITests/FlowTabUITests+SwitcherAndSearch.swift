@@ -4,13 +4,19 @@ private enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
     static let optionTabAppClickDismissal: TimeInterval = 2
     static let controlTabWindowClickDismissal: TimeInterval = 2
     static let searchResultClickDismissal: TimeInterval = 2
-    static let compatibleBounds = [optionTabAppClickDismissal, controlTabWindowClickDismissal, searchResultClickDismissal]
+    static let searchMockForegroundReadiness: TimeInterval = 10
+    static let compatibleBounds = [
+        optionTabAppClickDismissal,
+        controlTabWindowClickDismissal,
+        searchResultClickDismissal,
+        searchMockForegroundReadiness
+    ]
 }
 
 extension FlowTabUITests {
     func testSwitcherAndSearchWatchdogPolicyPreservesCompatibleBounds() {
         let policies = FlowTabUITestSwitcherAndSearchWatchdogPolicy.compatibleBounds
-        XCTAssertEqual(policies, [2, 2, 2])
+        XCTAssertEqual(policies, [2, 2, 2, 10])
         XCTAssertTrue(policies.allSatisfy { $0.isFinite && $0 > 0 })
     }
 
@@ -72,13 +78,28 @@ extension FlowTabUITests {
         let readiness =
             prepareInitialFlowTabSearchInputReadiness()
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(
-            waitForFlowTabUITestApplicationToBecomeReady(
-                app,
-                timeout: 10
-            )
-        )
+        assertSearchMockApplicationIsForegroundReady(app)
         return (app, readiness)
+    }
+
+    private func assertSearchMockApplicationIsForegroundReady(
+        _ app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let becameReady = waitForFlowTabUITestApplicationToBecomeReady(
+            app,
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                .searchMockForegroundReadiness
+        )
+        XCTAssertTrue(
+            becameReady,
+            "Search mock application foreground-readiness watchdog expired. "
+                + "unmetCondition=runningForeground "
+                + "finalState=\(String(describing: app.state))",
+            file: file,
+            line: line
+        )
     }
 
     func testSearchPanelEntryAndResultActivation() throws {
