@@ -132,12 +132,19 @@ extension FlowTabUITests {
                 }
             }
             launchFlowTabUITestApplication(relaunchedApp, traceLabel: "system-app-mru.relaunch")
-            XCTAssertTrue(
+            let relaunchedAppBecameReady =
                 waitForFlowTabUITestApplicationToBecomeReady(
                     relaunchedApp,
-                    timeout: 12,
+                    timeout:
+                        FlowTabUITestSupportWatchdogPolicy
+                            .foregroundActivation,
                     traceLabel: "system-app-mru.relaunch"
                 )
+            XCTAssertTrue(
+                relaunchedAppBecameReady,
+                "Relaunched FlowTab did not become foreground-ready before "
+                    + "the System MRU rebuilt-order trigger. "
+                    + "finalState=\(String(describing: relaunchedApp.state))"
             )
 
             let rebuiltOrder = triggerAndWaitForWorkflowAppOrder(
