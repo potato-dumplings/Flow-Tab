@@ -5,18 +5,20 @@ private enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
     static let controlTabWindowClickDismissal: TimeInterval = 2
     static let searchResultClickDismissal: TimeInterval = 2
     static let searchMockForegroundReadiness: TimeInterval = 10
+    static let spaceFixtureSearchResultPublication: TimeInterval = 5
     static let compatibleBounds = [
         optionTabAppClickDismissal,
         controlTabWindowClickDismissal,
         searchResultClickDismissal,
-        searchMockForegroundReadiness
+        searchMockForegroundReadiness,
+        spaceFixtureSearchResultPublication
     ]
 }
 
 extension FlowTabUITests {
     func testSwitcherAndSearchWatchdogPolicyPreservesCompatibleBounds() {
         let policies = FlowTabUITestSwitcherAndSearchWatchdogPolicy.compatibleBounds
-        XCTAssertEqual(policies, [2, 2, 2, 10])
+        XCTAssertEqual(policies, [2, 2, 2, 10, 5])
         XCTAssertTrue(policies.allSatisfy { $0.isFinite && $0 > 0 })
     }
 
@@ -116,12 +118,27 @@ extension FlowTabUITests {
                     in: app,
                     observedBy: readiness
                 )
-            app.typeText(identity.switcherSearchQuery)
-
-            let fixtureResult = app.descendants(matching: .any)
-                .matching(identifier: identity.switcherSearchAppAccessibilityIdentifier)
-                .firstMatch
-            XCTAssertTrue(fixtureResult.waitForExistence(timeout: 5))
+            XCTAssertTrue(
+                performAndWaitForCommittedSearchResultRow(
+                    in: app,
+                    scope: "app",
+                    query: identity.switcherSearchQuery,
+                    resultID: "app:\(identity.bundleIdentifier)",
+                    rowIdentifier:
+                        identity
+                            .switcherSearchAppAccessibilityIdentifier,
+                    timeout:
+                        FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                            .spaceFixtureSearchResultPublication,
+                    trigger: {
+                        app.typeText(
+                            identity.switcherSearchQuery
+                        )
+                    }
+                ),
+                "Search did not publish the exact committed "
+                    + "Space fixture App result row."
+            )
 
             confirmSwitcherSearchSelection(
                 in: app,
