@@ -12,6 +12,7 @@ enum FlowTabUITestRuntimeTruthWatchdogPolicy {
     static let windowSearchConfirmedWindowActivation: TimeInterval = 12
     static let windowSearchInputDismissal: TimeInterval = 4
     static let windowSearchRelaunchWindowTopology: TimeInterval = 4
+    static let windowSearchDiagnosticsPublication: TimeInterval = 12
 }
 
 extension FlowTabUITests {
@@ -75,5 +76,11 @@ extension FlowTabUITests {
                 .windowSearchRelaunchWindowTopology
         XCTAssertEqual(windowSearchRelaunchWindowTopology, 4)
         XCTAssertTrue(windowSearchRelaunchWindowTopology.isFinite && windowSearchRelaunchWindowTopology > 0)
+
+        let windowSearchDiagnosticsPublication =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .windowSearchDiagnosticsPublication
+        XCTAssertEqual(windowSearchDiagnosticsPublication, 12)
+        XCTAssertTrue(windowSearchDiagnosticsPublication.isFinite && windowSearchDiagnosticsPublication > 0)
     }
 }

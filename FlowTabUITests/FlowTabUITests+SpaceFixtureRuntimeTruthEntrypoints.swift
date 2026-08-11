@@ -250,9 +250,11 @@ extension FlowTabUITests {
         ) { _, app in
             logWorkflowSpaceObservation("\(traceLabel).beforeTrigger", app: targetApp)
             let readiness =
-                prepareInitialFlowTabSearchInputReadiness()
+                prepareWindowSearchPresentationReadiness(
+                    in: app
+                )
             postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.search, traceLabel: traceLabel)
-            var searchInput = assertWindowSearchReady(
+            var searchInput = requireWindowSearchPresentation(
                 in: app,
                 observedBy: readiness
             )
@@ -764,26 +766,14 @@ extension FlowTabUITests {
     private func relaunchWindowSearch(_ app: XCUIApplication, traceLabel: String) -> XCUIElement {
         XCTAssertTrue(app.state == .runningForeground || app.state == .runningBackground)
         let readiness =
-            prepareInitialFlowTabSearchInputReadiness()
+            prepareWindowSearchPresentationReadiness(
+                in: app
+            )
         postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.search, traceLabel: "\(traceLabel).relaunch")
-        return assertWindowSearchReady(
+        return requireWindowSearchPresentation(
             in: app,
             observedBy: readiness
         )
-    }
-
-    private func assertWindowSearchReady(
-        in app: XCUIApplication,
-        observedBy readiness:
-            FlowTabUITestSearchInputReadinessObservationOwner
-    ) -> XCUIElement {
-        let searchInput = requireInitialFlowTabSearchInput(
-            in: app,
-            observedBy: readiness
-        )
-        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 12))
-        return searchInput
     }
 
 }
