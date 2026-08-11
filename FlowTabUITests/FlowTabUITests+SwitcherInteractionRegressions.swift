@@ -46,13 +46,29 @@ extension FlowTabUITests {
             app,
             scenario: "Home and fresh Option+Tab runtime order"
         )
-        XCTAssertTrue(
-            tapFirstHittable(
-                in: app.buttons.matching(identifier: Identifier.homeTabButton),
-                timeout: 5
-            )
+        let homeTabButtons = app.buttons.matching(
+            identifier: Identifier.homeTabButton
         )
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
+        let homeTabButton = homeTabButtons.firstMatch
+        let homeContent = element(
+            in: app,
+            identifier: Identifier.homeTabContent
+        )
+        XCTAssertTrue(
+            tapFirstHittableAndWaitForExistence(
+                in: homeTabButtons,
+                content: homeContent,
+                contentDescription: Identifier.homeTabContent,
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .tabNavigation
+            ),
+            "Home runtime-order navigation watchdog expired. "
+                + "candidateCount=\(homeTabButtons.count) "
+                + "firstExists=\(homeTabButton.exists) "
+                + "firstHittable=\(homeTabButton.isHittable) "
+                + "contentExists=\(homeContent.exists)"
+        )
 
         let appIDs = [
             "com.flowtab.mock.mail",
