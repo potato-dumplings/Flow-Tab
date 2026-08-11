@@ -293,7 +293,9 @@ extension FlowTabUITests {
         waitForRuntimeLogFiles(
             matching: #"window-entries app=\#(escapedAppName) .*id=cg:[0-9]+:\#(selection.windowNumber):title=\#(escapedTitle)[^\n]*ax=0:cg=\#(selection.windowNumber):sticky=0:source=nil:spaceEvidence=(observed|inferredFromTopology|inferredFromFullscreenGeometry):publicAXRecovery=1"#,
             since: snapshot,
-            timeout: 8,
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .spaceBackedSelectedWindowLayerSourceReadback,
             description: "space-backed CG-only window-layer source"
         )
     }
