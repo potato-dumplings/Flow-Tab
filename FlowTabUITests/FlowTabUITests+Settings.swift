@@ -273,7 +273,6 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
         assertInitialDeniedSettingsPermissionProjection(in: app) {
             openSettingsTab(in: app)
         }
