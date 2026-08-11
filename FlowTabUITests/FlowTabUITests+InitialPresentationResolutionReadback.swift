@@ -90,6 +90,24 @@ struct FlowTabUITestInitialPresentationResolutionReadback:
     let candidateItemIDs: [String]
     let didPresent: Bool
     let sessionItemIDs: [String]
+    let selectedAppID: String
+    let inputReadinessObservationGeneration: UInt64
+    let inputReadinessSource: String
+    let inputReadinessResolved: Bool
+    let inputReadinessBaselineSourceGeneration: Generation?
+    let inputReadinessSourceGeneration: Generation?
+    let inputReadinessPresentationGeneration: Int
+    let inputReadinessPanelIsVisibleToUser: Bool
+    let inputReadinessPanelIsKey: Bool
+    let inputReadinessApplicationIsActive: Bool
+    let inputReadinessSessionItemIDs: [String]
+    let inputReadinessSelectedAppID: String?
+    let inputReadinessPanelPresentationDiagnosticProbePending: Bool
+    let inputReadinessInitialVisibilityPending: Bool
+    let inputReadinessPanelVisibilityRecoveryPending: Bool
+    let inputReadinessActiveSpaceTransitionPending: Bool
+    let inputReadinessApplicationActivationSuppressed: Bool
+    let inputReadinessTerminateInterruptionProtectionPending: Bool
     let attemptSearchIsActiveOrPending: Bool
     let postPresentationMode: String
     let postPresentationSourceGeneration: Generation?
@@ -111,6 +129,22 @@ struct FlowTabUITestInitialPresentationResolutionReadback:
             + "candidateItems=[\(candidateItemIDs.joined(separator: ","))] "
             + "didPresent=\(didPresent) "
             + "sessionItems=[\(sessionItemIDs.joined(separator: ","))] "
+            + "selectedAppID=\(selectedAppID) "
+            + "inputGeneration=\(inputReadinessObservationGeneration) "
+            + "inputSource=\(inputReadinessSource) "
+            + "inputResolved=\(inputReadinessResolved) "
+            + "inputPresentationGeneration=\(inputReadinessPresentationGeneration) "
+            + "inputPanelVisible=\(inputReadinessPanelIsVisibleToUser) "
+            + "inputPanelKey=\(inputReadinessPanelIsKey) "
+            + "inputAppActive=\(inputReadinessApplicationIsActive) "
+            + "inputSessionItems=[\(inputReadinessSessionItemIDs.joined(separator: ","))] "
+            + "inputSelectedAppID=\(inputReadinessSelectedAppID ?? "nil") "
+            + "inputPanelDiagnosticPending=\(inputReadinessPanelPresentationDiagnosticProbePending) "
+            + "inputInitialVisibilityPending=\(inputReadinessInitialVisibilityPending) "
+            + "inputPanelRecoveryPending=\(inputReadinessPanelVisibilityRecoveryPending) "
+            + "inputActiveSpacePending=\(inputReadinessActiveSpaceTransitionPending) "
+            + "inputActivationSuppressed=\(inputReadinessApplicationActivationSuppressed) "
+            + "inputTerminateProtectionPending=\(inputReadinessTerminateInterruptionProtectionPending) "
             + "attemptSearch=\(attemptSearchIsActiveOrPending) "
             + "postMode=\(postPresentationMode) "
             + "postItems=[\(postPresentationItemIDs.joined(separator: ","))] "
@@ -139,7 +173,14 @@ struct FlowTabUITestInitialPresentationResolutionExpectation {
             "readinessRequestReadback",
             "appSwitcherProjectionDidUpdate"
         ]
-        guard readback.schemaVersion == 1,
+        let acceptedInputReadinessSources: Set<String> = [
+            "initialReadback",
+            "readinessRequestReadback",
+            "projectionUpdateReadback",
+            "scheduledReadback",
+            "watchdogReadback"
+        ]
+        guard readback.schemaVersion == 3,
               readback.observationGeneration > 0,
               acceptedSources.contains(readback.source),
               readback.resolution == "presented",
@@ -157,6 +198,33 @@ struct FlowTabUITestInitialPresentationResolutionExpectation {
               readback.didPresent,
               readback.sessionItemIDs
                 == readback.candidateItemIDs,
+              !readback.selectedAppID.isEmpty,
+              candidateItemIDs.contains(readback.selectedAppID),
+              readback.inputReadinessObservationGeneration > 0,
+              acceptedInputReadinessSources.contains(
+                readback.inputReadinessSource
+              ),
+              readback.inputReadinessResolved,
+              let inputBaselineGeneration =
+                readback.inputReadinessBaselineSourceGeneration,
+              let inputGeneration =
+                readback.inputReadinessSourceGeneration,
+              inputGeneration.isSameOrLater(
+                than: inputBaselineGeneration
+              ),
+              inputGeneration != inputBaselineGeneration,
+              readback.inputReadinessPresentationGeneration > 0,
+              readback.inputReadinessPanelIsVisibleToUser,
+              readback.inputReadinessSessionItemIDs
+                == readback.candidateItemIDs,
+              readback.inputReadinessSelectedAppID
+                == readback.selectedAppID,
+              !readback.inputReadinessPanelPresentationDiagnosticProbePending,
+              !readback.inputReadinessInitialVisibilityPending,
+              !readback.inputReadinessPanelVisibilityRecoveryPending,
+              !readback.inputReadinessActiveSpaceTransitionPending,
+              !readback.inputReadinessApplicationActivationSuppressed,
+              !readback.inputReadinessTerminateInterruptionProtectionPending,
               !readback.attemptSearchIsActiveOrPending,
               readback.postPresentationMode
                 == readback.candidateMode,
@@ -183,6 +251,12 @@ struct FlowTabUITestInitialPresentationResolutionExpectation {
     }
 }
 
+struct FlowTabUITestInitialPresentationResolutionLaunch {
+    let application: XCUIApplication
+    let resolution:
+        FlowTabUITestInitialPresentationResolutionReadback
+}
+
 extension FlowTabUITests {
     @discardableResult
     func assertInitialSwitcherPresentationResolution(
@@ -192,6 +266,27 @@ extension FlowTabUITests {
         targetDescription: String
     ) throws ->
         FlowTabUITestInitialPresentationResolutionReadback?
+    {
+        guard let launch = try
+            launchFlowTabUITestApplicationResolvingInitialPresentation(
+                additionalArguments: additionalArguments,
+                expectation: expectation,
+                targetDescription: targetDescription
+            )
+        else {
+            return nil
+        }
+        defer { launch.application.terminate() }
+        return launch.resolution
+    }
+
+    func launchFlowTabUITestApplicationResolvingInitialPresentation(
+        additionalArguments: [String],
+        expectation:
+            FlowTabUITestInitialPresentationResolutionExpectation,
+        targetDescription: String
+    ) throws ->
+        FlowTabUITestInitialPresentationResolutionLaunch?
     {
         let route = FlowTabUITestInitialPresentationResolutionRoute()
         try route.prepareReadback()
@@ -210,7 +305,6 @@ extension FlowTabUITests {
             additionalArguments:
                 additionalArguments + route.launchArguments
         )
-        defer { app.terminate() }
         launchFlowTabUITestApplication(app)
 
         guard let resolution = owner.waitForResolution(
@@ -227,6 +321,7 @@ extension FlowTabUITests {
                     + "[\(expectation.excludedItemIDs.sorted().joined(separator: ","))] "
                     + owner.diagnosticSummary
             )
+            app.terminate()
             return nil
         }
 
@@ -255,7 +350,28 @@ extension FlowTabUITests {
             "appCycle",
             resolution.diagnosticSummary
         )
-        return resolution
+        XCTAssertTrue(
+            candidateItemIDs.contains(resolution.selectedAppID),
+            resolution.diagnosticSummary
+        )
+        XCTAssertTrue(
+            resolution.inputReadinessResolved,
+            resolution.diagnosticSummary
+        )
+        XCTAssertEqual(
+            resolution.inputReadinessSessionItemIDs,
+            resolution.candidateItemIDs,
+            resolution.diagnosticSummary
+        )
+        XCTAssertEqual(
+            resolution.inputReadinessSelectedAppID,
+            resolution.selectedAppID,
+            resolution.diagnosticSummary
+        )
+        return FlowTabUITestInitialPresentationResolutionLaunch(
+            application: app,
+            resolution: resolution
+        )
     }
 }
 

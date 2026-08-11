@@ -16,6 +16,20 @@ extension FlowTabUITestBootstrapper {
                 .isObserving == true
     }
 
+    static var isObservingInitialPresentationInputReadinessForTesting:
+        Bool
+    {
+        initialPresentationInputReadinessObservationOwner?
+            .isObserving == true
+    }
+
+    static var initialPresentationInputReadinessLastEvidenceForTesting:
+        FlowTabUITestInitialPresentationInputReadinessEvidence?
+    {
+        initialPresentationInputReadinessObservationOwner?
+            .lastEvidence
+    }
+
     static func presentInitialUIIfNeeded(
         panelController: SwitcherPanelController
     ) {
@@ -146,6 +160,9 @@ extension FlowTabUITestBootstrapper {
         initialPresentationObservationOwner?
             .cancel()
         initialPresentationObservationOwner = nil
+        initialPresentationInputReadinessObservationOwner?
+            .cancel()
+        initialPresentationInputReadinessObservationOwner = nil
         stopInitialSearchActivationObservation()
     }
 
@@ -158,7 +175,7 @@ extension FlowTabUITestBootstrapper {
         : .global
     }
 
-    private static func initialPresentationNotificationRoutes(
+    static func initialPresentationNotificationRoutes(
         mode: FlowTabUITestInitialPresentationMode
     ) -> [FlowTabUITestInitialPresentationNotificationRoute] {
         switch mode {
@@ -189,7 +206,7 @@ extension FlowTabUITestBootstrapper {
         }
     }
 
-    private static func requestInitialPresentationReadiness(
+    static func requestInitialPresentationReadiness(
         runtimeProjectionService:
             any RuntimeProjectionServing,
         mode: FlowTabUITestInitialPresentationMode
@@ -223,7 +240,7 @@ extension FlowTabUITestBootstrapper {
         }
     }
 
-    private static func initialPresentationSessionItemIDs(
+    static func initialPresentationSessionItemIDs(
         panelController: SwitcherPanelController,
         mode: FlowTabUITestInitialPresentationMode
     ) -> [String] {
@@ -242,7 +259,7 @@ extension FlowTabUITestBootstrapper {
         }
     }
 
-    private static func initialPresentationSnapshot(
+    static func initialPresentationSnapshot(
         panelController: SwitcherPanelController,
         mode: FlowTabUITestInitialPresentationMode
     ) -> FlowTabUITestInitialPresentationSnapshot {

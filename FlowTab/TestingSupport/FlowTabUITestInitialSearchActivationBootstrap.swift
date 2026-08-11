@@ -190,11 +190,13 @@ extension FlowTabUITestBootstrapper {
         else {
             return
         }
-        guard let readback =
-                FlowTabUITestInitialPresentationResolutionReadback(
-                    evidence: evidence,
-                    panelController: panelController
-                )
+        guard let attempt = evidence.attempt,
+              let baseline =
+                evidence.postPresentationReadback,
+              let selectedAppID =
+                panelController.modelForTesting
+                    .session?.selectedApp.id,
+              !selectedAppID.isEmpty
         else {
             RuntimeLog.error(
                 "UITest",
@@ -204,11 +206,123 @@ extension FlowTabUITestBootstrapper {
             )
             return
         }
-        FlowTabUITestInitialPresentationResolutionTransport
-            .post(
-                readback,
-                route: route
+        initialPresentationInputReadinessObservationOwner?
+            .cancel()
+        let mode = evidence.candidate.mode
+        let runtimeProjectionService =
+            panelController.modelForTesting
+                .runtimeProjectionService
+        let owner =
+            FlowTabUITestInitialPresentationInputReadinessObservationOwner(
+                notificationNames:
+                    initialPresentationNotificationRoutes(
+                        mode: mode
+                    ).map(\.name),
+                notificationObject:
+                    runtimeProjectionService as AnyObject,
+                readback: {
+                    FlowTabUITestInitialPresentationInputReadinessSnapshot(
+                        panelController: panelController,
+                        mode: mode
+                    )
+                }
             )
+        initialPresentationInputReadinessObservationOwner = owner
+        owner.start(
+            baseline: baseline,
+            expectedPresentationGeneration:
+                panelController.presentationSessionGeneration,
+            expectedSessionItemIDs:
+                attempt.sessionItemIDs,
+            expectedSelectedAppID: selectedAppID,
+            watchdogInterval:
+                FlowTabUITestInitialPresentationInputReadinessPolicy
+                    .watchdog,
+            triggerReadiness: {
+                requestInitialPresentationReadiness(
+                    runtimeProjectionService:
+                        runtimeProjectionService,
+                    mode: mode
+                )
+            },
+            onResolved: {
+                [weak owner, weak panelController]
+                inputEvidence in
+                guard let owner,
+                      let panelController,
+                      initialPresentationInputReadinessObservationOwner
+                        === owner
+                else {
+                    return
+                }
+                initialPresentationInputReadinessObservationOwner = nil
+                postInitialPresentationResolutionReadback(
+                    evidence,
+                    inputReadinessEvidence:
+                        inputEvidence,
+                    panelController: panelController,
+                    route: route
+                )
+                RuntimeLog.info(
+                    "UITest",
+                    "initial presentation input ready "
+                        + inputEvidence.logFields
+                )
+            },
+            onWatchdog: {
+                [weak owner, weak panelController]
+                failure in
+                guard let owner,
+                      let panelController,
+                      initialPresentationInputReadinessObservationOwner
+                        === owner
+                else {
+                    return
+                }
+                initialPresentationInputReadinessObservationOwner = nil
+                postInitialPresentationResolutionReadback(
+                    evidence,
+                    inputReadinessEvidence:
+                        failure.finalEvidence,
+                    panelController: panelController,
+                    route: route
+                )
+                RuntimeLog.error(
+                    "UITest",
+                    "initial presentation input readiness watchdog "
+                        + failure.logFields
+                )
+            }
+        )
+    }
+
+    private static func postInitialPresentationResolutionReadback(
+        _ evidence:
+            FlowTabUITestInitialPresentationEvidence,
+        inputReadinessEvidence:
+            FlowTabUITestInitialPresentationInputReadinessEvidence,
+        panelController: SwitcherPanelController,
+        route:
+            FlowTabUITestInitialPresentationResolutionRoute
+    ) {
+        guard let readback =
+                FlowTabUITestInitialPresentationResolutionReadback(
+                    evidence: evidence,
+                    inputReadinessEvidence:
+                        inputReadinessEvidence,
+                    panelController: panelController
+                )
+        else {
+            RuntimeLog.error(
+                "UITest",
+                "initial presentation resolution readback "
+                    + "missing input-readiness evidence "
+                    + inputReadinessEvidence.logFields
+            )
+            return
+        }
+        FlowTabUITestInitialPresentationResolutionTransport
+            .post(readback, route: route)
     }
 }
 

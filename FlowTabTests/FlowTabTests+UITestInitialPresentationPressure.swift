@@ -143,4 +143,86 @@ extension FlowTabTests {
             scheduler.tokens.allSatisfy(\.isCancelled)
         )
     }
+
+    @MainActor
+    func testUITestInitialPresentationInputReadinessReplacementPressureRejectsStaleWork() {
+        let scheduler = ManualInitialPresentationScheduler()
+        var snapshot =
+            initialPresentationInputReadinessSnapshot(
+                generation: 1,
+                activeSpaceTransitionPending: true
+            )
+        var resolutions:
+            [FlowTabUITestInitialPresentationInputReadinessEvidence]
+                = []
+        var failures:
+            [FlowTabUITestInitialPresentationInputReadinessWatchdogFailure]
+                = []
+        let owner = makeInitialPresentationInputReadinessOwner(
+            scheduler: scheduler,
+            readback: { snapshot }
+        )
+        var generations: [UInt64] = []
+
+        for index in 1...2_000 {
+            let sourceGeneration = UInt64(index)
+            let baseline = initialPresentationSnapshot(
+                generation: sourceGeneration,
+                itemIDs: ["app-a", "app-b"]
+            )
+            snapshot =
+                initialPresentationInputReadinessSnapshot(
+                    generation: sourceGeneration,
+                    activeSpaceTransitionPending: true
+                )
+            generations.append(
+                owner.start(
+                    baseline: baseline,
+                    expectedPresentationGeneration: 3,
+                    expectedSessionItemIDs: [
+                        "app-a",
+                        "app-b"
+                    ],
+                    expectedSelectedAppID: "app-a",
+                    watchdogInterval:
+                        FlowTabUITestInitialPresentationInputReadinessPolicy
+                            .watchdog,
+                    triggerReadiness: {},
+                    onResolved: { resolutions.append($0) },
+                    onWatchdog: { failures.append($0) }
+                )
+            )
+        }
+
+        for staleGeneration in generations.dropLast() {
+            XCTAssertFalse(
+                owner.observe(
+                    source: .projectionUpdateReadback,
+                    observationGeneration: staleGeneration
+                )
+            )
+        }
+        snapshot = initialPresentationInputReadinessSnapshot(
+            generation: 2_001
+        )
+        XCTAssertTrue(
+            owner.observe(
+                source: .projectionUpdateReadback,
+                observationGeneration: generations.last!
+            )
+        )
+        for token in scheduler.tokens {
+            scheduler.fire(
+                token,
+                includingCancelled: true
+            )
+        }
+
+        XCTAssertEqual(resolutions.count, 1)
+        XCTAssertTrue(failures.isEmpty)
+        XCTAssertFalse(owner.isObserving)
+        XCTAssertTrue(
+            scheduler.tokens.allSatisfy(\.isCancelled)
+        )
+    }
 }

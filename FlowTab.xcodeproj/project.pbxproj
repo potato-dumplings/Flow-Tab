@@ -101,6 +101,7 @@
 		A46800023D70000100B0D737 /* FlowTabUITests+HomeInitialProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46800013D70000100B0D737 /* FlowTabUITests+HomeInitialProjection.swift */; };
 		A46900023D71000100B0D737 /* FlowTabUITestHomeInitialProjectionApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46900013D71000100B0D737 /* FlowTabUITestHomeInitialProjectionApplication.swift */; };
 		A48B00023D97000100B0D737 /* FlowTabUITestInitialPresentationResolutionTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48B00013D97000100B0D737 /* FlowTabUITestInitialPresentationResolutionTransport.swift */; };
+		A48B00083D97000100B0D737 /* FlowTabUITestInitialPresentationResolutionReadback.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48B00073D97000100B0D737 /* FlowTabUITestInitialPresentationResolutionReadback.swift */; };
 		A48B00043D97000100B0D737 /* FlowTabUITests+InitialPresentationResolutionReadback.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48B00033D97000100B0D737 /* FlowTabUITests+InitialPresentationResolutionReadback.swift */; };
 		A48B00063D97000100B0D737 /* FlowTabUITests+InitialPresentationResolutionReadbackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48B00053D97000100B0D737 /* FlowTabUITests+InitialPresentationResolutionReadbackTests.swift */; };
 		A46B00023D73000100B0D737 /* FlowTabUITests+SwitcherStationaryPointer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46B00013D73000100B0D737 /* FlowTabUITests+SwitcherStationaryPointer.swift */; };
@@ -982,6 +983,7 @@
 		A46800013D70000100B0D737 /* FlowTabUITests+HomeInitialProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeInitialProjection.swift"; sourceTree = "<group>"; };
 		A46900013D71000100B0D737 /* FlowTabUITestHomeInitialProjectionApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestHomeInitialProjectionApplication.swift; sourceTree = "<group>"; };
 		A48B00013D97000100B0D737 /* FlowTabUITestInitialPresentationResolutionTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestInitialPresentationResolutionTransport.swift; sourceTree = "<group>"; };
+		A48B00073D97000100B0D737 /* FlowTabUITestInitialPresentationResolutionReadback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestInitialPresentationResolutionReadback.swift; sourceTree = "<group>"; };
 		A48B00033D97000100B0D737 /* FlowTabUITests+InitialPresentationResolutionReadback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+InitialPresentationResolutionReadback.swift"; sourceTree = "<group>"; };
 		A48B00053D97000100B0D737 /* FlowTabUITests+InitialPresentationResolutionReadbackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+InitialPresentationResolutionReadbackTests.swift"; sourceTree = "<group>"; };
 		A46B00013D73000100B0D737 /* FlowTabUITests+SwitcherStationaryPointer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherStationaryPointer.swift"; sourceTree = "<group>"; };
@@ -1722,6 +1724,7 @@
 				FFD300013D2E000100B0D737 /* FlowTabUITestProjectionAcknowledgement.swift */,
 				A46900013D71000100B0D737 /* FlowTabUITestHomeInitialProjectionApplication.swift */,
 				A48B00013D97000100B0D737 /* FlowTabUITestInitialPresentationResolutionTransport.swift */,
+				A48B00073D97000100B0D737 /* FlowTabUITestInitialPresentationResolutionReadback.swift */,
 				A45900013D61000100B0D737 /* FlowTabUITestAXSuppressionReadbackEvidence.swift */,
 				A45A00013D62000100B0D737 /* FlowTabUITestAXSuppressionReadbackScheduling.swift */,
 				A45A00033D62000100B0D737 /* FlowTabUITestAXSuppressionReadbackObservation.swift */,
@@ -2249,6 +2252,7 @@
 				FFD300023D2E000100B0D737 /* FlowTabUITestProjectionAcknowledgement.swift in Sources */,
 				A46900023D71000100B0D737 /* FlowTabUITestHomeInitialProjectionApplication.swift in Sources */,
 				A48B00023D97000100B0D737 /* FlowTabUITestInitialPresentationResolutionTransport.swift in Sources */,
+				A48B00083D97000100B0D737 /* FlowTabUITestInitialPresentationResolutionReadback.swift in Sources */,
 				A45900023D61000100B0D737 /* FlowTabUITestAXSuppressionReadbackEvidence.swift in Sources */,
 				A45A00023D62000100B0D737 /* FlowTabUITestAXSuppressionReadbackScheduling.swift in Sources */,
 				A45A00043D62000100B0D737 /* FlowTabUITestAXSuppressionReadbackObservation.swift in Sources */,

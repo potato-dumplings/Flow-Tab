@@ -9,13 +9,16 @@ final class ManualInitialPresentationScheduler:
     final class Token:
         FlowTabUITestInitialPresentationCancellable
     {
+        let interval: TimeInterval
         let action: @MainActor @Sendable () -> Void
         private(set) var isCancelled = false
 
         init(
+            interval: TimeInterval,
             action:
                 @escaping @MainActor @Sendable () -> Void
         ) {
+            self.interval = interval
             self.action = action
         }
 
@@ -27,11 +30,14 @@ final class ManualInitialPresentationScheduler:
     private(set) var tokens: [Token] = []
 
     func schedule(
-        after _: TimeInterval,
+        after interval: TimeInterval,
         _ action:
             @escaping @MainActor @Sendable () -> Void
     ) -> any FlowTabUITestInitialPresentationCancellable {
-        let token = Token(action: action)
+        let token = Token(
+            interval: interval,
+            action: action
+        )
         tokens.append(token)
         return token
     }
@@ -97,6 +103,71 @@ extension FlowTabTests {
             dirtyCGWindowIDs: [],
             pendingRepairScopes:
                 isComplete ? [] : ["coldStart"]
+        )
+    }
+
+    @MainActor
+    func initialPresentationInputReadinessSnapshot(
+        generation: UInt64,
+        projectionIsComplete: Bool = true,
+        presentationGeneration: Int = 3,
+        itemIDs: [String] = ["app-a", "app-b"],
+        selectedAppID: String? = "app-a",
+        panelIsPresented: Bool = true,
+        panelIsVisibleToUser: Bool = true,
+        panelPresentationDiagnosticProbePending: Bool = false,
+        initialVisibilityPending: Bool = false,
+        panelVisibilityRecoveryPending: Bool = false,
+        activeSpaceTransitionPending: Bool = false,
+        applicationActivationSuppressed: Bool = false,
+        terminateInterruptionProtectionPending: Bool = false
+    ) -> FlowTabUITestInitialPresentationInputReadinessSnapshot {
+        FlowTabUITestInitialPresentationInputReadinessSnapshot(
+            projection: initialPresentationSnapshot(
+                generation: generation,
+                isComplete: projectionIsComplete,
+                itemIDs: itemIDs
+            ),
+            presentationGeneration: presentationGeneration,
+            panelIsPresented: panelIsPresented,
+            panelIsVisibleToUser: panelIsVisibleToUser,
+            panelIsKey: true,
+            applicationIsActive: true,
+            sessionItemIDs: itemIDs,
+            selectedAppID: selectedAppID,
+            sessionMode: "appCycle",
+            panelPresentationDiagnosticProbePending:
+                panelPresentationDiagnosticProbePending,
+            initialVisibilityPending: initialVisibilityPending,
+            panelVisibilityRecoveryPending:
+                panelVisibilityRecoveryPending,
+            activeSpaceTransitionPending:
+                activeSpaceTransitionPending,
+            applicationActivationSuppressed:
+                applicationActivationSuppressed,
+            terminateInterruptionProtectionPending:
+                terminateInterruptionProtectionPending
+        )
+    }
+
+    @MainActor
+    func makeInitialPresentationInputReadinessOwner(
+        notificationCenter: NotificationCenter =
+            NotificationCenter(),
+        notificationObject: AnyObject = NSObject(),
+        scheduler: ManualInitialPresentationScheduler,
+        readback:
+            @escaping @MainActor () ->
+                FlowTabUITestInitialPresentationInputReadinessSnapshot
+    ) -> FlowTabUITestInitialPresentationInputReadinessObservationOwner {
+        FlowTabUITestInitialPresentationInputReadinessObservationOwner(
+            notificationNames: [
+                .runtimeAppSwitcherProjectionDidUpdate
+            ],
+            notificationObject: notificationObject,
+            notificationCenter: notificationCenter,
+            scheduler: scheduler,
+            readback: readback
         )
     }
 }

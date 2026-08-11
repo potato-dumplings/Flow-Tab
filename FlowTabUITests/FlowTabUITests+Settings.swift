@@ -527,24 +527,42 @@ extension FlowTabUITests {
                 ]
             )
 
-            let app = makeApp(additionalArguments: hotkeyEffectArguments() + ["--flowtab-ui-open-switcher"])
-            launchFlowTabUITestApplication(app)
-            XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
-            let browserTile = element(in: app, identifier: Identifier.switcherAppMockBrowser)
-            XCTAssertTrue(browserTile.waitForExistence(timeout: 8))
-            let selectedAppID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected")
-            XCTAssertFalse(selectedAppID.isEmpty)
+            guard let launch = try
+                launchFlowTabUITestApplicationResolvingInitialPresentation(
+                    additionalArguments:
+                        hotkeyEffectArguments() + [
+                            "--flowtab-ui-open-switcher"
+                        ],
+                    expectation:
+                        FlowTabUITestInitialPresentationResolutionExpectation(
+                            requiredItemIDs: [
+                                "com.flowtab.mock.browser"
+                            ],
+                            excludedItemIDs: [],
+                            searchFeatureEnabled: true,
+                            searchIsActive: false,
+                            searchActivationIsPending: false
+                        ),
+                    targetDescription:
+                        "settings quit hotkey "
+                            + item.expectedQuitShortcut
+                )
+            else {
+                continue
+            }
+            let app = launch.application
+            let selectedAppID = launch.resolution.selectedAppID
             let selectedTile = element(
                 in: app,
-                identifier: "flowtab.switcher.app.\(selectedAppID.flowTabUITestAccessibilityIdentifierComponent)"
+                identifier: switcherAppRowIdentifier(selectedAppID)
             )
-            XCTAssertTrue(selectedTile.waitForExistence(timeout: 8))
 
             let logSnapshot = makeRuntimeLogFileSnapshot()
-            typeHotkey(in: app, key: item.triggerKey, modifier: "option")
+            typeHotkey(
+                in: app,
+                key: item.triggerKey,
+                modifier: "option"
+            )
             waitForRuntimeLogFiles(
                 containing: [
                     "mock terminate request appID=\(selectedAppID)",
@@ -654,6 +672,7 @@ extension FlowTabUITests {
             "--flowtab-ui-enable-verbose-logs",
             "--flowtab-ui-record-hotkey-reload-diagnostics",
             "--flowtab-ui-enable-mock-hotkey-effects",
+            "--flowtab-ui-mock-window-previews",
             "--flowtab-ui-ax-trusted",
             "YES",
             "--flowtab-ui-screen-trusted",
@@ -674,6 +693,7 @@ extension FlowTabUITests {
             "--flowtab-ui-mock-runtime",
             "--flowtab-ui-mock-runtime-variant",
             "minimized-window-behavior",
+            "--flowtab-ui-mock-window-previews",
             "-showPermissionReminder",
             "NO",
             "--flowtab-ui-ax-trusted",

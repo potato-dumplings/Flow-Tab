@@ -128,6 +128,7 @@ extension FlowTabUITests {
         let relaunchApp = makeApp(
             additionalArguments: [
                 "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-mock-window-previews",
                 "--flowtab-ui-open-switcher-search",
                 "--flowtab-ui-ax-trusted",
                 "YES",

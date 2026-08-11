@@ -17,6 +17,8 @@ enum FlowTabUITestBootstrapper {
         (() -> Void)?
     static var initialPresentationObservationOwner:
         FlowTabUITestInitialPresentationObservationOwner?
+    static var initialPresentationInputReadinessObservationOwner:
+        FlowTabUITestInitialPresentationInputReadinessObservationOwner?
     static var initialSearchActivationObservationOwner:
         FlowTabUITestInitialSearchActivationObservationOwner?
 

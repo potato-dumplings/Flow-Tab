@@ -83,6 +83,10 @@ extension FlowTabUITests {
                 "searchEnabled=true"
             )
         )
+        for _ in 0..<5 {
+            requestReadback?(.scheduledReadback)
+            XCTAssertFalse(registrationWasCancelled)
+        }
         try writeInitialPresentationResolutionReadback(
             matchingInitialPresentationResolutionReadback(),
             to: route.readbackURL
@@ -133,6 +137,112 @@ extension FlowTabUITests {
             expectation.isSatisfied(
                 by: matchingInitialPresentationResolutionReadback(
                     candidateProjectionIsComplete: false
+                )
+            )
+        )
+        XCTAssertTrue(
+            expectation.isSatisfied(
+                by: matchingInitialPresentationResolutionReadback()
+            )
+        )
+    }
+
+    func testInitialPresentationResolutionExpectationRequiresExactSelectedApplication() {
+        let expectation = disabledSearchInitialPresentationExpectation()
+
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: matchingInitialPresentationResolutionReadback(
+                    schemaVersion: 2
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: matchingInitialPresentationResolutionReadback(
+                    selectedAppID: ""
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: matchingInitialPresentationResolutionReadback(
+                    selectedAppID: "com.flowtab.mock.notes"
+                )
+            )
+        )
+        XCTAssertTrue(
+            expectation.isSatisfied(
+                by: matchingInitialPresentationResolutionReadback(
+                    selectedAppID: "com.flowtab.mock.browser"
+                )
+            )
+        )
+    }
+
+    func testInitialPresentationResolutionExpectationRequiresInputReadinessEvidence() {
+        let expectation = disabledSearchInitialPresentationExpectation()
+
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: matchingInitialPresentationResolutionReadback(
+                    inputReadinessResolved: false
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: matchingInitialPresentationResolutionReadback(
+                    inputReadinessProjectionGeneration: 6
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: matchingInitialPresentationResolutionReadback(
+                    inputReadinessSessionItemIDs: [
+                        "com.flowtab.mock.mail"
+                    ]
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: matchingInitialPresentationResolutionReadback(
+                    inputReadinessSelectedAppID:
+                        "com.flowtab.mock.browser"
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: matchingInitialPresentationResolutionReadback(
+                    inputReadinessPanelPresentationDiagnosticProbePending:
+                        true
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: matchingInitialPresentationResolutionReadback(
+                    inputReadinessActiveSpaceTransitionPending:
+                        true
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: matchingInitialPresentationResolutionReadback(
+                    inputReadinessApplicationActivationSuppressed:
+                        true
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: matchingInitialPresentationResolutionReadback(
+                    inputReadinessTerminateInterruptionProtectionPending:
+                        true
                 )
             )
         )
@@ -247,13 +357,26 @@ extension FlowTabUITests {
     }
 
     private func matchingInitialPresentationResolutionReadback(
+        schemaVersion: Int = 3,
         baselineMode: String = "global",
         searchFeatureEnabled: Bool = false,
         candidateProjectionIsComplete: Bool = true,
         candidateItemIDs: [String] = [
             "com.flowtab.mock.mail",
             "com.flowtab.mock.browser"
-        ]
+        ],
+        selectedAppID: String = "com.flowtab.mock.mail",
+        inputReadinessResolved: Bool = true,
+        inputReadinessProjectionGeneration: UInt64 = 7,
+        inputReadinessPanelIsVisibleToUser: Bool = true,
+        inputReadinessSessionItemIDs: [String]? = nil,
+        inputReadinessSelectedAppID: String? = nil,
+        inputReadinessPanelPresentationDiagnosticProbePending: Bool = false,
+        inputReadinessInitialVisibilityPending: Bool = false,
+        inputReadinessPanelVisibilityRecoveryPending: Bool = false,
+        inputReadinessActiveSpaceTransitionPending: Bool = false,
+        inputReadinessApplicationActivationSuppressed: Bool = false,
+        inputReadinessTerminateInterruptionProtectionPending: Bool = false
     ) -> FlowTabUITestInitialPresentationResolutionReadback {
         let candidateGeneration =
             FlowTabUITestInitialPresentationResolutionReadback
@@ -265,7 +388,7 @@ extension FlowTabUITests {
                     projection: 6
                 )
         return FlowTabUITestInitialPresentationResolutionReadback(
-            schemaVersion: 1,
+            schemaVersion: schemaVersion,
             observationGeneration: 7,
             source: "initialReadback",
             resolution: "presented",
@@ -280,6 +403,45 @@ extension FlowTabUITests {
             candidateItemIDs: candidateItemIDs,
             didPresent: true,
             sessionItemIDs: candidateItemIDs,
+            selectedAppID: selectedAppID,
+            inputReadinessObservationGeneration: 9,
+            inputReadinessSource: "scheduledReadback",
+            inputReadinessResolved: inputReadinessResolved,
+            inputReadinessBaselineSourceGeneration:
+                candidateGeneration,
+            inputReadinessSourceGeneration:
+                FlowTabUITestInitialPresentationResolutionReadback
+                    .Generation(
+                        appLifecycle: 2,
+                        cg: 3,
+                        space: 4,
+                        axDirty: 5,
+                        projection:
+                            inputReadinessProjectionGeneration
+                    ),
+            inputReadinessPresentationGeneration: 11,
+            inputReadinessPanelIsVisibleToUser:
+                inputReadinessPanelIsVisibleToUser,
+            inputReadinessPanelIsKey: true,
+            inputReadinessApplicationIsActive: true,
+            inputReadinessSessionItemIDs:
+                inputReadinessSessionItemIDs
+                    ?? candidateItemIDs,
+            inputReadinessSelectedAppID:
+                inputReadinessSelectedAppID
+                    ?? selectedAppID,
+            inputReadinessPanelPresentationDiagnosticProbePending:
+                inputReadinessPanelPresentationDiagnosticProbePending,
+            inputReadinessInitialVisibilityPending:
+                inputReadinessInitialVisibilityPending,
+            inputReadinessPanelVisibilityRecoveryPending:
+                inputReadinessPanelVisibilityRecoveryPending,
+            inputReadinessActiveSpaceTransitionPending:
+                inputReadinessActiveSpaceTransitionPending,
+            inputReadinessApplicationActivationSuppressed:
+                inputReadinessApplicationActivationSuppressed,
+            inputReadinessTerminateInterruptionProtectionPending:
+                inputReadinessTerminateInterruptionProtectionPending,
             attemptSearchIsActiveOrPending: false,
             postPresentationMode: "global",
             postPresentationSourceGeneration:

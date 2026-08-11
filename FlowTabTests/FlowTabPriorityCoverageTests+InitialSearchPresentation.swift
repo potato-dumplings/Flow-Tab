@@ -245,6 +245,29 @@ extension FlowTabPriorityCoverageTests {
                 RecordingRuntimeProjectionService(
                     appSwitcherApps: apps
                 )
+            var nextProjectionGeneration: UInt64 = 2
+            runtimeProjectionService
+                .setAppSwitcherMaintenanceRequestHandler {
+                    [weak runtimeProjectionService]
+                    reason in
+                    guard reason == .switcherSessionStarted,
+                          let runtimeProjectionService
+                    else {
+                        return
+                    }
+                    runtimeProjectionService
+                        .installAppSwitcherProjection(
+                            apps: apps,
+                            projectionGeneration:
+                                nextProjectionGeneration
+                        )
+                    nextProjectionGeneration += 1
+                    NotificationCenter.default.post(
+                        name:
+                            .runtimeAppSwitcherProjectionDidUpdate,
+                        object: runtimeProjectionService
+                    )
+                }
             let controller = SwitcherPanelController(
                 model: LiveSwitcherModel(
                     runtimeProjectionService:
@@ -257,6 +280,22 @@ extension FlowTabPriorityCoverageTests {
                     "unmetCondition=disabledSearchLaunchResolvedAsExactAppCycle"
             )
             presentationResolved.assertForOverFulfill = true
+            let inputReadinessPublished = expectation(
+                description:
+                    "unmetCondition=disabledSearchLaunchPublishedExactInputReadiness"
+            )
+            inputReadinessPublished.assertForOverFulfill = true
+            let distributedCenter =
+                DistributedNotificationCenter.default()
+            let inputReadinessObserver =
+                distributedCenter.addObserver(
+                    forName:
+                        resolutionRoute.notificationName,
+                    object: nil,
+                    queue: .main
+                ) { _ in
+                    inputReadinessPublished.fulfill()
+                }
             var resolvedEvidence:
                 FlowTabUITestInitialPresentationEvidence?
             var lastObservedEvidence:
@@ -317,8 +356,13 @@ extension FlowTabPriorityCoverageTests {
             defer {
                 NotificationCenter.default
                     .removeObserver(observer)
+                distributedCenter.removeObserver(
+                    inputReadinessObserver
+                )
                 FlowTabUITestBootstrapper
                     .stopInitialUIPresentationObservation()
+                runtimeProjectionService
+                    .setAppSwitcherMaintenanceRequestHandler(nil)
                 controller.cancelSelectionForTesting()
                 FlowTabTestLaunchOptions
                     .argumentsOverrideForTesting =
@@ -343,11 +387,22 @@ extension FlowTabPriorityCoverageTests {
                 )
 
             await fulfillment(
-                of: [presentationResolved],
+                of: [
+                    presentationResolved,
+                    inputReadinessPublished
+                ],
                 timeout:
                     FlowTabPriorityCoverageWatchdogPolicy
                         .initialSearchPresentationResolution
             )
+
+            guard !FlowTabUITestBootstrapper
+                    .isObservingInitialPresentationInputReadinessForTesting
+            else {
+                return XCTFail(
+                    "Disabled Search launch input readiness did not satisfy the Oracle; last=\(FlowTabUITestBootstrapper.initialPresentationInputReadinessLastEvidenceForTesting?.logFields ?? "none")"
+                )
+            }
 
             guard let resolvedEvidence else {
                 return XCTFail(
@@ -398,6 +453,48 @@ extension FlowTabPriorityCoverageTests {
                 expectedAppIDs
             )
             XCTAssertEqual(
+                readback.selectedAppID,
+                model.session?.selectedApp.id
+            )
+            XCTAssertTrue(
+                expectedAppIDs.contains(readback.selectedAppID)
+            )
+            XCTAssertTrue(readback.inputReadinessResolved)
+            XCTAssertEqual(
+                readback.inputReadinessSessionItemIDs,
+                expectedAppIDs
+            )
+            XCTAssertEqual(
+                readback.inputReadinessSelectedAppID,
+                readback.selectedAppID
+            )
+            XCTAssertEqual(
+                readback.inputReadinessBaselineSourceGeneration?
+                    .projection,
+                2
+            )
+            XCTAssertEqual(
+                readback.inputReadinessSourceGeneration?
+                    .projection,
+                3
+            )
+            XCTAssertFalse(
+                readback
+                    .inputReadinessPanelPresentationDiagnosticProbePending
+            )
+            XCTAssertFalse(
+                readback
+                    .inputReadinessActiveSpaceTransitionPending
+            )
+            XCTAssertFalse(
+                readback
+                    .inputReadinessApplicationActivationSuppressed
+            )
+            XCTAssertFalse(
+                readback
+                    .inputReadinessTerminateInterruptionProtectionPending
+            )
+            XCTAssertEqual(
                 readback.postPresentationItemIDs,
                 expectedAppIDs
             )
@@ -407,6 +504,10 @@ extension FlowTabPriorityCoverageTests {
             XCTAssertFalse(readback.searchIsActive)
             XCTAssertFalse(
                 readback.searchActivationIsPending
+            )
+            XCTAssertFalse(
+                FlowTabUITestBootstrapper
+                    .isObservingInitialPresentationInputReadinessForTesting
             )
         }
     }
