@@ -187,25 +187,84 @@ extension FlowTabUITests {
         )
     }
 
-    func testSettingsWindowBehaviorHideMinimizedAppsAffectsSwitcherAppLayer() throws {
+    func testSettingsWindowBehaviorDefaultIncludesMinimizedAppsInInitialSwitcher()
+        throws
+    {
+        let baselineRequiredItemIDs: Set<String> = [
+            "com.flowtab.mock.mail",
+            "com.flowtab.mock.minimized-notes"
+        ]
+        let baselineResolutionRoute =
+            FlowTabUITestInitialPresentationResolutionRoute()
+        try baselineResolutionRoute.prepareReadback()
+        let baselineResolutionOwner =
+            FlowTabUITestInitialPresentationResolutionObservationOwner(
+                route: baselineResolutionRoute,
+                expectation:
+                    FlowTabUITestInitialPresentationResolutionExpectation(
+                        requiredItemIDs: baselineRequiredItemIDs,
+                        searchFeatureEnabled: true,
+                        searchIsActive: false,
+                        searchActivationIsPending: false
+                    )
+            )
+        baselineResolutionOwner.start()
+        defer {
+            baselineResolutionOwner.cancel()
+            baselineResolutionRoute.removeReadback()
+        }
+
         let baselineApp = makeApp(
             additionalArguments: windowBehaviorRuntimeArguments(
                 resetDefaults: true,
                 opensSwitcher: true
             )
+                + baselineResolutionRoute.launchArguments
         )
+        defer { baselineApp.terminate() }
         launchFlowTabUITestApplication(baselineApp)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(baselineApp, timeout: 10))
-        XCTAssertTrue(element(in: baselineApp, identifier: Identifier.switcherAppMockMail).waitForExistence(timeout: 8))
+        guard let baselineResolution =
+                baselineResolutionOwner.waitForResolution(
+                    timeout:
+                        FlowTabUITestInitialPresentationResolutionPolicy
+                            .watchdog
+                )
+        else {
+            XCTFail(
+                "Hide-minimized baseline initial presentation watchdog "
+                    + "expired. "
+                    + baselineResolutionOwner.diagnosticSummary
+            )
+            return
+        }
         XCTAssertTrue(
-            element(
-                in: baselineApp,
-                identifier: Identifier.switcherAppMockMinimizedNotes
-            ).waitForExistence(timeout: 8)
+            baselineRequiredItemIDs.isSubset(
+                of: Set(baselineResolution.candidateItemIDs)
+            ),
+            baselineResolution.diagnosticSummary
         )
-        baselineApp.terminate()
+        XCTAssertEqual(
+            baselineResolution.sessionItemIDs,
+            baselineResolution.candidateItemIDs,
+            baselineResolution.diagnosticSummary
+        )
+        XCTAssertTrue(
+            baselineResolution.panelIsPresented,
+            baselineResolution.diagnosticSummary
+        )
+        XCTAssertEqual(
+            baselineResolution.sessionMode,
+            "appCycle",
+            baselineResolution.diagnosticSummary
+        )
+    }
 
-        let settingsApp = makeApp(additionalArguments: windowBehaviorRuntimeArguments())
+    func testSettingsWindowBehaviorHideMinimizedAppsAffectsSwitcherAppLayer() throws {
+        let settingsApp = makeApp(
+            additionalArguments: windowBehaviorRuntimeArguments(
+                resetDefaults: true
+            )
+        )
         launchFlowTabUITestApplication(settingsApp)
         openSettingsTab(in: settingsApp)
 
