@@ -170,11 +170,14 @@ extension FlowTabUITests {
                     + "app=\(escapedAppName) "
                     + "windows=1 mode=appCycle",
                 since: advanceEvidenceSnapshot,
-                timeout: 4,
+                timeout:
+                    FlowTabUITestRuntimeTruthWatchdogPolicy
+                        .provisionalHiddenSingleWindowAdvance,
                 description:
                     "single eligible window remains in app cycle "
                     + "after manual Down"
             )
+            advanceEvidenceSnapshot.cancel()
             XCTAssertFalse(
                 switcherPanelDiagnosticsValue(diagnosticsSummary, key: "mode").hasPrefix("windowCycle"),
                 """

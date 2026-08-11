@@ -7,6 +7,7 @@ enum FlowTabUITestRuntimeTruthWatchdogPolicy {
     static let optionTabConfirmedWindowActivation: TimeInterval = 12
     static let optionTabSwitcherDismissal: TimeInterval = 4
     static let optionTabRelaunchWindowTopology: TimeInterval = 4
+    static let provisionalHiddenSingleWindowAdvance: TimeInterval = 4
     static let windowSearchInitialTopology: TimeInterval = 12
     static let windowSearchInitialPresentationTopology: TimeInterval = 4
     static let windowSearchConfirmedWindowActivation: TimeInterval = 12
@@ -53,6 +54,15 @@ extension FlowTabUITests {
                 .optionTabRelaunchWindowTopology
         XCTAssertEqual(relaunchWindowTopology, 4)
         XCTAssertTrue(relaunchWindowTopology.isFinite && relaunchWindowTopology > 0)
+
+        let provisionalHiddenSingleWindowAdvance =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .provisionalHiddenSingleWindowAdvance
+        XCTAssertEqual(provisionalHiddenSingleWindowAdvance, 4)
+        XCTAssertTrue(
+            provisionalHiddenSingleWindowAdvance.isFinite
+                && provisionalHiddenSingleWindowAdvance > 0
+        )
 
         let windowSearchInitialTopology =
             FlowTabUITestRuntimeTruthWatchdogPolicy
