@@ -40,8 +40,57 @@ extension FlowTabUITests {
             )
 
             let activationLogSnapshot = makeRuntimeLogFileSnapshot()
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "option.spaceBacked.confirm")
-            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
+            let dismissalOwner =
+                FlowTabUITestElementNonExistenceObservationOwner(
+                    elementIdentifier:
+                        diagnosticsSummary.identifier,
+                    readback: { diagnosticsSummary.exists }
+                )
+            dismissalOwner.start()
+            defer { dismissalOwner.cancel() }
+
+            guard
+                let initialDismissalEvidence =
+                    dismissalOwner.latestEvidence,
+                initialDismissalEvidence.source
+                    == .initialReadback,
+                initialDismissalEvidence.value.exists
+            else {
+                XCTFail(
+                    "Space-backed Option+Tab confirmation requires "
+                        + "the exact diagnostics element before the "
+                        + "trigger. "
+                        + dismissalOwner.diagnosticSummary
+                )
+                return
+            }
+
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                .confirm,
+                traceLabel: "option.spaceBacked.confirm"
+            )
+            dismissalOwner.markTriggerCompleted()
+
+            guard
+                let dismissalEvidence =
+                    dismissalOwner.waitForResolution(
+                        timeout:
+                            FlowTabUITestRuntimeTruthWatchdogPolicy
+                                .optionTabSwitcherDismissal
+                    )
+            else {
+                XCTFail(
+                    "Space-backed Option+Tab switcher dismissal "
+                        + "watchdog expired. "
+                        + dismissalOwner.diagnosticSummary
+                )
+                return
+            }
+            XCTAssertFalse(
+                dismissalEvidence.value.exists,
+                "Space-backed Option+Tab confirmation must dismiss "
+                    + "the exact switcher diagnostics element."
+            )
             assertSpaceBackedWindowRequestSource(
                 selection,
                 appID: targetApp.identity.bundleIdentifier,
