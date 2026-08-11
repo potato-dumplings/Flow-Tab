@@ -417,19 +417,6 @@ extension FlowTabUITests {
         )
     }
 
-    func postFlowTabUITestSelectSwitcherAppAndWaitForDelivery(
-        bundleIdentifier: String,
-        traceLabel: String,
-        timeout: TimeInterval = SupportWatchdog.switcherCommandDelivery
-    ) throws {
-        try FlowTabUITestSwitcherCommandPayload.write(bundleIdentifier)
-        postFlowTabUITestSwitcherCommandAndWaitForDelivery(
-            .selectApp,
-            traceLabel: traceLabel,
-            timeout: timeout
-        )
-    }
-
     func settingsReminderToggle(in app: XCUIApplication) -> XCUIElement {
         toggleElement(in: app, identifier: Identifier.permissionReminderSwitch)
     }

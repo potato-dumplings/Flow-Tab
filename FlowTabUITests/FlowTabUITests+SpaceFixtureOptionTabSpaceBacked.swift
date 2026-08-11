@@ -80,9 +80,22 @@ extension FlowTabUITests {
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
             XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
 
-            try postFlowTabUITestSelectSwitcherAppAndWaitForDelivery(
+            _ = try performAndWaitForSwitcherAppSelection(
+                in: app,
                 bundleIdentifier: targetApp.identity.bundleIdentifier,
-                traceLabel: "option.provisionalHidden.selectApp"
+                timeout:
+                    FlowTabUITestRuntimeTruthWatchdogPolicy
+                        .switcherAppSelectionApplication,
+                trigger: {
+                    try FlowTabUITestSwitcherCommandPayload.write(
+                        targetApp.identity.bundleIdentifier
+                    )
+                    postFlowTabUITestSwitcherCommand(
+                        .selectApp,
+                        traceLabel:
+                            "option.provisionalHidden.selectApp"
+                    )
+                }
             )
             XCTAssertTrue(
                 waitForSwitcherAppsSummary(

@@ -16,6 +16,7 @@ enum FlowTabUITestRuntimeTruthWatchdogPolicy {
     static let windowSearchCommittedProjectionPublication: TimeInterval = 8
     static let windowSearchQueryProjectionPublication: TimeInterval = 8
     static let windowSearchResultSelectionApplication: TimeInterval = 6
+    static let switcherAppSelectionApplication: TimeInterval = 8
 }
 
 extension FlowTabUITests {
@@ -111,6 +112,15 @@ extension FlowTabUITests {
         XCTAssertTrue(
             windowSearchResultSelectionApplication.isFinite
                 && windowSearchResultSelectionApplication > 0
+        )
+
+        let switcherAppSelectionApplication =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .switcherAppSelectionApplication
+        XCTAssertEqual(switcherAppSelectionApplication, 8)
+        XCTAssertTrue(
+            switcherAppSelectionApplication.isFinite
+                && switcherAppSelectionApplication > 0
         )
     }
 }

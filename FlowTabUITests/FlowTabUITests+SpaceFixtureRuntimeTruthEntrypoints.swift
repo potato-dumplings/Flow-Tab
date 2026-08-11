@@ -421,15 +421,21 @@ extension FlowTabUITests {
         logFlowTabUITestTrace(
             "[\(traceLabel).selectWorkflowApp.direct] target=\(workflowApp.identity.bundleIdentifier) selected=\(switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected"))"
         )
-        try postFlowTabUITestSelectSwitcherAppAndWaitForDelivery(
-            bundleIdentifier: workflowApp.identity.bundleIdentifier,
-            traceLabel: "\(traceLabel).selectApp"
-        )
-        assertSwitcherSelectedApp(
-            workflowApp,
+        _ = try performAndWaitForSwitcherAppSelection(
             in: app,
-            diagnosticsSummary: diagnosticsSummary,
-            stage: "before entering Option+Tab window state"
+            bundleIdentifier: workflowApp.identity.bundleIdentifier,
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .switcherAppSelectionApplication,
+            trigger: {
+                try FlowTabUITestSwitcherCommandPayload.write(
+                    workflowApp.identity.bundleIdentifier
+                )
+                postFlowTabUITestSwitcherCommand(
+                    .selectApp,
+                    traceLabel: "\(traceLabel).selectApp"
+                )
+            }
         )
         if allowsNoisyCGSiblings {
             XCTAssertTrue(
