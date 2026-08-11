@@ -112,6 +112,53 @@ final class FlowTabUITestElementExistenceObservationOwner {
 }
 
 extension FlowTabUITests {
+    func startElementExistenceObservation(
+        in app: XCUIApplication,
+        identifier: String,
+        requiresInitialAbsence: Bool = false,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> FlowTabUITestElementExistenceObservationOwner {
+        let observedElement = element(in: app, identifier: identifier)
+        let observation =
+            FlowTabUITestElementExistenceObservationOwner(
+                elementIdentifier: identifier,
+                readback: { observedElement.exists }
+            )
+        observation.start()
+        if requiresInitialAbsence,
+            observation.latestEvidence?.value.exists != false
+        {
+            XCTFail(
+                "Element existence baseline mismatch; expectedExists=0. "
+                    + observation.diagnosticSummary,
+                file: file,
+                line: line
+            )
+        }
+        return observation
+    }
+
+    func assertElementExistsAfterTrigger(
+        _ observation:
+            FlowTabUITestElementExistenceObservationOwner,
+        timeout: TimeInterval,
+        description: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        observation.markTriggerCompleted()
+        guard observation.waitForResolution(timeout: timeout) != nil else {
+            XCTFail(
+                "\(description) watchdog expired. "
+                    + observation.diagnosticSummary,
+                file: file,
+                line: line
+            )
+            return
+        }
+    }
+
     func waitForSettingsControl(
         in app: XCUIApplication,
         identifier: String,

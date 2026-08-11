@@ -3,7 +3,8 @@ import XCTest
 private enum FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy {
     static let foregroundReadiness: TimeInterval = 10
     static let controlTabDiagnostics: TimeInterval = 5
-    static let compatibleBounds = [foregroundReadiness, controlTabDiagnostics]
+    static let controlTabSelectedPreview: TimeInterval = 5
+    static let compatibleBounds = [foregroundReadiness, controlTabDiagnostics, controlTabSelectedPreview]
 }
 
 private enum FlowTabUITestDelayedWindowLayerEntryEvidence {
@@ -20,7 +21,7 @@ private enum FlowTabUITestDelayedWindowLayerEntryEvidence {
 extension FlowTabUITests {
     func testSwitcherInteractionRegressionWatchdogPolicyPreservesCompatibleBound() {
         let policies = FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy.compatibleBounds
-        XCTAssertEqual(policies, [10, 5])
+        XCTAssertEqual(policies, [10, 5, 5])
         XCTAssertTrue(policies.allSatisfy { $0.isFinite && $0 > 0 })
     }
 
@@ -160,9 +161,10 @@ extension FlowTabUITests {
         )
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        let secondaryWindowID =
-            "flowtab.switcher.window.\("mock-current-secondary".flowTabUITestAccessibilityIdentifierComponent)"
+        let secondaryWindowID = "flowtab.switcher.window.\("mock-current-secondary".flowTabUITestAccessibilityIdentifierComponent)"
         let secondaryPreviewID = previewImageIdentifier(for: secondaryWindowID)
+        let secondaryPreviewObservation = startElementExistenceObservation(in: app, identifier: secondaryPreviewID, requiresInitialAbsence: true)
+        defer { secondaryPreviewObservation.cancel() }
         let logSnapshot = makeRuntimeLogFileSnapshot()
 
         app.activate()
@@ -185,17 +187,15 @@ extension FlowTabUITests {
                         FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy
                             .controlTabDiagnostics,
                     trigger: {
-                        app.typeKey(
-                            .tab,
-                            modifierFlags: .control
-                        )
+                        app.typeKey(.tab, modifierFlags: .control)
                     }
                 ),
                 "The first physical Control+Tab gesture should select the next current-app window with both previews."
             )
-            XCTAssertTrue(
-                element(in: app, identifier: secondaryPreviewID).waitForExistence(timeout: 5),
-                "The selected window should expose a real preview marker while Control remains held."
+            assertElementExistsAfterTrigger(
+                secondaryPreviewObservation,
+                timeout: FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy.controlTabSelectedPreview,
+                description: "Selected Control+Tab window preview"
             )
             XCTAssertTrue(
                 waitForSwitcherWindowCards(
