@@ -2,6 +2,7 @@ import AppKit
 import XCTest
 
 private enum FlowTabUITestSystemAppMRUPolicy {
+    static let appOrderWatchdog: TimeInterval = 10
     static let switcherDismissalWatchdog: TimeInterval = 4
 }
 
@@ -37,6 +38,24 @@ struct FlowTabUITestWorkflowAppOrderEvidence: Equatable {
 }
 
 extension FlowTabUITests {
+    func testSystemAppMRUPolicyUsesNamedWatchdogs() {
+        let policies = [
+            FlowTabUITestSystemAppMRUPolicy.appOrderWatchdog,
+            FlowTabUITestSystemAppMRUPolicy.switcherDismissalWatchdog
+        ]
+        XCTAssertEqual(
+            FlowTabUITestSystemAppMRUPolicy.appOrderWatchdog,
+            10
+        )
+        XCTAssertEqual(
+            FlowTabUITestSystemAppMRUPolicy.switcherDismissalWatchdog,
+            4
+        )
+        XCTAssertTrue(
+            policies.allSatisfy { $0.isFinite && $0 > 0 }
+        )
+    }
+
     func testSystemAppMRURebuildsForEveryFlowTabProcessSession() throws {
         let workflow = try configuredSystemAppMRUFixtureWorkflow()
         var initialLaunchLogSnapshot =
@@ -62,7 +81,6 @@ extension FlowTabUITests {
             let initialOrder = triggerAndWaitForWorkflowAppOrder(
                 fixtureAppIDs,
                 in: app,
-                timeout: 10,
                 traceLabel: "system-app-mru.initial"
             )
             XCTAssertEqual(initialOrder, fixtureAppIDs)
@@ -101,7 +119,6 @@ extension FlowTabUITests {
             let rebuiltOrder = triggerAndWaitForWorkflowAppOrder(
                 relaunchedExpectedOrder,
                 in: relaunchedApp,
-                timeout: 10,
                 traceLabel: "system-app-mru.relaunch-order"
             )
             XCTAssertEqual(rebuiltOrder, relaunchedExpectedOrder)
@@ -122,7 +139,6 @@ extension FlowTabUITests {
                 let reopenedOrder = triggerAndWaitForWorkflowAppOrder(
                     relaunchedExpectedOrder,
                     in: relaunchedApp,
-                    timeout: 10,
                     traceLabel:
                         "system-app-mru.reopen.\(iteration)"
                 )
@@ -172,7 +188,6 @@ extension FlowTabUITests {
     private func triggerAndWaitForWorkflowAppOrder(
         _ expectedAppIDs: [String],
         in app: XCUIApplication,
-        timeout: TimeInterval,
         traceLabel: String
     ) -> [String] {
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
@@ -208,7 +223,9 @@ extension FlowTabUITests {
             .global,
             traceLabel: traceLabel
         )
-        if let evidence = owner.waitForResolution(timeout: timeout) {
+        if let evidence = owner.waitForResolution(
+            timeout: FlowTabUITestSystemAppMRUPolicy.appOrderWatchdog
+        ) {
             return evidence.value.order
         }
 
