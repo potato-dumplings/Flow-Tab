@@ -151,7 +151,7 @@ extension FlowTabUITests {
     func testSearchHeaderHighlightedAppChipStaysContentSizedForShortTitle() throws {
         let app = makeApp(additionalArguments: searchPointerHoverArguments)
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertSearchMockApplicationIsForegroundReady(app)
 
         let searchHeader = element(in: app, identifier: Identifier.switcherSearchHeader)
         let highlightedChip = element(in: app, identifier: Identifier.switcherSearchHighlight)
