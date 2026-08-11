@@ -3,6 +3,7 @@ import XCTest
 private enum FlowTabUITestNoisyOptionTabPolicy {
     static let exactPreviewProjectionWatchdog: TimeInterval = 8
     static let switcherDismissalWatchdog: TimeInterval = 4
+    static let exactSelectedWindowActivationWatchdog: TimeInterval = 12
 }
 
 extension FlowTabUITests {
@@ -11,10 +12,13 @@ extension FlowTabUITests {
             FlowTabUITestNoisyOptionTabPolicy
                 .exactPreviewProjectionWatchdog,
             FlowTabUITestNoisyOptionTabPolicy
-                .switcherDismissalWatchdog
+                .switcherDismissalWatchdog,
+            FlowTabUITestNoisyOptionTabPolicy
+                .exactSelectedWindowActivationWatchdog
         ]
         XCTAssertEqual(watchdogs[0], 8)
         XCTAssertEqual(watchdogs[1], 4)
+        XCTAssertEqual(watchdogs[2], 12)
         XCTAssertTrue(
             watchdogs.allSatisfy { $0.isFinite && $0 > 0 }
         )
@@ -141,7 +145,9 @@ extension FlowTabUITests {
                     windowNumber: selection.windowNumber,
                     title: phase.targetTitle,
                     app: targetApp,
-                    timeout: 12
+                    timeout:
+                        FlowTabUITestNoisyOptionTabPolicy
+                            .exactSelectedWindowActivationWatchdog
                 ),
                 "Noisy Option+Tab must activate the exact \(phase.targetTitle) CG window selected in \(phase.trace)."
             )
