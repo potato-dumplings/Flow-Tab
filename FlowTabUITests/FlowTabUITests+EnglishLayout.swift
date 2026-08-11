@@ -22,7 +22,10 @@ extension FlowTabUITests {
                     .applicationEvidenceLaunchArguments
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertEnglishFlowTabForegroundReadiness(
+            in: app,
+            targetDescription: "English primary surfaces"
+        )
 
         openSettingsTab(in: app)
         assertSettingsPermissionActionProjection(
@@ -92,7 +95,10 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertEnglishFlowTabForegroundReadiness(
+            in: app,
+            targetDescription: "English granted-permission actions"
+        )
 
         openSettingsTab(in: app)
         assertSettingsPermissionActionProjection(
@@ -140,5 +146,27 @@ extension FlowTabUITests {
         )
         XCTAssertFalse(terminalPreviewToggle.exists)
         XCTAssertFalse(app.staticTexts["Allow Terminal content previews"].exists)
+    }
+
+    private func assertEnglishFlowTabForegroundReadiness(
+        in app: XCUIApplication,
+        targetDescription: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let readinessSatisfied =
+            waitForFlowTabUITestApplicationToBecomeReady(
+                app,
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .foregroundActivation
+            )
+        XCTAssertTrue(
+            readinessSatisfied,
+            "\(targetDescription) foreground readiness watchdog expired. "
+                + "finalState=\(String(describing: app.state))",
+            file: file,
+            line: line
+        )
     }
 }
