@@ -3,13 +3,14 @@ import XCTest
 private enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
     static let optionTabAppClickDismissal: TimeInterval = 2
     static let controlTabWindowClickDismissal: TimeInterval = 2
-    static let compatibleBounds = [optionTabAppClickDismissal, controlTabWindowClickDismissal]
+    static let searchResultClickDismissal: TimeInterval = 2
+    static let compatibleBounds = [optionTabAppClickDismissal, controlTabWindowClickDismissal, searchResultClickDismissal]
 }
 
 extension FlowTabUITests {
     func testSwitcherAndSearchWatchdogPolicyPreservesCompatibleBounds() {
         let policies = FlowTabUITestSwitcherAndSearchWatchdogPolicy.compatibleBounds
-        XCTAssertEqual(policies, [2, 2])
+        XCTAssertEqual(policies, [2, 2, 2])
         XCTAssertTrue(policies.allSatisfy { $0.isFinite && $0 > 0 })
     }
 
@@ -400,11 +401,11 @@ extension FlowTabUITests {
         XCTAssertTrue(browserResult.waitForExistence(timeout: 5))
         assertSearchResultUsesRowSizedFrame(browserResult)
 
-        browserResult.tap()
-
-        XCTAssertTrue(
-            waitForNonExistence(diagnosticsSummary, timeout: 2),
-            "Clicking a search result row should commit the result and close the panel immediately."
+        assertElementDoesNotExistAfterTrigger(
+            diagnosticsSummary,
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.searchResultClickDismissal,
+            description: "Search result-row click presentation dismissal",
+            trigger: { browserResult.tap() }
         )
     }
 
