@@ -1,6 +1,17 @@
 import XCTest
 
+private enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
+    static let optionTabAppClickDismissal: TimeInterval = 2
+    static let compatibleBounds = [optionTabAppClickDismissal]
+}
+
 extension FlowTabUITests {
+    func testSwitcherAndSearchWatchdogPolicyPreservesCompatibleBounds() {
+        let policies = FlowTabUITestSwitcherAndSearchWatchdogPolicy.compatibleBounds
+        XCTAssertEqual(policies, [2])
+        XCTAssertTrue(policies.allSatisfy { $0.isFinite && $0 > 0 })
+    }
+
     private var searchPointerHoverArguments: [String] {
         searchMockRuntimeArguments()
     }
@@ -260,11 +271,11 @@ extension FlowTabUITests {
         )
         XCTAssertTrue(mailTile.waitForExistence(timeout: 5))
 
-        mailTile.tap()
-
-        XCTAssertTrue(
-            waitForNonExistence(diagnosticsSummary, timeout: 2),
-            "Clicking an Option+Tab app tile should commit the app and close the panel immediately."
+        assertElementDoesNotExistAfterTrigger(
+            diagnosticsSummary,
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.optionTabAppClickDismissal,
+            description: "Option+Tab App-card click presentation dismissal",
+            trigger: { mailTile.tap() }
         )
     }
 
