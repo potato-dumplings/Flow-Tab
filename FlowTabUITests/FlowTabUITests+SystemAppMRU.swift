@@ -64,6 +64,14 @@ extension FlowTabUITests {
         )
     }
 
+    func testSystemAppMRUTerminationUsesCompatibleSharedWatchdog() {
+        let watchdog =
+            FlowTabUITestApplicationTerminationPolicy
+                .watchdogFailureObservationTimeout
+        XCTAssertEqual(watchdog, 5)
+        XCTAssertTrue(watchdog.isFinite && watchdog > 0)
+    }
+
     func testSystemAppMRURebuildsForEveryFlowTabProcessSession() throws {
         let workflow = try configuredSystemAppMRUFixtureWorkflow()
         var initialLaunchLogSnapshot =
@@ -100,9 +108,15 @@ extension FlowTabUITests {
                         .appRankBootstrapLogWatchdog
             )
 
-            terminateFlowTabUITestApplicationAndWait(
+            let terminationEvidence = terminateFlowTabUITestApplication(
                 app,
-                timeout: 5
+                targetDescription:
+                    "System App MRU initial FlowTab process"
+            )
+            XCTAssertTrue(
+                terminationEvidence.isSatisfied,
+                "FlowTab did not terminate before the MRU relaunch phase. "
+                    + terminationEvidence.diagnosticSummary
             )
             let relaunchedExpectedOrder = [3, 7, 1, 5, 0, 6, 2, 4].map { fixtureAppIDs[$0] }
             establishSystemAppOrder(relaunchedExpectedOrder)
@@ -277,18 +291,6 @@ extension FlowTabUITests {
                     app,
                     diagnosticsSummary: diagnosticsSummary
                 )
-        )
-    }
-
-    private func terminateFlowTabUITestApplicationAndWait(
-        _ app: XCUIApplication,
-        timeout: TimeInterval
-    ) {
-        app.terminate()
-        XCTAssertTrue(
-            app.wait(for: .notRunning, timeout: timeout),
-            "FlowTab did not terminate before the MRU relaunch phase. "
-                + "lastState=\(String(describing: app.state))"
         )
     }
 }
