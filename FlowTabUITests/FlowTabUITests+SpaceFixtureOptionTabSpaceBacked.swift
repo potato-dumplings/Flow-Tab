@@ -343,7 +343,9 @@ extension FlowTabUITests {
         waitForRuntimeLogFiles(
             matching: #"binding-readback-mismatch route=cg pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) reason=targetCGNotVisible targetCG=\#(selection.windowNumber)"#,
             since: snapshot,
-            timeout: 8,
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .spaceBackedCGActivationReadbackMismatchPublication,
             description: "space-backed CG-only activation readback mismatch"
         )
         waitForRuntimeLogFiles(
