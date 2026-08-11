@@ -7,6 +7,32 @@ private enum FlowTabUITestSwitcherSelectionTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testSwitcherPreviewTransitionPolicyPreservesCompatibleBounds() {
+        XCTAssertEqual(
+            FlowTabUITestSwitcherPreviewTransitionPolicy
+                .entryProjectionWatchdog(
+                    for: .exactTitles(["Primary"])
+                ),
+            11
+        )
+        XCTAssertEqual(
+            FlowTabUITestSwitcherPreviewTransitionPolicy
+                .entryProjectionWatchdog(
+                    for:
+                        .requiredRealWindows(
+                            standardTitles: ["Primary"],
+                            fullscreenTitles: ["Fullscreen"]
+                        )
+                ),
+            15
+        )
+        XCTAssertEqual(
+            FlowTabUITestSwitcherPreviewTransitionPolicy
+                .exitWatchdog,
+            3
+        )
+    }
+
     func testSwitcherSelectionTransitionRequiresExactAtomicState() {
         let windowBaseline =
             FlowTabUITestSwitcherSelectionState(
@@ -322,6 +348,8 @@ extension FlowTabUITests {
             FlowTabUITestSwitcherSelectionTransitionObservationOwner(
                 transition:
                     .enterWindowCycle(from: baseline),
+                previewExpectation:
+                    .exactTitles(["Primary", "Secondary"]),
                 acceptsEvidence: {
                     acceptsEvidence
                 },
@@ -336,7 +364,10 @@ extension FlowTabUITests {
                         mode:
                             "windowCycle("
                             + bundleIdentifier
-                            + ")"
+                            + ")",
+                        preview:
+                            bundleIdentifier
+                            + "::Primary|Secondary"
                     )
                 }
             )
@@ -358,35 +389,161 @@ extension FlowTabUITests {
                 "mode":
                     "windowCycle("
                     + bundleIdentifier
-                    + ")"
+                    + ")",
+                "preview":
+                    bundleIdentifier
+                    + "::Primary|Secondary",
             ]
         )
         XCTAssertEqual(cancellationCount, 1)
     }
 
-    func testSwitcherSelectionTransitionScheduledLatencyOnlyDelaysResolution() {
+    func testSwitcherWindowCycleEntryRequiresAtomicPreviewProjection() {
+        let bundleIdentifier = "com.example.notes"
         let baseline =
             FlowTabUITestSwitcherSelectionState(
-                selectedBundleIdentifier: "com.example.notes",
+                selectedBundleIdentifier: bundleIdentifier,
                 mode: "appCycle"
             )
+        var triggerCompleted = false
+        var snapshot = switcherSelectionTestSnapshot(
+            selected: bundleIdentifier,
+            mode: "appCycle",
+            preview: "inactive"
+        )
         var scheduledReadback:
             ((FlowTabUITestConditionObservationSource) -> Void)?
-        var selected = "com.example.notes"
         let owner =
             FlowTabUITestSwitcherSelectionTransitionObservationOwner(
                 transition:
-                    .advanceApplication(from: baseline),
+                    .enterWindowCycle(from: baseline),
+                previewExpectation:
+                    .exactTitles(["Primary", "Secondary"]),
+                acceptsEvidence: {
+                    triggerCompleted
+                },
                 observationRegistration: { callback in
                     scheduledReadback = callback
                     return FlowTabUITestObservationCancellation {}
                 },
-                readback: {
-                    self.switcherSelectionTestSnapshot(
-                        selected: selected,
-                        mode: "appCycle"
-                    )
-                }
+                readback: { snapshot }
+            )
+        owner.start()
+        defer { owner.cancel() }
+        triggerCompleted = true
+
+        snapshot = switcherSelectionTestSnapshot(
+            selected: bundleIdentifier,
+            mode: "windowCycle(\(bundleIdentifier))",
+            preview: bundleIdentifier + "::Primary"
+        )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = switcherSelectionTestSnapshot(
+            selected: "com.example.other",
+            mode: "windowCycle(com.example.other)",
+            preview: bundleIdentifier + "::Primary|Secondary"
+        )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = switcherSelectionTestSnapshot(
+            selected: bundleIdentifier,
+            mode: "windowCycle(\(bundleIdentifier))",
+            preview:
+                "com.example.other::Primary|Secondary"
+        )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = switcherSelectionTestSnapshot(
+            selected: bundleIdentifier,
+            mode: "windowCycle(\(bundleIdentifier))",
+            preview:
+                bundleIdentifier
+                + "::Secondary|Primary"
+        )
+        scheduledReadback?(.scheduledReadback)
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .scheduledReadback
+        )
+        XCTAssertEqual(
+            FlowTabUITestSwitcherPreviewProjectionSnapshot(
+                diagnostics:
+                    owner.resolvedEvidence?.value
+                        ?? snapshot
+            ).titles,
+            ["Secondary", "Primary"]
+        )
+    }
+
+    func testSwitcherWindowCycleEntryCancellationRejectsLateProjection() {
+        let bundleIdentifier = "com.example.notes"
+        let baseline =
+            FlowTabUITestSwitcherSelectionState(
+                selectedBundleIdentifier: bundleIdentifier,
+                mode: "appCycle"
+            )
+        var callback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var snapshot = switcherSelectionTestSnapshot(
+            selected: bundleIdentifier,
+            mode: "appCycle",
+            preview: "inactive"
+        )
+        let owner =
+            FlowTabUITestSwitcherSelectionTransitionObservationOwner(
+                transition:
+                    .enterWindowCycle(from: baseline),
+                previewExpectation:
+                    .exactTitles(["Primary"]),
+                observationRegistration: { readback in
+                    callback = readback
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: { snapshot }
+            )
+        owner.start()
+        owner.cancel()
+
+        snapshot = switcherSelectionTestSnapshot(
+            selected: bundleIdentifier,
+            mode: "windowCycle(\(bundleIdentifier))",
+            preview: bundleIdentifier + "::Primary"
+        )
+        callback?(.scheduledReadback)
+
+        XCTAssertNil(owner.resolvedEvidence)
+    }
+
+    func testSwitcherWindowCycleEntryScheduledLatencyOnlyDelaysResolution() {
+        let bundleIdentifier = "com.example.notes"
+        let baseline =
+            FlowTabUITestSwitcherSelectionState(
+                selectedBundleIdentifier: bundleIdentifier,
+                mode: "appCycle"
+            )
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var snapshot = switcherSelectionTestSnapshot(
+            selected: bundleIdentifier,
+            mode: "appCycle",
+            preview: "inactive"
+        )
+        let owner =
+            FlowTabUITestSwitcherSelectionTransitionObservationOwner(
+                transition:
+                    .enterWindowCycle(from: baseline),
+                previewExpectation:
+                    .exactTitles(["Primary", "Secondary"]),
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: { snapshot }
             )
         owner.start()
         defer { owner.cancel() }
@@ -395,7 +552,13 @@ extension FlowTabUITests {
             scheduledReadback?(.scheduledReadback)
             XCTAssertNil(owner.resolvedEvidence)
         }
-        selected = "com.example.browser"
+        snapshot = switcherSelectionTestSnapshot(
+            selected: bundleIdentifier,
+            mode: "windowCycle(\(bundleIdentifier))",
+            preview:
+                bundleIdentifier
+                + "::Primary|Secondary"
+        )
         scheduledReadback?(.scheduledReadback)
 
         XCTAssertEqual(
@@ -412,10 +575,11 @@ extension FlowTabUITests {
         for _ in 0..<FlowTabUITestSwitcherSelectionTestPolicy
             .pressureIterations
         {
+            let bundleIdentifier = "com.example.notes"
             let baseline =
                 FlowTabUITestSwitcherSelectionState(
                     selectedBundleIdentifier:
-                        "com.example.notes",
+                        bundleIdentifier,
                     mode: "appCycle"
                 )
             var scheduledReadbacks: [
@@ -423,30 +587,39 @@ extension FlowTabUITests {
                     FlowTabUITestConditionObservationSource
                 ) -> Void
             ] = []
-            var selected = "com.example.notes"
+            var snapshot = switcherSelectionTestSnapshot(
+                selected: bundleIdentifier,
+                mode: "appCycle",
+                preview: "inactive"
+            )
             let owner =
                 FlowTabUITestSwitcherSelectionTransitionObservationOwner(
                     transition:
-                        .advanceApplication(
+                        .enterWindowCycle(
                             from: baseline
+                        ),
+                    previewExpectation:
+                        .exactTitles(
+                            ["Primary", "Secondary"]
                         ),
                     observationRegistration: { callback in
                         scheduledReadbacks.append(callback)
                         return FlowTabUITestObservationCancellation {}
                     },
-                    readback: {
-                        self.switcherSelectionTestSnapshot(
-                            selected: selected,
-                            mode: "appCycle"
-                        )
-                    }
+                    readback: { snapshot }
                 )
 
             owner.start()
             let staleReadback = scheduledReadbacks[0]
             owner.cancel()
             owner.start()
-            selected = "com.example.browser"
+            snapshot = switcherSelectionTestSnapshot(
+                selected: bundleIdentifier,
+                mode: "windowCycle(\(bundleIdentifier))",
+                preview:
+                    bundleIdentifier
+                    + "::Primary|Secondary"
+            )
 
             staleReadback(.scheduledReadback)
             XCTAssertNil(owner.resolvedEvidence)
@@ -460,21 +633,30 @@ extension FlowTabUITests {
         }
     }
 
-    func testSwitcherSelectionTransitionWatchdogReportsFinalState() {
+    func testSwitcherWindowCycleEntryWatchdogReportsFinalProjection() {
+        let bundleIdentifier = "com.example.notes"
         let baseline =
             FlowTabUITestSwitcherSelectionState(
-                selectedBundleIdentifier: "com.example.notes",
+                selectedBundleIdentifier: bundleIdentifier,
                 mode: "appCycle"
             )
         let owner =
             FlowTabUITestSwitcherSelectionTransitionObservationOwner(
                 transition:
-                    .advanceApplication(from: baseline),
+                    .enterWindowCycle(from: baseline),
+                previewExpectation:
+                    .exactTitles(["Primary", "Secondary"]),
                 observationRegistration: nil,
                 readback: {
                     self.switcherSelectionTestSnapshot(
-                        selected: "com.example.notes",
-                        mode: "appCycle"
+                        selected: bundleIdentifier,
+                        mode:
+                            "windowCycle("
+                            + bundleIdentifier
+                            + ")",
+                        preview:
+                            bundleIdentifier
+                            + "::Primary"
                     )
                 }
             )
@@ -495,34 +677,46 @@ extension FlowTabUITests {
         )
         XCTAssertTrue(
             owner.diagnosticSummary.contains(
-                "advanceApplication"
+                "enterWindowCycle"
             )
         )
         XCTAssertTrue(
             owner.diagnosticSummary.contains(
-                "selected=com.example.notes"
+                "expectedPreview=[exactTitles="
             )
         )
         XCTAssertTrue(
             owner.diagnosticSummary.contains(
-                "mode=appCycle"
+                "observedPreview=["
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "titles=[\"Primary\"]"
             )
         )
     }
 
     private func switcherSelectionTestSnapshot(
         selected: String,
-        mode: String
+        mode: String,
+        preview: String? = nil
     ) -> FlowTabUITestSwitcherDiagnosticsSnapshot {
-        FlowTabUITestSwitcherDiagnosticsSnapshot(
+        var rawValue =
+            "selected=\(selected);mode=\(mode)"
+        var values = [
+            "selected": selected,
+            "mode": mode,
+        ]
+        if let preview {
+            rawValue += ";preview=\(preview)"
+            values["preview"] = preview
+        }
+        return FlowTabUITestSwitcherDiagnosticsSnapshot(
             identifier: "switcher-summary",
             exists: true,
-            rawValue:
-                "selected=\(selected);mode=\(mode)",
-            values: [
-                "selected": selected,
-                "mode": mode
-            ]
+            rawValue: rawValue,
+            values: values
         )
     }
 }

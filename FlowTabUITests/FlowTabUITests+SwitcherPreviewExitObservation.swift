@@ -1,6 +1,26 @@
 import Foundation
 import XCTest
 
+enum FlowTabUITestSwitcherPreviewTransitionPolicy {
+    static let exactEntryProjectionWatchdog:
+        TimeInterval = 11
+    static let noisyEntryProjectionWatchdog:
+        TimeInterval = 15
+    static let exitWatchdog: TimeInterval = 3
+
+    static func entryProjectionWatchdog(
+        for expectation:
+            FlowTabUITestSwitcherPreviewProjectionExpectation
+    ) -> TimeInterval {
+        switch expectation {
+        case .exactTitles, .exactTitleCount:
+            return exactEntryProjectionWatchdog
+        case .requiredRealWindows:
+            return noisyEntryProjectionWatchdog
+        }
+    }
+}
+
 extension FlowTabUITestSwitcherSelectionState {
     static func exactWindowCycle(
         expectedBundleIdentifier: String,
@@ -62,23 +82,43 @@ extension FlowTabUITestSwitcherSelectionTransition {
 }
 
 extension FlowTabUITests {
-    private enum SwitcherPreviewTransitionPolicy {
-        static let transitionWatchdog:
-            TimeInterval = 3
+    func enterSwitcherPreview(
+        _ workflowApp:
+            SpaceFixtureResolvedWorkflow.App,
+        in app: XCUIApplication,
+        diagnostics: XCUIElement,
+        allowsNoisyCGSiblings: Bool
+    ) -> Bool {
+        enterSwitcherPreview(
+            workflowApp,
+            in: app,
+            diagnostics: diagnostics,
+            previewExpectation:
+                .workflowApp(
+                    workflowApp,
+                    allowsNoisyCGSiblings:
+                        allowsNoisyCGSiblings
+                )
+        )
     }
 
     func enterSwitcherPreview(
         _ workflowApp:
             SpaceFixtureResolvedWorkflow.App,
         in app: XCUIApplication,
-        diagnostics: XCUIElement
+        diagnostics: XCUIElement,
+        previewExpectation:
+            FlowTabUITestSwitcherPreviewProjectionExpectation
     ) -> Bool {
         enterSwitcherPreview(
             workflowApp,
             diagnostics: diagnostics,
+            previewExpectation: previewExpectation,
             timeout:
-                SwitcherPreviewTransitionPolicy
-                    .transitionWatchdog
+                FlowTabUITestSwitcherPreviewTransitionPolicy
+                    .entryProjectionWatchdog(
+                        for: previewExpectation
+                    )
         ) {
             app.typeKey(
                 .downArrow,
@@ -91,6 +131,8 @@ extension FlowTabUITests {
         _ workflowApp:
             SpaceFixtureResolvedWorkflow.App,
         diagnostics: XCUIElement,
+        previewExpectation:
+            FlowTabUITestSwitcherPreviewProjectionExpectation,
         timeout: TimeInterval,
         trigger: () -> Void
     ) -> Bool {
@@ -128,6 +170,7 @@ extension FlowTabUITests {
             expectedBundleIdentifier:
                 expectedBundleIdentifier,
             operation: "entry",
+            previewExpectation: previewExpectation,
             diagnostics: diagnostics,
             timeout: timeout,
             trigger: trigger
@@ -209,10 +252,11 @@ extension FlowTabUITests {
             expectedBundleIdentifier:
                 expectedBundleIdentifier,
             operation: "exit",
+            previewExpectation: nil,
             diagnostics: diagnostics,
             timeout:
-                SwitcherPreviewTransitionPolicy
-                    .transitionWatchdog
+                FlowTabUITestSwitcherPreviewTransitionPolicy
+                    .exitWatchdog
         ) {
             app.typeKey(
                 .upArrow,
@@ -226,14 +270,22 @@ extension FlowTabUITests {
             FlowTabUITestSwitcherSelectionTransition,
         expectedBundleIdentifier: String,
         operation: String,
+        previewExpectation:
+            FlowTabUITestSwitcherPreviewProjectionExpectation?,
         diagnostics: XCUIElement,
         timeout: TimeInterval,
         trigger: () -> Void
     ) -> Bool {
         var triggerCompleted = false
+        let diagnosticsKeys =
+            FlowTabUITestSwitcherSelectionState
+                .diagnosticsKeys
+            + (previewExpectation == nil ? [] : ["preview"])
         let owner =
             FlowTabUITestSwitcherSelectionTransitionObservationOwner(
                 transition: transition,
+                previewExpectation:
+                    previewExpectation,
                 acceptsEvidence: {
                     triggerCompleted
                 },
@@ -241,8 +293,7 @@ extension FlowTabUITests {
                     self.switcherDiagnosticsSnapshot(
                         diagnostics,
                         keys:
-                            FlowTabUITestSwitcherSelectionState
-                                .diagnosticsKeys
+                            diagnosticsKeys
                     )
                 }
             )

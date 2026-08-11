@@ -232,12 +232,13 @@ extension FlowTabUITests {
             let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
             selectSwitcherWorkflowApp(targetApp, in: app, diagnosticsSummary: diagnosticsSummary)
             app.activate()
-            guard enterSwitcherPreview(targetApp, in: app, diagnostics: diagnosticsSummary) else { return }
-            assertSwitcherPreviewShowsOnlyExpectedTitles(
-                targetApp.expectedWindowTitles,
-                in: diagnosticsSummary,
-                timeout: 8
-            )
+            guard
+                enterSwitcherPreview(
+                    targetApp,
+                    in: app,
+                    diagnostics: diagnosticsSummary,
+                    allowsNoisyCGSiblings: false
+                ) else { return }
 
             assertSwitcherPreviewShowsOnlyExpectedTitles(
                 remainingTitles,
@@ -323,19 +324,13 @@ extension FlowTabUITests {
             let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
             selectSwitcherWorkflowApp(targetApp, in: app, diagnosticsSummary: diagnosticsSummary)
             app.activate()
-            guard enterSwitcherPreview(targetApp, in: app, diagnostics: diagnosticsSummary) else { return }
-            XCTAssertTrue(
-                waitForNoisyFullscreenWorkflowPreviewTitles(
-                    diagnosticsSummary,
-                    for: targetApp,
-                    timeout: 12
-                ),
-                """
-                Expected the open Switcher window layer to expose the Notes fullscreen target before mutation.
-
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
+            guard
+                enterSwitcherPreview(
+                    targetApp,
+                    in: app,
+                    diagnostics: diagnosticsSummary,
+                    allowsNoisyCGSiblings: true
+                ) else { return }
             let closedFullscreenTitle = try XCTUnwrap(
                 visibleFullscreenWindowTitle(in: diagnosticsSummary, for: targetApp)
             )

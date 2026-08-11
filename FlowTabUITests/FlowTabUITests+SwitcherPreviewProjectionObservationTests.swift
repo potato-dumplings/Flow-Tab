@@ -26,6 +26,43 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherPreviewProjectionReadsAtomicDiagnostics() {
+        let rawValue =
+            "selected=com.example.browser;"
+            + "mode=windowCycle(com.example.browser);"
+            + "preview=com.example.browser::Primary|Secondary"
+        let snapshot =
+            FlowTabUITestSwitcherPreviewProjectionSnapshot(
+                diagnostics:
+                    FlowTabUITestSwitcherDiagnosticsSnapshot(
+                        identifier: "switcher-summary",
+                        exists: true,
+                        rawValue: rawValue,
+                        values: [
+                            "selected": "com.example.browser",
+                            "mode":
+                                "windowCycle(com.example.browser)",
+                            "preview":
+                                "com.example.browser::Primary|Secondary",
+                        ]
+                    )
+            )
+
+        XCTAssertEqual(snapshot.rawValue, rawValue)
+        XCTAssertEqual(
+            snapshot.selectedBundleIdentifier,
+            "com.example.browser"
+        )
+        XCTAssertEqual(
+            snapshot.previewBundleIdentifier,
+            "com.example.browser"
+        )
+        XCTAssertEqual(
+            snapshot.titles,
+            ["Primary", "Secondary"]
+        )
+    }
+
     func testSwitcherPreviewProjectionAcceptsMatchingInitialTitles() {
         var order: [String] = []
         let owner =

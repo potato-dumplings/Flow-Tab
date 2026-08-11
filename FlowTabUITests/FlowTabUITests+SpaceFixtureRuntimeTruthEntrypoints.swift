@@ -450,13 +450,22 @@ extension FlowTabUITests {
                 )
             }
         )
+        let previewExpectation =
+            FlowTabUITestSwitcherPreviewProjectionExpectation
+                .workflowApp(
+                    workflowApp,
+                    allowsNoisyCGSiblings:
+                        allowsNoisyCGSiblings
+                )
         XCTAssertTrue(
             enterSwitcherPreview(
                 workflowApp,
                 diagnostics: diagnosticsSummary,
+                previewExpectation:
+                    previewExpectation,
                 timeout:
                     FlowTabUITestRuntimeTruthWatchdogPolicy
-                        .switcherWindowCycleEntry,
+                        .switcherWindowCyclePreviewProjection,
                 trigger: {
                     self.logWorkflowSpaceObservation(
                         "\(traceLabel).beforeEnterWindowState",
@@ -479,33 +488,6 @@ extension FlowTabUITests {
             \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
             """
         )
-        if allowsNoisyCGSiblings {
-            XCTAssertTrue(
-                waitForNoisyFullscreenWorkflowPreviewTitles(
-                    diagnosticsSummary,
-                    for: workflowApp,
-                    timeout: 8
-                ),
-                """
-                Option+Tab noisy app window state did not include the required real windows.
-
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-        } else {
-            XCTAssertTrue(
-                waitForSwitcherPreviewTitles(
-                    diagnosticsSummary,
-                    toEqual: Set(workflowApp.expectedWindowTitles),
-                    timeout: 8
-                ),
-                """
-                Option+Tab app window state did not expose the expected real windows.
-
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-        }
         return diagnosticsSummary
     }
 

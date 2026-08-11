@@ -25,14 +25,46 @@ struct FlowTabUITestSwitcherPreviewProjectionSnapshot: Equatable {
         titles = Self.parseTitles(from: previewValue)
     }
 
+    init(
+        diagnostics:
+            FlowTabUITestSwitcherDiagnosticsSnapshot
+    ) {
+        self.init(
+            identifier: diagnostics.identifier,
+            exists: diagnostics.exists,
+            rawValue: diagnostics.rawValue,
+            previewValue: diagnostics.values["preview"],
+            selectedBundleIdentifier:
+                diagnostics.values["selected"]
+        )
+    }
+
     var diagnosticSummary: String {
         "identifier=\(identifier) "
             + "exists=\(exists) "
             + "selectedBundleID="
             + "\(selectedBundleIdentifier ?? "nil") "
+            + "previewBundleID="
+            + "\(previewBundleIdentifier ?? "nil") "
             + "titles=\(titles.sorted()) "
             + "preview=\(previewValue ?? "nil") "
             + "raw=\(rawValue ?? "nil")"
+    }
+
+    var previewBundleIdentifier: String? {
+        guard
+            let previewValue,
+            previewValue != "inactive",
+            let separatorRange =
+                previewValue.range(of: "::"),
+            !previewValue[..<separatorRange.lowerBound]
+                .isEmpty
+        else {
+            return nil
+        }
+        return String(
+            previewValue[..<separatorRange.lowerBound]
+        )
     }
 
     private static func parseTitles(
@@ -65,6 +97,27 @@ enum FlowTabUITestSwitcherPreviewProjectionExpectation: Equatable {
         standardTitles: Set<String>,
         fullscreenTitles: Set<String>
     )
+
+    static func workflowApp(
+        _ workflowApp:
+            SpaceFixtureResolvedWorkflow.App,
+        allowsNoisyCGSiblings: Bool
+    ) -> Self {
+        let expectedTitles =
+            Set(workflowApp.expectedWindowTitles)
+        guard allowsNoisyCGSiblings else {
+            return .exactTitles(expectedTitles)
+        }
+        let fullscreenTitles =
+            Set(workflowApp.fullscreenWindowTitles)
+        return .requiredRealWindows(
+            standardTitles:
+                expectedTitles.subtracting(
+                    fullscreenTitles
+                ),
+            fullscreenTitles: fullscreenTitles
+        )
+    }
 
     func isSatisfied(
         by snapshot:
@@ -227,15 +280,10 @@ extension FlowTabUITests {
             SpaceFixtureResolvedWorkflow.App,
         timeout: TimeInterval
     ) -> Bool {
-        let fullscreenTitles =
-            Set(workflowApp.fullscreenWindowTitles)
-        let standardTitles =
-            Set(workflowApp.expectedWindowTitles)
-                .subtracting(fullscreenTitles)
         return waitForSwitcherPreviewProjection(
-            .requiredRealWindows(
-                standardTitles: standardTitles,
-                fullscreenTitles: fullscreenTitles
+            .workflowApp(
+                workflowApp,
+                allowsNoisyCGSiblings: true
             ),
             in: diagnosticsSummary,
             timeout: timeout

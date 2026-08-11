@@ -115,6 +115,9 @@ final class FlowTabUITestSwitcherSelectionTransitionObservationOwner {
     init(
         transition:
             FlowTabUITestSwitcherSelectionTransition,
+        previewExpectation:
+            FlowTabUITestSwitcherPreviewProjectionExpectation?
+                = nil,
         acceptsEvidence: @escaping () -> Bool = {
             true
         },
@@ -135,17 +138,51 @@ final class FlowTabUITestSwitcherSelectionTransitionObservationOwner {
                     observationRegistration,
                 readback: readback,
                 isSatisfied: { snapshot in
-                    acceptsEvidence()
+                    let previewProjection =
+                        FlowTabUITestSwitcherPreviewProjectionSnapshot(
+                            diagnostics: snapshot
+                        )
+                    let previewSatisfied: Bool
+                    if let previewExpectation {
+                        previewSatisfied =
+                            previewProjection
+                                .previewBundleIdentifier != nil
+                            && previewProjection
+                                .previewBundleIdentifier
+                                == previewProjection
+                                    .selectedBundleIdentifier
+                            && previewExpectation.isSatisfied(
+                                by: previewProjection
+                            )
+                    } else {
+                        previewSatisfied = true
+                    }
+                    return acceptsEvidence()
                         && transition.isSatisfied(
                             by: snapshot
                         )
+                        && previewSatisfied
                 },
                 describe: { snapshot in
-                    "acceptanceEnabled="
+                    let previewProjection =
+                        FlowTabUITestSwitcherPreviewProjectionSnapshot(
+                            diagnostics: snapshot
+                        )
+                    let previewDescription =
+                        previewExpectation.map {
+                            "expectedPreview=["
+                                + $0.diagnosticSummary
+                                + "] observedPreview=["
+                                + previewProjection
+                                    .diagnosticSummary
+                                + "] "
+                        } ?? "expectedPreview=none "
+                    return "acceptanceEnabled="
                         + "\(acceptsEvidence()) "
                         + "expected=["
                         + transition.diagnosticSummary
                         + "] "
+                        + previewDescription
                         + snapshot.diagnosticSummary
                 }
             )
