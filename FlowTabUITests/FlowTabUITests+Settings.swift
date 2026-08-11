@@ -773,15 +773,14 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
-
-        let inAppModifier = element(in: app, identifier: Identifier.settingsHotkeyInAppModifier)
-        let inAppKey = element(in: app, identifier: Identifier.settingsHotkeyInAppKey)
-        XCTAssertTrue(inAppModifier.waitForExistence(timeout: 5))
-        XCTAssertTrue(inAppKey.waitForExistence(timeout: 5))
-
-        XCTAssertFalse(inAppModifier.isEnabled)
-        XCTAssertFalse(inAppKey.isEnabled)
+        guard let controls = waitForDisabledSettingsInAppControls(
+            in: app,
+            trigger: { openSettingsTab(in: app) }
+        ) else {
+            return
+        }
+        XCTAssertFalse(controls.modifier.isEnabled)
+        XCTAssertFalse(controls.key.isEnabled)
     }
 
     private func assertSettingsPageSubtitleIsVisible(
