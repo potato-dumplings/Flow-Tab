@@ -1,6 +1,22 @@
 import XCTest
 
 extension FlowTabUITests {
+    func testSettingsWindowBehaviorHideMinimizedAppsCanBeEnabled() throws {
+        let app = makeApp(
+            additionalArguments: windowBehaviorRuntimeArguments(
+                resetDefaults: true
+            )
+        )
+        defer { app.terminate() }
+        launchFlowTabUITestApplication(app)
+
+        assertSettingsWindowBehaviorHideMinimizedAppsCanBeSet(
+            in: app,
+            to: true,
+            targetDescription: "hide-minimized Settings mutation"
+        )
+    }
+
     func testSettingsWindowBehaviorDelayAndTogglesPersistAcrossRelaunch() throws {
         let firstLaunchApp = makeApp(
             additionalArguments: [

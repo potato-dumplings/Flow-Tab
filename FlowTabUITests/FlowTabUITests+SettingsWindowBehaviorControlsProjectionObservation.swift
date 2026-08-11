@@ -213,6 +213,39 @@ extension FlowTabUITests {
         return elements.controls
     }
 
+    @discardableResult
+    func assertSettingsWindowBehaviorHideMinimizedAppsCanBeSet(
+        in app: XCUIApplication,
+        to isEnabled: Bool,
+        targetDescription: String
+    ) -> Bool {
+        guard
+            let controls =
+                assertSettingsWindowBehaviorControlsProjectionAfterNavigation(
+                    in: app,
+                    targetDescription: targetDescription,
+                    trigger: {
+                        openSettingsTab(in: app)
+                    }
+                )
+        else {
+            return false
+        }
+
+        setToggle(controls.hideMinimizedToggle, to: isEnabled)
+        let observedState = toggleIsOn(controls.hideMinimizedToggle)
+        XCTAssertEqual(
+            observedState,
+            isEnabled,
+            "Settings hide-minimized state mismatch. "
+                + "target=\(targetDescription) "
+                + "identifier="
+                + "\(Identifier.settingsWindowHideMinimizedApps) "
+                + "observed=\(observedState) expected=\(isEnabled)"
+        )
+        return observedState == isEnabled
+    }
+
     private func settingsWindowBehaviorProjectionElements(
         in app: XCUIApplication
     ) -> FlowTabUITestSettingsWindowBehaviorProjectionElements {

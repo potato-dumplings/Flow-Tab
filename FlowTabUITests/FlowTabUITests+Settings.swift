@@ -265,13 +265,17 @@ extension FlowTabUITests {
                 resetDefaults: true
             )
         )
+        defer { settingsApp.terminate() }
         launchFlowTabUITestApplication(settingsApp)
-        openSettingsTab(in: settingsApp)
-
-        let hideMinimizedToggle = toggleElement(in: settingsApp, identifier: Identifier.settingsWindowHideMinimizedApps)
-        XCTAssertTrue(hideMinimizedToggle.waitForExistence(timeout: 5))
-        setToggle(hideMinimizedToggle, to: true)
-        XCTAssertTrue(toggleIsOn(hideMinimizedToggle))
+        guard
+            assertSettingsWindowBehaviorHideMinimizedAppsCanBeSet(
+                in: settingsApp,
+                to: true,
+                targetDescription: "filtered Switcher setup"
+            )
+        else {
+            return
+        }
         settingsApp.terminate()
 
         let filteredApp = makeApp(
@@ -685,7 +689,7 @@ extension FlowTabUITests {
         return arguments
     }
 
-    private func windowBehaviorRuntimeArguments(
+    func windowBehaviorRuntimeArguments(
         resetDefaults: Bool = false,
         opensSwitcher: Bool = false
     ) -> [String] {
