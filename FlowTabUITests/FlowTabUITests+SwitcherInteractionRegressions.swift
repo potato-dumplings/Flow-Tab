@@ -167,6 +167,7 @@ extension FlowTabUITests {
         let secondaryPreviewObservation = startElementExistenceObservation(in: app, identifier: secondaryPreviewID, requiresInitialAbsence: true)
         defer { secondaryPreviewObservation.cancel() }
         let logSnapshot = makeRuntimeLogFileSnapshot()
+        defer { logSnapshot.cancel() }
 
         app.activate()
         XCUIElement.perform(withKeyModifiers: .control) {
@@ -227,8 +228,7 @@ extension FlowTabUITests {
                 "show kind=inApp action=initialAdvance key=tabForward",
                 "initial window-only panel revealed reason=preview_batch_completed previewsReady=1",
             ],
-            since: logSnapshot,
-            timeout: 8
+            since: logSnapshot
         )
     }
 
