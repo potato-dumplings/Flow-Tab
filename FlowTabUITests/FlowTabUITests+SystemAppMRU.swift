@@ -4,6 +4,7 @@ import XCTest
 private enum FlowTabUITestSystemAppMRUPolicy {
     static let appOrderWatchdog: TimeInterval = 10
     static let appRankBootstrapLogWatchdog: TimeInterval = 10
+    static let fixtureActivationWatchdog: TimeInterval = 5
     static let switcherDismissalWatchdog: TimeInterval = 4
 }
 
@@ -44,6 +45,8 @@ extension FlowTabUITests {
             FlowTabUITestSystemAppMRUPolicy.appOrderWatchdog,
             FlowTabUITestSystemAppMRUPolicy
                 .appRankBootstrapLogWatchdog,
+            FlowTabUITestSystemAppMRUPolicy
+                .fixtureActivationWatchdog,
             FlowTabUITestSystemAppMRUPolicy.switcherDismissalWatchdog
         ]
         XCTAssertEqual(
@@ -54,6 +57,11 @@ extension FlowTabUITests {
             FlowTabUITestSystemAppMRUPolicy
                 .appRankBootstrapLogWatchdog,
             10
+        )
+        XCTAssertEqual(
+            FlowTabUITestSystemAppMRUPolicy
+                .fixtureActivationWatchdog,
+            5
         )
         XCTAssertEqual(
             FlowTabUITestSystemAppMRUPolicy.switcherDismissalWatchdog,
@@ -208,7 +216,9 @@ extension FlowTabUITests {
         for bundleIdentifier in orderedAppIDs.reversed() {
             assertTriggerMakesApplicationFrontmost(
                 bundleIdentifier,
-                timeout: 5,
+                timeout:
+                    FlowTabUITestSystemAppMRUPolicy
+                        .fixtureActivationWatchdog,
                 message: "Failed to establish the fixture application activation Oracle."
             ) {
                 XCUIApplication(
