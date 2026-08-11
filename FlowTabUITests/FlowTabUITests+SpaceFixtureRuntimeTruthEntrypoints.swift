@@ -275,12 +275,12 @@ extension FlowTabUITests {
                     ? waitForWorkflowSpaceContainingCGWindow(
                         title: fullscreenTitle,
                         app: targetApp,
-                        timeout: 4
+                        timeout: FlowTabUITestRuntimeTruthWatchdogPolicy.windowSearchInitialPresentationTopology
                     )
                     : waitForActiveSpaceWorkflowCGWindow(
                     title: fullscreenTitle,
                     app: targetApp,
-                    timeout: 4
+                    timeout: FlowTabUITestRuntimeTruthWatchdogPolicy.windowSearchInitialPresentationTopology
                 ),
                 "Window search first phase must open from the fullscreen sibling's Space."
             )
