@@ -210,9 +210,16 @@ extension FlowTabUITests {
         let readinessSatisfied =
             waitForFlowTabUITestApplicationToBecomeReady(
                 app,
-                timeout: 12
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .foregroundActivation
             )
-        XCTAssertTrue(readinessSatisfied)
+        XCTAssertTrue(
+            readinessSatisfied,
+            "Space Fixture permission-preflight foreground readiness "
+                + "watchdog expired. "
+                + "finalState=\(String(describing: app.state))"
+        )
         guard readinessSatisfied else { return false }
 
         let navigationSatisfied = tapFirstHittable(
