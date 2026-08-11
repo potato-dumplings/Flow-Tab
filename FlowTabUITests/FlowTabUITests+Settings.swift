@@ -433,11 +433,31 @@ extension FlowTabUITests {
                 ]
             )
 
+            let logSnapshot = makeRuntimeLogFileSnapshot()
             let app = makeApp(additionalArguments: hotkeyEffectArguments())
             launchFlowTabUITestApplication(app)
-            XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+            waitForRuntimeLogFiles(
+                containing: [
+                    "register ok signature=1179926850 id=1",
+                    "register ok signature=1179926850 id=2",
+                    "register main=\(item.shortcutText) backward=",
+                    "registration evidence generation=1"
+                ],
+                since: logSnapshot
+            )
+            XCTAssertTrue(
+                waitForFlowTabUITestApplicationToBecomeReady(
+                    app,
+                    timeout:
+                        FlowTabUITestSupportWatchdogPolicy
+                            .foregroundActivation,
+                    traceLabel:
+                        "settings.mainHotkey.\(item.modifier).\(item.key).inputReadiness"
+                ),
+                "Expected foreground input readiness for \(item.shortcutText); "
+                    + "finalState=\(String(describing: app.state))"
+            )
 
-            let logSnapshot = makeRuntimeLogFileSnapshot()
             app.activate()
             typeHotkey(in: app, key: item.key, modifier: item.modifier)
             waitForRuntimeLogFiles(
