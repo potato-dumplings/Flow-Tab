@@ -106,6 +106,7 @@ extension FlowTabUITests {
             )
             assertSpaceBackedCGActivationReadbackFailure(
                 selection,
+                appID: targetApp.identity.bundleIdentifier,
                 since: activationLogSnapshot
             )
         }
@@ -337,6 +338,7 @@ extension FlowTabUITests {
 
     private func assertSpaceBackedCGActivationReadbackFailure(
         _ selection: RuntimeTruthWindowSelection,
+        appID: String,
         since snapshot:
             FlowTabUITestRuntimeLogObservationBaseline
     ) {
@@ -348,11 +350,14 @@ extension FlowTabUITests {
                     .spaceBackedCGActivationReadbackMismatchPublication,
             description: "space-backed CG-only activation readback mismatch"
         )
+        let escapedAppID = NSRegularExpression.escapedPattern(for: appID)
         waitForRuntimeLogFiles(
-            matching: #"focus-recovery exhausted generation=[0-9]+ attempts=[0-9]+ pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) targetCG=\#(selection.windowNumber)"#,
+            matching: #"focus-recovery state=watchdogExpired unmetCondition=exactTargetWindowFocusedOrFrontmost generation=[0-9]+ appID=\#(escapedAppID) pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) targetCG=\#(selection.windowNumber) pollingAttempt=[0-9]+ lastTrigger=watchdogReadback conditionSatisfied=0 processTerminated=0 targetVisible=0 focusedCG=nil frontmostCG=(?:nil|[0-9]+) visibleCG=[0-9,]*"#,
             since: snapshot,
-            timeout: 8,
-            description: "space-backed CG-only activation recovery exhaustion"
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .spaceBackedCGActivationRecoveryFailurePublication,
+            description: "space-backed CG-only activation recovery failure"
         )
     }
 

@@ -12,6 +12,7 @@ enum FlowTabUITestRuntimeTruthWatchdogPolicy {
     static let spaceBackedWindowRequestPublication: TimeInterval = 8
     static let spaceBackedCGActivationRoutePublication: TimeInterval = 8
     static let spaceBackedCGActivationReadbackMismatchPublication: TimeInterval = 8
+    static let spaceBackedCGActivationRecoveryFailurePublication: TimeInterval = 8
     static let provisionalHiddenProjectionPublication: TimeInterval = 8
     static let provisionalHiddenSingleWindowAdvance: TimeInterval = 4
     static let windowSearchInitialTopology: TimeInterval = 12
@@ -104,6 +105,15 @@ extension FlowTabUITests {
         XCTAssertTrue(
             spaceBackedCGActivationReadbackMismatchPublication.isFinite
                 && spaceBackedCGActivationReadbackMismatchPublication > 0
+        )
+
+        let spaceBackedCGActivationRecoveryFailurePublication =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .spaceBackedCGActivationRecoveryFailurePublication
+        XCTAssertEqual(spaceBackedCGActivationRecoveryFailurePublication, 8)
+        XCTAssertTrue(
+            spaceBackedCGActivationRecoveryFailurePublication.isFinite
+                && spaceBackedCGActivationRecoveryFailurePublication > 0
         )
 
         let provisionalHiddenProjectionPublication =
