@@ -363,12 +363,12 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(firstLaunchApp)
 
-        assertHomePermissionOpenSettingsTriggerReady(
-            in: firstLaunchApp
+        let reminderToggle = try XCTUnwrap(
+            waitForHomePermissionReminderToggleAfterOpeningSettings(
+                in: firstLaunchApp
+            ),
+            "Settings did not publish the exact permission reminder toggle."
         )
-
-        let reminderToggle = settingsReminderToggle(in: firstLaunchApp)
-        XCTAssertTrue(reminderToggle.waitForExistence(timeout: 5))
         reminderToggle.tap()
 
         firstLaunchApp.terminate()
