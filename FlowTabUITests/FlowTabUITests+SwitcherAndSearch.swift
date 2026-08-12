@@ -683,22 +683,22 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         assertSwitcherAndSearchApplicationIsForegroundReady(app)
 
-        let hostWeChatRow = element(in: app, identifier: Identifier.switcherAppWeChat)
-        let topLevelZeroWindowRow = element(in: app, identifier: Identifier.switcherAppTopLevelZeroWindow)
         let logSnapshot = makeRuntimeLogFileSnapshot()
         try FlowTabUITestSwitcherCommandPayload.write("com.tencent.xinWeChat")
 
         app.activate()
         XCUIElement.perform(withKeyModifiers: .option) {
-            app.typeKey(.tab, modifierFlags: .option)
-
             XCTAssertTrue(
-                hostWeChatRow.waitForExistence(timeout: 8),
-                "Option+Tab should open the switcher with the outer WeChat app row."
-            )
-            XCTAssertTrue(
-                topLevelZeroWindowRow.waitForExistence(timeout: 8),
-                "The nested-app filter must not hide ordinary top-level 0w apps."
+                assertInitialSwitcherAppProjectionAfterLaunch(
+                    in: app,
+                    requiredBundleIdentifiers: ["com.tencent.xinWeChat", "com.flowtab.mock.top-level-zero-window"],
+                    excludedBundleIdentifiers: ["com.tencent.flue.WeChatAppEx", "com.tencent.flue.WeApp"],
+                    targetDescription: "Option+Tab nested-topology App rows",
+                    timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.nestedTopologyAppProjection,
+                    trigger: { app.typeKey(.tab, modifierFlags: .option) }
+                ),
+                "Option+Tab should publish the exact nested-topology "
+                    + "App-row projection."
             )
             let switcherAppIdentifiers = Set(
                 app.descendants(matching: .any)
