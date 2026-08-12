@@ -79,8 +79,7 @@ struct FlowTabUITestSwitcherSearchResultSnapshot: Equatable {
     let resultsScope: String?
     let resultsQuery: String?
     let committedResultIDs: [String]
-    let observedRowIdentifier: String?
-    let observedRowExists: Bool
+    let observedRowIdentifiers: [String]
     let applicationState: XCUIApplication.State?
 
     init(
@@ -88,8 +87,7 @@ struct FlowTabUITestSwitcherSearchResultSnapshot: Equatable {
         resultsScope: String? = nil,
         resultsQuery: String? = nil,
         committedResultIDs: [String]? = nil,
-        observedRowIdentifier: String? = nil,
-        observedRowExists: Bool = false,
+        observedRowIdentifiers: [String] = [],
         applicationState: XCUIApplication.State? = nil
     ) {
         self.results = results
@@ -98,8 +96,7 @@ struct FlowTabUITestSwitcherSearchResultSnapshot: Equatable {
         self.committedResultIDs =
             committedResultIDs
                 ?? results.compactMap(\.resultID)
-        self.observedRowIdentifier = observedRowIdentifier
-        self.observedRowExists = observedRowExists
+        self.observedRowIdentifiers = observedRowIdentifiers
         self.applicationState = applicationState
     }
 
@@ -111,11 +108,27 @@ struct FlowTabUITestSwitcherSearchResultSnapshot: Equatable {
         return "scope=\(resultsScope ?? "nil") "
             + "query=\(resultsQuery ?? "nil") "
             + "resultIDs=\(committedResultIDs) "
-            + "rowIdentifier=\(observedRowIdentifier ?? "nil") "
-            + "rowExists=\(observedRowExists) "
+            + "rowIdentifiers=\(observedRowIdentifiers) "
             + "appState=\(String(describing: applicationState)) "
             + "count=\(results.count) "
             + "results=[\(resultSummary)]"
+    }
+}
+
+struct FlowTabUITestSwitcherSearchExpectedResultRow:
+    Equatable,
+    Hashable
+{
+    let resultID: String
+    let rowIdentifier: String
+
+    static func formsValidProjection(
+        _ rows: [Self]
+    ) -> Bool {
+        !rows.isEmpty
+            && Set(rows.map(\.resultID)).count == rows.count
+            && Set(rows.map(\.rowIdentifier)).count
+                == rows.count
     }
 }
 
@@ -140,11 +153,10 @@ enum FlowTabUITestSwitcherSearchResultExpectation:
         identifierFragment: String?,
         expectedCount: Int
     )
-    case committedResultRow(
+    case committedResultRows(
         scope: String,
         query: String,
-        resultID: String,
-        rowIdentifier: String
+        rows: [FlowTabUITestSwitcherSearchExpectedResultRow]
     )
 
     func matchingResult(
@@ -206,20 +218,29 @@ enum FlowTabUITestSwitcherSearchResultExpectation:
                 && countMatches
         case .exactWindowIdentifiers:
             return matchingIdentifiers(in: snapshot) != nil
-        case let .committedResultRow(
+        case let .committedResultRows(
             scope,
             query,
-            resultID,
-            rowIdentifier
+            rows
         ):
+            guard FlowTabUITestSwitcherSearchExpectedResultRow
+                .formsValidProjection(rows)
+            else {
+                return false
+            }
+            let expectedResultIDs = Set(rows.map(\.resultID))
+            let expectedRowIdentifiers = Set(
+                rows.map(\.rowIdentifier)
+            )
             return snapshot.resultsScope == scope
                 && snapshot.resultsQuery == query
-                && snapshot.committedResultIDs.contains(
-                    resultID
+                && expectedResultIDs.isSubset(
+                    of: Set(snapshot.committedResultIDs)
                 )
-                && snapshot.observedRowIdentifier
-                    == rowIdentifier
-                && snapshot.observedRowExists
+                && snapshot.observedRowIdentifiers.count
+                    == rows.count
+                && Set(snapshot.observedRowIdentifiers)
+                    == expectedRowIdentifiers
                 && snapshot.applicationState
                     == .runningForeground
         }
@@ -229,18 +250,25 @@ enum FlowTabUITestSwitcherSearchResultExpectation:
         in snapshot: FlowTabUITestSwitcherSearchResultSnapshot
     ) -> Bool {
         guard
-            case let .committedResultRow(
+            case let .committedResultRows(
                 scope,
                 query,
-                resultID,
-                _
+                rows
             ) = self
         else {
             return false
         }
+        guard FlowTabUITestSwitcherSearchExpectedResultRow
+            .formsValidProjection(rows)
+        else {
+            return false
+        }
+        let expectedResultIDs = Set(rows.map(\.resultID))
         return snapshot.resultsScope == scope
             && snapshot.resultsQuery == query
-            && snapshot.committedResultIDs.contains(resultID)
+            && expectedResultIDs.isSubset(
+                of: Set(snapshot.committedResultIDs)
+            )
     }
 
     func matchingIdentifiers(
@@ -304,15 +332,17 @@ enum FlowTabUITestSwitcherSearchResultExpectation:
                 + "query=\(query) "
                 + "fragment=\(identifierFragment ?? "<any>") "
                 + "count=\(expectedCount)"
-        case let .committedResultRow(
+        case let .committedResultRows(
             scope,
             query,
-            resultID,
-            rowIdentifier
+            rows
         ):
-            return "committedResultRow scope=\(scope) "
-                + "query=\(query) resultID=\(resultID) "
-                + "rowIdentifier=\(rowIdentifier)"
+            let rowSummary = rows.map {
+                "resultID=\($0.resultID),"
+                    + "rowIdentifier=\($0.rowIdentifier)"
+            }.joined(separator: " | ")
+            return "committedResultRows scope=\(scope) "
+                + "query=\(query) rows=[\(rowSummary)]"
         }
     }
 }
@@ -491,7 +521,7 @@ extension FlowTabUITests {
 
     func committedSwitcherSearchResultSnapshot(
         in app: XCUIApplication,
-        targetRowIdentifier: String? = nil
+        targetRowIdentifiers: [String] = []
     ) -> FlowTabUITestSwitcherSearchResultSnapshot {
         let diagnosticsSummary = element(
             in: app,
@@ -510,10 +540,14 @@ extension FlowTabUITests {
         ]
         let rawResults =
             diagnostics.values["searchResults"] ?? ""
-        let targetRow = targetRowIdentifier.map {
-            element(in: app, identifier: $0)
-        }
-        let targetRowExists = targetRow?.exists == true
+        let observedRowIdentifiers =
+            targetRowIdentifiers.compactMap { identifier in
+                let row = element(
+                    in: app,
+                    identifier: identifier
+                )
+                return row.exists ? row.identifier : nil
+            }
         return FlowTabUITestSwitcherSearchResultSnapshot(
             results:
                 searchWindowResultObservations(
@@ -530,11 +564,8 @@ extension FlowTabUITests {
                 searchResultIdentifiers(
                     inDiagnosticsProjection: rawResults
                 ),
-            observedRowIdentifier:
-                targetRowExists
-                    ? targetRow?.identifier
-                    : nil,
-            observedRowExists: targetRowExists,
+            observedRowIdentifiers:
+                observedRowIdentifiers,
             applicationState: app.state
         )
     }

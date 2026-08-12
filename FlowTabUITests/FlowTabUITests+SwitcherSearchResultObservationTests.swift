@@ -64,23 +64,43 @@ extension FlowTabUITests {
         )
     }
 
-    func testSwitcherSearchResultObserverRequiresCommittedVisibleRow() {
+    func testSwitcherSearchResultObserverRequiresCommittedVisibleRows() {
+        let rows = [
+            FlowTabUITestSwitcherSearchExpectedResultRow(
+                resultID: "app:com.example.chat",
+                rowIdentifier: "search.app.chat"
+            ),
+            FlowTabUITestSwitcherSearchExpectedResultRow(
+                resultID: "app:com.example.mail",
+                rowIdentifier: "search.app.mail"
+            )
+        ]
         let expectation =
             FlowTabUITestSwitcherSearchResultExpectation
-                .committedResultRow(
+                .committedResultRows(
                     scope: "app",
-                    query: "Mail",
-                    resultID: "app:com.example.mail",
-                    rowIdentifier: "search.app.mail"
+                    query: "cm",
+                    rows: rows
                 )
-        var acceptsEvidence = false
-        var snapshot =
+        func snapshot(
+            scope: String = "app",
+            query: String = "cm",
+            observedRows: [String],
+            state: XCUIApplication.State = .runningForeground
+        ) -> FlowTabUITestSwitcherSearchResultSnapshot {
             FlowTabUITestSwitcherSearchResultSnapshot(
                 results: [],
-                resultsScope: "app",
-                resultsQuery: "",
-                committedResultIDs: []
+                resultsScope: scope,
+                resultsQuery: query,
+                committedResultIDs: rows.map(\.resultID),
+                observedRowIdentifiers: observedRows,
+                applicationState: state
             )
+        }
+        var acceptsEvidence = false
+        var currentSnapshot = snapshot(
+            observedRows: rows.map(\.rowIdentifier)
+        )
         var scheduledReadback:
             ((FlowTabUITestConditionObservationSource) -> Void)?
         let owner =
@@ -94,70 +114,43 @@ extension FlowTabUITests {
                     return FlowTabUITestObservationCancellation {}
                 },
                 readback: {
-                    snapshot
+                    currentSnapshot
                 }
             )
         owner.start()
         defer { owner.cancel() }
 
+        XCTAssertNil(owner.resolvedEvidence)
+        XCTAssertTrue(
+            expectation.hasCommittedIdentity(
+                in: currentSnapshot
+            )
+        )
         acceptsEvidence = true
-        snapshot =
-            FlowTabUITestSwitcherSearchResultSnapshot(
-                results: [],
-                resultsScope: "window",
-                resultsQuery: "Mail",
-                committedResultIDs: [
-                    "app:com.example.mail"
-                ],
-                observedRowIdentifier: "search.app.mail",
-                observedRowExists: true,
-                applicationState: .runningForeground
-            )
+        currentSnapshot = snapshot(
+            scope: "window",
+            observedRows: rows.map(\.rowIdentifier)
+        )
         scheduledReadback?(.scheduledReadback)
         XCTAssertNil(owner.resolvedEvidence)
 
-        snapshot =
-            FlowTabUITestSwitcherSearchResultSnapshot(
-                results: [],
-                resultsScope: "app",
-                resultsQuery: "Mail",
-                committedResultIDs: [
-                    "app:com.example.mail"
-                ],
-                observedRowIdentifier: "search.app.mail",
-                observedRowExists: true,
-                applicationState: .runningBackground
-            )
+        currentSnapshot = snapshot(
+            observedRows: rows.map(\.rowIdentifier),
+            state: .runningBackground
+        )
         scheduledReadback?(.scheduledReadback)
         XCTAssertNil(owner.resolvedEvidence)
 
-        snapshot =
-            FlowTabUITestSwitcherSearchResultSnapshot(
-                results: [],
-                resultsScope: "app",
-                resultsQuery: "Mail",
-                committedResultIDs: [
-                    "app:com.example.mail"
-                ],
-                observedRowIdentifier: "search.app.mail",
-                observedRowExists: false,
-                applicationState: .runningForeground
-            )
+        currentSnapshot = snapshot(
+            observedRows: [rows[0].rowIdentifier]
+        )
+        scheduledReadback?(.scheduledReadback)
         scheduledReadback?(.scheduledReadback)
         XCTAssertNil(owner.resolvedEvidence)
 
-        snapshot =
-            FlowTabUITestSwitcherSearchResultSnapshot(
-                results: [],
-                resultsScope: "app",
-                resultsQuery: "Mail",
-                committedResultIDs: [
-                    "app:com.example.mail"
-                ],
-                observedRowIdentifier: "search.app.mail",
-                observedRowExists: true,
-                applicationState: .runningForeground
-            )
+        currentSnapshot = snapshot(
+            observedRows: rows.reversed().map(\.rowIdentifier)
+        )
         owner.requestReadback(source: .triggerReadback)
 
         XCTAssertEqual(
@@ -172,14 +165,19 @@ extension FlowTabUITests {
         )
     }
 
-    func testSwitcherSearchResultVisibleRowSchedulingOnlyChangesCompletionTime() {
+    func testSwitcherSearchResultVisibleRowsSchedulingOnlyChangesCompletionTime() {
+        let rows = [
+            FlowTabUITestSwitcherSearchExpectedResultRow(
+                resultID: "window:mail#inbox",
+                rowIdentifier: "search.window.inbox"
+            )
+        ]
         let expectation =
             FlowTabUITestSwitcherSearchResultExpectation
-                .committedResultRow(
+                .committedResultRows(
                     scope: "window",
                     query: "Inbox",
-                    resultID: "window:mail#inbox",
-                    rowIdentifier: "search.window.inbox"
+                    rows: rows
                 )
         var snapshot =
             FlowTabUITestSwitcherSearchResultSnapshot(
@@ -189,8 +187,6 @@ extension FlowTabUITests {
                 committedResultIDs: [
                     "window:mail#inbox"
                 ],
-                observedRowIdentifier: nil,
-                observedRowExists: false,
                 applicationState: .runningForeground
             )
         var scheduledReadback:
@@ -218,9 +214,8 @@ extension FlowTabUITests {
                 committedResultIDs: [
                     "window:mail#inbox"
                 ],
-                observedRowIdentifier:
-                    "search.window.inbox",
-                observedRowExists: true,
+                observedRowIdentifiers:
+                    rows.map(\.rowIdentifier),
                 applicationState: .runningForeground
             )
         XCTAssertNil(owner.resolvedEvidence)
@@ -232,8 +227,8 @@ extension FlowTabUITests {
         )
         XCTAssertEqual(
             owner.resolvedEvidence?.value
-                .observedRowIdentifier,
-            "search.window.inbox"
+                .observedRowIdentifiers,
+            rows.map(\.rowIdentifier)
         )
     }
 
@@ -702,15 +697,23 @@ extension FlowTabUITests {
         }
     }
 
-    func testSwitcherSearchResultRowWatchdogReportsFinalProjection() {
+    func testSwitcherSearchResultRowsWatchdogReportsFinalProjection() {
         let owner =
             FlowTabUITestSwitcherSearchResultObservationOwner(
                 expectation:
-                    .committedResultRow(
+                    .committedResultRows(
                         scope: "app",
                         query: "Mail",
-                        resultID: "app:com.example.mail",
-                        rowIdentifier: "search.app.mail"
+                        rows: [
+                            FlowTabUITestSwitcherSearchExpectedResultRow(
+                                resultID: "app:com.example.chat",
+                                rowIdentifier: "search.app.chat"
+                            ),
+                            FlowTabUITestSwitcherSearchExpectedResultRow(
+                                resultID: "app:com.example.mail",
+                                rowIdentifier: "search.app.mail"
+                            )
+                        ]
                     ),
                 observationRegistration: nil,
                 readback: {
@@ -719,10 +722,12 @@ extension FlowTabUITests {
                         resultsScope: "app",
                         resultsQuery: "Mail",
                         committedResultIDs: [
+                            "app:com.example.chat",
                             "app:com.example.mail"
                         ],
-                        observedRowIdentifier: nil,
-                        observedRowExists: false,
+                        observedRowIdentifiers: [
+                            "search.app.mail"
+                        ],
                         applicationState: .runningForeground
                     )
                 }
@@ -744,11 +749,13 @@ extension FlowTabUITests {
         )
         XCTAssertTrue(
             owner.diagnosticSummary.contains(
-                "resultID=app:com.example.mail"
+                "rowIdentifier=search.app.chat"
             )
         )
         XCTAssertTrue(
-            owner.diagnosticSummary.contains("rowExists=false")
+            owner.diagnosticSummary.contains(
+                "rowIdentifiers=[\"search.app.mail\"]"
+            )
         )
     }
 

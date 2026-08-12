@@ -7,20 +7,27 @@ private enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
     static let searchMockForegroundReadiness: TimeInterval = 10
     static let spaceFixtureSearchResultPublication: TimeInterval = 5
     static let searchHeaderProjection: TimeInterval = 10
+    static let searchMockSingleResultProjection: TimeInterval = 5
+    static let searchMockMultipleResultProjection: TimeInterval = 10
     static let compatibleBounds = [
         optionTabAppClickDismissal,
         controlTabWindowClickDismissal,
         searchResultClickDismissal,
         searchMockForegroundReadiness,
         spaceFixtureSearchResultPublication,
-        searchHeaderProjection
+        searchHeaderProjection,
+        searchMockSingleResultProjection,
+        searchMockMultipleResultProjection
     ]
 }
 
 extension FlowTabUITests {
     func testSwitcherAndSearchWatchdogPolicyPreservesCompatibleBounds() {
         let policies = FlowTabUITestSwitcherAndSearchWatchdogPolicy.compatibleBounds
-        XCTAssertEqual(policies, [2, 2, 2, 10, 5, 10])
+        XCTAssertEqual(
+            policies,
+            [2, 2, 2, 10, 5, 10, 5, 10]
+        )
         XCTAssertTrue(policies.allSatisfy { $0.isFinite && $0 > 0 })
     }
 
@@ -63,6 +70,41 @@ extension FlowTabUITests {
             arguments.append("--flowtab-ui-listen-switcher-trigger")
         }
         return arguments
+    }
+
+    private func assertCommittedMockSearchResults(
+        in app: XCUIApplication,
+        query: String,
+        bundleIdentifiers: [String],
+        timeout: TimeInterval,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let rows = bundleIdentifiers.map { bundleIdentifier in
+            FlowTabUITestSwitcherSearchExpectedResultRow(
+                resultID: "app:\(bundleIdentifier)",
+                rowIdentifier:
+                    "flowtab.switcher.search.app."
+                    + bundleIdentifier
+                        .flowTabUITestAccessibilityIdentifierComponent
+            )
+        }
+        XCTAssertTrue(
+            performAndWaitForCommittedSearchResultRows(
+                in: app,
+                scope: "app",
+                query: query,
+                rows: rows,
+                timeout: timeout,
+                trigger: {
+                    app.typeText(query)
+                }
+            ),
+            "Search did not publish the exact committed mock "
+                + "App result rows for query \(String(reflecting: query)).",
+            file: file,
+            line: line
+        )
     }
 
     func launchSearchMockApplication(
@@ -189,12 +231,14 @@ extension FlowTabUITests {
             in: app,
             observedBy: launch.readiness
         )
-        app.typeText("测")
-
-        let chineseResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.\("com.xxx.test".flowTabUITestAccessibilityIdentifierComponent)")
-            .firstMatch
-        XCTAssertTrue(chineseResult.waitForExistence(timeout: 5))
+        assertCommittedMockSearchResults(
+            in: app,
+            query: "测",
+            bundleIdentifiers: ["com.xxx.test"],
+            timeout:
+                FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                    .searchMockSingleResultProjection
+        )
     }
 
     func testSearchPanelPinyinInitialsShowChineseMockResult() throws {
@@ -205,12 +249,14 @@ extension FlowTabUITests {
             in: app,
             observedBy: launch.readiness
         )
-        app.typeText("cs")
-
-        let chineseResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.\("com.xxx.test".flowTabUITestAccessibilityIdentifierComponent)")
-            .firstMatch
-        XCTAssertTrue(chineseResult.waitForExistence(timeout: 5))
+        assertCommittedMockSearchResults(
+            in: app,
+            query: "cs",
+            bundleIdentifiers: ["com.xxx.test"],
+            timeout:
+                FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                    .searchMockSingleResultProjection
+        )
     }
 
     func testSearchPanelSharedCsQueryShowsCSGOAndChineseMockResults() throws {
@@ -221,17 +267,17 @@ extension FlowTabUITests {
             in: app,
             observedBy: launch.readiness
         )
-        app.typeText("cs")
-
-        let csgoResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.\("com.xxx.csgo".flowTabUITestAccessibilityIdentifierComponent)")
-            .firstMatch
-        XCTAssertTrue(csgoResult.waitForExistence(timeout: 5))
-
-        let chineseResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.\("com.xxx.test".flowTabUITestAccessibilityIdentifierComponent)")
-            .firstMatch
-        XCTAssertTrue(chineseResult.waitForExistence(timeout: 5))
+        assertCommittedMockSearchResults(
+            in: app,
+            query: "cs",
+            bundleIdentifiers: [
+                "com.xxx.csgo",
+                "com.xxx.test"
+            ],
+            timeout:
+                FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                    .searchMockMultipleResultProjection
+        )
     }
 
     func testSearchPanelCodeLikeSubsequenceShowsMockResult() throws {
@@ -242,12 +288,14 @@ extension FlowTabUITests {
             in: app,
             observedBy: launch.readiness
         )
-        app.typeText("cgo")
-
-        let csgoResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.\("com.xxx.csgo".flowTabUITestAccessibilityIdentifierComponent)")
-            .firstMatch
-        XCTAssertTrue(csgoResult.waitForExistence(timeout: 5))
+        assertCommittedMockSearchResults(
+            in: app,
+            query: "cgo",
+            bundleIdentifiers: ["com.xxx.csgo"],
+            timeout:
+                FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                    .searchMockSingleResultProjection
+        )
     }
 
     func testSearchPanelSegmentedChineseQueryShowsCompoundMockResult() throws {
@@ -258,12 +306,16 @@ extension FlowTabUITests {
             in: app,
             observedBy: launch.readiness
         )
-        app.typeText("文件助手")
-
-        let segmentedResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.\("com.flowtab.mock.file-transfer-assistant".flowTabUITestAccessibilityIdentifierComponent)")
-            .firstMatch
-        XCTAssertTrue(segmentedResult.waitForExistence(timeout: 5))
+        assertCommittedMockSearchResults(
+            in: app,
+            query: "文件助手",
+            bundleIdentifiers: [
+                "com.flowtab.mock.file-transfer-assistant"
+            ],
+            timeout:
+                FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                    .searchMockSingleResultProjection
+        )
     }
 
     func testOptionTabSwitcherPointerHoverSelectsMockAppAfterMovement() throws {

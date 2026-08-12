@@ -10,13 +10,44 @@ extension FlowTabUITests {
         timeout: TimeInterval,
         trigger: () -> Void
     ) -> Bool {
-        let expectation =
-            FlowTabUITestSwitcherSearchResultExpectation
-                .committedResultRow(
-                    scope: scope,
-                    query: query,
+        performAndWaitForCommittedSearchResultRows(
+            in: app,
+            scope: scope,
+            query: query,
+            rows: [
+                FlowTabUITestSwitcherSearchExpectedResultRow(
                     resultID: resultID,
                     rowIdentifier: rowIdentifier
+                )
+            ],
+            timeout: timeout,
+            trigger: trigger
+        )
+    }
+
+    func performAndWaitForCommittedSearchResultRows(
+        in app: XCUIApplication,
+        scope: String,
+        query: String,
+        rows: [FlowTabUITestSwitcherSearchExpectedResultRow],
+        timeout: TimeInterval,
+        trigger: () -> Void
+    ) -> Bool {
+        guard FlowTabUITestSwitcherSearchExpectedResultRow
+            .formsValidProjection(rows)
+        else {
+            XCTFail(
+                "Committed Search result projection requires "
+                    + "unique nonempty result and row identities."
+            )
+            return false
+        }
+        let expectation =
+            FlowTabUITestSwitcherSearchResultExpectation
+                .committedResultRows(
+                    scope: scope,
+                    query: query,
+                    rows: rows
                 )
         var triggerCompleted = false
         let owner =
@@ -28,7 +59,8 @@ extension FlowTabUITests {
                 readback: {
                     self.committedSwitcherSearchResultSnapshot(
                         in: app,
-                        targetRowIdentifier: rowIdentifier
+                        targetRowIdentifiers:
+                            rows.map(\.rowIdentifier)
                     )
                 }
             )
