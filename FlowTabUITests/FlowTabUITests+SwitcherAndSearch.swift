@@ -602,6 +602,7 @@ extension FlowTabUITests {
 
     func testSwitcherInitialPresentationStaleOcclusionDoesNotHardRecover() throws {
         let logSnapshot = makeRuntimeLogFileSnapshot()
+        defer { logSnapshot.cancel() }
         let app = makeApp(
             additionalArguments: [
                 "--flowtab-ui-reset-defaults",
@@ -638,8 +639,7 @@ extension FlowTabUITests {
                 "initial panel occlusion stale released",
                 "presentationRecovery trigger=global_show action=complete"
             ],
-            since: logSnapshot,
-            timeout: 8
+            since: logSnapshot
         )
         let logContents = runtimeLogContentsSinceSnapshot(logSnapshot)
         XCTAssertTrue(
