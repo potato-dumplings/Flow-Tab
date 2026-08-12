@@ -332,10 +332,7 @@ extension FlowTabUITests {
             return
         }
 
-        let nestedAppExRow = element(in: app, identifier: Identifier.homeAppNestedWeChatAppEx)
-        let nestedMiniProgramRow = element(in: app, identifier: Identifier.homeAppNestedMiniProgram)
-
-        guard assertHomeAndLogsNestedTopologyWindowsAfterSelectingHost(
+        guard assertHomeAndLogsNestedTopologyFilteredAppsAfterSelectingHost(
             hostWeChatRow,
             in: app
         ) else {
@@ -347,14 +344,6 @@ extension FlowTabUITests {
         screenshot.lifetime = .keepAlways
         add(screenshot)
 
-        XCTAssertFalse(
-            nestedAppExRow.waitForExistence(timeout: 2),
-            "Home should hide zero-window nested app rows when the outer host app is already visible."
-        )
-        XCTAssertFalse(
-            nestedMiniProgramRow.exists,
-            "Home should hide deeper zero-window nested app rows while keeping ordinary top-level 0w apps visible."
-        )
     }
 
     func testPermissionReminderTogglePersistsAcrossRelaunch() throws {
