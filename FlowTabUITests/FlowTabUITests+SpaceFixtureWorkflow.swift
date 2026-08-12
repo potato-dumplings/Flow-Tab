@@ -221,7 +221,11 @@ extension FlowTabUITests {
             }
         }
 
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
+        assertRealSpaceFixtureFlowTabIsForegroundReady(
+            app,
+            traceLabel: nil,
+            targetDescription: "runtime-lifecycle-before-fixture-launch"
+        )
 
         let launchLogSnapshot = makeRuntimeLogFileSnapshot()
         let fixtureApp = launchSpaceFixtureWorkflow(
