@@ -402,14 +402,17 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(firstLaunchApp)
 
-        let dismissButtons = firstLaunchApp.buttons.matching(identifier: Identifier.permissionDismiss)
-        XCTAssertTrue(dismissButtons.firstMatch.waitForExistence(timeout: 5))
         assertHomePermissionBannerHiddenProjection(
             in: firstLaunchApp,
             targetDescription: "permission-dismiss",
             baselineRequirement: .visiblePermissionControls
         ) {
-            XCTAssertTrue(tapFirstHittable(in: dismissButtons, timeout: 5))
+            let dismissButtons = firstLaunchApp.buttons.matching(
+                identifier: Identifier.permissionDismiss
+            )
+            XCTAssertTrue(
+                tapFirstHittable(in: dismissButtons, timeout: 5)
+            )
         }
 
         firstLaunchApp.terminate()

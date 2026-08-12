@@ -3,6 +3,7 @@ import XCTest
 
 private enum FlowTabUITestPermissionObservationPolicy {
     static let settingsInitialProjectionWatchdog: TimeInterval = 5
+    static let homeVisibleControlsBaselineWatchdog: TimeInterval = 5
     static let homeHiddenProjectionWatchdog: TimeInterval = 2
 }
 
@@ -161,6 +162,15 @@ extension FlowTabUITests {
         )
     }
 
+    func testHomeVisiblePermissionControlsBaselinePolicyPreservesWatchdog() {
+        let watchdog =
+            FlowTabUITestPermissionObservationPolicy
+                .homeVisibleControlsBaselineWatchdog
+        XCTAssertEqual(watchdog, 5)
+        XCTAssertTrue(watchdog.isFinite)
+        XCTAssertGreaterThan(watchdog, 0)
+    }
+
     func testHomeHiddenPermissionProjectionRequiresLoadedContentAndAbsence() {
         for mask in 0..<16 {
             let snapshot =
@@ -232,33 +242,35 @@ extension FlowTabUITests {
                                     .xcuiReadbackCadence
                         )
             )
+        let readback: () ->
+            FlowTabUITestHomeHiddenPermissionProjectionSnapshot = {
+                let applicationState = app.state
+                guard applicationState == .runningForeground
+                        || applicationState == .runningBackground
+                else {
+                    return FlowTabUITestHomeHiddenPermissionProjectionSnapshot(
+                        applicationState: applicationState,
+                        homeContentExists: false,
+                        permissionBannerExists: false,
+                        permissionActionExists: false,
+                        permissionDismissExists: false
+                    )
+                }
+                return FlowTabUITestHomeHiddenPermissionProjectionSnapshot(
+                    applicationState: applicationState,
+                    homeContentExists: homeContent.exists,
+                    permissionBannerExists: permissionBanner.exists,
+                    permissionActionExists: permissionAction.exists,
+                    permissionDismissExists: permissionDismiss.exists
+                )
+            }
         let observation =
             FlowTabUITestConditionObservationOwner(
                 observationRegistration: {
                     readback in
                     deferredReadbacks.register(readback)
                 },
-                readback: {
-                    let applicationState = app.state
-                    guard applicationState == .runningForeground
-                            || applicationState == .runningBackground
-                    else {
-                        return FlowTabUITestHomeHiddenPermissionProjectionSnapshot(
-                            applicationState: applicationState,
-                            homeContentExists: false,
-                            permissionBannerExists: false,
-                            permissionActionExists: false,
-                            permissionDismissExists: false
-                        )
-                    }
-                    return FlowTabUITestHomeHiddenPermissionProjectionSnapshot(
-                        applicationState: applicationState,
-                        homeContentExists: homeContent.exists,
-                        permissionBannerExists: permissionBanner.exists,
-                        permissionActionExists: permissionAction.exists,
-                        permissionDismissExists: permissionDismiss.exists
-                    )
-                },
+                readback: readback,
                 isSatisfied: {
                     triggerCompleted && $0.isSatisfied
                 },
@@ -280,12 +292,13 @@ extension FlowTabUITests {
         )
         XCTAssertNil(observation.resolvedEvidence)
         if baselineRequirement == .visiblePermissionControls {
-            XCTAssertTrue(
-                observation.latestEvidence?.value
-                    .hasVisiblePermissionControls == true,
-                "Home permission control baseline was not visible. "
-                    + observation.diagnosticSummary
-            )
+            guard waitForHomePermissionVisibleControlsBaseline(
+                initialSnapshot: observation.latestEvidence?.value,
+                readback: readback,
+                targetDescription: targetDescription
+            ) else {
+                return
+            }
         }
 
         trigger()
@@ -304,6 +317,44 @@ extension FlowTabUITests {
             "Home hidden-permission projection watchdog expired. "
                 + observation.diagnosticSummary
         )
+    }
+
+    private func waitForHomePermissionVisibleControlsBaseline(
+        initialSnapshot:
+            FlowTabUITestHomeHiddenPermissionProjectionSnapshot?,
+        readback: @escaping () ->
+            FlowTabUITestHomeHiddenPermissionProjectionSnapshot,
+        targetDescription: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> Bool {
+        if initialSnapshot?.hasVisiblePermissionControls == true {
+            return true
+        }
+
+        let observation = FlowTabUITestConditionObservationOwner(
+            readback: readback,
+            isSatisfied: \.hasVisiblePermissionControls,
+            describe: \.diagnosticSummary
+        )
+        observation.start()
+        defer { observation.cancel() }
+
+        guard observation.waitForResolution(
+            timeout:
+                FlowTabUITestPermissionObservationPolicy
+                    .homeVisibleControlsBaselineWatchdog
+        ) != nil else {
+            XCTFail(
+                "Home visible-permission-controls baseline watchdog "
+                    + "expired. target=\(targetDescription) "
+                    + observation.diagnosticSummary,
+                file: file,
+                line: line
+            )
+            return false
+        }
+        return true
     }
 
     func testHomePermissionBannerConvergesFromOwnedTCCReadbackEvidence() throws {
