@@ -121,6 +121,34 @@ extension FlowTabUITests {
         XCTAssertEqual(cancellationCount, 1)
     }
 
+    func testElementCollectionExistenceSlowSchedulingOnlyDelaysResolution() {
+        var elements = incompleteElementCollectionExistenceReadback()
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        let owner =
+            FlowTabUITestElementCollectionExistenceObservationOwner(
+                expectedIdentifiers: ["first", "second"],
+                scheduledRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: { elements }
+            )
+        owner.start()
+        defer { owner.cancel() }
+        owner.markTriggerCompleted()
+
+        elements = completeElementCollectionExistenceReadback()
+        XCTAssertNil(owner.resolvedEvidence)
+
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertEqual(
+            owner.resolvedEvidence?.value.elements,
+            completeElementCollectionExistenceReadback()
+        )
+        XCTAssertEqual(owner.resolvedEvidence?.source, .scheduledReadback)
+    }
+
     func testElementCollectionExistenceCancellationRejectsLateReadback() {
         var elements = incompleteElementCollectionExistenceReadback()
         var scheduledReadback:

@@ -204,19 +204,19 @@ extension FlowTabUITests {
             let targetWindowTitle = "Draft"
             let fallbackWindowTitle = "Inbox"
 
-            XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10))
+            let homeAppRow = try XCTUnwrap(
+                waitForHomeWindowRecencyTargetAppRowAfterNavigation(
+                    identifier: targetApp.identity.homeAppAccessibilityIdentifier,
+                    appName: targetApp.appName,
+                    in: app
+                ),
+                "FlowTab did not publish the exact Home App row for "
+                    + "\(targetApp.appName)."
+            )
             XCTAssertNotEqual(
                 NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
                 targetApp.identity.bundleIdentifier,
                 "Home recency scenario must start outside the target fixture app."
-            )
-
-            let homeAppRow = app.buttons
-                .matching(identifier: targetApp.identity.homeAppAccessibilityIdentifier)
-                .firstMatch
-            XCTAssertTrue(
-                homeAppRow.waitForExistence(timeout: 20),
-                "FlowTab did not surface \(targetApp.appName) on the home page."
             )
             tapElement(homeAppRow)
 
