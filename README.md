@@ -1,64 +1,64 @@
 # FlowTab
 
-[简体中文](./README.md) | [English](./README.en.md)
+**English** | [简体中文](./README.zh-CN.md)
 
-FlowTab 是一个 macOS 应用切换器，目标是在接近系统 `Command + Tab` 的手感下，提供更可控的多窗口切换体验。
+FlowTab is a macOS app switcher designed to stay close to the native `Command + Tab` feel while giving you better control over multi-window switching.
 
-## 你可以用它做什么
+## What You Can Do
 
-- 自定义全局切换快捷键（默认 `Option + Tab` / `Option + Shift + Tab`）
-- 应用层与窗口层切换
-- 窗口预览与窗口级激活
-- 面板内结束应用快捷键（默认 `Option + Q`）
-- 搜索匹配（部分匹配、中文分词、拼音、英文缩写、bundle id 关键词）
+- Customize global switch shortcuts (default `Option + Tab` / `Option + Shift + Tab`)
+- Switch across app-level and window-level views
+- Preview windows and activate a specific window directly
+- Quit the highlighted app inside the panel (default `Option + Q`)
+- Search with partial match, Chinese tokenization, pinyin, abbreviations, and bundle-id keywords
 
-## 下载与安装
+## Download And Install
 
-请从 GitHub Releases 下载 DMG：
+Download the DMG from GitHub Releases:
 
-- 通用（Apple Silicon + Intel）: `flowtab-universal2-apple-darwin.dmg`
-- 发布资产使用 Developer ID 签名、Hardened Runtime 与安全时间戳，并通过 Apple 公证和票据装订；Gatekeeper 会在打开时验证这些信息。
+- Universal (Apple Silicon + Intel): `flowtab-universal2-apple-darwin.dmg`
+- Release assets use Developer ID signing, Hardened Runtime, and secure timestamps, and are notarized and stapled by Apple for Gatekeeper verification.
 
-安装步骤：
+Install steps:
 
-1. 打开下载的 `.dmg` 文件。
-2. 将 `Flow Tab.app` 拖到 `Applications` 文件夹。
-3. 在 `Applications` 中打开 FlowTab。
+1. Open the downloaded `.dmg`.
+2. Drag `Flow Tab.app` into the `Applications` folder.
+3. Launch FlowTab from `Applications`.
 
-卸载步骤：
+Uninstall steps:
 
-1. 重新打开下载的 `.dmg` 文件。
-2. 双击里面的 `Uninstall Flow Tab.app`。
-3. 按提示确认后，会自动退出应用、删除 `/Applications/Flow Tab.app`，并清理权限记录与本地偏好设置。
+1. Open the downloaded `.dmg` again.
+2. Double-click `Uninstall Flow Tab.app`.
+3. Confirm the prompt to quit the app, remove `/Applications/Flow Tab.app`, and clear permissions plus local preferences.
 
-## 必要权限
+## Required Permissions
 
-首次使用时建议授予以下权限：
+For full functionality, grant:
 
-- 辅助功能：用于切换和激活窗口
-- 屏幕录制：用于窗口预览（不授权也能切换，只是没有预览画面）
-- Terminal 内容预览：FlowTab 通过 Apple Events 读取目标 Terminal 窗口当前选中的标签，并仅在内存中生成预览；标签内容不会写入偏好、日志或文件，也不会通过网络发送
+- Accessibility: required for window switching and activation
+- Screen Recording: required for window previews (switching still works without it)
+- Terminal content preview: FlowTab uses Apple Events to read only the currently selected tab in the target Terminal window and renders the preview in memory; tab content is not written to preferences, logs, or files, and is not sent over the network
 
-系统路径：
+System paths:
 
-- `系统设置 -> 隐私与安全性 -> 辅助功能`
-- `系统设置 -> 隐私与安全性 -> 屏幕录制`
-- `系统设置 -> 隐私与安全性 -> 自动化`
+- `System Settings -> Privacy & Security -> Accessibility`
+- `System Settings -> Privacy & Security -> Screen Recording`
+- `System Settings -> Privacy & Security -> Automation`
 
-## 快速上手
+## Quick Start
 
-1. 打开 FlowTab 后，按默认快捷键 `Option + Tab` 呼出切换面板。
-2. 继续按 `Tab` 在应用间切换，按 `Shift + Tab` 反向切换。
-3. 在面板里按 `Enter` 可进入搜索并直接筛选目标。
-4. 松开主修饰键会确认当前选择并切换到目标窗口。
+1. Launch FlowTab and press `Option + Tab` to open the switch panel.
+2. Press `Tab` to move forward and `Shift + Tab` to move backward.
+3. Press `Enter` in the panel to start searching and narrow results.
+4. Release the main modifier key to confirm and switch.
 
-## 常见问题
+## FAQ
 
-1. 看不到可切换窗口：通常是辅助功能权限未生效，建议重新授权后重启应用。
-2. 预览无画面：请确认已授予屏幕录制权限。
-3. 快捷键冲突：请在应用内设置页调整主快捷键。
-4. 面板内结束应用无效：请确认当前处于面板会话中，并按住主修饰键后再按结束应用按键。
+1. No windows are listed: Accessibility permission is usually missing or not applied. Re-grant permission and relaunch.
+2. No preview image: confirm Screen Recording permission is granted.
+3. Shortcut conflict: change the main shortcut in FlowTab settings.
+4. Quit shortcut does not work: make sure the switch panel is visible, then hold the modifier and press the quit key.
 
-## 反馈问题
+## Feedback
 
-你可以在 GitHub Issues 提交问题与建议。
+Please report issues and suggestions in GitHub Issues.
