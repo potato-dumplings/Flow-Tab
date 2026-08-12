@@ -7,6 +7,21 @@ enum FlowTabUITestHomeAndLogsWatchdogPolicy {
     static let homeTabTriggerReadiness: TimeInterval = 5
     static let homeTabProjectionReadiness: TimeInterval = 5
     static let liveApplicationDirectoryReadiness: TimeInterval = 2
+    static let overviewChromeProjectionReadiness: TimeInterval = 8
+}
+
+enum FlowTabUITestHomeOverviewProjectionPolicy {
+    static let identifiers = [
+        FlowTabUITests.Identifier.homeHeader,
+        FlowTabUITests.Identifier.homeAppCount,
+        FlowTabUITests.Identifier.homeWindowCount,
+        FlowTabUITests.Identifier.homeStatsTotalApps,
+        FlowTabUITests.Identifier.homeStatsVisibleApps,
+        FlowTabUITests.Identifier.homeStatsHiddenApps,
+        FlowTabUITests.Identifier.homeStatsTotalWindows,
+        FlowTabUITests.Identifier.sidebarPermissionAccessibility,
+        FlowTabUITests.Identifier.sidebarPermissionScreenCapture
+    ]
 }
 
 struct FlowTabUITestHomeAndLogsReadinessEvidence: Equatable {
@@ -27,6 +42,37 @@ struct FlowTabUITestHomeAndLogsReadinessEvidence: Equatable {
 }
 
 extension FlowTabUITests {
+    @discardableResult
+    func assertHomeAndLogsOverviewChromeAfterNavigation(
+        in app: XCUIApplication,
+        targetDescription: String = #function,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> Bool {
+        let identifiers =
+            FlowTabUITestHomeOverviewProjectionPolicy.identifiers
+        let elements = waitForExactElementCollection(
+            in: app,
+            identifiers: identifiers,
+            watchdog:
+                FlowTabUITestHomeAndLogsWatchdogPolicy
+                    .overviewChromeProjectionReadiness,
+            targetDescription:
+                "Home Overview chrome target=\(targetDescription)",
+            file: file,
+            line: line,
+            trigger: {
+                self.assertHomeAndLogsHomeTabProjectionAfterNavigation(
+                    in: app,
+                    targetDescription: targetDescription,
+                    file: file,
+                    line: line
+                )
+            }
+        )
+        return elements != nil
+    }
+
     @discardableResult
     func assertHomeAndLogsLiveApplicationDirectoryAfterNavigation(
         in app: XCUIApplication,
@@ -232,6 +278,39 @@ extension FlowTabUITests {
             FlowTabUITestHomeAndLogsWatchdogPolicy
                 .liveApplicationDirectoryReadiness,
             0
+        )
+        XCTAssertEqual(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .overviewChromeProjectionReadiness,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .overviewChromeProjectionReadiness.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .overviewChromeProjectionReadiness,
+            0
+        )
+        XCTAssertEqual(
+            FlowTabUITestHomeOverviewProjectionPolicy.identifiers,
+            [
+                Identifier.homeHeader,
+                Identifier.homeAppCount,
+                Identifier.homeWindowCount,
+                Identifier.homeStatsTotalApps,
+                Identifier.homeStatsVisibleApps,
+                Identifier.homeStatsHiddenApps,
+                Identifier.homeStatsTotalWindows,
+                Identifier.sidebarPermissionAccessibility,
+                Identifier.sidebarPermissionScreenCapture
+            ]
+        )
+        XCTAssertEqual(
+            Set(FlowTabUITestHomeOverviewProjectionPolicy.identifiers)
+                .count,
+            FlowTabUITestHomeOverviewProjectionPolicy.identifiers.count
         )
 
         XCTAssertTrue(

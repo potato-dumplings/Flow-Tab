@@ -187,17 +187,7 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(app)
         assertHomeAndLogsApplicationIsForegroundReady(app)
-        assertHomeAndLogsHomeTabProjectionAfterNavigation(in: app)
-
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeHeader).waitForExistence(timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeAppCount).waitForExistence(timeout: 8))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeWindowCount).waitForExistence(timeout: 8))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeStatsTotalApps).waitForExistence(timeout: 8))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeStatsVisibleApps).waitForExistence(timeout: 8))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeStatsHiddenApps).waitForExistence(timeout: 8))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeStatsTotalWindows).waitForExistence(timeout: 8))
-        XCTAssertTrue(element(in: app, identifier: Identifier.sidebarPermissionAccessibility).waitForExistence(timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.sidebarPermissionScreenCapture).waitForExistence(timeout: 5))
+        assertHomeAndLogsOverviewChromeAfterNavigation(in: app)
     }
 
     func testHomeWindowListUsesSeededWindowRecency() throws {
