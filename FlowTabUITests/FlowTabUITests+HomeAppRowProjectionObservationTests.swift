@@ -3,6 +3,7 @@ import XCTest
 
 private enum FlowTabUITestHomeAppRowProjectionTestPolicy {
     static let watchdog: TimeInterval = 0.01
+    static let pressureIterations = 200
 }
 
 private enum FlowTabUITestHomeAppRowProjectionTestFixture {
@@ -529,5 +530,57 @@ extension FlowTabUITests {
         XCTAssertTrue(
             owner.diagnosticSummary.contains("value=1w")
         )
+    }
+
+    func testHomeAppRowProjectionRejectsReplacedReadbacksUnderPressure() {
+        for _ in 0..<FlowTabUITestHomeAppRowProjectionTestPolicy
+            .pressureIterations
+        {
+            var snapshot =
+                FlowTabUITestHomeAppRowProjectionTestFixture.snapshot(
+                    mailExists: false,
+                    mailValue: nil,
+                    mailFrameMinY: nil
+                )
+            var scheduledReadbacks: [
+                (FlowTabUITestConditionObservationSource) -> Void
+            ] = []
+            var cancellationCount = 0
+            let owner =
+                FlowTabUITestHomeAppRowProjectionObservationOwner(
+                    expectation:
+                        FlowTabUITestHomeAppRowProjectionTestFixture
+                            .expectation,
+                    observationRegistration: { callback in
+                        scheduledReadbacks.append(callback)
+                        return FlowTabUITestObservationCancellation {
+                            cancellationCount += 1
+                        }
+                    },
+                    readback: { snapshot }
+                )
+
+            owner.start()
+            XCTAssertEqual(scheduledReadbacks.count, 1)
+            let staleReadback = scheduledReadbacks[0]
+
+            owner.cancel()
+            owner.start()
+            XCTAssertEqual(scheduledReadbacks.count, 2)
+            let currentReadback = scheduledReadbacks[1]
+
+            snapshot =
+                FlowTabUITestHomeAppRowProjectionTestFixture.snapshot()
+            staleReadback(.scheduledReadback)
+            XCTAssertNil(owner.resolvedEvidence)
+            currentReadback(.scheduledReadback)
+            XCTAssertEqual(owner.resolvedEvidence?.generation, 2)
+            XCTAssertEqual(
+                owner.resolvedEvidence?.source,
+                .scheduledReadback
+            )
+            XCTAssertEqual(cancellationCount, 2)
+            owner.cancel()
+        }
     }
 }

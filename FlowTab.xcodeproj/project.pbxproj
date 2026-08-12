@@ -132,6 +132,7 @@
 		A49100043D9D000100B0D737 /* FlowTabUITests+SettingsWindowBehaviorControlsProjectionObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A49100033D9D000100B0D737 /* FlowTabUITests+SettingsWindowBehaviorControlsProjectionObservationTests.swift */; };
 		A49200023D9E000100B0D737 /* FlowTabUITests+SettingsWindowBehaviorPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A49200013D9E000100B0D737 /* FlowTabUITests+SettingsWindowBehaviorPersistence.swift */; };
 		A49300023D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A49300013D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift */; };
+		A49400023DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A49400013DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift */; };
 		A44E00023D56000100B0D737 /* FlowTabUITests+SwitcherAppProjectionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44E00013D56000100B0D737 /* FlowTabUITests+SwitcherAppProjectionObservation.swift */; };
 		A44E00043D56000100B0D737 /* FlowTabUITests+SwitcherAppProjectionObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44E00033D56000100B0D737 /* FlowTabUITests+SwitcherAppProjectionObservationTests.swift */; };
 		A44F00023D57000100B0D737 /* FlowTabUITests+SwitcherSelectedWindowTitleObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44F00013D57000100B0D737 /* FlowTabUITests+SwitcherSelectedWindowTitleObservation.swift */; };
@@ -826,6 +827,7 @@
 		F7B8C9D335B8000100B0D737 /* FlowTabTests+LaunchAtLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+LaunchAtLogin.swift"; sourceTree = "<group>"; };
 		B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeAndLogs.swift"; sourceTree = "<group>"; };
 		A49300013D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeAndLogsWatchdogPolicy.swift"; sourceTree = "<group>"; };
+		A49400013DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeHiddenAppRowProjection.swift"; sourceTree = "<group>"; };
 		C8A100013A24000100B0D737 /* FlowTabUITests+HomePermissionBoundary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomePermissionBoundary.swift"; sourceTree = "<group>"; };
 		B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+Settings.swift"; sourceTree = "<group>"; };
 		E12000023600000100B0D737 /* FlowTabUITests+EnglishLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+EnglishLayout.swift"; sourceTree = "<group>"; };
@@ -1425,6 +1427,7 @@
 				4A6DAE892F727AF600B0D737 /* FlowTabUITests.swift */,
 				B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */,
 				A49300013D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift */,
+				A49400013DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift */,
 				A46800013D70000100B0D737 /* FlowTabUITests+HomeInitialProjection.swift */,
 				A48B00033D97000100B0D737 /* FlowTabUITests+InitialPresentationResolutionReadback.swift */,
 				A48B00053D97000100B0D737 /* FlowTabUITests+InitialPresentationResolutionReadbackTests.swift */,
@@ -2540,6 +2543,7 @@
 				4A6DAE8A2F727AF600B0D737 /* FlowTabUITests.swift in Sources */,
 				B10012012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift in Sources */,
 				A49300023D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift in Sources */,
+				A49400023DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift in Sources */,
 				A46800023D70000100B0D737 /* FlowTabUITests+HomeInitialProjection.swift in Sources */,
 				A48B00043D97000100B0D737 /* FlowTabUITests+InitialPresentationResolutionReadback.swift in Sources */,
 				A48B00063D97000100B0D737 /* FlowTabUITests+InitialPresentationResolutionReadbackTests.swift in Sources */,

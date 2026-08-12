@@ -296,22 +296,19 @@ extension FlowTabUITests {
         setToggle(showToggle, to: false)
         XCTAssertFalse(toggleIsOn(showToggle))
 
-        assertHomeAndLogsHomeTabProjectionAfterNavigation(in: app)
-
-        let browserRow = element(in: app, identifier: Identifier.homeAppMockBrowser)
-        let mailRow = element(in: app, identifier: Identifier.homeAppMockMail)
-        XCTAssertTrue(browserRow.waitForExistence(timeout: 8))
-        XCTAssertTrue(mailRow.waitForExistence(timeout: 8))
-        XCTAssertLessThan(
-            browserRow.frame.minY,
-            mailRow.frame.minY,
+        guard let rowProjection =
+            assertHomeAndLogsHiddenAppRowsAfterNavigation(in: app)
+        else {
+            return
+        }
+        XCTAssertEqual(
+            rowProjection.identifiersByAscendingFrame,
+            [Identifier.homeAppMockBrowser, Identifier.homeAppMockMail],
             "Home should keep hidden apps visible but place them after visible apps."
         )
-        let mailRowDescription = "\(mailRow.label) \(elementStringValue(mailRow))"
         XCTAssertTrue(
-            mailRowDescription.contains("不展示")
-                || mailRowDescription.contains("Not shown")
-                || mailRowDescription.contains("hidden"),
+            FlowTabUITestHomeHiddenAppRowProjectionPolicy
+                .acceptsHiddenMailState(rowProjection),
             "Hidden Home app rows should expose the not-shown state for automation."
         )
     }

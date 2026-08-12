@@ -8,6 +8,7 @@ enum FlowTabUITestHomeAndLogsWatchdogPolicy {
     static let homeTabProjectionReadiness: TimeInterval = 5
     static let liveApplicationDirectoryReadiness: TimeInterval = 2
     static let overviewChromeProjectionReadiness: TimeInterval = 8
+    static let hiddenAppRowProjectionReadiness: TimeInterval = 8
 }
 
 enum FlowTabUITestHomeOverviewProjectionPolicy {
@@ -292,6 +293,57 @@ extension FlowTabUITests {
             FlowTabUITestHomeAndLogsWatchdogPolicy
                 .overviewChromeProjectionReadiness,
             0
+        )
+        XCTAssertEqual(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .hiddenAppRowProjectionReadiness,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .hiddenAppRowProjectionReadiness.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .hiddenAppRowProjectionReadiness,
+            0
+        )
+        XCTAssertEqual(
+            FlowTabUITestHomeHiddenAppRowProjectionPolicy.rows,
+            [
+                .init(
+                    identifier: Identifier.homeAppMockBrowser,
+                    value: nil
+                ),
+                .init(
+                    identifier: Identifier.homeAppMockMail,
+                    value: nil
+                )
+            ]
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeHiddenAppRowProjectionPolicy
+                .isHiddenAccessibilityValue("0w hidden")
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeHiddenAppRowProjectionPolicy
+                .isHiddenAccessibilityValue("2w hidden")
+        )
+        XCTAssertFalse(
+            FlowTabUITestHomeHiddenAppRowProjectionPolicy
+                .isHiddenAccessibilityValue(nil)
+        )
+        XCTAssertFalse(
+            FlowTabUITestHomeHiddenAppRowProjectionPolicy
+                .isHiddenAccessibilityValue("-1w hidden")
+        )
+        XCTAssertFalse(
+            FlowTabUITestHomeHiddenAppRowProjectionPolicy
+                .isHiddenAccessibilityValue("2w")
+        )
+        XCTAssertFalse(
+            FlowTabUITestHomeHiddenAppRowProjectionPolicy
+                .isHiddenAccessibilityValue("2w hidden extra")
         )
         XCTAssertEqual(
             FlowTabUITestHomeOverviewProjectionPolicy.identifiers,
