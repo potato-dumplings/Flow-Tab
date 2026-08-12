@@ -6,19 +6,21 @@ private enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
     static let searchResultClickDismissal: TimeInterval = 2
     static let searchMockForegroundReadiness: TimeInterval = 10
     static let spaceFixtureSearchResultPublication: TimeInterval = 5
+    static let searchHeaderProjection: TimeInterval = 10
     static let compatibleBounds = [
         optionTabAppClickDismissal,
         controlTabWindowClickDismissal,
         searchResultClickDismissal,
         searchMockForegroundReadiness,
-        spaceFixtureSearchResultPublication
+        spaceFixtureSearchResultPublication,
+        searchHeaderProjection
     ]
 }
 
 extension FlowTabUITests {
     func testSwitcherAndSearchWatchdogPolicyPreservesCompatibleBounds() {
         let policies = FlowTabUITestSwitcherAndSearchWatchdogPolicy.compatibleBounds
-        XCTAssertEqual(policies, [2, 2, 2, 10, 5])
+        XCTAssertEqual(policies, [2, 2, 2, 10, 5, 10])
         XCTAssertTrue(policies.allSatisfy { $0.isFinite && $0 > 0 })
     }
 
@@ -150,13 +152,27 @@ extension FlowTabUITests {
 
     func testSearchHeaderHighlightedAppChipStaysContentSizedForShortTitle() throws {
         let app = makeApp(additionalArguments: searchPointerHoverArguments)
-        launchFlowTabUITestApplication(app)
-        assertSearchMockApplicationIsForegroundReady(app)
-
-        let searchHeader = element(in: app, identifier: Identifier.switcherSearchHeader)
-        let highlightedChip = element(in: app, identifier: Identifier.switcherSearchHighlight)
-        XCTAssertTrue(searchHeader.waitForExistence(timeout: 5))
-        XCTAssertTrue(highlightedChip.waitForExistence(timeout: 5))
+        guard
+            let searchElements = waitForExactElementCollection(
+                in: app,
+                identifiers: [
+                    Identifier.switcherSearchHeader,
+                    Identifier.switcherSearchHighlight
+                ],
+                watchdog:
+                    FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                        .searchHeaderProjection,
+                targetDescription:
+                    "Search header and highlighted App chip",
+                trigger: {
+                    launchFlowTabUITestApplication(app)
+                    assertSearchMockApplicationIsForegroundReady(app)
+                }
+            )
+        else {
+            return
+        }
+        let highlightedChip = searchElements[1]
         XCTAssertGreaterThan(highlightedChip.frame.width, 40)
         XCTAssertLessThan(
             highlightedChip.frame.width,
