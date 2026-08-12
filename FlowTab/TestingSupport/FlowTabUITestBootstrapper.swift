@@ -68,6 +68,10 @@ enum FlowTabUITestBootstrapper {
 
         installMockRuntimeProjectionServiceIfNeeded()
         installFrontmostRuntimeProjectionOverrideIfNeeded()
+        FlowTabUITestCurrentAppProjectionEvidenceBootstrap
+            .prepareIfNeeded(
+                service: resolvedRuntimeProjectionService
+            )
         FlowTabUITestProjectionAcknowledgementBootstrap
             .prepareIfNeeded(
                 service: resolvedRuntimeProjectionService

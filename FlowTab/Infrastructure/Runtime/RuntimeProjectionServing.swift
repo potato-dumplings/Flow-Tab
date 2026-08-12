@@ -14,6 +14,43 @@ extension Notification.Name {
 
 enum RuntimeProjectionNotificationUserInfoKey {
     static let appID = "appID"
+    static let currentAppWindowProjectionUpdateEvidence =
+        "currentAppWindowProjectionUpdateEvidence"
+}
+
+struct RuntimeCurrentAppWindowProjectionUpdateEvidence: Equatable {
+    let appID: String
+    let processIdentifier: pid_t
+    let windowIDs: [String]
+    let isCompleteForScope: Bool
+    let sourceGeneration: RuntimeReadModelGeneration
+
+    init(
+        appID: String,
+        processIdentifier: pid_t,
+        windowIDs: [String],
+        isCompleteForScope: Bool,
+        sourceGeneration: RuntimeReadModelGeneration
+    ) {
+        self.appID = appID
+        self.processIdentifier = processIdentifier
+        self.windowIDs = windowIDs
+        self.isCompleteForScope = isCompleteForScope
+        self.sourceGeneration = sourceGeneration
+    }
+
+    init(projection: RuntimeCurrentAppWindowProjection) {
+        appID = projection.appID
+        processIdentifier =
+            projection.currentAppWindowPayload.summary.pid
+        windowIDs =
+            projection.currentAppWindowPayload.candidate.windows
+                .map(\.id)
+        isCompleteForScope =
+            projection.freshness.isCompleteForScope
+        sourceGeneration =
+            projection.freshness.sourceGeneration
+    }
 }
 
 enum RuntimeProjectionNotificationPublisher {

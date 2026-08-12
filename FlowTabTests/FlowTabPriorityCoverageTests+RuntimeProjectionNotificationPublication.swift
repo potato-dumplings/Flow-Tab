@@ -409,9 +409,53 @@ extension FlowTabPriorityCoverageTests {
                 ])
             }
         )
+        let projected = expectation(
+            description:
+                "unmetCondition=exact current-app projection published"
+        )
+        projected.assertForOverFulfill = false
+        let projectionObserver = NotificationCenter.default
+            .addObserver(
+                forName:
+                    .runtimeCurrentAppWindowProjectionDidUpdate,
+                object: service,
+                queue: .main
+            ) { notification in
+                guard notification.userInfo?[
+                        RuntimeProjectionNotificationUserInfoKey
+                            .appID
+                    ] as? String == appID,
+                      let evidence = notification.userInfo?[
+                        RuntimeProjectionNotificationUserInfoKey
+                            .currentAppWindowProjectionUpdateEvidence
+                      ] as?
+                        RuntimeCurrentAppWindowProjectionUpdateEvidence,
+                      evidence.appID == appID,
+                      evidence.processIdentifier == pid,
+                      evidence.windowIDs.isEmpty
+                else {
+                    return
+                }
+                XCTAssertGreaterThan(
+                    evidence.sourceGeneration.projection,
+                    0
+                )
+                projected.fulfill()
+            }
+        defer {
+            NotificationCenter.default.removeObserver(
+                projectionObserver
+            )
+        }
 
         service.signalAXWindowDestroyed(appID: appID, pid: pid, axWindowID: axWindowID)
         service.waitForMaintenanceQueueForTesting()
+        wait(
+            for: [projected],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .runtimeProjectionMainThreadDelivery
+        )
 
         XCTAssertEqual(
             readModelStore.readAppSwitcherProjection()?

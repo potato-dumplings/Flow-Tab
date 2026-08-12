@@ -7,6 +7,8 @@ enum FlowTabTestLaunchOptions {
     static let unitTestingBundlePathEnvironmentKey = "XCTestBundlePath"
     static let projectionAcknowledgementRouteArgument =
         "--flowtab-ui-projection-acknowledgement-route"
+    static let currentAppProjectionEvidenceRouteArgument =
+        "--flowtab-ui-current-app-projection-evidence-route"
     static let homeInitialProjectionApplicationRouteArgument =
         "--flowtab-ui-home-initial-projection-application-notification-name"
     static let homeInitialProjectionApplicationReadbackPathArgument =
@@ -25,6 +27,7 @@ enum FlowTabTestLaunchOptions {
 
     private static let uiTestArguments: Set<String> = [
         "--flowtab-ui-ax-trusted",
+        currentAppProjectionEvidenceRouteArgument,
         "--flowtab-ui-enable-mock-hotkey-effects",
         "--flowtab-ui-enable-verbose-logs",
         "--flowtab-ui-frontmost-bundle-id",
@@ -157,6 +160,51 @@ enum FlowTabTestLaunchOptions {
             )
         }
         return routes
+    }
+
+    static var currentAppProjectionEvidenceRoute:
+        FlowTabUITestCurrentAppProjectionEvidenceRoute?
+    {
+        guard isRunningUITests else { return nil }
+        for index in arguments.indices
+        where arguments[index]
+            == currentAppProjectionEvidenceRouteArgument
+        {
+            guard index + 3 < arguments.count else {
+                continue
+            }
+            let notificationName = arguments[index + 1]
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+            let bundleIdentifier = arguments[index + 2]
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+            let readbackPath = arguments[index + 3]
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+            guard !notificationName.isEmpty,
+                  !bundleIdentifier.isEmpty,
+                  !readbackPath.isEmpty,
+                  NSString(string: readbackPath).isAbsolutePath
+            else {
+                continue
+            }
+            return FlowTabUITestCurrentAppProjectionEvidenceRoute(
+                notificationName:
+                    Notification.Name(notificationName),
+                readbackURL:
+                    URL(
+                        fileURLWithPath: readbackPath,
+                        isDirectory: false
+                    )
+                    .standardizedFileURL,
+                bundleIdentifier: bundleIdentifier
+            )
+        }
+        return nil
     }
 
     static var homeInitialProjectionApplicationRoute:

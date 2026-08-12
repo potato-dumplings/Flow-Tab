@@ -903,10 +903,25 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             authoritativeCGWindowIDs: authoritativeCGWindowIDs,
             generatedAt: generatedAt
         )
+        var userInfo: [AnyHashable: Any] = [
+            RuntimeProjectionNotificationUserInfoKey.appID: appID
+        ]
+        if let committedProjection =
+            readModelStore.readCurrentAppWindowProjection(
+                appID: appID
+            )
+        {
+            userInfo[
+                RuntimeProjectionNotificationUserInfoKey
+                    .currentAppWindowProjectionUpdateEvidence
+            ] = RuntimeCurrentAppWindowProjectionUpdateEvidence(
+                projection: committedProjection
+            )
+        }
         RuntimeProjectionNotificationPublisher.post(
             name: .runtimeCurrentAppWindowProjectionDidUpdate,
             object: self,
-            userInfo: [RuntimeProjectionNotificationUserInfoKey.appID: appID]
+            userInfo: userInfo
         )
         return true
     }

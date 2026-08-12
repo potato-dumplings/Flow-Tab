@@ -4,6 +4,32 @@ import XCTest
 @testable import FlowTab
 import FlowTabCore
 
+private final class CurrentAppProjectionEvidenceRecorder:
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private var storage:
+        [FlowTabUITestCurrentAppProjectionEvidence] = []
+
+    func record(
+        _ evidence:
+            FlowTabUITestCurrentAppProjectionEvidence
+    ) {
+        lock.lock()
+        storage.append(evidence)
+        lock.unlock()
+    }
+
+    var values:
+        [FlowTabUITestCurrentAppProjectionEvidence]
+    {
+        lock.lock()
+        let values = storage
+        lock.unlock()
+        return values
+    }
+}
+
 extension FlowTabTests {
     @MainActor
     func testProjectionAcknowledgementRoutesRequireCompleteValidTriples() {
@@ -295,6 +321,314 @@ extension FlowTabTests {
         XCTAssertEqual(
             published.map(\.observationGeneration),
             published.map(\.observationGeneration).sorted()
+        )
+    }
+
+    func testCurrentAppProjectionEvidenceRouteRequiresExactEnabledValues() {
+        let argument = FlowTabTestLaunchOptions
+            .currentAppProjectionEvidenceRouteArgument
+        let readbackPath =
+            "/private/tmp/test-current-app-projection.json"
+        withLaunchArgumentsForTesting([
+            "FlowTab",
+            argument,
+            "  test.current-app-projection  ",
+            "  com.example.fixture  ",
+            "  \(readbackPath)  "
+        ]) {
+            XCTAssertEqual(
+                FlowTabTestLaunchOptions
+                    .currentAppProjectionEvidenceRoute,
+                FlowTabUITestCurrentAppProjectionEvidenceRoute(
+                    notificationName:
+                        Notification.Name(
+                            "test.current-app-projection"
+                        ),
+                    readbackURL: URL(
+                        fileURLWithPath: readbackPath
+                    ),
+                    bundleIdentifier: "com.example.fixture"
+                )
+            )
+        }
+
+        for invalidArguments in [
+            ["FlowTab", argument, "test.incomplete"],
+            [
+                "FlowTab",
+                argument,
+                "test.relative",
+                "com.example.fixture",
+                "relative/readback.json"
+            ]
+        ] {
+            withLaunchArgumentsForTesting(invalidArguments) {
+                XCTAssertNil(
+                    FlowTabTestLaunchOptions
+                        .currentAppProjectionEvidenceRoute
+                )
+            }
+        }
+        withLaunchArgumentsForTesting(
+            [
+                "FlowTab",
+                argument,
+                "test.disabled",
+                "com.example.fixture",
+                readbackPath
+            ],
+            environment: [:]
+        ) {
+            XCTAssertNil(
+                FlowTabTestLaunchOptions
+                    .currentAppProjectionEvidenceRoute
+            )
+        }
+    }
+
+    @MainActor
+    func testCurrentAppProjectionEvidenceObservationPublishesExactSnapshots() {
+        let route =
+            FlowTabUITestCurrentAppProjectionEvidenceRoute(
+                notificationName:
+                    Notification.Name(
+                        "test.current-app-projection"
+                    ),
+                readbackURL: URL(
+                    fileURLWithPath:
+                        "/private/tmp/test-current-app-projection.json"
+                ),
+                bundleIdentifier: "com.example.fixture"
+            )
+        let recorder = CurrentAppProjectionEvidenceRecorder()
+        let publisher =
+            FlowTabUITestCurrentAppProjectionEvidencePublisher(
+                route: route,
+                sink: recorder.record
+            )
+        let notificationCenter = NotificationCenter()
+        let notificationObject = NSObject()
+        let owner =
+            FlowTabUITestCurrentAppProjectionEvidenceObservationOwner(
+                route: route,
+                notificationObject: notificationObject,
+                evidencePublisher: publisher,
+                notificationCenter: notificationCenter
+            )
+        owner.start()
+        XCTAssertTrue(owner.isObserving)
+
+        notificationCenter.post(
+            name: .runtimeCurrentAppWindowProjectionDidUpdate,
+            object: notificationObject,
+            userInfo: [
+                RuntimeProjectionNotificationUserInfoKey
+                    .currentAppWindowProjectionUpdateEvidence:
+                    currentAppProjectionUpdate(
+                        appID: "com.example.other",
+                        projectionGeneration: 1,
+                        windowIDs: ["other-window"]
+                    )
+            ]
+        )
+        notificationCenter.post(
+            name: .runtimeCurrentAppWindowProjectionDidUpdate,
+            object: NSObject(),
+            userInfo: [
+                RuntimeProjectionNotificationUserInfoKey
+                    .currentAppWindowProjectionUpdateEvidence:
+                    currentAppProjectionUpdate(
+                        projectionGeneration: 2,
+                        windowIDs: ["wrong-object"]
+                    )
+            ]
+        )
+        for generation in 3...4 {
+            notificationCenter.post(
+                name:
+                    .runtimeCurrentAppWindowProjectionDidUpdate,
+                object: notificationObject,
+                userInfo: [
+                    RuntimeProjectionNotificationUserInfoKey
+                        .currentAppWindowProjectionUpdateEvidence:
+                        currentAppProjectionUpdate(
+                            projectionGeneration:
+                                UInt64(generation),
+                            windowIDs:
+                                generation == 3
+                                    ? ["window-1", "window-2"]
+                                    : ["window-1"]
+                        )
+                ]
+            )
+        }
+        owner.cancel()
+        notificationCenter.post(
+            name: .runtimeCurrentAppWindowProjectionDidUpdate,
+            object: notificationObject,
+            userInfo: [
+                RuntimeProjectionNotificationUserInfoKey
+                    .currentAppWindowProjectionUpdateEvidence:
+                    currentAppProjectionUpdate(
+                        projectionGeneration: 5,
+                        windowIDs: []
+                    )
+            ]
+        )
+
+        XCTAssertFalse(owner.isObserving)
+        XCTAssertEqual(
+            recorder.values.map(\.evidenceGeneration),
+            [1, 2]
+        )
+        XCTAssertEqual(
+            recorder.values.map(\.windowIDs),
+            [
+                ["window-1", "window-2"],
+                ["window-1"]
+            ]
+        )
+        XCTAssertEqual(
+            recorder.values.map {
+                $0.sourceGeneration.projection
+            },
+            [3, 4]
+        )
+        XCTAssertEqual(
+            FlowTabUITestCurrentAppProjectionEvidenceTransport
+                .userInfo(for: recorder.values[0])[
+                    FlowTabUITestCurrentAppProjectionEvidenceUserInfoKey
+                        .windowIDs
+                ] as? [String],
+            ["window-1", "window-2"]
+        )
+    }
+
+    @MainActor
+    func testCurrentAppProjectionEvidenceBootstrapPreservesServiceIdentity() {
+        let previousHooks = AppDelegate.testHooks
+        let baseService = RecordingRuntimeProjectionService()
+        var hooks = previousHooks
+        hooks.runtimeProjectionService = baseService
+        AppDelegate.testHooks = hooks
+        defer {
+            withLaunchArgumentsForTesting(["FlowTab"]) {
+                FlowTabUITestCurrentAppProjectionEvidenceBootstrap
+                    .prepareIfNeeded(service: baseService)
+            }
+            AppDelegate.testHooks = previousHooks
+        }
+
+        withLaunchArgumentsForTesting([
+            "FlowTab",
+            FlowTabTestLaunchOptions
+                .currentAppProjectionEvidenceRouteArgument,
+            "test.current-app-projection.bootstrap",
+            "com.example.fixture",
+            "/private/tmp/test-current-app-projection-bootstrap.json"
+        ]) {
+            FlowTabUITestCurrentAppProjectionEvidenceBootstrap
+                .prepareIfNeeded(service: baseService)
+        }
+
+        XCTAssertTrue(
+            AppDelegate.testHooks.runtimeProjectionService
+                as AnyObject
+                === baseService as AnyObject
+        )
+        XCTAssertEqual(
+            FlowTabUITestCurrentAppProjectionEvidenceBootstrap
+                .installedRouteForTesting?
+                .bundleIdentifier,
+            "com.example.fixture"
+        )
+        XCTAssertTrue(
+            FlowTabUITestCurrentAppProjectionEvidenceBootstrap
+                .isObservingForTesting
+        )
+
+        withLaunchArgumentsForTesting(["FlowTab"]) {
+            FlowTabUITestCurrentAppProjectionEvidenceBootstrap
+                .prepareIfNeeded(service: baseService)
+        }
+        XCTAssertTrue(
+            AppDelegate.testHooks.runtimeProjectionService
+                as AnyObject
+                === baseService as AnyObject
+        )
+        XCTAssertNil(
+            FlowTabUITestCurrentAppProjectionEvidenceBootstrap
+                .installedRouteForTesting
+        )
+        XCTAssertFalse(
+            FlowTabUITestCurrentAppProjectionEvidenceBootstrap
+                .isObservingForTesting
+        )
+    }
+
+    func testCurrentAppProjectionEvidencePublisherPressureIsDeterministic() {
+        let route =
+            FlowTabUITestCurrentAppProjectionEvidenceRoute(
+                notificationName:
+                    Notification.Name(
+                        "test.current-app-projection.pressure"
+                    ),
+                readbackURL: URL(
+                    fileURLWithPath:
+                        "/private/tmp/test-current-app-projection-pressure.json"
+                ),
+                bundleIdentifier: "com.example.fixture"
+            )
+        let recorder = CurrentAppProjectionEvidenceRecorder()
+        let publisher =
+            FlowTabUITestCurrentAppProjectionEvidencePublisher(
+                route: route,
+                sink: recorder.record
+            )
+
+        for generation in 1...2_000 {
+            publisher.record(
+                currentAppProjectionUpdate(
+                    appID: "com.example.other",
+                    projectionGeneration: UInt64(generation),
+                    windowIDs: ["other-window"]
+                )
+            )
+            publisher.record(
+                currentAppProjectionUpdate(
+                    processIdentifier:
+                        pid_t(45_000 + generation),
+                    projectionGeneration: UInt64(generation),
+                    windowIDs: ["window-\(generation)"]
+                )
+            )
+        }
+
+        XCTAssertEqual(recorder.values.count, 2_000)
+        XCTAssertEqual(
+            recorder.values.map(\.evidenceGeneration),
+            Array(1...2_000).map(UInt64.init)
+        )
+    }
+
+    private func currentAppProjectionUpdate(
+        appID: String = "com.example.fixture",
+        processIdentifier: pid_t = 44_001,
+        projectionGeneration: UInt64,
+        windowIDs: [String]
+    ) -> RuntimeCurrentAppWindowProjectionUpdateEvidence {
+        RuntimeCurrentAppWindowProjectionUpdateEvidence(
+            appID: appID,
+            processIdentifier: processIdentifier,
+            windowIDs: windowIDs,
+            isCompleteForScope: true,
+            sourceGeneration: RuntimeReadModelGeneration(
+                appLifecycle: projectionGeneration,
+                cg: projectionGeneration,
+                space: projectionGeneration,
+                axDirty: projectionGeneration,
+                projection: projectionGeneration
+            )
         )
     }
 

@@ -276,12 +276,18 @@ extension FlowTabUITests {
 
         guard assertSpaceFixtureWorkflowPermissionsAvailable() else { return }
 
+        let currentAppProjectionAcceptanceRoute =
+            makeSpaceFixtureCurrentAppProjectionAcceptanceRoute(
+                bundleIdentifier: identity.bundleIdentifier
+            )
+        currentAppProjectionAcceptanceRoute.removeReadback()
+        defer { currentAppProjectionAcceptanceRoute.removeReadback() }
         let app = makeRealRuntimeFlowTabApp(
             additionalArguments: [
                 "--flowtab-ui-runtime-log-level",
                 "DEBUG",
                 "--flowtab-ui-enable-verbose-logs"
-            ]
+            ] + currentAppProjectionAcceptanceRoute.flowTabLaunchArguments
         )
         launchFlowTabUITestApplication(app)
         defer {
@@ -305,7 +311,6 @@ extension FlowTabUITests {
         windowCloseObservation.start()
         defer { windowCloseObservation.cancel() }
 
-        let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
         let fixtureApp = launchSpaceFixtureWorkflow(
             identity: identity,
             windowCount: 2,
@@ -334,6 +339,7 @@ extension FlowTabUITests {
             )
             return
         }
+        let fixturePID = scheduledClose.identity.processIdentifier
         XCTAssertEqual(
             scheduledClose.snapshot
                 .targetWindowPlanIndex,
@@ -356,9 +362,7 @@ extension FlowTabUITests {
                     identity.bundleIdentifier
             ).contains {
                 !$0.isTerminated
-                    && $0.processIdentifier
-                        == scheduledClose.identity
-                            .processIdentifier
+                    && $0.processIdentifier == fixturePID
             }
         )
         XCTAssertTrue(
@@ -375,6 +379,28 @@ extension FlowTabUITests {
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
         let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity, timeout: 12)
         assertValue(of: fixtureAppRow, equals: "2w", timeout: 12)
+
+        let currentAppProjectionAcceptance =
+            SpaceFixtureCurrentAppProjectionAcceptanceOwner(
+                route: currentAppProjectionAcceptanceRoute,
+                expectedPID: fixturePID
+            )
+        currentAppProjectionAcceptance.start()
+        defer { currentAppProjectionAcceptance.cancel() }
+        guard assertSpaceFixtureCurrentAppProjectionBaseline(
+            from: currentAppProjectionAcceptance,
+            identity: identity,
+            expectedPID: fixturePID
+        ) else { return }
+        guard currentAppProjectionAcceptance.startTargetObservation()
+        else {
+            XCTFail(
+                "Failed to establish post-close projection observer: "
+                    + currentAppProjectionAcceptance
+                        .diagnosticSummary
+            )
+            return
+        }
 
         windowCloseObservation.requestClose(
             from: scheduledClose
@@ -436,26 +462,11 @@ extension FlowTabUITests {
             windowCloseObservation.diagnosticSummary
         )
         assertValue(of: fixtureAppRow, equals: "1w", timeout: 15)
-        waitForRuntimeLogFiles(
-            containing: [
-                "homeAppDetailProjectionRead result=observed appID=\(identity.bundleIdentifier)",
-                "reason=ax_window_destroyed"
-            ],
-            since: mutationLogSnapshot,
-            timeout: 8
-        )
-        waitForRuntimeLogFiles(
-            matching: #"homeAXDestroyed known appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+"#,
-            since: mutationLogSnapshot,
-            timeout: 8,
-            description: "known destroyed AX notification resolves to a registered window element"
-        )
-        waitForRuntimeLogFiles(
-            matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=(none|[0-9]+)"#,
-            since: mutationLogSnapshot,
-            timeout: 8,
-            description: "known destroyed AX notification carries an affected CG window into shared runtime reconciliation"
-        )
+        guard assertSpaceFixtureCurrentAppProjectionAccepted(
+            by: currentAppProjectionAcceptance,
+            identity: identity,
+            expectedPID: fixturePID
+        ) else { return }
         XCTAssertNotEqual(fixtureApp.state, .notRunning)
     }
 
