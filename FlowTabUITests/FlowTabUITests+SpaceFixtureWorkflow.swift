@@ -94,7 +94,11 @@ extension FlowTabUITests {
             }
         }
 
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
+        assertRealSpaceFixtureFlowTabIsForegroundReady(
+            app,
+            traceLabel: nil,
+            targetDescription: "quit-shortcut-post-fixture-launch"
+        )
 
         let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
         XCTAssertTrue(fixtureAppTile.waitForExistence(timeout: 12))
