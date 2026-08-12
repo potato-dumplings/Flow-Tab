@@ -327,49 +327,6 @@ extension FlowTabUITests {
         }
     }
 
-    func performAndWaitForHomeWindowTitlePrefix(
-        _ expectedTitles: [String],
-        in app: XCUIApplication,
-        timeout: TimeInterval,
-        trigger: () -> Void
-    ) -> Bool {
-        var triggerCompleted = false
-        let expectation =
-            FlowTabUITestHomeWindowProjectionExpectation
-                .rowLabelPrefix(expectedTitles)
-        let owner =
-            FlowTabUITestHomeWindowProjectionObservationOwner(
-                expectation: expectation,
-                acceptsEvidence: {
-                    triggerCompleted
-                },
-                readback: {
-                    self.homeWindowProjectionSnapshot(
-                        in: app,
-                        expectation: expectation
-                    )
-                }
-            )
-        owner.start()
-        defer { owner.cancel() }
-
-        trigger()
-        triggerCompleted = true
-        owner.requestReadback(source: .triggerReadback)
-
-        guard
-            owner.waitForResolution(timeout: timeout) != nil
-        else {
-            XCTFail(
-                "Home window title prefix did not satisfy "
-                    + "\(expectedTitles). "
-                    + owner.diagnosticSummary
-            )
-            return false
-        }
-        return true
-    }
-
     private func observeHomeWindowProjection(
         in app: XCUIApplication,
         expectation: FlowTabUITestHomeWindowProjectionExpectation,

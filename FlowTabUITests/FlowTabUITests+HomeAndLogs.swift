@@ -225,9 +225,12 @@ extension FlowTabUITests {
                 ),
                 "FlowTab did not expose a Home window row for \(targetApp.appName) / \(targetWindowTitle)."
             )
+            let targetWindowIdentifier = targetWindowRow.identifier
             let targetWindowNumber = try XCTUnwrap(
-                cgWindowNumber(fromHomeWindowRowIdentifier: targetWindowRow.identifier),
-                "Home window row did not expose a CG window identifier: \(targetWindowRow.identifier)"
+                cgWindowNumber(
+                    fromHomeWindowRowIdentifier: targetWindowIdentifier
+                ),
+                "Home window row did not expose a CG window identifier: \(targetWindowIdentifier)"
             )
             XCTAssertTrue(
                 activateHomeWindowRecencyTargetWindow(
@@ -249,13 +252,15 @@ extension FlowTabUITests {
             )
 
             XCTAssertTrue(
-                performAndWaitForHomeWindowTitlePrefix(
-                    [targetWindowTitle, fallbackWindowTitle],
-                    in: app,
-                    timeout: 12,
-                    trigger: {
-                        tapElement(homeAppRow)
-                    }
+                waitForHomeWindowRecencyOrderedProjectionAfterSelectingApp(
+                    homeAppRow,
+                    appName: targetApp.appName,
+                    expectedTitles: [
+                        targetWindowTitle,
+                        fallbackWindowTitle
+                    ],
+                    targetWindowIdentifier: targetWindowIdentifier,
+                    in: app
                 ),
                 "Home window candidates should use real app-local recency before fallback order."
             )
