@@ -5,6 +5,7 @@ enum FlowTabUITestHomeAndLogsWatchdogPolicy {
     static let applicationForegroundReadiness: TimeInterval = 8
     static let frontmostApplicationActivation: TimeInterval = 5
     static let homeTabTriggerReadiness: TimeInterval = 5
+    static let homeTabProjectionReadiness: TimeInterval = 5
 }
 
 struct FlowTabUITestHomeAndLogsReadinessEvidence: Equatable {
@@ -25,6 +26,33 @@ struct FlowTabUITestHomeAndLogsReadinessEvidence: Equatable {
 }
 
 extension FlowTabUITests {
+    @discardableResult
+    func assertHomeAndLogsHomeTabProjectionAfterNavigation(
+        in app: XCUIApplication,
+        targetDescription: String = #function,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> Bool {
+        let didProject = assertSidebarTabProjectionAfterNavigation(
+            in: app,
+            target: .home,
+            triggerWatchdog:
+                FlowTabUITestHomeAndLogsWatchdogPolicy
+                    .homeTabTriggerReadiness,
+            projectionWatchdog:
+                FlowTabUITestHomeAndLogsWatchdogPolicy
+                    .homeTabProjectionReadiness
+        )
+        XCTAssertTrue(
+            didProject,
+            "Home/Logs Home-tab projection watchdog expired. "
+                + "target=\(targetDescription)",
+            file: file,
+            line: line
+        )
+        return didProject
+    }
+
     @discardableResult
     func assertHomeAndLogsHomeTabTriggerReady(
         in app: XCUIApplication,
@@ -124,6 +152,20 @@ extension FlowTabUITests {
         XCTAssertGreaterThan(
             FlowTabUITestHomeAndLogsWatchdogPolicy
                 .homeTabTriggerReadiness,
+            0
+        )
+        XCTAssertEqual(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .homeTabProjectionReadiness,
+            5
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .homeTabProjectionReadiness.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .homeTabProjectionReadiness,
             0
         )
 

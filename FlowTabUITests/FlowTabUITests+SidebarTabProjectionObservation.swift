@@ -162,7 +162,11 @@ extension FlowTabUITests {
     @discardableResult
     func assertSidebarTabProjectionAfterNavigation(
         in app: XCUIApplication,
-        target: FlowTabUITestSidebarTabProjectionTarget
+        target: FlowTabUITestSidebarTabProjectionTarget,
+        triggerWatchdog: TimeInterval =
+            FlowTabUITestSupportWatchdogPolicy.tabNavigation,
+        projectionWatchdog: TimeInterval =
+            FlowTabUITestSupportWatchdogPolicy.tabNavigation
     ) -> Bool {
         let elements = sidebarTabProjectionElements(in: app)
         let readback = sidebarTabProjectionReadback(
@@ -209,9 +213,7 @@ extension FlowTabUITests {
         )
         let triggerSucceeded = tapFirstHittable(
             in: tabQuery,
-            timeout:
-                FlowTabUITestSupportWatchdogPolicy
-                    .tabNavigation
+            timeout: triggerWatchdog
         )
         triggerDidComplete = true
         owner.requestReadback(source: .triggerReadback)
@@ -228,9 +230,7 @@ extension FlowTabUITests {
         }
 
         guard owner.waitForResolution(
-            timeout:
-                FlowTabUITestSupportWatchdogPolicy
-                    .tabNavigation
+            timeout: projectionWatchdog
         ) != nil else {
             XCTFail(
                 "Sidebar tab projection watchdog expired. "

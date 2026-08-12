@@ -169,8 +169,7 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(app)
         assertHomeAndLogsApplicationIsForegroundReady(app)
-        assertHomeAndLogsHomeTabTriggerReady(in: app)
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
+        assertHomeAndLogsHomeTabProjectionAfterNavigation(in: app)
         let firstLiveAppRow = app.buttons.matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "flowtab.home.app.")
         ).firstMatch
@@ -195,8 +194,7 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(app)
         assertHomeAndLogsApplicationIsForegroundReady(app)
-        assertHomeAndLogsHomeTabTriggerReady(in: app)
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
+        assertHomeAndLogsHomeTabProjectionAfterNavigation(in: app)
 
         XCTAssertTrue(element(in: app, identifier: Identifier.homeHeader).waitForExistence(timeout: 5))
         XCTAssertTrue(element(in: app, identifier: Identifier.homeAppCount).waitForExistence(timeout: 8))
@@ -315,8 +313,7 @@ extension FlowTabUITests {
         setToggle(showToggle, to: false)
         XCTAssertFalse(toggleIsOn(showToggle))
 
-        assertHomeAndLogsHomeTabTriggerReady(in: app)
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
+        assertHomeAndLogsHomeTabProjectionAfterNavigation(in: app)
 
         let browserRow = element(in: app, identifier: Identifier.homeAppMockBrowser)
         let mailRow = element(in: app, identifier: Identifier.homeAppMockMail)
@@ -346,8 +343,7 @@ extension FlowTabUITests {
         let app = makeApp(additionalArguments: launchArguments)
         launchFlowTabUITestApplication(app)
         assertHomeAndLogsApplicationIsForegroundReady(app)
-        assertHomeAndLogsHomeTabTriggerReady(in: app)
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
+        assertHomeAndLogsHomeTabProjectionAfterNavigation(in: app)
 
         let hostWeChatRow = element(in: app, identifier: Identifier.homeAppWeChat)
         let nestedAppExRow = element(in: app, identifier: Identifier.homeAppNestedWeChatAppEx)
