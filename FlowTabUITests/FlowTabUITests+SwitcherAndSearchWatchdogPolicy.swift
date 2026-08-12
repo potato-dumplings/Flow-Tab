@@ -26,6 +26,7 @@ enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
     static let manyWindowInitialAppProjection: TimeInterval = 5
     static let manyWindowFirstWindowProjection: TimeInterval = 5
     static let manyWindowNextPageControlProjection: TimeInterval = 2
+    static let manyWindowFirstPageProjection: TimeInterval = 5
 
     static let compatibleBounds = [
         optionTabAppClickDismissal,
@@ -52,7 +53,8 @@ enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
         nestedTopologyHotkeyLog,
         manyWindowInitialAppProjection,
         manyWindowFirstWindowProjection,
-        manyWindowNextPageControlProjection
+        manyWindowNextPageControlProjection,
+        manyWindowFirstPageProjection
     ]
 }
 
@@ -63,7 +65,7 @@ extension FlowTabUITests {
             policies,
             [
                 2, 2, 2, 10, 5, 10, 5, 10, 10, 5, 10, 3,
-                5, 10, 3, 3, 5, 10, 5, 8, 6, 10, 5, 5, 2
+                5, 10, 3, 3, 5, 10, 5, 8, 6, 10, 5, 5, 2, 5
             ]
         )
         XCTAssertTrue(policies.allSatisfy { $0.isFinite && $0 > 0 })

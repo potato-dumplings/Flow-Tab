@@ -774,27 +774,26 @@ extension FlowTabUITests {
         defer { firstWindowObservation.cancel() }
         let nextPageObservation = startElementExistenceObservation(in: app, identifier: Identifier.switcherNextWindowPage, requiresInitialAbsence: true)
         defer { nextPageObservation.cancel() }
+        let pageObservation = startSwitcherWindowPageProjectionObservation(in: app,
+            expectation: FlowTabUITestSwitcherWindowPageExpectation(
+                expectedWindows: (0..<16).map { (id: String(format: "mock-many-window-%02d", $0), title: String(format: "Many Window %02d", $0)) },
+                excludedWindowIDs: ["mock-many-window-25"],
+                minimumCardCount: FlowTabUITestSwitcherWindowPageProjectionPolicy.minimumCardCount,
+                maximumCardCount: FlowTabUITestSwitcherWindowPageProjectionPolicy.maximumCardCount,
+                minimumCardWidth: FlowTabUITestSwitcherWindowPageProjectionPolicy.minimumCardWidth,
+                maximumCardGap: FlowTabUITestSwitcherWindowPageProjectionPolicy.maximumCardGap),
+            nextPageIdentifier: Identifier.switcherNextWindowPage, requiresEmptyInitialSnapshot: true)
+        defer { pageObservation.cancel() }
         postFlowTabUITestSwitcherCommandAndWaitForDelivery(.advanceDown, traceLabel: "many-window-page")
+        firstWindowObservation.markTriggerCompleted()
+        nextPageObservation.markTriggerCompleted()
+        pageObservation.markTriggerCompleted()
         assertElementExistsAfterTrigger(firstWindowObservation,
             timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.manyWindowFirstWindowProjection, description: "many-window first Window-card projection")
         assertElementExistsAfterTrigger(nextPageObservation,
             timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.manyWindowNextPageControlProjection, description: "many-window next-page control projection")
-        let windowCards = switcherWindowCardObservations(in: app)
-        XCTAssertGreaterThan(windowCards.count, 0)
-        XCTAssertLessThan(windowCards.count, 20)
-        XCTAssertTrue(
-            windowCards.allSatisfy { $0.frame.width >= 100 },
-            "Expected current visible window cards to keep preview width, found \(windowCards.map { "\($0.identifier)=\($0.frame)" })"
-        )
-        XCTAssertTrue(
-            windowCards.allSatisfy(\.hasImage),
-            "Expected current visible window cards to expose mock screenshots, found \(windowCards.map { "\($0.identifier)=\($0.value)" })"
-        )
-        XCTAssertFalse(
-            app.descendants(matching: .any)
-                .matching(identifier: "flowtab.switcher.window.\("mock-many-window-25".flowTabUITestAccessibilityIdentifierComponent)")
-                .firstMatch
-                .exists
-        )
+        _ = assertSwitcherWindowPageProjectionAfterTrigger(pageObservation,
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.manyWindowFirstPageProjection,
+            description: "many-window complete first-page projection")
     }
 }

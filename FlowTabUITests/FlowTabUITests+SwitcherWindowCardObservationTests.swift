@@ -8,6 +8,252 @@ private enum FlowTabUITestSwitcherWindowCardTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testSwitcherWindowPageExpectationRequiresCompleteLayoutClosure() {
+        let expectation = switcherWindowPageExpectation()
+        let matching = switcherWindowPageSnapshot()
+
+        XCTAssertTrue(expectation.isSatisfied(by: matching))
+        XCTAssertTrue(
+            expectation.isSatisfied(
+                by: FlowTabUITestSwitcherWindowPageSnapshot(
+                    cards: Array(matching.cards.reversed()),
+                    nextPageBoundary: matching.nextPageBoundary
+                )
+            )
+        )
+
+        var cards = matching.cards
+        cards.removeLast()
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: switcherWindowPageSnapshot(cards: cards)
+            )
+        )
+
+        cards = matching.cards
+        cards[2] = switcherWindowPageCard(
+            index: 2,
+            identifier: "wrong-card"
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: switcherWindowPageSnapshot(cards: cards)
+            )
+        )
+
+        cards = matching.cards
+        cards[2] = switcherWindowPageCard(
+            index: 2,
+            title: "Wrong title"
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: switcherWindowPageSnapshot(cards: cards)
+            )
+        )
+
+        cards = matching.cards
+        cards[2] = switcherWindowPageCard(
+            index: 2,
+            hasImage: false
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: switcherWindowPageSnapshot(cards: cards)
+            )
+        )
+
+        cards = matching.cards
+        cards[2] = switcherWindowPageCard(
+            index: 2,
+            frame: CGRect(x: 224, y: 0, width: 99, height: 120)
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: switcherWindowPageSnapshot(cards: cards)
+            )
+        )
+
+        cards = matching.cards
+        cards[3] = switcherWindowPageCard(
+            index: 3,
+            frame: CGRect(x: 360, y: 0, width: 100, height: 120)
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: switcherWindowPageSnapshot(cards: cards)
+            )
+        )
+
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: switcherWindowPageSnapshot(
+                    nextPageExists: false
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: switcherWindowPageSnapshot(
+                    nextPageX: 700
+                )
+            )
+        )
+    }
+
+    func testSwitcherWindowPageObserverRequiresPostTriggerReadback() {
+        let matching = switcherWindowPageSnapshot()
+        var registrationCount = 0
+        let owner = FlowTabUITestSwitcherWindowPageObservationOwner(
+            expectation: switcherWindowPageExpectation(),
+            scheduledRegistration: { _ in
+                registrationCount += 1
+                return FlowTabUITestObservationCancellation {}
+            },
+            readback: { matching }
+        )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertNil(owner.resolvedEvidence)
+        owner.markTriggerCompleted()
+
+        XCTAssertEqual(owner.resolvedEvidence?.source, .triggerReadback)
+        XCTAssertEqual(owner.resolvedEvidence?.value, matching)
+        XCTAssertEqual(registrationCount, 0)
+    }
+
+    func testSwitcherWindowPageObserverUsesPostTriggerScheduledEvidence() {
+        let matching = switcherWindowPageSnapshot()
+        var snapshot = switcherWindowPageSnapshot(cards: [])
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var registrationCount = 0
+        var cancellationCount = 0
+        let owner = FlowTabUITestSwitcherWindowPageObservationOwner(
+            expectation: switcherWindowPageExpectation(),
+            scheduledRegistration: { callback in
+                registrationCount += 1
+                scheduledReadback = callback
+                return FlowTabUITestObservationCancellation {
+                    cancellationCount += 1
+                }
+            },
+            readback: { snapshot }
+        )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertNil(owner.resolvedEvidence)
+        XCTAssertEqual(registrationCount, 0)
+        owner.markTriggerCompleted()
+        XCTAssertEqual(registrationCount, 1)
+
+        for _ in 0..<5 {
+            scheduledReadback?(.scheduledReadback)
+            XCTAssertNil(owner.resolvedEvidence)
+        }
+
+        snapshot = matching
+        scheduledReadback?(.scheduledReadback)
+
+        XCTAssertEqual(owner.resolvedEvidence?.source, .scheduledReadback)
+        XCTAssertEqual(owner.resolvedEvidence?.value, matching)
+        XCTAssertEqual(cancellationCount, 1)
+    }
+
+    func testSwitcherWindowPageObserverCancellationWatchdogAndPressure() {
+        let expectation = switcherWindowPageExpectation()
+        let matching = switcherWindowPageSnapshot()
+        var cancelledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var cancellationCount = 0
+        var cancelledSnapshot = switcherWindowPageSnapshot(cards: [])
+        let cancelledOwner = FlowTabUITestSwitcherWindowPageObservationOwner(
+            expectation: expectation,
+            scheduledRegistration: { callback in
+                cancelledReadback = callback
+                return FlowTabUITestObservationCancellation {
+                    cancellationCount += 1
+                }
+            },
+            readback: { cancelledSnapshot }
+        )
+        cancelledOwner.start()
+        cancelledOwner.markTriggerCompleted()
+        cancelledOwner.cancel()
+        cancelledSnapshot = matching
+        cancelledReadback?(.scheduledReadback)
+        XCTAssertNil(cancelledOwner.resolvedEvidence)
+        XCTAssertEqual(cancellationCount, 1)
+
+        var watchdogReadbackCount = 0
+        let watchdogOwner = FlowTabUITestSwitcherWindowPageObservationOwner(
+            expectation: expectation,
+            scheduledRegistration: { _ in
+                FlowTabUITestObservationCancellation {}
+            },
+            readback: {
+                defer { watchdogReadbackCount += 1 }
+                return watchdogReadbackCount >= 2
+                    ? matching
+                    : self.switcherWindowPageSnapshot(cards: [])
+            }
+        )
+        watchdogOwner.start()
+        watchdogOwner.markTriggerCompleted()
+        XCTAssertNil(
+            watchdogOwner.waitForResolution(
+                timeout:
+                    FlowTabUITestSwitcherWindowCardTestPolicy
+                        .watchdog
+            )
+        )
+        XCTAssertEqual(watchdogOwner.latestSnapshot, matching)
+        XCTAssertTrue(
+            watchdogOwner.diagnosticSummary.contains(
+                "source=watchdogReadback"
+            )
+        )
+        XCTAssertTrue(
+            watchdogOwner.diagnosticSummary.contains(
+                "phase=triggerCompleted"
+            )
+        )
+        watchdogOwner.cancel()
+
+        for _ in 0..<FlowTabUITestSwitcherWindowCardTestPolicy
+            .pressureIterations
+        {
+            var snapshot = switcherWindowPageSnapshot(cards: [])
+            var scheduledReadbacks: [
+                (FlowTabUITestConditionObservationSource) -> Void
+            ] = []
+            let owner = FlowTabUITestSwitcherWindowPageObservationOwner(
+                expectation: expectation,
+                scheduledRegistration: { callback in
+                    scheduledReadbacks.append(callback)
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: { snapshot }
+            )
+            owner.start()
+            owner.markTriggerCompleted()
+            let staleReadback = scheduledReadbacks[0]
+            owner.cancel()
+            owner.start()
+            owner.markTriggerCompleted()
+            let currentReadback = scheduledReadbacks[1]
+
+            snapshot = matching
+            staleReadback(.scheduledReadback)
+            XCTAssertNil(owner.resolvedEvidence)
+            currentReadback(.scheduledReadback)
+            XCTAssertEqual(owner.resolvedEvidence?.generation, 2)
+            owner.cancel()
+        }
+    }
+
     func testSwitcherWindowCardObserverRequiresFreshExactIdentityEvidence() {
         let expectation =
             FlowTabUITestSwitcherWindowCardExpectation(
@@ -280,6 +526,69 @@ extension FlowTabUITests {
             title: title,
             value: "title=\(title)",
             frame: frame,
+            hasImage: hasImage
+        )
+    }
+
+    private func switcherWindowPageExpectation()
+        -> FlowTabUITestSwitcherWindowPageExpectation
+    {
+        FlowTabUITestSwitcherWindowPageExpectation(
+            expectedCards: (0..<6).map { index in
+                FlowTabUITestSwitcherWindowPageCardExpectation(
+                    identifier: "card-\(index)",
+                    title: "Window \(index)"
+                )
+            },
+            excludedIdentifiers: ["card-25"],
+            minimumCardCount: 3,
+            maximumCardCount: 6,
+            minimumCardWidth: 100,
+            maximumCardGap: 24
+        )
+    }
+
+    private func switcherWindowPageSnapshot(
+        cards: [SwitcherWindowCardObservation]? = nil,
+        nextPageExists: Bool = true,
+        nextPageX: CGFloat = 668
+    ) -> FlowTabUITestSwitcherWindowPageSnapshot {
+        FlowTabUITestSwitcherWindowPageSnapshot(
+            cards: cards ?? (0..<6).map {
+                switcherWindowPageCard(index: $0)
+            },
+            nextPageBoundary:
+                FlowTabUITestSwitcherWindowPageBoundarySnapshot(
+                    exists: nextPageExists,
+                    frame: nextPageExists
+                        ? CGRect(
+                            x: nextPageX,
+                            y: 0,
+                            width: 28,
+                            height: 48
+                        )
+                        : .zero
+                )
+        )
+    }
+
+    private func switcherWindowPageCard(
+        index: Int,
+        identifier: String? = nil,
+        title: String? = nil,
+        frame: CGRect? = nil,
+        hasImage: Bool = true
+    ) -> SwitcherWindowCardObservation {
+        switcherWindowCard(
+            identifier: identifier ?? "card-\(index)",
+            title: title ?? "Window \(index)",
+            frame: frame
+                ?? CGRect(
+                    x: CGFloat(index) * 112,
+                    y: 0,
+                    width: 100,
+                    height: 120
+                ),
             hasImage: hasImage
         )
     }
