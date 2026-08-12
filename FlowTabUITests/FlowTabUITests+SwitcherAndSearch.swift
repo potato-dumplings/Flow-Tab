@@ -721,17 +721,17 @@ extension FlowTabUITests {
                 """
             )
 
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.selectApp, traceLabel: "nestedTopology.selectWeChat")
-            app.typeKey(.downArrow, modifierFlags: [])
-            _ = waitForSwitcherWindowCards(
+            _ = performAndWaitForSwitcherWindowCards(
                 in: app,
-                expectedTitles: [
-                    "微信",
-                    "微信（窗口）",
-                    "Mock Mini Program Window"
-                ],
-                timeout: 6
-            )
+                expectedTitles: ["微信", "微信（窗口）", "Mock Mini Program Window"],
+                requiresEmptyInitialSnapshot: true,
+                timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.nestedTopologyWindowProjection
+            ) {
+                postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                    .selectApp, traceLabel: "nestedTopology.selectWeChat"
+                )
+                app.typeKey(.downArrow, modifierFlags: [])
+            }
 
             let screenshot = XCTAttachment(screenshot: app.screenshot())
             screenshot.name = "Option Tab switcher nested zero-window topology"
