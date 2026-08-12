@@ -28,7 +28,7 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        assertHomeAndLogsApplicationIsForegroundReady(app)
 
         for target in FlowTabUITestSidebarTabProjectionTarget.allCases {
             guard assertSidebarTabProjectionAfterNavigation(
@@ -55,7 +55,7 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        assertHomeAndLogsApplicationIsForegroundReady(app)
         openLogsTab(in: app)
 
         assertStatusItemMainWindowCloses(in: app) {
@@ -109,7 +109,7 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        assertHomeAndLogsApplicationIsForegroundReady(app)
 
         let quitItem = flowTabStatusMenuQuitItem(
             in: app,
@@ -142,7 +142,7 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        assertHomeAndLogsApplicationIsForegroundReady(app)
         assertHomePermissionBannerHiddenProjection(
             in: app,
             targetDescription: "granted-permissions"
@@ -171,7 +171,7 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        assertHomeAndLogsApplicationIsForegroundReady(app)
         XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
         XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
         let firstLiveAppRow = app.buttons.matching(
@@ -197,7 +197,7 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        assertHomeAndLogsApplicationIsForegroundReady(app)
         XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
         XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
 
@@ -289,7 +289,7 @@ extension FlowTabUITests {
             additionalArguments: homeAppVisibilityRuntimeArguments(resetDefaults: true)
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        assertHomeAndLogsApplicationIsForegroundReady(app)
         openSettingsTab(in: app)
 
         guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
@@ -348,7 +348,7 @@ extension FlowTabUITests {
 
         let app = makeApp(additionalArguments: launchArguments)
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        assertHomeAndLogsApplicationIsForegroundReady(app)
         XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
         XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
 
