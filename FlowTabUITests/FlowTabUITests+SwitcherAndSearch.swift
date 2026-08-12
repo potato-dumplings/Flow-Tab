@@ -432,16 +432,34 @@ extension FlowTabUITests {
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let primaryWindowID = "flowtab.switcher.window.\("mock-current-primary".flowTabUITestAccessibilityIdentifierComponent)"
         let secondaryWindowID = "flowtab.switcher.window.\("mock-current-secondary".flowTabUITestAccessibilityIdentifierComponent)"
-        let primaryWindow = element(in: app, identifier: primaryWindowID)
-        let secondaryWindow = element(in: app, identifier: secondaryWindowID)
-        XCTAssertTrue(
-            openInAppSwitcherForPointerHover(
-                diagnosticsSummary,
-                traceLabel: "pointer.window.hover"
+        guard
+            let windows = waitForExactElementCollection(
+                in: app,
+                identifiers: [
+                    primaryWindowID,
+                    secondaryWindowID
+                ],
+                watchdog:
+                    FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                        .controlTabWindowCollectionProjection,
+                targetDescription:
+                    "Control+Tab pointer Window-card presentation",
+                trigger: {
+                    XCTAssertTrue(
+                        openInAppSwitcherForPointerHover(
+                            diagnosticsSummary,
+                            traceLabel: "pointer.window.hover"
+                        ),
+                        "Control+Tab pointer presentation did not "
+                            + "publish its exact diagnostics summary."
+                    )
+                }
             )
-        )
-        XCTAssertTrue(primaryWindow.waitForExistence(timeout: 5))
-        XCTAssertTrue(secondaryWindow.waitForExistence(timeout: 5))
+        else {
+            return
+        }
+        let primaryWindow = windows[0]
+        let secondaryWindow = windows[1]
 
         XCTAssertTrue(
             performAndWaitForSwitcherDiagnostics(
@@ -471,14 +489,29 @@ extension FlowTabUITests {
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let secondaryWindowID = "flowtab.switcher.window.\("mock-current-secondary".flowTabUITestAccessibilityIdentifierComponent)"
-        let secondaryWindow = element(in: app, identifier: secondaryWindowID)
-        XCTAssertTrue(
-            openInAppSwitcherForPointerHover(
-                diagnosticsSummary,
-                traceLabel: "pointer.window.click"
-            )
-        )
-        XCTAssertTrue(secondaryWindow.waitForExistence(timeout: 5))
+        guard
+            let secondaryWindow = waitForExactElementCollection(
+                in: app,
+                identifiers: [secondaryWindowID],
+                watchdog:
+                    FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                        .controlTabSingleWindowProjection,
+                targetDescription:
+                    "Control+Tab pointer Window-card presentation",
+                trigger: {
+                    XCTAssertTrue(
+                        openInAppSwitcherForPointerHover(
+                            diagnosticsSummary,
+                            traceLabel: "pointer.window.click"
+                        ),
+                        "Control+Tab pointer presentation did not "
+                            + "publish its exact diagnostics summary."
+                    )
+                }
+            )?.first
+        else {
+            return
+        }
 
         assertElementDoesNotExistAfterTrigger(
             diagnosticsSummary,
