@@ -7,6 +7,7 @@ USER_HOME="${HOME}"
 ORIGINAL_HOME="${HOME}"
 ORIGINAL_CFFIXED_USER_HOME="${CFFIXED_USER_HOME:-${HOME}}"
 LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
+PATH_BOUNDARIES_PATH="${ROOT_DIR}/scripts/lib/path-boundaries.sh"
 
 CONFIGURATION="Testing"
 INSTALL_PATH="${USER_HOME}/Applications/Flow Tab UITest.app"
@@ -17,18 +18,12 @@ MANUAL_CODESIGN_ENABLED=0
 DEVELOPMENT_TEAM_SOURCE=""
 HAS_CUSTOM_BUILD_ROOT=false
 
+# shellcheck source=/dev/null
+source "${PATH_BOUNDARIES_PATH}"
+
 if [[ -n "${DEVELOPMENT_TEAM}" ]]; then
   DEVELOPMENT_TEAM_SOURCE="FLOWTAB_DEVELOPMENT_TEAM"
 fi
-
-expand_path() {
-  local path="$1"
-  if [[ "${path}" == "~/"* ]]; then
-    printf '%s/%s' "${USER_HOME}" "${path#~/}"
-    return
-  fi
-  printf '%s' "${path}"
-}
 
 detect_local_development_team() {
   if [[ ! -f "${LOCAL_SIGNING_CONFIG_PATH}" ]]; then
@@ -110,6 +105,12 @@ Defaults:
   configuration: Testing
   install path: ~/Applications/Flow Tab UITest.app
 
+Supported install boundaries:
+  ~/Applications/Flow Tab UITest.app
+  ~/Applications/Flow Tab.app
+  /Applications/Flow Tab UITest.app
+  /Applications/Flow Tab.app
+
 Development team:
   FLOWTAB_DEVELOPMENT_TEAM
 
@@ -159,7 +160,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-INSTALL_PATH="$(expand_path "${INSTALL_PATH}")"
+INSTALL_PATH="$(flowtab_resolve_ui_test_install_path "${USER_HOME}" "${INSTALL_PATH}")"
 DERIVED_DATA_PATH="${BUILD_ROOT}/DerivedData"
 TMP_ROOT="${BUILD_ROOT}/tmp"
 HOME_ROOT="${BUILD_ROOT}/home"
@@ -207,14 +208,20 @@ if [[ -n "${DEVELOPMENT_TEAM}" || -n "${CODE_SIGN_IDENTITY}" ]]; then
   fi
 fi
 
+if [[ "${INSTALL_PATH}" == "${USER_HOME%/}/Applications/"* ]]; then
+  INSTALL_BOUNDARY="$(flowtab_prepare_direct_child_directory "${USER_HOME}" "Applications")"
+else
+  INSTALL_BOUNDARY="$(flowtab_prepare_direct_child_directory "/" "Applications")"
+fi
+INSTALL_PATH="$(flowtab_resolve_direct_child_path "${INSTALL_BOUNDARY}" "$(/usr/bin/basename "${INSTALL_PATH}")")"
+
 mkdir -p \
   "${DERIVED_DATA_PATH}" \
   "${TMP_ROOT}" \
   "${HOME_ROOT}" \
   "${MODULE_CACHE_ROOT}/clang" \
   "${MODULE_CACHE_ROOT}/swift" \
-  "${PACKAGE_CACHE_PATH}" \
-  "$(dirname "${INSTALL_PATH}")"
+  "${PACKAGE_CACHE_PATH}"
 
 export TMPDIR="${TMP_ROOT}/"
 export CLANG_MODULE_CACHE_PATH="${MODULE_CACHE_ROOT}/clang"
