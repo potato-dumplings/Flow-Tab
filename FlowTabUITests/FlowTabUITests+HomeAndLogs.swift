@@ -242,7 +242,11 @@ extension FlowTabUITests {
             XCTAssertTrue(
                 activateFlowTabAfterHomeWindowRecencyTargetActivation(app)
             )
-            XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10))
+            XCTAssertTrue(
+                navigateHomeAfterHomeWindowRecencyFlowTabActivation(
+                    in: app
+                )
+            )
 
             XCTAssertTrue(
                 performAndWaitForHomeWindowTitlePrefix(
