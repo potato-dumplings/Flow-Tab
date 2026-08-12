@@ -407,11 +407,9 @@ extension FlowTabUITests {
             targetDescription: "permission-dismiss",
             baselineRequirement: .visiblePermissionControls
         ) {
-            let dismissButtons = firstLaunchApp.buttons.matching(
-                identifier: Identifier.permissionDismiss
-            )
-            XCTAssertTrue(
-                tapFirstHittable(in: dismissButtons, timeout: 5)
+            assertHomePermissionDismissTriggerReady(
+                in: firstLaunchApp,
+                targetDescription: "permission-dismiss"
             )
         }
 
