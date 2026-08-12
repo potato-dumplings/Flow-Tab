@@ -692,7 +692,11 @@ extension FlowTabUITests {
             }
         }
 
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
+        assertRealSpaceFixtureFlowTabIsForegroundReady(
+            app,
+            traceLabel: nil,
+            targetDescription: "standard-workflow-post-fixture-launch"
+        )
         assertions(identity, app)
     }
 
