@@ -749,7 +749,6 @@ extension FlowTabUITests {
             timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.nestedTopologyHotkeyLog
         )
     }
-
     func testSwitcherWindowLayerPaginatesLargeMockWindowSet() throws {
         let app = makeApp(
             additionalArguments: [
@@ -757,23 +756,25 @@ extension FlowTabUITests {
                 "--flowtab-ui-mock-runtime",
                 "--flowtab-ui-mock-window-previews",
                 "--flowtab-ui-enable-mock-hotkey-effects",
-                "--flowtab-ui-mock-runtime-variant",
-                "single-app-many-windows",
+                "--flowtab-ui-mock-runtime-variant", "single-app-many-windows",
                 "--flowtab-ui-open-switcher",
                 "--flowtab-ui-listen-switcher-trigger",
-                "--flowtab-ui-runtime-log-level",
-                "DEBUG",
+                "--flowtab-ui-runtime-log-level", "DEBUG",
                 "--flowtab-ui-enable-verbose-logs",
-                "-showPermissionReminder",
-                "NO"
+                "-showPermissionReminder", "NO"
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         )
-        launchFlowTabUITestApplication(app)
-        assertSwitcherAndSearchApplicationIsForegroundReady(app)
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherAppMockManyWindows).waitForExistence(timeout: 5))
-
+        XCTAssertTrue(assertInitialSwitcherAppProjectionAfterLaunch(
+            in: app, requiredBundleIdentifiers: ["com.flowtab.mock.many-windows"],
+            excludedBundleIdentifiers: [],
+            projectionExpectation: .exactEntry("com.flowtab.mock.many-windows:100"),
+            targetDescription: "many-window pagination initial App projection",
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.manyWindowInitialAppProjection
+        ) {
+            launchFlowTabUITestApplication(app)
+            assertSwitcherAndSearchApplicationIsForegroundReady(app)
+        })
         postFlowTabUITestSwitcherCommandAndWaitForDelivery(.advanceDown, traceLabel: "many-window-page")
-
         let firstWindowID = "flowtab.switcher.window.\("mock-many-window-00".flowTabUITestAccessibilityIdentifierComponent)"
         XCTAssertTrue(element(in: app, identifier: firstWindowID).waitForExistence(timeout: 5))
         XCTAssertTrue(element(in: app, identifier: Identifier.switcherNextWindowPage).waitForExistence(timeout: 2))
@@ -796,5 +797,4 @@ extension FlowTabUITests {
                 .exists
         )
     }
-
 }

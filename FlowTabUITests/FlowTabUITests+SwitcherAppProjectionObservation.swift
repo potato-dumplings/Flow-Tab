@@ -238,6 +238,8 @@ extension FlowTabUITests {
         in app: XCUIApplication,
         requiredBundleIdentifiers: Set<String>,
         excludedBundleIdentifiers: Set<String>,
+        projectionExpectation:
+            FlowTabUITestSwitcherAppProjectionExpectation? = nil,
         targetDescription: String,
         timeout: TimeInterval =
             FlowTabUITestSwitcherAppProjectionPolicy
@@ -275,7 +277,7 @@ extension FlowTabUITests {
             )
         var triggerDidComplete = false
         let owner = FlowTabUITestSwitcherAppProjectionObservationOwner(
-            expectation: .bundleIdentifiers(
+            expectation: projectionExpectation ?? .bundleIdentifiers(
                 required: requiredBundleIdentifiers,
                 excluded: excludedBundleIdentifiers
             ),
