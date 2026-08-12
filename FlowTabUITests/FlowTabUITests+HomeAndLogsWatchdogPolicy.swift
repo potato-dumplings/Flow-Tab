@@ -6,6 +6,7 @@ enum FlowTabUITestHomeAndLogsWatchdogPolicy {
     static let frontmostApplicationActivation: TimeInterval = 5
     static let homeTabTriggerReadiness: TimeInterval = 5
     static let homeTabProjectionReadiness: TimeInterval = 5
+    static let liveApplicationDirectoryReadiness: TimeInterval = 2
 }
 
 struct FlowTabUITestHomeAndLogsReadinessEvidence: Equatable {
@@ -26,6 +27,56 @@ struct FlowTabUITestHomeAndLogsReadinessEvidence: Equatable {
 }
 
 extension FlowTabUITests {
+    @discardableResult
+    func assertHomeAndLogsLiveApplicationDirectoryAfterNavigation(
+        in app: XCUIApplication,
+        targetDescription: String = #function,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> Bool {
+        let identifierPrefix = "flowtab.home.app."
+        let firstLiveAppRow = app.buttons.matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH %@",
+                identifierPrefix
+            )
+        ).firstMatch
+        let observation =
+            FlowTabUITestElementExistenceObservationOwner(
+                elementIdentifier: "\(identifierPrefix)*",
+                readback: { firstLiveAppRow.exists }
+            )
+        observation.start()
+        defer { observation.cancel() }
+
+        let didNavigate =
+            assertHomeAndLogsHomeTabProjectionAfterNavigation(
+                in: app,
+                targetDescription: targetDescription,
+                file: file,
+                line: line
+            )
+        observation.markTriggerCompleted()
+        guard didNavigate else { return false }
+
+        guard observation.waitForResolution(
+            timeout:
+                FlowTabUITestHomeAndLogsWatchdogPolicy
+                    .liveApplicationDirectoryReadiness
+        ) != nil else {
+            XCTFail(
+                "Home live application directory watchdog expired. "
+                    + "target=\(targetDescription) "
+                    + "identifierPrefix=\(identifierPrefix) "
+                    + observation.diagnosticSummary,
+                file: file,
+                line: line
+            )
+            return false
+        }
+        return true
+    }
+
     @discardableResult
     func assertHomeAndLogsHomeTabProjectionAfterNavigation(
         in app: XCUIApplication,
@@ -166,6 +217,20 @@ extension FlowTabUITests {
         XCTAssertGreaterThan(
             FlowTabUITestHomeAndLogsWatchdogPolicy
                 .homeTabProjectionReadiness,
+            0
+        )
+        XCTAssertEqual(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .liveApplicationDirectoryReadiness,
+            2
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .liveApplicationDirectoryReadiness.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .liveApplicationDirectoryReadiness,
             0
         )
 

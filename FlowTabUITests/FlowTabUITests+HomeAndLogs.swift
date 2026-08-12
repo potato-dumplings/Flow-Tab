@@ -169,14 +169,7 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(app)
         assertHomeAndLogsApplicationIsForegroundReady(app)
-        assertHomeAndLogsHomeTabProjectionAfterNavigation(in: app)
-        let firstLiveAppRow = app.buttons.matching(
-            NSPredicate(format: "identifier BEGINSWITH %@", "flowtab.home.app.")
-        ).firstMatch
-        XCTAssertTrue(
-            firstLiveAppRow.waitForExistence(timeout: 2),
-            "Home should publish the running-application directory without waiting for AX window repair."
-        )
+        assertHomeAndLogsLiveApplicationDirectoryAfterNavigation(in: app)
     }
 
     func testHomeOverviewChromeShowsCountsStatsAndSidebarPermissionStatus() throws {
