@@ -239,8 +239,9 @@ extension FlowTabUITests {
                 "Clicking the Home window row did not activate the real \(targetWindowTitle) fixture window."
             )
 
-            app.activate()
-            XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+            XCTAssertTrue(
+                activateFlowTabAfterHomeWindowRecencyTargetActivation(app)
+            )
             XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10))
 
             XCTAssertTrue(
