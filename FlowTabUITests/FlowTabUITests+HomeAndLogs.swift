@@ -323,15 +323,18 @@ extension FlowTabUITests {
         let app = makeApp(additionalArguments: launchArguments)
         launchFlowTabUITestApplication(app)
         assertHomeAndLogsApplicationIsForegroundReady(app)
-        assertHomeAndLogsHomeTabProjectionAfterNavigation(in: app)
 
-        let hostWeChatRow = element(in: app, identifier: Identifier.homeAppWeChat)
+        guard let hostWeChatRow =
+            assertHomeAndLogsNestedTopologyTopLevelRowsAfterNavigation(
+                in: app
+            )
+        else {
+            return
+        }
+
         let nestedAppExRow = element(in: app, identifier: Identifier.homeAppNestedWeChatAppEx)
         let nestedMiniProgramRow = element(in: app, identifier: Identifier.homeAppNestedMiniProgram)
-        let topLevelZeroWindowRow = element(in: app, identifier: Identifier.homeAppTopLevelZeroWindow)
 
-        XCTAssertTrue(hostWeChatRow.waitForExistence(timeout: 8))
-        XCTAssertTrue(topLevelZeroWindowRow.waitForExistence(timeout: 8))
         tapElement(hostWeChatRow)
         assertHomeWindowTitle("微信", in: app, timeout: 6)
         assertHomeWindowTitle("微信（窗口）", in: app, timeout: 6)
