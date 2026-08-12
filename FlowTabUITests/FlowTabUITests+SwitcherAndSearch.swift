@@ -10,6 +10,8 @@ private enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
     static let searchMockSingleResultProjection: TimeInterval = 5
     static let searchMockMultipleResultProjection: TimeInterval = 10
     static let pointerInteractionForegroundReadiness: TimeInterval = 10
+    static let optionTabSingleAppRowProjection: TimeInterval = 5
+    static let optionTabAppRowCollectionProjection: TimeInterval = 10
     static let compatibleBounds = [
         optionTabAppClickDismissal,
         controlTabWindowClickDismissal,
@@ -19,7 +21,9 @@ private enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
         searchHeaderProjection,
         searchMockSingleResultProjection,
         searchMockMultipleResultProjection,
-        pointerInteractionForegroundReadiness
+        pointerInteractionForegroundReadiness,
+        optionTabSingleAppRowProjection,
+        optionTabAppRowCollectionProjection
     ]
 }
 
@@ -28,7 +32,7 @@ extension FlowTabUITests {
         let policies = FlowTabUITestSwitcherAndSearchWatchdogPolicy.compatibleBounds
         XCTAssertEqual(
             policies,
-            [2, 2, 2, 10, 5, 10, 5, 10, 10]
+            [2, 2, 2, 10, 5, 10, 5, 10, 10, 5, 10]
         )
         XCTAssertTrue(policies.allSatisfy { $0.isFinite && $0 > 0 })
     }
@@ -167,6 +171,38 @@ extension FlowTabUITests {
                 + "finalState=\(String(describing: app.state))",
             file: file,
             line: line
+        )
+    }
+
+    private func waitForOptionTabPointerAppRows(
+        in app: XCUIApplication,
+        diagnosticsSummary: XCUIElement,
+        identifiers: [String],
+        watchdog: TimeInterval,
+        traceLabel: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> [XCUIElement]? {
+        waitForExactElementCollection(
+            in: app,
+            identifiers: identifiers,
+            watchdog: watchdog,
+            targetDescription:
+                "Option+Tab pointer App-row presentation",
+            file: file,
+            line: line,
+            trigger: {
+                XCTAssertTrue(
+                    openGlobalSwitcherForPointerHover(
+                        diagnosticsSummary,
+                        traceLabel: traceLabel
+                    ),
+                    "Option+Tab pointer presentation did not "
+                        + "publish its exact diagnostics summary.",
+                    file: file,
+                    line: line
+                )
+            }
         )
     }
 
@@ -346,16 +382,24 @@ extension FlowTabUITests {
         assertPointerInteractionApplicationIsForegroundReady(app)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        let browserTile = element(in: app, identifier: Identifier.switcherAppMockBrowser)
-        let mailTile = element(in: app, identifier: Identifier.switcherAppMockMail)
-        XCTAssertTrue(
-            openGlobalSwitcherForPointerHover(
-                diagnosticsSummary,
+        guard
+            let appTiles = waitForOptionTabPointerAppRows(
+                in: app,
+                diagnosticsSummary: diagnosticsSummary,
+                identifiers: [
+                    Identifier.switcherAppMockBrowser,
+                    Identifier.switcherAppMockMail
+                ],
+                watchdog:
+                    FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                        .optionTabAppRowCollectionProjection,
                 traceLabel: "pointer.app.hover"
             )
-        )
-        XCTAssertTrue(browserTile.waitForExistence(timeout: 5))
-        XCTAssertTrue(mailTile.waitForExistence(timeout: 5))
+        else {
+            return
+        }
+        let browserTile = appTiles[0]
+        let mailTile = appTiles[1]
         XCTAssertTrue(
             waitForSwitcherDiagnostics(
                 diagnosticsSummary,
@@ -392,14 +436,21 @@ extension FlowTabUITests {
         assertPointerInteractionApplicationIsForegroundReady(app)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        let mailTile = element(in: app, identifier: Identifier.switcherAppMockMail)
-        XCTAssertTrue(
-            openGlobalSwitcherForPointerHover(
-                diagnosticsSummary,
+        guard
+            let mailTile = waitForOptionTabPointerAppRows(
+                in: app,
+                diagnosticsSummary: diagnosticsSummary,
+                identifiers: [
+                    Identifier.switcherAppMockMail
+                ],
+                watchdog:
+                    FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                        .optionTabSingleAppRowProjection,
                 traceLabel: "pointer.app.click"
-            )
-        )
-        XCTAssertTrue(mailTile.waitForExistence(timeout: 5))
+            )?.first
+        else {
+            return
+        }
 
         assertElementDoesNotExistAfterTrigger(
             diagnosticsSummary,
