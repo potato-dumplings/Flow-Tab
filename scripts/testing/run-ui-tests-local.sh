@@ -12,6 +12,7 @@ ORIGINAL_HOME="${HOME}"
 ORIGINAL_CFFIXED_USER_HOME="${CFFIXED_USER_HOME:-${HOME}}"
 DEFAULT_UI_TEST_APP_PATH="${USER_HOME}/Applications/Flow Tab UITest.app"
 LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
+CODE_SIGNING_IDENTITY_PATH="${ROOT_DIR}/scripts/lib/code-signing-identity.sh"
 SPACE_FIXTURE_BUILD_SCRIPT="${ROOT_DIR}/scripts/testing/build-space-fixture-workflow.sh"
 SPACE_FIXTURE_BASELINE_WORKFLOW="${ROOT_DIR}/docs/fixtures/space-fixture-home-multi-app-workflow.json"
 SYSTEM_APP_MRU_FIXTURE_WORKFLOW="${ROOT_DIR}/docs/fixtures/space-fixture-system-app-mru-workflow.json"
@@ -39,6 +40,9 @@ DEVELOPMENT_TEAM="${FLOWTAB_DEVELOPMENT_TEAM:-}"
 CODE_SIGN_IDENTITY="${FLOWTAB_CODE_SIGN_IDENTITY:-}"
 RESOLVED_CODE_SIGN_IDENTITY=""
 declare -a EXTRA_ARGS=()
+
+# shellcheck source=/dev/null
+source "${CODE_SIGNING_IDENTITY_PATH}"
 
 expand_path() {
   local path="$1"
@@ -125,50 +129,6 @@ local_signing_config_value() {
   ' "${LOCAL_SIGNING_CONFIG_PATH}"
 }
 
-resolve_code_sign_identity() {
-  local requested="$1"
-  local team="$2"
-  local identities
-  local line
-  local identity
-
-  identities="$(
-    HOME="${ORIGINAL_HOME}" \
-    CFFIXED_USER_HOME="${ORIGINAL_CFFIXED_USER_HOME}" \
-    security find-identity -v -p codesigning 2>/dev/null || true
-  )"
-
-  while IFS= read -r line; do
-    identity="${line#*\"}"
-    identity="${identity%\"*}"
-
-    if [[ "${identity}" == "${line}" ]]; then
-      continue
-    fi
-
-    if [[ -n "${team}" && "${identity}" != *"(${team})" ]]; then
-      continue
-    fi
-
-    if [[ -n "${requested}" && "${requested}" != "Apple Development" && "${identity}" != "${requested}" ]]; then
-      continue
-    fi
-
-    if [[ -z "${requested}" && "${identity}" != Apple\ Development:* ]]; then
-      continue
-    fi
-
-    if [[ "${requested}" == "Apple Development" && "${identity}" != Apple\ Development:* ]]; then
-      continue
-    fi
-
-    printf '%s' "${identity}"
-    return 0
-  done <<< "${identities}"
-
-  return 1
-}
-
 resolve_runner_signing_identity() {
   if [[ -n "${RESOLVED_CODE_SIGN_IDENTITY}" ]]; then
     return 0
@@ -186,8 +146,14 @@ resolve_runner_signing_identity() {
     CODE_SIGN_IDENTITY="Apple Development"
   fi
 
-  if RESOLVED_CODE_SIGN_IDENTITY="$(resolve_code_sign_identity "${CODE_SIGN_IDENTITY}" "${DEVELOPMENT_TEAM}")"; then
-    echo "UI test runner signing identity: ${RESOLVED_CODE_SIGN_IDENTITY}"
+  if RESOLVED_CODE_SIGN_IDENTITY="$(
+    HOME="${ORIGINAL_HOME}" \
+    CFFIXED_USER_HOME="${ORIGINAL_CFFIXED_USER_HOME}" \
+      flowtab_resolve_code_sign_identity \
+        "${CODE_SIGN_IDENTITY}" \
+        "${DEVELOPMENT_TEAM}"
+  )"; then
+    echo "UI test runner signing fingerprint: ${RESOLVED_CODE_SIGN_IDENTITY}"
     return 0
   fi
 

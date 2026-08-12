@@ -8,6 +8,7 @@ ORIGINAL_HOME="${HOME}"
 ORIGINAL_CFFIXED_USER_HOME="${CFFIXED_USER_HOME:-${HOME}}"
 LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
 PATH_BOUNDARIES_PATH="${ROOT_DIR}/scripts/lib/path-boundaries.sh"
+CODE_SIGNING_IDENTITY_PATH="${ROOT_DIR}/scripts/lib/code-signing-identity.sh"
 
 CONFIGURATION="Testing"
 INSTALL_PATH="${USER_HOME}/Applications/Flow Tab UITest.app"
@@ -20,6 +21,8 @@ HAS_CUSTOM_BUILD_ROOT=false
 
 # shellcheck source=/dev/null
 source "${PATH_BOUNDARIES_PATH}"
+# shellcheck source=/dev/null
+source "${CODE_SIGNING_IDENTITY_PATH}"
 
 if [[ -n "${DEVELOPMENT_TEAM}" ]]; then
   DEVELOPMENT_TEAM_SOURCE="FLOWTAB_DEVELOPMENT_TEAM"
@@ -48,46 +51,6 @@ detect_local_development_team() {
   ' "${LOCAL_SIGNING_CONFIG_PATH}"
 }
 
-resolve_code_sign_identity() {
-  local requested="$1"
-  local team="$2"
-  local identities
-  local line
-  local identity
-
-  identities="$(security find-identity -v -p codesigning 2>/dev/null || true)"
-
-  while IFS= read -r line; do
-    identity="${line#*\"}"
-    identity="${identity%\"*}"
-
-    if [[ "${identity}" == "${line}" ]]; then
-      continue
-    fi
-
-    if [[ -n "${team}" && "${identity}" != *"(${team})" ]]; then
-      continue
-    fi
-
-    if [[ -n "${requested}" && "${requested}" != "Apple Development" && "${identity}" != "${requested}" ]]; then
-      continue
-    fi
-
-    if [[ -z "${requested}" && "${identity}" != Apple\ Development:* ]]; then
-      continue
-    fi
-
-    if [[ "${requested}" == "Apple Development" && "${identity}" != Apple\ Development:* ]]; then
-      continue
-    fi
-
-    printf '%s' "${identity}"
-    return 0
-  done <<< "${identities}"
-
-  return 1
-}
-
 print_help() {
   cat <<'EOF'
 Usage:
@@ -96,7 +59,7 @@ Usage:
     [--build-root /custom/build/root] \
     [--install-path /absolute/path/to/Flow Tab UITest.app] \
     [--development-team TEAMID] \
-    [--code-sign-identity "Apple Development"]
+    [--code-sign-identity "Apple Development"|SHA1]
 
 Builds FlowTab into a fixed app bundle path for UI automation so macOS permissions
 can be granted to a stable bundle instead of a DerivedData product.
@@ -187,7 +150,11 @@ if [[ -n "${DEVELOPMENT_TEAM}" || -n "${CODE_SIGN_IDENTITY}" ]]; then
     CODE_SIGN_IDENTITY="Apple Development"
   fi
 
-  if ! RESOLVED_CODE_SIGN_IDENTITY="$(resolve_code_sign_identity "${CODE_SIGN_IDENTITY}" "${DEVELOPMENT_TEAM}")"; then
+  if ! RESOLVED_CODE_SIGN_IDENTITY="$(
+    flowtab_resolve_code_sign_identity \
+      "${CODE_SIGN_IDENTITY}" \
+      "${DEVELOPMENT_TEAM}"
+  )"; then
     if [[ "${DEVELOPMENT_TEAM_SOURCE}" != "--development-team" && -z "${REQUESTED_CODE_SIGN_IDENTITY}" ]]; then
       echo "Project signing team ${DEVELOPMENT_TEAM} found, but no matching Apple Development identity is installed." >&2
       echo "Continuing with the default adhoc UI test app install." >&2
@@ -265,7 +232,7 @@ rm -rf "${INSTALL_PATH}"
 /usr/bin/ditto "${BUILT_APP_PATH}" "${INSTALL_PATH}"
 
 if [[ "${MANUAL_CODESIGN_ENABLED}" -eq 1 ]]; then
-  echo "Signing FlowTab UI automation app with ${RESOLVED_CODE_SIGN_IDENTITY}..."
+  echo "Signing FlowTab UI automation app with fingerprint ${RESOLVED_CODE_SIGN_IDENTITY}..."
   /usr/bin/codesign --force --deep --sign "${RESOLVED_CODE_SIGN_IDENTITY}" "${INSTALL_PATH}"
   /usr/bin/codesign --verify --deep --strict --verbose=2 "${INSTALL_PATH}"
 fi
