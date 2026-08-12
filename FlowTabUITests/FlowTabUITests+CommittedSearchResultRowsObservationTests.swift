@@ -116,6 +116,78 @@ extension FlowTabUITests {
         )
     }
 
+    func testCommittedSearchResultRowsAcceptEmptyQueryAfterTrigger() {
+        let rows = committedSearchResultRowsTestExpectations()
+        let expectation =
+            FlowTabUITestSwitcherSearchResultExpectation
+                .committedResultRows(
+                    scope: "app",
+                    query: "",
+                    rows: rows
+                )
+        var acceptsEvidence = false
+        var snapshot =
+            FlowTabUITestSwitcherSearchResultSnapshot(
+                results: [],
+                applicationState: .notRunning
+            )
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        let owner =
+            FlowTabUITestSwitcherSearchResultObservationOwner(
+                expectation: expectation,
+                acceptsEvidence: {
+                    acceptsEvidence
+                },
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: {
+                    snapshot
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertEqual(
+            owner.latestSnapshot?.applicationState,
+            .notRunning
+        )
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = FlowTabUITestSwitcherSearchResultSnapshot(
+            results: [],
+            resultsScope: "app",
+            resultsQuery: "",
+            committedResultIDs: rows.map(\.resultID),
+            observedRowIdentifiers:
+                rows.reversed().map(\.rowIdentifier),
+            applicationState: .runningForeground
+        )
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        acceptsEvidence = true
+        owner.requestReadback(source: .triggerReadback)
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .triggerReadback
+        )
+        XCTAssertEqual(
+            owner.resolvedEvidence?.value.resultsQuery,
+            ""
+        )
+        XCTAssertEqual(
+            Set(
+                owner.resolvedEvidence?.value
+                    .observedRowIdentifiers ?? []
+            ),
+            Set(rows.map(\.rowIdentifier))
+        )
+    }
+
     func testCommittedSearchResultRowsRejectStaleGenerationsUnderPressure() {
         let rows = committedSearchResultRowsTestExpectations()
         let expectation =

@@ -1,6 +1,58 @@
 import XCTest
 
 extension FlowTabUITests {
+    func launchAndWaitForPointerSearchResultRows(
+        in app: XCUIApplication,
+        bundleIdentifiers: [String],
+        timeout: TimeInterval
+    ) -> [XCUIElement]? {
+        let rows = bundleIdentifiers.map { bundleIdentifier in
+            FlowTabUITestSwitcherSearchExpectedResultRow(
+                resultID: "app:\(bundleIdentifier)",
+                rowIdentifier:
+                    "flowtab.switcher.search.app."
+                    + bundleIdentifier
+                        .flowTabUITestAccessibilityIdentifierComponent
+            )
+        }
+        guard
+            performAndWaitForCommittedSearchResultRows(
+                in: app,
+                scope: "app",
+                query: "",
+                rows: rows,
+                timeout: timeout,
+                trigger: {
+                    launchFlowTabUITestApplication(app)
+                    assertPointerInteractionApplicationIsForegroundReady(
+                        app
+                    )
+                }
+            )
+        else {
+            return nil
+        }
+        return rows.map {
+            element(in: app, identifier: $0.rowIdentifier)
+        }
+    }
+
+    func assertSearchResultUsesRowSizedFrame(
+        _ result: XCUIElement,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertGreaterThan(
+            result.frame.width,
+            200,
+            "Search result hover tests must target the full "
+                + "result row, not only its label. "
+                + "frame=\(result.frame)",
+            file: file,
+            line: line
+        )
+    }
+
     func performAndWaitForCommittedSearchResultRow(
         in app: XCUIApplication,
         scope: String,

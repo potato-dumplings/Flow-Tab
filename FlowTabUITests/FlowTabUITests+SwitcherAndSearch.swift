@@ -118,7 +118,7 @@ extension FlowTabUITests {
         )
     }
 
-    private func assertPointerInteractionApplicationIsForegroundReady(
+    func assertPointerInteractionApplicationIsForegroundReady(
         _ app: XCUIApplication,
         file: StaticString = #filePath,
         line: UInt = #line
@@ -523,21 +523,26 @@ extension FlowTabUITests {
 
     func testSearchPanelPointerHoverSelectsResultAfterMovement() throws {
         let app = makeApp(additionalArguments: searchPointerHoverArguments)
-        launchFlowTabUITestApplication(app)
-        assertPointerInteractionApplicationIsForegroundReady(app)
-
-        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        let mailResultID = "flowtab.switcher.search.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
-        let browserResultID = "flowtab.switcher.search.app.\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
-        let mailResult = app.descendants(matching: .any)
-            .matching(identifier: mailResultID)
-            .firstMatch
-        let browserResult = app.descendants(matching: .any)
-            .matching(identifier: browserResultID)
-            .firstMatch
-        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 5))
-        XCTAssertTrue(mailResult.waitForExistence(timeout: 5))
-        XCTAssertTrue(browserResult.waitForExistence(timeout: 5))
+        guard
+            let resultRows = launchAndWaitForPointerSearchResultRows(
+                in: app,
+                bundleIdentifiers: [
+                    "com.flowtab.mock.mail",
+                    "com.flowtab.mock.browser"
+                ],
+                timeout:
+                    FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                        .searchPointerResultCollectionProjection
+            )
+        else {
+            return
+        }
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        let mailResult = resultRows[0]
+        let browserResult = resultRows[1]
         assertSearchResultUsesRowSizedFrame(mailResult)
         assertSearchResultUsesRowSizedFrame(browserResult)
 
@@ -567,16 +572,24 @@ extension FlowTabUITests {
 
     func testSearchPanelClickCommitsResultAndClosesPanel() throws {
         let app = makeApp(additionalArguments: searchPointerHoverArguments)
-        launchFlowTabUITestApplication(app)
-        assertPointerInteractionApplicationIsForegroundReady(app)
-
-        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        let browserResultID = "flowtab.switcher.search.app.\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
-        let browserResult = app.descendants(matching: .any)
-            .matching(identifier: browserResultID)
-            .firstMatch
-        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 5))
-        XCTAssertTrue(browserResult.waitForExistence(timeout: 5))
+        guard
+            let browserResult =
+                launchAndWaitForPointerSearchResultRows(
+                    in: app,
+                    bundleIdentifiers: [
+                        "com.flowtab.mock.browser"
+                    ],
+                    timeout:
+                        FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                            .searchPointerSingleResultProjection
+                )?.first
+        else {
+            return
+        }
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
         assertSearchResultUsesRowSizedFrame(browserResult)
 
         assertElementDoesNotExistAfterTrigger(
@@ -775,20 +788,6 @@ extension FlowTabUITests {
                 .matching(identifier: "flowtab.switcher.window.\("mock-many-window-25".flowTabUITestAccessibilityIdentifierComponent)")
                 .firstMatch
                 .exists
-        )
-    }
-
-    func assertSearchResultUsesRowSizedFrame(
-        _ result: XCUIElement,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        XCTAssertGreaterThan(
-            result.frame.width,
-            200,
-            "Search result hover tests must target the full result row, not only its label. frame=\(result.frame)",
-            file: file,
-            line: line
         )
     }
 
