@@ -15,6 +15,21 @@ struct FlowTabUITestRealSpaceFixtureReadinessEvidence: Equatable {
             + "waiterCompleted=\(waiterCompleted ? 1 : 0) "
             + "finalState=\(String(describing: finalState))"
     }
+
+    static func resolve(
+        targetDescription: String,
+        waiterCompleted: Bool,
+        finalStateReadback: () -> XCUIApplication.State
+    ) -> Self {
+        Self(
+            targetDescription: targetDescription,
+            waiterCompleted: waiterCompleted,
+            finalState:
+                waiterCompleted
+                    ? .runningForeground
+                    : finalStateReadback()
+        )
+    }
 }
 
 extension FlowTabUITests {
@@ -35,10 +50,10 @@ extension FlowTabUITests {
                 traceLabel: traceLabel
             )
         let evidence =
-            FlowTabUITestRealSpaceFixtureReadinessEvidence(
+            FlowTabUITestRealSpaceFixtureReadinessEvidence.resolve(
                 targetDescription: targetDescription,
                 waiterCompleted: waiterCompleted,
-                finalState: app.state
+                finalStateReadback: { app.state }
             )
         XCTAssertTrue(
             evidence.isSatisfied,
@@ -64,28 +79,44 @@ extension FlowTabUITests {
             0
         )
 
-        XCTAssertTrue(
-            FlowTabUITestRealSpaceFixtureReadinessEvidence(
+        var finalStateReadbackCount = 0
+        let waiterEvidence =
+            FlowTabUITestRealSpaceFixtureReadinessEvidence.resolve(
                 targetDescription: "waiter",
                 waiterCompleted: true,
-                finalState: .runningBackground
-            ).isSatisfied
-        )
-        XCTAssertTrue(
-            FlowTabUITestRealSpaceFixtureReadinessEvidence(
+                finalStateReadback: {
+                    finalStateReadbackCount += 1
+                    return .runningBackground
+                }
+            )
+        XCTAssertTrue(waiterEvidence.isSatisfied)
+        XCTAssertEqual(waiterEvidence.finalState, .runningForeground)
+        XCTAssertEqual(finalStateReadbackCount, 0)
+
+        let boundaryEvidence =
+            FlowTabUITestRealSpaceFixtureReadinessEvidence.resolve(
                 targetDescription: "boundary-readback",
                 waiterCompleted: false,
-                finalState: .runningForeground
-            ).isSatisfied
-        )
+                finalStateReadback: {
+                    finalStateReadbackCount += 1
+                    return .runningForeground
+                }
+            )
+        XCTAssertTrue(boundaryEvidence.isSatisfied)
+        XCTAssertEqual(boundaryEvidence.finalState, .runningForeground)
+        XCTAssertEqual(finalStateReadbackCount, 1)
 
         let missing =
-            FlowTabUITestRealSpaceFixtureReadinessEvidence(
+            FlowTabUITestRealSpaceFixtureReadinessEvidence.resolve(
                 targetDescription: "prelaunch-before-fixture",
                 waiterCompleted: false,
-                finalState: .runningBackground
+                finalStateReadback: {
+                    finalStateReadbackCount += 1
+                    return .runningBackground
+                }
             )
         XCTAssertFalse(missing.isSatisfied)
+        XCTAssertEqual(finalStateReadbackCount, 2)
         XCTAssertTrue(
             missing.diagnosticSummary.contains(
                 "target=prelaunch-before-fixture "
