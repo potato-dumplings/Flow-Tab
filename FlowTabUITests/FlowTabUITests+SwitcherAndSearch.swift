@@ -770,15 +770,15 @@ extension FlowTabUITests {
             launchFlowTabUITestApplication(app)
             assertSwitcherAndSearchApplicationIsForegroundReady(app)
         })
-        let firstWindowObservation = startElementExistenceObservation(
-            in: app,
-            identifier: "flowtab.switcher.window.\("mock-many-window-00".flowTabUITestAccessibilityIdentifierComponent)",
-            requiresInitialAbsence: true)
+        let firstWindowObservation = startElementExistenceObservation(in: app, identifier: "flowtab.switcher.window.\("mock-many-window-00".flowTabUITestAccessibilityIdentifierComponent)", requiresInitialAbsence: true)
         defer { firstWindowObservation.cancel() }
+        let nextPageObservation = startElementExistenceObservation(in: app, identifier: Identifier.switcherNextWindowPage, requiresInitialAbsence: true)
+        defer { nextPageObservation.cancel() }
         postFlowTabUITestSwitcherCommandAndWaitForDelivery(.advanceDown, traceLabel: "many-window-page")
         assertElementExistsAfterTrigger(firstWindowObservation,
             timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.manyWindowFirstWindowProjection, description: "many-window first Window-card projection")
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherNextWindowPage).waitForExistence(timeout: 2))
+        assertElementExistsAfterTrigger(nextPageObservation,
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.manyWindowNextPageControlProjection, description: "many-window next-page control projection")
         let windowCards = switcherWindowCardObservations(in: app)
         XCTAssertGreaterThan(windowCards.count, 0)
         XCTAssertLessThan(windowCards.count, 20)
