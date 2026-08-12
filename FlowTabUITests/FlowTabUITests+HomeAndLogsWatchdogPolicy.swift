@@ -3,6 +3,7 @@ import XCTest
 
 enum FlowTabUITestHomeAndLogsWatchdogPolicy {
     static let applicationForegroundReadiness: TimeInterval = 8
+    static let frontmostApplicationActivation: TimeInterval = 5
 }
 
 struct FlowTabUITestHomeAndLogsReadinessEvidence: Equatable {
@@ -66,6 +67,20 @@ extension FlowTabUITests {
         XCTAssertGreaterThan(
             FlowTabUITestHomeAndLogsWatchdogPolicy
                 .applicationForegroundReadiness,
+            0
+        )
+        XCTAssertEqual(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .frontmostApplicationActivation,
+            5
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .frontmostApplicationActivation.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .frontmostApplicationActivation,
             0
         )
 

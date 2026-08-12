@@ -66,7 +66,9 @@ extension FlowTabUITests {
         let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
         assertTriggerMakesApplicationFrontmost(
             "com.apple.finder",
-            timeout: 5,
+            timeout:
+                FlowTabUITestHomeAndLogsWatchdogPolicy
+                    .frontmostApplicationActivation,
             message: "Status item reopen should be exercised from another normal Space app."
         ) {
             finder.activate()
@@ -81,7 +83,9 @@ extension FlowTabUITests {
             assertStatusItemMainWindowReopens(in: app) {
                 assertTriggerMakesApplicationFrontmost(
                     flowTabBundleIdentifier,
-                    timeout: 5,
+                    timeout:
+                        FlowTabUITestHomeAndLogsWatchdogPolicy
+                            .frontmostApplicationActivation,
                     message: "FlowTab should stay foreground after restoring its hidden accessory policy."
                 ) {
                     flowTabStatusItem(in: app).tap()
