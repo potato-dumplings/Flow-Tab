@@ -620,11 +620,16 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         assertSwitcherAndSearchApplicationIsForegroundReady(app)
 
-        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
-            .global,
-            traceLabel: "initial-stale-occlusion"
-        )
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherAppMockBrowser).waitForExistence(timeout: 5))
+        _ = waitForExactElementCollection(
+            in: app,
+            identifiers: [Identifier.switcherAppMockBrowser],
+            watchdog: FlowTabUITestSwitcherAndSearchWatchdogPolicy.initialStaleOcclusionBrowserRowProjection,
+            targetDescription: "Initial stale-occlusion Browser-row presentation"
+        ) {
+            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                .global, traceLabel: "initial-stale-occlusion"
+            )
+        }
 
         waitForRuntimeLogFiles(
             containing: [
