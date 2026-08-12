@@ -118,7 +118,7 @@ extension FlowTabUITests {
         )
     }
 
-    func assertPointerInteractionApplicationIsForegroundReady(
+    func assertSwitcherAndSearchApplicationIsForegroundReady(
         _ app: XCUIApplication,
         file: StaticString = #filePath,
         line: UInt = #line
@@ -126,11 +126,11 @@ extension FlowTabUITests {
         let becameReady = waitForFlowTabUITestApplicationToBecomeReady(
             app,
             timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy
-                .pointerInteractionForegroundReadiness
+                .switcherAndSearchForegroundReadiness
         )
         XCTAssertTrue(
             becameReady,
-            "Pointer-interaction application foreground-readiness "
+            "Switcher/Search application foreground-readiness "
                 + "watchdog expired. unmetCondition=runningForeground "
                 + "finalState=\(String(describing: app.state))",
             file: file,
@@ -343,7 +343,7 @@ extension FlowTabUITests {
     func testOptionTabSwitcherPointerHoverSelectsMockAppAfterMovement() throws {
         let app = makeApp(additionalArguments: optionTabPointerHoverArguments)
         launchFlowTabUITestApplication(app)
-        assertPointerInteractionApplicationIsForegroundReady(app)
+        assertSwitcherAndSearchApplicationIsForegroundReady(app)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         guard
@@ -397,7 +397,7 @@ extension FlowTabUITests {
     func testOptionTabSwitcherClickCommitsAppAndClosesPanel() throws {
         let app = makeApp(additionalArguments: optionTabPointerHoverArguments)
         launchFlowTabUITestApplication(app)
-        assertPointerInteractionApplicationIsForegroundReady(app)
+        assertSwitcherAndSearchApplicationIsForegroundReady(app)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         guard
@@ -427,7 +427,7 @@ extension FlowTabUITests {
     func testControlTabSwitcherPointerHoverSelectsWindowAfterMovement() throws {
         let app = makeApp(additionalArguments: controlTabPointerHoverArguments)
         launchFlowTabUITestApplication(app)
-        assertPointerInteractionApplicationIsForegroundReady(app)
+        assertSwitcherAndSearchApplicationIsForegroundReady(app)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let primaryWindowID = "flowtab.switcher.window.\("mock-current-primary".flowTabUITestAccessibilityIdentifierComponent)"
@@ -485,7 +485,7 @@ extension FlowTabUITests {
     func testControlTabSwitcherClickCommitsWindowAndClosesPanel() throws {
         let app = makeApp(additionalArguments: controlTabPointerHoverArguments)
         launchFlowTabUITestApplication(app)
-        assertPointerInteractionApplicationIsForegroundReady(app)
+        assertSwitcherAndSearchApplicationIsForegroundReady(app)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let secondaryWindowID = "flowtab.switcher.window.\("mock-current-secondary".flowTabUITestAccessibilityIdentifierComponent)"
@@ -618,7 +618,7 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertSwitcherAndSearchApplicationIsForegroundReady(app)
 
         postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
             .global,
@@ -676,7 +676,7 @@ extension FlowTabUITests {
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertSwitcherAndSearchApplicationIsForegroundReady(app)
 
         let hostWeChatRow = element(in: app, identifier: Identifier.switcherAppWeChat)
         let topLevelZeroWindowRow = element(in: app, identifier: Identifier.switcherAppTopLevelZeroWindow)
@@ -763,7 +763,7 @@ extension FlowTabUITests {
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertSwitcherAndSearchApplicationIsForegroundReady(app)
         XCTAssertTrue(element(in: app, identifier: Identifier.switcherAppMockManyWindows).waitForExistence(timeout: 5))
 
         postFlowTabUITestSwitcherCommandAndWaitForDelivery(.advanceDown, traceLabel: "many-window-page")

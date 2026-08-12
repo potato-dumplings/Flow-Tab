@@ -24,7 +24,7 @@ extension FlowTabUITests {
                 timeout: timeout,
                 trigger: {
                     launchFlowTabUITestApplication(app)
-                    assertPointerInteractionApplicationIsForegroundReady(
+                    assertSwitcherAndSearchApplicationIsForegroundReady(
                         app
                     )
                 }

@@ -9,7 +9,7 @@ enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
     static let searchHeaderProjection: TimeInterval = 10
     static let searchMockSingleResultProjection: TimeInterval = 5
     static let searchMockMultipleResultProjection: TimeInterval = 10
-    static let pointerInteractionForegroundReadiness: TimeInterval = 10
+    static let switcherAndSearchForegroundReadiness: TimeInterval = 10
     static let optionTabSingleAppRowProjection: TimeInterval = 5
     static let optionTabAppRowCollectionProjection: TimeInterval = 10
     static let optionTabSelectedAppProjection: TimeInterval = 3
@@ -29,7 +29,7 @@ enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
         searchHeaderProjection,
         searchMockSingleResultProjection,
         searchMockMultipleResultProjection,
-        pointerInteractionForegroundReadiness,
+        switcherAndSearchForegroundReadiness,
         optionTabSingleAppRowProjection,
         optionTabAppRowCollectionProjection,
         optionTabSelectedAppProjection,
