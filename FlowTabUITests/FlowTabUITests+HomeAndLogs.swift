@@ -218,10 +218,11 @@ extension FlowTabUITests {
                 targetApp.identity.bundleIdentifier,
                 "Home recency scenario must start outside the target fixture app."
             )
-            tapElement(homeAppRow)
-
             let targetWindowRow = try XCTUnwrap(
-                waitForHomeWindowRow(in: app, title: targetWindowTitle, timeout: 12),
+                waitForHomeWindowRecencyTargetWindowRowAfterSelectingApp(
+                    homeAppRow, appName: targetApp.appName,
+                    title: targetWindowTitle, in: app
+                ),
                 "FlowTab did not expose a Home window row for \(targetApp.appName) / \(targetWindowTitle)."
             )
             let targetWindowNumber = try XCTUnwrap(

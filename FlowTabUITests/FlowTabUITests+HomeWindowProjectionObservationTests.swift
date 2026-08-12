@@ -308,6 +308,49 @@ extension FlowTabUITests {
         owner.cancel()
     }
 
+    func testHomeWindowProjectionSlowSchedulingOnlyDelaysResolution() {
+        var triggerCompleted = false
+        var snapshot = homeWindowProjectionTestSnapshot(
+            rowTitle: nil,
+            staticTitles: []
+        )
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        let owner =
+            FlowTabUITestHomeWindowProjectionObservationOwner(
+                expectation: .rowContaining("Draft"),
+                acceptsEvidence: { triggerCompleted },
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: { snapshot }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        triggerCompleted = true
+        owner.requestReadback(source: .triggerReadback)
+        for _ in 0..<5 {
+            scheduledReadback?(.scheduledReadback)
+            XCTAssertNil(owner.resolvedEvidence)
+        }
+
+        snapshot = homeWindowProjectionTestSnapshot(
+            rowTitle: "Draft",
+            staticTitles: []
+        )
+        scheduledReadback?(.scheduledReadback)
+
+        XCTAssertEqual(owner.resolvedEvidence?.source, .scheduledReadback)
+        XCTAssertEqual(
+            owner.resolvedEvidence?.value.row(
+                containing: "Draft"
+            )?.element,
+            "row-element-0"
+        )
+    }
+
     func testHomeWindowProjectionObserverLifecycleUnderPressure() {
         for iteration in 0..<FlowTabUITestHomeWindowProjectionTestPolicy
             .pressureIterations

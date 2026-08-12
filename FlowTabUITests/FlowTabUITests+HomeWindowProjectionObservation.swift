@@ -161,6 +161,12 @@ final class FlowTabUITestHomeWindowProjectionObservationOwner<Element> {
         conditionOwner.resolvedEvidence
     }
 
+    var latestEvidence: FlowTabUITestConditionEvidence<
+        FlowTabUITestHomeWindowProjectionSnapshot<Element>
+    >? {
+        conditionOwner.latestEvidence
+    }
+
     func requestReadback(
         source: FlowTabUITestConditionObservationSource
     ) {
