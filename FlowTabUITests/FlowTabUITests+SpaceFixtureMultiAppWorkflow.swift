@@ -773,11 +773,11 @@ extension FlowTabUITests {
                     routedFlowTabAdditionalArguments
             )
             launchFlowTabUITestApplication(app, traceLabel: flowTabLaunchTraceLabel)
-            XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(
+            assertRealSpaceFixtureFlowTabIsForegroundReady(
                 app,
-                timeout: 12,
-                traceLabel: flowTabLaunchTraceLabel
-            ))
+                traceLabel: flowTabLaunchTraceLabel,
+                targetDescription: "prelaunch-before-fixture"
+            )
             prelaunchedFlowTabApp = app
             flowTabAppForCleanup = app
         } else {
@@ -841,11 +841,11 @@ extension FlowTabUITests {
             flowTabAppForCleanup = app
             try afterFlowTabLaunch?(workflow, app)
 
-            XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(
+            assertRealSpaceFixtureFlowTabIsForegroundReady(
                 app,
-                timeout: 12,
-                traceLabel: flowTabLaunchTraceLabel
-            ))
+                traceLabel: flowTabLaunchTraceLabel,
+                targetDescription: "post-fixture-launch"
+            )
         }
         try assertions(workflow, app)
     }
