@@ -151,14 +151,7 @@ extension FlowTabUITests {
             in: app,
             targetDescription: "granted-permissions"
         ) {
-            XCTAssertTrue(
-                tapFirstHittable(
-                    in: app.buttons.matching(
-                        identifier: Identifier.homeTabButton
-                    ),
-                    timeout: 5
-                )
-            )
+            assertHomeAndLogsHomeTabTriggerReady(in: app)
         }
     }
 
@@ -176,7 +169,7 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(app)
         assertHomeAndLogsApplicationIsForegroundReady(app)
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
+        assertHomeAndLogsHomeTabTriggerReady(in: app)
         XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
         let firstLiveAppRow = app.buttons.matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "flowtab.home.app.")
@@ -202,7 +195,7 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(app)
         assertHomeAndLogsApplicationIsForegroundReady(app)
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
+        assertHomeAndLogsHomeTabTriggerReady(in: app)
         XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
 
         XCTAssertTrue(element(in: app, identifier: Identifier.homeHeader).waitForExistence(timeout: 5))
@@ -322,7 +315,7 @@ extension FlowTabUITests {
         setToggle(showToggle, to: false)
         XCTAssertFalse(toggleIsOn(showToggle))
 
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
+        assertHomeAndLogsHomeTabTriggerReady(in: app)
         XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
 
         let browserRow = element(in: app, identifier: Identifier.homeAppMockBrowser)
@@ -353,7 +346,7 @@ extension FlowTabUITests {
         let app = makeApp(additionalArguments: launchArguments)
         launchFlowTabUITestApplication(app)
         assertHomeAndLogsApplicationIsForegroundReady(app)
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
+        assertHomeAndLogsHomeTabTriggerReady(in: app)
         XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
 
         let hostWeChatRow = element(in: app, identifier: Identifier.homeAppWeChat)
@@ -418,14 +411,7 @@ extension FlowTabUITests {
             targetDescription: "persisted-reminder-toggle"
         ) {
             launchFlowTabUITestApplication(relaunchApp)
-            XCTAssertTrue(
-                tapFirstHittable(
-                    in: relaunchApp.buttons.matching(
-                        identifier: Identifier.homeTabButton
-                    ),
-                    timeout: 5
-                )
-            )
+            assertHomeAndLogsHomeTabTriggerReady(in: relaunchApp)
         }
     }
 
@@ -466,14 +452,7 @@ extension FlowTabUITests {
             targetDescription: "persisted-permission-dismiss"
         ) {
             launchFlowTabUITestApplication(relaunchApp)
-            XCTAssertTrue(
-                tapFirstHittable(
-                    in: relaunchApp.buttons.matching(
-                        identifier: Identifier.homeTabButton
-                    ),
-                    timeout: 5
-                )
-            )
+            assertHomeAndLogsHomeTabTriggerReady(in: relaunchApp)
         }
     }
 

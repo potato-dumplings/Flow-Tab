@@ -4,6 +4,7 @@ import XCTest
 enum FlowTabUITestHomeAndLogsWatchdogPolicy {
     static let applicationForegroundReadiness: TimeInterval = 8
     static let frontmostApplicationActivation: TimeInterval = 5
+    static let homeTabTriggerReadiness: TimeInterval = 5
 }
 
 struct FlowTabUITestHomeAndLogsReadinessEvidence: Equatable {
@@ -24,6 +25,34 @@ struct FlowTabUITestHomeAndLogsReadinessEvidence: Equatable {
 }
 
 extension FlowTabUITests {
+    @discardableResult
+    func assertHomeAndLogsHomeTabTriggerReady(
+        in app: XCUIApplication,
+        targetDescription: String = #function,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> Bool {
+        let query = app.buttons.matching(
+            identifier: Identifier.homeTabButton
+        )
+        let didTap = tapFirstHittable(
+            in: query,
+            timeout:
+                FlowTabUITestHomeAndLogsWatchdogPolicy
+                    .homeTabTriggerReadiness
+        )
+        XCTAssertTrue(
+            didTap,
+            "Home/Logs Home-tab trigger watchdog expired. "
+                + "target=\(targetDescription) "
+                + "identifier=\(Identifier.homeTabButton) "
+                + "finalCandidateCount=\(query.count)",
+            file: file,
+            line: line
+        )
+        return didTap
+    }
+
     @discardableResult
     func assertHomeAndLogsApplicationIsForegroundReady(
         _ app: XCUIApplication,
@@ -81,6 +110,20 @@ extension FlowTabUITests {
         XCTAssertGreaterThan(
             FlowTabUITestHomeAndLogsWatchdogPolicy
                 .frontmostApplicationActivation,
+            0
+        )
+        XCTAssertEqual(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .homeTabTriggerReadiness,
+            5
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .homeTabTriggerReadiness.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .homeTabTriggerReadiness,
             0
         )
 
