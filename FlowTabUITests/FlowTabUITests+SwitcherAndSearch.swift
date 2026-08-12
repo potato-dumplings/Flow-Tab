@@ -684,6 +684,7 @@ extension FlowTabUITests {
         assertSwitcherAndSearchApplicationIsForegroundReady(app)
 
         let logSnapshot = makeRuntimeLogFileSnapshot()
+        defer { logSnapshot.cancel() }
         try FlowTabUITestSwitcherCommandPayload.write("com.tencent.xinWeChat")
 
         app.activate()
@@ -745,7 +746,7 @@ extension FlowTabUITests {
                 "HotKey Forward"
             ],
             since: logSnapshot,
-            timeout: 10
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.nestedTopologyHotkeyLog
         )
     }
 
