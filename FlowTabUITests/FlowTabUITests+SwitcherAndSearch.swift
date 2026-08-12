@@ -9,6 +9,7 @@ private enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
     static let searchHeaderProjection: TimeInterval = 10
     static let searchMockSingleResultProjection: TimeInterval = 5
     static let searchMockMultipleResultProjection: TimeInterval = 10
+    static let pointerInteractionForegroundReadiness: TimeInterval = 10
     static let compatibleBounds = [
         optionTabAppClickDismissal,
         controlTabWindowClickDismissal,
@@ -17,7 +18,8 @@ private enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
         spaceFixtureSearchResultPublication,
         searchHeaderProjection,
         searchMockSingleResultProjection,
-        searchMockMultipleResultProjection
+        searchMockMultipleResultProjection,
+        pointerInteractionForegroundReadiness
     ]
 }
 
@@ -26,7 +28,7 @@ extension FlowTabUITests {
         let policies = FlowTabUITestSwitcherAndSearchWatchdogPolicy.compatibleBounds
         XCTAssertEqual(
             policies,
-            [2, 2, 2, 10, 5, 10, 5, 10]
+            [2, 2, 2, 10, 5, 10, 5, 10, 10]
         )
         XCTAssertTrue(policies.allSatisfy { $0.isFinite && $0 > 0 })
     }
@@ -142,6 +144,26 @@ extension FlowTabUITests {
             becameReady,
             "Search mock application foreground-readiness watchdog expired. "
                 + "unmetCondition=runningForeground "
+                + "finalState=\(String(describing: app.state))",
+            file: file,
+            line: line
+        )
+    }
+
+    private func assertPointerInteractionApplicationIsForegroundReady(
+        _ app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let becameReady = waitForFlowTabUITestApplicationToBecomeReady(
+            app,
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                .pointerInteractionForegroundReadiness
+        )
+        XCTAssertTrue(
+            becameReady,
+            "Pointer-interaction application foreground-readiness "
+                + "watchdog expired. unmetCondition=runningForeground "
                 + "finalState=\(String(describing: app.state))",
             file: file,
             line: line
@@ -321,7 +343,7 @@ extension FlowTabUITests {
     func testOptionTabSwitcherPointerHoverSelectsMockAppAfterMovement() throws {
         let app = makeApp(additionalArguments: optionTabPointerHoverArguments)
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertPointerInteractionApplicationIsForegroundReady(app)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let browserTile = element(in: app, identifier: Identifier.switcherAppMockBrowser)
@@ -367,7 +389,7 @@ extension FlowTabUITests {
     func testOptionTabSwitcherClickCommitsAppAndClosesPanel() throws {
         let app = makeApp(additionalArguments: optionTabPointerHoverArguments)
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertPointerInteractionApplicationIsForegroundReady(app)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let mailTile = element(in: app, identifier: Identifier.switcherAppMockMail)
@@ -390,7 +412,7 @@ extension FlowTabUITests {
     func testControlTabSwitcherPointerHoverSelectsWindowAfterMovement() throws {
         let app = makeApp(additionalArguments: controlTabPointerHoverArguments)
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertPointerInteractionApplicationIsForegroundReady(app)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let primaryWindowID = "flowtab.switcher.window.\("mock-current-primary".flowTabUITestAccessibilityIdentifierComponent)"
@@ -430,7 +452,7 @@ extension FlowTabUITests {
     func testControlTabSwitcherClickCommitsWindowAndClosesPanel() throws {
         let app = makeApp(additionalArguments: controlTabPointerHoverArguments)
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertPointerInteractionApplicationIsForegroundReady(app)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let secondaryWindowID = "flowtab.switcher.window.\("mock-current-secondary".flowTabUITestAccessibilityIdentifierComponent)"
@@ -454,7 +476,7 @@ extension FlowTabUITests {
     func testSearchPanelPointerHoverSelectsResultAfterMovement() throws {
         let app = makeApp(additionalArguments: searchPointerHoverArguments)
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertPointerInteractionApplicationIsForegroundReady(app)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let mailResultID = "flowtab.switcher.search.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
@@ -496,7 +518,7 @@ extension FlowTabUITests {
     func testSearchPanelClickCommitsResultAndClosesPanel() throws {
         let app = makeApp(additionalArguments: searchPointerHoverArguments)
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertPointerInteractionApplicationIsForegroundReady(app)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let browserResultID = "flowtab.switcher.search.app.\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
