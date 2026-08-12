@@ -51,6 +51,7 @@ enum FlowTabUITestHomeWindowProjectionExpectation: Equatable {
     case rowContaining(String)
     case rowLabelPrefix([String])
     case titleVisible(String)
+    case titlesVisible([String])
     case titlesAbsent([String])
 
     func isSatisfied<Element>(
@@ -65,6 +66,9 @@ enum FlowTabUITestHomeWindowProjectionExpectation: Equatable {
                     == titles
         case .titleVisible(let title):
             return snapshot.contains(title: title)
+        case .titlesVisible(let titles):
+            return !titles.isEmpty
+                && titles.allSatisfy(snapshot.contains(title:))
         case .titlesAbsent(let titles):
             return snapshot.unexpectedTitles(from: titles).isEmpty
         }
@@ -77,6 +81,8 @@ enum FlowTabUITestHomeWindowProjectionExpectation: Equatable {
             return [title]
         case .rowLabelPrefix:
             return []
+        case .titlesVisible(let titles):
+            return titles
         case .titlesAbsent(let titles):
             return titles
         }
@@ -90,6 +96,8 @@ enum FlowTabUITestHomeWindowProjectionExpectation: Equatable {
             return "rowLabelPrefix=\(titles)"
         case .titleVisible(let title):
             return "titleVisible=\(title)"
+        case .titlesVisible(let titles):
+            return "titlesVisible=\(titles)"
         case .titlesAbsent(let titles):
             return "titlesAbsent=\(titles)"
         }

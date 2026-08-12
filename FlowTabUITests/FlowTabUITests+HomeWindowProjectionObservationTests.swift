@@ -7,6 +7,137 @@ private enum FlowTabUITestHomeWindowProjectionTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testHomeWindowAllTitlesExpectationRequiresCompleteSnapshot() {
+        let titles = ["Main", "Child", "Mini Program"]
+        let expectation =
+            FlowTabUITestHomeWindowProjectionExpectation
+                .titlesVisible(titles)
+
+        XCTAssertTrue(
+            expectation.isSatisfied(
+                by: homeWindowProjectionTestSnapshot(
+                    rowTitles: ["Main", "Mini Program"],
+                    staticTitles: ["Child"]
+                )
+            )
+        )
+        XCTAssertFalse(
+            FlowTabUITestHomeWindowProjectionExpectation
+                .titlesVisible([])
+                .isSatisfied(
+                    by: homeWindowProjectionTestSnapshot(
+                        rowTitles: [],
+                        staticTitles: []
+                    )
+                )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: homeWindowProjectionTestSnapshot(
+                    rowTitles: ["Main", "Child"],
+                    staticTitles: []
+                )
+            )
+        )
+        XCTAssertEqual(expectation.titles, titles)
+        XCTAssertEqual(
+            expectation.diagnosticSummary,
+            "titlesVisible=\(titles)"
+        )
+    }
+
+    func testHomeWindowAllTitlesObserverRequiresPostTriggerEvidence() {
+        let titles = ["Main", "Child", "Mini Program"]
+        var triggerCompleted = false
+        var snapshot = homeWindowProjectionTestSnapshot(
+            rowTitles: titles,
+            staticTitles: []
+        )
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var cancellationCount = 0
+        let owner =
+            FlowTabUITestHomeWindowProjectionObservationOwner(
+                expectation: .titlesVisible(titles),
+                acceptsEvidence: { triggerCompleted },
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {
+                        cancellationCount += 1
+                    }
+                },
+                readback: { snapshot }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertNil(owner.resolvedEvidence)
+        triggerCompleted = true
+        snapshot = homeWindowProjectionTestSnapshot(
+            rowTitles: ["Main", "Child"],
+            staticTitles: []
+        )
+        owner.requestReadback(source: .triggerReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = homeWindowProjectionTestSnapshot(
+            rowTitles: ["Main", "Mini Program"],
+            staticTitles: ["Child"]
+        )
+        scheduledReadback?(.scheduledReadback)
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .scheduledReadback
+        )
+        XCTAssertEqual(cancellationCount, 1)
+    }
+
+    func testHomeWindowAllTitlesWatchdogReportsFinalProjection() {
+        let titles = ["Main", "Child", "Mini Program"]
+        var triggerCompleted = false
+        let owner =
+            FlowTabUITestHomeWindowProjectionObservationOwner(
+                expectation: .titlesVisible(titles),
+                acceptsEvidence: { triggerCompleted },
+                observationRegistration: nil,
+                readback: {
+                    self.homeWindowProjectionTestSnapshot(
+                        rowTitles: ["Main", "Child"],
+                        staticTitles: []
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+        triggerCompleted = true
+        owner.requestReadback(source: .triggerReadback)
+
+        XCTAssertNil(
+            owner.waitForResolution(
+                timeout:
+                    FlowTabUITestHomeWindowProjectionTestPolicy
+                        .watchdog
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "source=watchdogReadback"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "titlesVisible=\(titles)"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains("label=Main")
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains("waitResult=")
+        )
+    }
+
     func testHomeWindowProjectionObserverUsesInitialAndScheduledEvidence() {
         var snapshot = homeWindowProjectionTestSnapshot(
             rowTitle: "Primary Document",

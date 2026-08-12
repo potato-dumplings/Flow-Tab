@@ -335,10 +335,12 @@ extension FlowTabUITests {
         let nestedAppExRow = element(in: app, identifier: Identifier.homeAppNestedWeChatAppEx)
         let nestedMiniProgramRow = element(in: app, identifier: Identifier.homeAppNestedMiniProgram)
 
-        tapElement(hostWeChatRow)
-        assertHomeWindowTitle("微信", in: app, timeout: 6)
-        assertHomeWindowTitle("微信（窗口）", in: app, timeout: 6)
-        assertHomeWindowTitle("Mock Mini Program Window", in: app, timeout: 6)
+        guard assertHomeAndLogsNestedTopologyWindowsAfterSelectingHost(
+            hostWeChatRow,
+            in: app
+        ) else {
+            return
+        }
 
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "Home app layer nested zero-window topology"

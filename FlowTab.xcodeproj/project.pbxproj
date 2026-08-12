@@ -134,6 +134,7 @@
 		A49300023D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A49300013D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift */; };
 		A49400023DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A49400013DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift */; };
 		A49500023DA1000100B0D737 /* FlowTabUITests+HomeNestedTopologyTopLevelProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A49500013DA1000100B0D737 /* FlowTabUITests+HomeNestedTopologyTopLevelProjection.swift */; };
+		A49600023DA2000100B0D737 /* FlowTabUITests+HomeNestedTopologyWindowProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A49600013DA2000100B0D737 /* FlowTabUITests+HomeNestedTopologyWindowProjection.swift */; };
 		A44E00023D56000100B0D737 /* FlowTabUITests+SwitcherAppProjectionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44E00013D56000100B0D737 /* FlowTabUITests+SwitcherAppProjectionObservation.swift */; };
 		A44E00043D56000100B0D737 /* FlowTabUITests+SwitcherAppProjectionObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44E00033D56000100B0D737 /* FlowTabUITests+SwitcherAppProjectionObservationTests.swift */; };
 		A44F00023D57000100B0D737 /* FlowTabUITests+SwitcherSelectedWindowTitleObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44F00013D57000100B0D737 /* FlowTabUITests+SwitcherSelectedWindowTitleObservation.swift */; };
@@ -830,6 +831,7 @@
 		A49300013D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeAndLogsWatchdogPolicy.swift"; sourceTree = "<group>"; };
 		A49400013DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeHiddenAppRowProjection.swift"; sourceTree = "<group>"; };
 		A49500013DA1000100B0D737 /* FlowTabUITests+HomeNestedTopologyTopLevelProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeNestedTopologyTopLevelProjection.swift"; sourceTree = "<group>"; };
+		A49600013DA2000100B0D737 /* FlowTabUITests+HomeNestedTopologyWindowProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeNestedTopologyWindowProjection.swift"; sourceTree = "<group>"; };
 		C8A100013A24000100B0D737 /* FlowTabUITests+HomePermissionBoundary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomePermissionBoundary.swift"; sourceTree = "<group>"; };
 		B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+Settings.swift"; sourceTree = "<group>"; };
 		E12000023600000100B0D737 /* FlowTabUITests+EnglishLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+EnglishLayout.swift"; sourceTree = "<group>"; };
@@ -1431,6 +1433,7 @@
 				A49300013D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift */,
 				A49400013DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift */,
 				A49500013DA1000100B0D737 /* FlowTabUITests+HomeNestedTopologyTopLevelProjection.swift */,
+				A49600013DA2000100B0D737 /* FlowTabUITests+HomeNestedTopologyWindowProjection.swift */,
 				A46800013D70000100B0D737 /* FlowTabUITests+HomeInitialProjection.swift */,
 				A48B00033D97000100B0D737 /* FlowTabUITests+InitialPresentationResolutionReadback.swift */,
 				A48B00053D97000100B0D737 /* FlowTabUITests+InitialPresentationResolutionReadbackTests.swift */,
@@ -2548,6 +2551,7 @@
 				A49300023D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift in Sources */,
 				A49400023DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift in Sources */,
 				A49500023DA1000100B0D737 /* FlowTabUITests+HomeNestedTopologyTopLevelProjection.swift in Sources */,
+				A49600023DA2000100B0D737 /* FlowTabUITests+HomeNestedTopologyWindowProjection.swift in Sources */,
 				A46800023D70000100B0D737 /* FlowTabUITests+HomeInitialProjection.swift in Sources */,
 				A48B00043D97000100B0D737 /* FlowTabUITests+InitialPresentationResolutionReadback.swift in Sources */,
 				A48B00063D97000100B0D737 /* FlowTabUITests+InitialPresentationResolutionReadbackTests.swift in Sources */,
