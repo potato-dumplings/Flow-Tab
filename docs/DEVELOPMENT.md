@@ -432,8 +432,11 @@ chmod +x scripts/release/release-install.sh
 公开分发需要可用的 `Developer ID Application` 证书，以及通过 `xcrun notarytool store-credentials <profile>` 保存的公证凭据。运行脚本前设置凭据名称：
 
 ```bash
+export FLOWTAB_DEVELOPMENT_TEAM="YOUR_TEAM_ID"
 export FLOWTAB_NOTARY_KEYCHAIN_PROFILE="flowtab-release"
 ```
+
+Team ID 也可以配置在已忽略的 `xcconfigs/LocalSigning.xcconfig` 中；发布脚本会把它作为固定信任锚，并要求解析到的分发证书属于该 Team。
 
 ```bash
 chmod +x scripts/release/release-dmg.sh
@@ -453,6 +456,8 @@ chmod +x scripts/release/release-dmg.sh
 说明：
 - `Flow Tab.app` 与 `Uninstall Flow Tab.app` 的内嵌代码会由内到外显式签署，外层 app 使用 Hardened Runtime、安全时间戳与 `Developer ID Application` 身份签署。
 - DMG 使用同一分发身份与安全时间戳签署，提交 Apple 公证服务并等待接受，然后装订、校验公证票据和 Gatekeeper 接受状态。
+- `--target` 只接受 `aarch64-apple-darwin`、`x86_64-apple-darwin` 和 `universal2-apple-darwin`。版本与目标都会先按发行命名契约校验，再从仓库的 `release/` 边界解析输出路径。
+- `Flow Tab.app` 和卸载器都有固定 Bundle ID；最终验证会固定预期 Team ID、Bundle ID、可执行文件和 entitlements，挂载 DMG 后核对顶层布局，并按路径、类型、权限、符号链接目标与文件内容比对其中的 App 和已验证暂存产物。
 - 可通过 `FLOWTAB_CODE_SIGN_IDENTITY` 指定完整的 `Developer ID Application` 身份；脚本只接受该分发身份类型。
 - 任一步骤失败时都会删除当次输出，防止未完成验证的 DMG 被上传。
 - Apple 流程依据：[Notarizing macOS software before distribution](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)、[Customizing the notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)、[Technical Note TN2206](https://developer.apple.com/library/archive/technotes/tn2206/) 与 [Configuring the hardened runtime](https://developer.apple.com/documentation/xcode/configuring-the-hardened-runtime/)。
@@ -529,6 +534,8 @@ gh release create "${TAG}" release/"${TAG}"/flowtab-universal2-apple-darwin.dmg 
 默认会安装到：
 
 - `~/Applications/Flow Tab UITest.app`
+
+`--install-path` 会在构建和替换前解析到明确的 Applications 资源边界，只接受用户目录或系统目录下的 `Flow Tab UITest.app` 与 `Flow Tab.app` 固定名称。
 
 然后在下面两处把这份 app 加进去并授权：
 

@@ -4,22 +4,33 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 DERIVED_DATA_PATH="${ROOT_DIR}/.build-local"
 APP_BUNDLE_NAME="Flow Tab.app"
+APP_BUNDLE_ID="io.github.potato-dumplings.flowtab"
+APP_EXECUTABLE_NAME="FlowTab"
 UNINSTALLER_APP_NAME="Uninstall Flow Tab.app"
+UNINSTALLER_BUNDLE_ID="io.github.potato-dumplings.flowtab.uninstaller"
+UNINSTALLER_EXECUTABLE_NAME="applet"
 RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}"
 RELEASE_DIR="${ROOT_DIR}/release"
 PROJECT_PREFIX="flowtab"
-APP_EXECUTABLE_PATH="${RELEASE_APP_PATH}/Contents/MacOS/FlowTab"
+APP_EXECUTABLE_PATH="${RELEASE_APP_PATH}/Contents/MacOS/${APP_EXECUTABLE_NAME}"
 UNINSTALLER_SOURCE_PATH="${ROOT_DIR}/scripts/release/uninstall-flowtab.js"
 RELEASE_BINARY_VERIFY_PATH="${ROOT_DIR}/scripts/release/verify-release-binary.sh"
 RELEASE_DISTRIBUTION_CONTRACT_PATH="${ROOT_DIR}/scripts/release/test-release-distribution-contract.sh"
 RELEASE_DISTRIBUTION_VERIFY_PATH="${ROOT_DIR}/scripts/release/verify-release-distribution.sh"
 SIGN_BUNDLE_PATH="${ROOT_DIR}/scripts/release/sign-macos-bundle.sh"
+PATH_BOUNDARIES_PATH="${ROOT_DIR}/scripts/lib/path-boundaries.sh"
+RELEASE_SECURITY_PATH="${ROOT_DIR}/scripts/release/release-security.sh"
 APP_ENTITLEMENTS_PATH="${ROOT_DIR}/FlowTab/Resources/FlowTab.entitlements"
 LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
 DEVELOPMENT_TEAM="${FLOWTAB_DEVELOPMENT_TEAM:-}"
 CODE_SIGN_IDENTITY="${FLOWTAB_CODE_SIGN_IDENTITY:-Developer ID Application}"
 NOTARY_KEYCHAIN_PROFILE="${FLOWTAB_NOTARY_KEYCHAIN_PROFILE:-}"
 RESOLVED_CODE_SIGN_IDENTITY=""
+
+# shellcheck source=/dev/null
+source "${PATH_BOUNDARIES_PATH}"
+# shellcheck source=/dev/null
+source "${RELEASE_SECURITY_PATH}"
 
 usage() {
   cat <<'EOF'
@@ -32,9 +43,11 @@ Options:
   -h, --help           Show this help message.
 
 Environment:
-  FLOWTAB_DEVELOPMENT_TEAM          Optional team id; falls back to xcconfigs/LocalSigning.xcconfig.
+  FLOWTAB_DEVELOPMENT_TEAM          Pinned release Team ID; falls back to xcconfigs/LocalSigning.xcconfig.
   FLOWTAB_CODE_SIGN_IDENTITY        Optional identity; defaults to "Developer ID Application".
   FLOWTAB_NOTARY_KEYCHAIN_PROFILE   Required notarytool keychain profile name.
+
+The pinned release Team ID must be present in one of the supported configuration sources.
 
 Release version resolution:
 - Prefer --version when provided.
@@ -108,11 +121,14 @@ resolve_code_sign_identity() {
 }
 
 resolve_release_signing_identity() {
-  if [[ -z "${DEVELOPMENT_TEAM}" ]]; then
-    DEVELOPMENT_TEAM="$(detect_local_development_team)"
-  fi
+  local identity_team_id=""
 
   if RESOLVED_CODE_SIGN_IDENTITY="$(resolve_code_sign_identity "${CODE_SIGN_IDENTITY}" "${DEVELOPMENT_TEAM}")"; then
+    identity_team_id="$(flowtab_extract_team_id_from_identity "${RESOLVED_CODE_SIGN_IDENTITY}")"
+    if [[ "${DEVELOPMENT_TEAM}" != "${identity_team_id}" ]]; then
+      echo "Resolved distribution identity does not match the configured Team ID." >&2
+      exit 1
+    fi
     echo "Developer ID Application identity resolved."
     return 0
   fi
@@ -120,6 +136,18 @@ resolve_release_signing_identity() {
   echo "Could not resolve the required Developer ID Application identity for release distribution." >&2
   echo "Install the distribution certificate or set FLOWTAB_CODE_SIGN_IDENTITY to its exact identity name." >&2
   exit 1
+}
+
+resolve_expected_release_team() {
+  if [[ -z "${DEVELOPMENT_TEAM}" ]]; then
+    DEVELOPMENT_TEAM="$(detect_local_development_team)"
+  fi
+  if [[ -z "${DEVELOPMENT_TEAM}" ]]; then
+    echo "A pinned release Team ID is required." >&2
+    echo "Set FLOWTAB_DEVELOPMENT_TEAM or configure xcconfigs/LocalSigning.xcconfig." >&2
+    exit 1
+  fi
+  DEVELOPMENT_TEAM="$(flowtab_require_team_id "${DEVELOPMENT_TEAM}")"
 }
 
 require_notary_profile() {
@@ -290,6 +318,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ -n "${TARGET}" ]]; then
+  TARGET="$(flowtab_require_release_target "${TARGET}")"
+fi
+
 TAG_VERSION=""
 if ! TAG_VERSION="$(detect_version_from_github_ref)"; then
   exit 1
@@ -303,6 +335,7 @@ fi
 
 if [[ -n "${VERSION}" ]]; then
   VERSION="$(normalize_version "${VERSION}")"
+  VERSION="$(flowtab_require_release_version "${VERSION}")"
   if [[ -n "${TAG_VERSION}" && "${TAG_VERSION}" != "${VERSION}" ]]; then
     echo "--version (${VERSION}) does not match the current release tag (${TAG_VERSION})." >&2
     exit 1
@@ -316,6 +349,7 @@ if [[ -z "${VERSION}" ]]; then
   echo "Pass --version or run the script on a release tag (${PROJECT_PREFIX}-v<version> / v<version>)." >&2
   exit 1
 fi
+VERSION="$(flowtab_require_release_version "${VERSION}")"
 
 APP_MARKETING_VERSION="$(detect_app_marketing_version)"
 if [[ -n "${APP_MARKETING_VERSION}" && "${APP_MARKETING_VERSION}" != "${VERSION#v}" ]]; then
@@ -325,7 +359,7 @@ if [[ -n "${APP_MARKETING_VERSION}" && "${APP_MARKETING_VERSION}" != "${VERSION#
 fi
 
 RELEASE_TAG="${PROJECT_PREFIX}-${VERSION}"
-RELEASE_VERSION_DIR="${RELEASE_DIR}/${RELEASE_TAG}"
+resolve_expected_release_team
 
 default_target_for_uname() {
   case "$(uname -m)" in
@@ -341,7 +375,7 @@ default_target_for_uname() {
   esac
 }
 
-mkdir -p "${RELEASE_DIR}"
+RELEASE_DIR="$(flowtab_prepare_direct_child_directory "${ROOT_DIR}" "release")"
 
 echo "[1/8] Validate distribution identity and notarization credentials"
 "${RELEASE_DISTRIBUTION_CONTRACT_PATH}"
@@ -399,15 +433,17 @@ else
   fi
 fi
 
-mkdir -p "${RELEASE_VERSION_DIR}"
+TARGET_NAME="$(flowtab_require_release_target "${TARGET_NAME}")"
+
+RESOLVED_RELEASE_VERSION_DIR="$(flowtab_prepare_direct_child_directory "${RELEASE_DIR}" "${RELEASE_TAG}")"
 
 ASSET_BASENAME="${PROJECT_PREFIX}-${TARGET_NAME}.dmg"
-OUTPUT_DMG_PATH="${RELEASE_VERSION_DIR}/${ASSET_BASENAME}"
+OUTPUT_DMG_PATH="$(flowtab_resolve_direct_child_path "${RESOLVED_RELEASE_VERSION_DIR}" "${ASSET_BASENAME}")"
 VOLUME_NAME="Flow Tab ${VERSION}"
-STAGING_DIR="${RELEASE_VERSION_DIR}/.dmg-staging-${TARGET_NAME}"
+STAGING_DIR="$(flowtab_resolve_direct_child_path "${RESOLVED_RELEASE_VERSION_DIR}" ".dmg-staging-${TARGET_NAME}")"
 STAGED_APP_PATH="${STAGING_DIR}/${APP_BUNDLE_NAME}"
 STAGED_UNINSTALLER_PATH="${STAGING_DIR}/${UNINSTALLER_APP_NAME}"
-RW_DMG_PATH="${RELEASE_VERSION_DIR}/.flowtab-${TARGET_NAME}.temp.rw.dmg"
+RW_DMG_PATH="$(flowtab_resolve_direct_child_path "${RESOLVED_RELEASE_VERSION_DIR}" ".flowtab-${TARGET_NAME}.temp.rw.dmg")"
 
 RELEASE_SUCCEEDED="false"
 cleanup_release_work_files() {
@@ -424,6 +460,7 @@ echo "[3/8] Prepare and explicitly sign nested distribution code (${TARGET_NAME}
 mkdir -p "${STAGING_DIR}"
 /usr/bin/ditto "${RELEASE_APP_PATH}" "${STAGED_APP_PATH}"
 /usr/bin/osacompile -l JavaScript -o "${STAGED_UNINSTALLER_PATH}" "${UNINSTALLER_SOURCE_PATH}" >/dev/null
+flowtab_set_bundle_identifier "${STAGED_UNINSTALLER_PATH}" "${UNINSTALLER_BUNDLE_ID}"
 "${SIGN_BUNDLE_PATH}" \
   --identity "${RESOLVED_CODE_SIGN_IDENTITY}" \
   --entitlements "${APP_ENTITLEMENTS_PATH}" \
@@ -431,6 +468,7 @@ mkdir -p "${STAGING_DIR}"
   "${STAGED_APP_PATH}"
 "${SIGN_BUNDLE_PATH}" \
   --identity "${RESOLVED_CODE_SIGN_IDENTITY}" \
+  --entitlements "${APP_ENTITLEMENTS_PATH}" \
   --timestamp \
   "${STAGED_UNINSTALLER_PATH}"
 ln -s /Applications "${STAGING_DIR}/Applications"
@@ -474,8 +512,20 @@ echo "[7/8] Staple and validate notarization ticket"
 /usr/bin/xcrun stapler validate "${OUTPUT_DMG_PATH}"
 
 echo "[8/8] Verify app, uninstaller, DMG, and Gatekeeper acceptance"
-"${RELEASE_DISTRIBUTION_VERIFY_PATH}" "${STAGED_APP_PATH}" "${OUTPUT_DMG_PATH}"
-"${RELEASE_DISTRIBUTION_VERIFY_PATH}" "${STAGED_UNINSTALLER_PATH}"
+"${RELEASE_DISTRIBUTION_VERIFY_PATH}" \
+  --expected-team-id "${DEVELOPMENT_TEAM}" \
+  --expected-bundle-id "${APP_BUNDLE_ID}" \
+  --expected-executable "${APP_EXECUTABLE_NAME}" \
+  --expected-entitlements "${APP_ENTITLEMENTS_PATH}" \
+  --expected-dmg-bundle "${STAGED_UNINSTALLER_PATH}" \
+  "${STAGED_APP_PATH}" \
+  "${OUTPUT_DMG_PATH}"
+"${RELEASE_DISTRIBUTION_VERIFY_PATH}" \
+  --expected-team-id "${DEVELOPMENT_TEAM}" \
+  --expected-bundle-id "${UNINSTALLER_BUNDLE_ID}" \
+  --expected-executable "${UNINSTALLER_EXECUTABLE_NAME}" \
+  --expected-entitlements "${APP_ENTITLEMENTS_PATH}" \
+  "${STAGED_UNINSTALLER_PATH}"
 
 RELEASE_SUCCEEDED="true"
 cleanup_release_work_files
@@ -486,5 +536,5 @@ echo "Done: ${OUTPUT_DMG_PATH}"
 echo "Release version: ${VERSION}"
 echo "Release tag: ${RELEASE_TAG}"
 echo "Release asset: ${ASSET_BASENAME}"
-echo "Release directory: ${RELEASE_VERSION_DIR}"
+echo "Release directory: ${RESOLVED_RELEASE_VERSION_DIR}"
 echo "Distribution verification: Developer ID signed, Hardened Runtime, timestamped, notarized, and stapled"
