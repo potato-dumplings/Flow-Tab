@@ -1,6 +1,8 @@
-# FlowTab
+<h1 align="center">FlowTab</h1>
 
-**English** | [简体中文](./README.zh-CN.md)
+<p align="center">
+  <strong>English</strong> | <a href="./README.zh-CN.md">简体中文</a>
+</p>
 
 FlowTab is a macOS app switcher designed to stay close to the native `Command + Tab` feel while giving you better control over multi-window switching.
 
