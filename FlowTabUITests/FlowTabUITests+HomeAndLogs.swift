@@ -363,9 +363,9 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(firstLaunchApp)
 
-        let openSettingsButtons = firstLaunchApp.buttons.matching(identifier: Identifier.permissionOpenSettings)
-        XCTAssertTrue(openSettingsButtons.firstMatch.waitForExistence(timeout: 5))
-        XCTAssertTrue(tapFirstHittable(in: openSettingsButtons, timeout: 5))
+        assertHomePermissionOpenSettingsTriggerReady(
+            in: firstLaunchApp
+        )
 
         let reminderToggle = settingsReminderToggle(in: firstLaunchApp)
         XCTAssertTrue(reminderToggle.waitForExistence(timeout: 5))
