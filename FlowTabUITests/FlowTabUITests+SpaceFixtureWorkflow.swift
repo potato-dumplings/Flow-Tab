@@ -290,7 +290,11 @@ extension FlowTabUITests {
             }
         }
 
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
+        assertRealSpaceFixtureFlowTabIsForegroundReady(
+            app,
+            traceLabel: nil,
+            targetDescription: "window-set-mutation-before-observer"
+        )
 
         let windowCloseRoute =
             makeSpaceFixtureWindowCloseFaultRoute()
