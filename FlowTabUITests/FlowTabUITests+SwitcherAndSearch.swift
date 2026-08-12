@@ -466,7 +466,7 @@ extension FlowTabUITests {
                 diagnosticsSummary,
                 key: "selectedWindow",
                 equals: "mock-current-secondary",
-                timeout: 3,
+                timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.controlTabSelectedWindowProjection,
                 trigger: {
                     primaryWindow.coordinate(
                         withNormalizedOffset:
