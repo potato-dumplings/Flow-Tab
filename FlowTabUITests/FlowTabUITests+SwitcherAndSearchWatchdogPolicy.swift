@@ -16,6 +16,7 @@ enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
     static let controlTabSingleWindowProjection: TimeInterval = 5
     static let controlTabWindowCollectionProjection: TimeInterval = 10
     static let controlTabSelectedWindowProjection: TimeInterval = 3
+    static let searchSelectedResultProjection: TimeInterval = 3
 
     static let compatibleBounds = [
         optionTabAppClickDismissal,
@@ -32,7 +33,8 @@ enum FlowTabUITestSwitcherAndSearchWatchdogPolicy {
         optionTabSelectedAppProjection,
         controlTabSingleWindowProjection,
         controlTabWindowCollectionProjection,
-        controlTabSelectedWindowProjection
+        controlTabSelectedWindowProjection,
+        searchSelectedResultProjection
     ]
 }
 
@@ -41,7 +43,7 @@ extension FlowTabUITests {
         let policies = FlowTabUITestSwitcherAndSearchWatchdogPolicy.compatibleBounds
         XCTAssertEqual(
             policies,
-            [2, 2, 2, 10, 5, 10, 5, 10, 10, 5, 10, 3, 5, 10, 3]
+            [2, 2, 2, 10, 5, 10, 5, 10, 10, 5, 10, 3, 5, 10, 3, 3]
         )
         XCTAssertTrue(policies.allSatisfy { $0.isFinite && $0 > 0 })
     }

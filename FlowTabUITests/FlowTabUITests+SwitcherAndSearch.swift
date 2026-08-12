@@ -547,7 +547,9 @@ extension FlowTabUITests {
                 key: "searchSelectedResult",
                 equals: "app:com.flowtab.mock.browser",
                 decodesPercentEncoding: true,
-                timeout: 3,
+                timeout:
+                    FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                        .searchSelectedResultProjection,
                 trigger: {
                     mailResult.coordinate(
                         withNormalizedOffset:
