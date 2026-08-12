@@ -1,5 +1,9 @@
 import XCTest
 
+enum FlowTabUITestRealSpaceFixtureReadinessPolicy {
+    static let postFixtureActivationWatchdog: TimeInterval = 5
+}
+
 struct FlowTabUITestRealSpaceFixtureReadinessEvidence: Equatable {
     let targetDescription: String
     let waiterCompleted: Bool
@@ -38,15 +42,16 @@ extension FlowTabUITests {
         _ app: XCUIApplication,
         traceLabel: String?,
         targetDescription: String,
+        watchdog: TimeInterval =
+            FlowTabUITestSupportWatchdogPolicy
+                .foregroundActivation,
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> FlowTabUITestRealSpaceFixtureReadinessEvidence {
         let waiterCompleted =
             waitForFlowTabUITestApplicationToBecomeReady(
                 app,
-                timeout:
-                    FlowTabUITestSupportWatchdogPolicy
-                        .foregroundActivation,
+                timeout: watchdog,
                 traceLabel: traceLabel
             )
         let evidence =
@@ -63,6 +68,42 @@ extension FlowTabUITests {
             line: line
         )
         return evidence
+    }
+
+    @discardableResult
+    func assertRealSpaceFixtureFlowTabIsForegroundReadyAfterFixtureLaunch(
+        _ app: XCUIApplication,
+        targetDescription: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> FlowTabUITestRealSpaceFixtureReadinessEvidence {
+        assertRealSpaceFixtureFlowTabIsForegroundReady(
+            app,
+            traceLabel: nil,
+            targetDescription: targetDescription,
+            watchdog:
+                FlowTabUITestRealSpaceFixtureReadinessPolicy
+                    .postFixtureActivationWatchdog,
+            file: file,
+            line: line
+        )
+    }
+
+    func testRealSpaceFixturePostFixtureActivationUsesCompatiblePolicy() {
+        XCTAssertEqual(
+            FlowTabUITestRealSpaceFixtureReadinessPolicy
+                .postFixtureActivationWatchdog,
+            5
+        )
+        XCTAssertTrue(
+            FlowTabUITestRealSpaceFixtureReadinessPolicy
+                .postFixtureActivationWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestRealSpaceFixtureReadinessPolicy
+                .postFixtureActivationWatchdog,
+            0
+        )
     }
 
     func testRealSpaceFixtureForegroundReadinessUsesSharedPolicyAndFinalReadback() {

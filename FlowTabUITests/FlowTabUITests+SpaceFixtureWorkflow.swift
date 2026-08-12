@@ -277,9 +277,7 @@ extension FlowTabUITests {
         guard assertSpaceFixtureWorkflowPermissionsAvailable() else { return }
 
         let currentAppProjectionAcceptanceRoute =
-            makeSpaceFixtureCurrentAppProjectionAcceptanceRoute(
-                bundleIdentifier: identity.bundleIdentifier
-            )
+            makeSpaceFixtureCurrentAppProjectionAcceptanceRoute(bundleIdentifier: identity.bundleIdentifier)
         currentAppProjectionAcceptanceRoute.removeReadback()
         defer { currentAppProjectionAcceptanceRoute.removeReadback() }
         let app = makeRealRuntimeFlowTabApp(
@@ -376,7 +374,9 @@ extension FlowTabUITests {
         )
 
         app.activate()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
+        assertRealSpaceFixtureFlowTabIsForegroundReadyAfterFixtureLaunch(
+            app, targetDescription: "window-set-mutation-after-fixture-launch"
+        )
         let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity, timeout: 12)
         assertValue(of: fixtureAppRow, equals: "2w", timeout: 12)
 
