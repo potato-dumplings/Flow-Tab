@@ -1,6 +1,8 @@
-# FlowTab
+<h1 align="center">FlowTab</h1>
 
-[English](./README.md) | **简体中文**
+<p align="center">
+  <a href="./README.md">English</a> | <strong>简体中文</strong>
+</p>
 
 FlowTab 是一个 macOS 应用切换器，目标是在接近系统 `Command + Tab` 的手感下，提供更可控的多窗口切换体验。
 
