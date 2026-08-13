@@ -574,7 +574,7 @@ and Process/Tooling.
 | SYNC-036KO | standard multi-App open-window mutation; explicit close and gated one-card projection | A 30-second fixture auto-close supplies orchestration slack and a 40-second projection wait infers completion. Evidence migration. | Install the typed close observer before fixture launch, configure zero delay with explicit trigger, prove exact scheduled PID/window topology, start the one-card owner before triggering, and accept only matching applied generation plus exact remaining projection. Owners are cancelled by the scenario. | H; typed close/order/identity/cancel/watchdog and projection Pressure tests, signed standard mutation UI, Process/Tooling. | completed |
 | SYNC-036KP | standard multi-App open-window mutation; exact runtime AX-destroyed reconciliation | A prelaunch log snapshot and post-projection raw eight-second substring wait can accept a different fixture/window record. Evidence refinement. | Start an exact runtime-log owner immediately before the close and require the target bundle, scheduled PID, target AX/CG identity, and post-trigger delivery. Name the terminal bound; the scenario cancels the owner. | H; exact PID/window/event/cancel/watchdog tests, signed standard mutation UI, Process/Tooling. | completed |
 | SYNC-036KQ | fullscreen multi-App target-window mutation; explicit close and gated projection | A 30-second auto-close and 45-second projection wait substitute elapsed time for exact fullscreen-window completion. Evidence migration. | Use the typed close route before launch, explicit zero-delay trigger, exact fullscreen target number/index/PID, matching applied generation, and preinstalled exact remaining-card projection. The scenario owns both cancellations. | H; typed fullscreen identity/order/cancel/watchdog and projection Pressure tests, signed fullscreen mutation UI, Process/Tooling. | completed |
-| SYNC-036KR | fullscreen multi-App mutation; exact runtime reconciliation | A broad prelaunch baseline and raw eight-second substring wait do not bind destruction to the exact fullscreen target. Evidence refinement. | Observe before explicit close and require exact bundle/PID/AX or CG target identity in one post-trigger reconciliation record. Name the watchdog and cancel with the scenario. | H; exact target/event/cancel/watchdog tests, signed fullscreen mutation UI, Process/Tooling. | planned |
+| SYNC-036KR | fullscreen multi-App mutation; exact runtime reconciliation | A broad prelaunch baseline and raw eight-second substring wait do not bind destruction to the exact fullscreen target. Evidence refinement. | Observe before explicit close and require exact bundle/PID/AX or CG target identity in one post-trigger reconciliation record. Name the watchdog and cancel with the scenario. | H; exact target/event/cancel/watchdog tests, signed fullscreen mutation UI, Process/Tooling. | completed |
 | SYNC-036KS | standard and fullscreen multi-App Window Search; committed result projection | Both paths type before constructing `waitForSearchWindowResult`, allowing a stale matching row and losing the committed scope/query boundary. Evidence-order migration. | Reuse `performAndWaitForCommittedSearchWindowResult` with the owner installed before typing; require exact window scope, decoded query, app/title/result identity, and row publication. Name the shared watchdog; invocation owns cancellation. | H; stale-baseline/query/scope/identity/event/cancel/watchdog/Pressure tests, both signed Window Search UIs, Process/Tooling. | planned |
 | SYNC-036KT | standard/fullscreen Window Search confirmation; exact activation and fullscreen panel dismissal | Exact activation uses raw 10/12-second bounds, and the fullscreen dismissal observer is constructed after confirmation. Evidence composition/order migration. | Before confirmation, install exact workflow-window activation and, for fullscreen, exact panel-nonexistence owners; accept only exact bundle/window number plus dismissal readback. Name compatible bounds and cancel both owners on every exit. | H; initial/stale/wrong-window/event/cancel/watchdog/Pressure tests, both signed activation UIs, Process/Tooling. | planned |
 | SYNC-036KU | multi-App App Search; committed result projection | Text is typed before an eight-second raw row-existence wait, so a row alone proves neither committed app scope nor query. Evidence-order migration. | Install the committed Search result owner before typing and require exact app scope/query/result identifier plus row publication. Name the watchdog and cancel with the invocation. | H; stale-baseline/scope/query/row/cancel/watchdog/Pressure tests, signed App Search UI, Process/Tooling. | planned |
@@ -28460,6 +28460,77 @@ polling cadence, deadline, or timeout in the scoped paths.
   worktree-baseline checks.
 - Commit subject:
   `test(sync): migrate SYNC-036KQ fullscreen explicit close`.
+
+### SYNC-036KR Closure Record
+
+- Status and Oracle: completed. Fullscreen runtime reconciliation now resolves
+  only from one complete `runtimeAXDestroyed` record whose bundle identifier,
+  scheduled process ID, AX process namespace, and affected CG window ID match
+  the exact fullscreen close plan. A different bundle, PID, AX namespace, CG
+  identity, `none` mapping, or record with trailing fields remains unresolved.
+  The typed close generation and sole remaining `Notes Inbox` projection remain
+  independent evidence that the same fullscreen target was removed.
+- Evidence ordering and lifecycle: after scheduled topology and the initial
+  fullscreen preview are established, the scenario captures a runtime-log
+  baseline and starts `FlowTabUITestRuntimeLogObservationOwner` immediately
+  before publishing the typed close trigger. Its acceptance gate rejects
+  matching baseline evidence; the trigger opens the gate and requests an
+  immediate readback, while file events supply later notification readbacks.
+  Scenario `defer` blocks cancel the runtime owner and baseline on every return.
+  Resolution and cancellation cancel the shared file-event observer and
+  scheduled readback source exactly once, and late callbacks perform no further
+  readback.
+- Retained time: the named
+  `fullscreenMultiAppWindowMutationReconciliationWatchdog` value of eight
+  seconds is a terminal failure bound. Expiry reports the missing exact pattern
+  and final runtime-log generation, character count, and bounded tail. The
+  shared baseline retains a named 200-millisecond cancellable readback cadence
+  because the platform log boundary has no complete-delivery callback; the
+  file-event notification is primary, and only matching record content can
+  resolve success.
+- Deterministic and Pressure validation: the canonical final signed Runner
+  passed 8/8 selected checks with zero failures in 1.298 seconds under
+  `.build-local/sync-036kr-deterministic`. Coverage includes standard and
+  fullscreen named policies, exact identity, initially matching gated evidence,
+  post-trigger delivery, immediate readback, cancellation, late delivery,
+  watchdog diagnostics, 100 iterations of wrong bundle/PID/CG evidence, and
+  repeated independently cancelled owner lifetimes.
+- Affected UI: the initial signed run expired in the previously completed
+  SYNC-036KL App-strip prerequisite before constructing the runtime owner or
+  publishing the close trigger. Its final evidence retained the exact three
+  fixture rows and runtime counts `2/2/2`, followed by clean teardown. A fresh
+  fixture topology passed 1/1 with zero failures in 22.481 seconds under
+  `.build-local/sync-036kr-ui-rerun`. Its runtime log records the accepted first
+  target event as bundle `com.example.fixture.notes`, PID `39448`, AX namespace
+  `ax:39448`, and concrete CG `101219`; two later duplicate notifications with
+  `affectedCGWindowID=none` remain nonmatching.
+- Validation scope: FlowTabCore Unit, app Unit/Behavior, FlowTabTests, unrelated
+  UI, and production process Pressure are not relevant because this slice
+  changes only UI-test runtime-log matching and orchestration while reusing the
+  already validated exact pattern, condition owner, and typed fullscreen close
+  infrastructure. Production behavior, fixture behavior, configuration
+  compatibility, window identity semantics, module direction, path intent, and
+  recurring product work remain unchanged.
+- Signing and Process/Tooling: the canonical installer refreshed the fixed App,
+  and the canonical six-target UI build, deterministic run, lifecycle Pressure,
+  and affected UI run completed. Sandbox-external strict deep verification
+  accepts the App and Runner under Team `96PUA726W9` with CDHashes
+  `5a2359fb3361d8acda6849986e222fdeab7d1c4d` and
+  `0c6826314fdac16c6beac3bd3ea7fdbb20033d55`; executable SHA-256 values are
+  `57924bb695367931edf1f7607c291e81fdd6b69ec4937694c9eea8f64adbc3e3`
+  and `4078f1000028ca13cda08a9f85d8c4b3e62fa7b0d7bf0108992f2d63460c4799`.
+  Swift parsing, scoped runtime-log inventory, and `git diff --check` pass. The
+  shared runtime-log observer, exact-identity tests, and fullscreen workflow
+  contain 448, 399, and 305 lines with clear single responsibilities. Exact
+  App/Runner/fixture and repository-scoped xcodebuild process readbacks are
+  empty.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. Installer, deterministic,
+  diagnostic, and successful UI evidence roots are removed after this durable
+  record and independent commit, followed by exact absence and
+  worktree-baseline checks.
+- Commit subject:
+  `test(sync): migrate SYNC-036KR fullscreen AX reconciliation`.
 
 ### SYNC-001 Authorized Resume Closure Record
 

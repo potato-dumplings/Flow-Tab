@@ -56,12 +56,14 @@ extension FlowTabUITests {
     func testRuntimeAXDestroyedReconciliationPolicyAndExactIdentity()
         throws
     {
-        let watchdog =
-            FlowTabUITestRuntimeLogObservationPolicy
-                .multiAppOpenWindowMutationReconciliationWatchdog
+        let watchdog = FlowTabUITestRuntimeLogObservationPolicy
+            .multiAppOpenWindowMutationReconciliationWatchdog
         XCTAssertEqual(watchdog, 8)
-        XCTAssertTrue(watchdog.isFinite)
-        XCTAssertGreaterThan(watchdog, 0)
+        XCTAssertTrue(watchdog.isFinite && watchdog > 0)
+        let fullscreenWatchdog = FlowTabUITestRuntimeLogObservationPolicy
+            .fullscreenMultiAppWindowMutationReconciliationWatchdog
+        XCTAssertEqual(fullscreenWatchdog, 8)
+        XCTAssertTrue(fullscreenWatchdog.isFinite && fullscreenWatchdog > 0)
         let expectation =
             try FlowTabUITestRuntimeAXDestroyedObservationTestPolicy
                 .expectation()

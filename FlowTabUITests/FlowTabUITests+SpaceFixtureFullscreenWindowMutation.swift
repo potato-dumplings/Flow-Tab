@@ -117,8 +117,6 @@ extension FlowTabUITests {
                 initialWindowPlanIndices
             )
 
-            let mutationLogSnapshot =
-                makeRuntimeLogFileSnapshot()
             selectSwitcherWorkflowApp(
                 targetApp,
                 in: app,
@@ -151,8 +149,41 @@ extension FlowTabUITests {
             defer { postCloseCards.cancel() }
             XCTAssertNil(postCloseCards.resolvedEvidence)
 
+            let reconciliationLogBaseline =
+                makeRuntimeLogFileSnapshot()
+            defer { reconciliationLogBaseline.cancel() }
+            var acceptsRuntimeReconciliation = false
+            let runtimeReconciliation =
+                FlowTabUITestRuntimeLogObservationOwner(
+                    expectation:
+                        try .exactRuntimeAXDestroyed(
+                            bundleIdentifier:
+                                targetApp.identity.bundleIdentifier,
+                            processIdentifier:
+                                targetProcessIdentifier,
+                            affectedCGWindowID:
+                                scheduledClose.snapshot
+                                    .targetWindowNumber
+                        ),
+                    observationRegistration:
+                        reconciliationLogBaseline
+                            .observationRegistration(),
+                    acceptsResolution: {
+                        acceptsRuntimeReconciliation
+                    },
+                    readback:
+                        reconciliationLogBaseline.makeReadback
+                )
+            runtimeReconciliation.start()
+            defer { runtimeReconciliation.cancel() }
+            XCTAssertNil(runtimeReconciliation.resolvedEvidence)
+
             windowCloseObservation.requestClose(
                 from: scheduledClose
+            )
+            acceptsRuntimeReconciliation = true
+            runtimeReconciliation.requestReadback(
+                source: .triggerReadback
             )
             guard let appliedClose =
                     windowCloseObservation.waitForApplied(
@@ -223,14 +254,20 @@ extension FlowTabUITests {
                 targetApp,
                 diagnostics: diagnosticsSummary
             ) else { return }
-            waitForRuntimeLogFiles(
-                containing: [
-                    "runtimeAXDestroyed appID=\(targetApp.identity.bundleIdentifier)",
-                    "affectedCGWindowID="
-                ],
-                since: mutationLogSnapshot,
-                timeout: 8
-            )
+            guard
+                runtimeReconciliation.waitForResolution(
+                    timeout:
+                        FlowTabUITestRuntimeLogObservationPolicy
+                            .fullscreenMultiAppWindowMutationReconciliationWatchdog
+                ) != nil
+            else {
+                XCTFail(
+                    "Fullscreen multi-App runtime reconciliation "
+                        + "watchdog expired. "
+                        + runtimeReconciliation.diagnosticSummary
+                )
+                return
+            }
             assertWorkflowApplicationProcessRemainsRunning(
                 targetApp,
                 processIdentifier: targetProcessIdentifier

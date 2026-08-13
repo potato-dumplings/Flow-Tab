@@ -8,6 +8,8 @@ enum FlowTabUITestRuntimeLogObservationPolicy {
     static let quitShortcutTerminationRequestWatchdog: TimeInterval = 8
     static let openWindowMutationReconciliationWatchdog: TimeInterval = 8
     static let multiAppOpenWindowMutationReconciliationWatchdog: TimeInterval = 8
+    static let fullscreenMultiAppWindowMutationReconciliationWatchdog:
+        TimeInterval = 8
     static let selectedWindowMutationReconciliationWatchdog: TimeInterval = 8
     static let readbackCadence: TimeInterval = 0.2
     static let maximumDiagnosticCharacterCount = 4_000
