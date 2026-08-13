@@ -1,8 +1,8 @@
 import Foundation
 import XCTest
 
-private enum FlowTabUITestSwitcherSelectedAppPreviewPolicy {
-    static let watchdog: TimeInterval = 12
+enum FlowTabUITestSwitcherSelectedAppPreviewPolicy {
+    static let transitionWatchdog: TimeInterval = 12
 }
 
 struct FlowTabUITestSwitcherSelectedAppPreviewCandidate: Equatable {
@@ -29,7 +29,9 @@ struct FlowTabUITestSwitcherSelectedAppPreviewExpectation: Equatable {
         guard
             snapshot.exists,
             let selectedBundleIdentifier =
-                snapshot.selectedBundleIdentifier
+                snapshot.selectedBundleIdentifier,
+            snapshot.previewBundleIdentifier
+                == selectedBundleIdentifier
         else {
             return nil
         }
@@ -38,6 +40,8 @@ struct FlowTabUITestSwitcherSelectedAppPreviewExpectation: Equatable {
             $0.bundleIdentifier
                 == selectedBundleIdentifier
                 && $0.expectedTitles == observedTitles
+                && $0.expectedTitles.count
+                    == snapshot.titles.count
         }
         guard matches.count == 1 else {
             return nil
@@ -77,15 +81,20 @@ final class FlowTabUITestSwitcherSelectedAppPreviewObservationOwner {
                             FlowTabUITestConditionObservationPolicy
                                 .xcuiReadbackCadence
                     ),
+        acceptsResolution: @escaping () -> Bool = { true },
         readback: @escaping () ->
             FlowTabUITestSwitcherPreviewProjectionSnapshot
     ) {
         conditionOwner = FlowTabUITestConditionObservationOwner(
             observationRegistration: observationRegistration,
             readback: readback,
-            isSatisfied: expectation.isSatisfied(by:),
+            isSatisfied: {
+                acceptsResolution()
+                    && expectation.isSatisfied(by: $0)
+            },
             describe: { snapshot in
                 "candidates=[\(expectation.diagnosticSummary)] "
+                    + "acceptsResolution=\(acceptsResolution()) "
                     + snapshot.diagnosticSummary
             }
         )
@@ -93,6 +102,12 @@ final class FlowTabUITestSwitcherSelectedAppPreviewObservationOwner {
 
     func start() {
         conditionOwner.start()
+    }
+
+    func requestReadback(
+        source: FlowTabUITestConditionObservationSource
+    ) {
+        conditionOwner.requestReadback(source: source)
     }
 
     func waitForResolution(
@@ -116,9 +131,68 @@ final class FlowTabUITestSwitcherSelectedAppPreviewObservationOwner {
     func cancel() {
         conditionOwner.cancel()
     }
+
+    deinit {
+        cancel()
+    }
 }
 
 extension FlowTabUITests {
+    func performAndWaitForSwitcherSelectedAppPreviewTransition(
+        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
+        in app: XCUIApplication,
+        diagnosticsSummaryElement: XCUIElement,
+        trigger: () -> Void
+    ) -> FlowTabUITestSwitcherPreviewProjectionSnapshot? {
+        let expectation =
+            FlowTabUITestSwitcherSelectedAppPreviewExpectation(
+                candidates: [
+                    switcherSelectedAppPreviewCandidate(
+                        for: workflowApp
+                    )
+                ]
+            )
+        var triggerDidComplete = false
+        let owner =
+            FlowTabUITestSwitcherSelectedAppPreviewObservationOwner(
+                expectation: expectation,
+                acceptsResolution: {
+                    triggerDidComplete
+                },
+                readback: {
+                    self.switcherPreviewProjectionSnapshot(
+                        diagnosticsSummaryElement
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        trigger()
+        triggerDidComplete = true
+        owner.requestReadback(source: .triggerReadback)
+
+        guard let evidence = owner.waitForResolution(
+            timeout:
+                FlowTabUITestSwitcherSelectedAppPreviewPolicy
+                    .transitionWatchdog
+        ) else {
+            XCTFail(
+                "Selected-app preview transition watchdog expired "
+                    + "for \(workflowApp.appName). "
+                    + owner.diagnosticSummary
+                    + "\n\n"
+                    + switcherDebugSummary(
+                        app,
+                        diagnosticsSummary:
+                            diagnosticsSummaryElement
+                    )
+            )
+            return nil
+        }
+        return evidence.value
+    }
+
     func matchedWorkflowAppForVisibleSwitcherPreview(
         _ workflow: SpaceFixtureResolvedWorkflow,
         diagnosticsSummaryElement: XCUIElement,
@@ -130,12 +204,8 @@ extension FlowTabUITests {
         let expectation =
             FlowTabUITestSwitcherSelectedAppPreviewExpectation(
                 candidates: eligibleApps.map {
-                    FlowTabUITestSwitcherSelectedAppPreviewCandidate(
-                        appID: $0.appID,
-                        bundleIdentifier:
-                            $0.identity.bundleIdentifier,
-                        expectedTitles:
-                            Set($0.expectedWindowTitles)
+                    switcherSelectedAppPreviewCandidate(
+                        for: $0
                     )
                 }
             )
@@ -154,7 +224,7 @@ extension FlowTabUITests {
         guard let evidence = owner.waitForResolution(
             timeout:
                 FlowTabUITestSwitcherSelectedAppPreviewPolicy
-                    .watchdog
+                    .transitionWatchdog
         ) else {
             XCTFail(
                 "Selected-app preview watchdog expired. "
@@ -174,5 +244,17 @@ extension FlowTabUITests {
         return eligibleApps.first {
             $0.appID == candidate.appID
         }
+    }
+
+    private func switcherSelectedAppPreviewCandidate(
+        for workflowApp: SpaceFixtureResolvedWorkflow.App
+    ) -> FlowTabUITestSwitcherSelectedAppPreviewCandidate {
+        FlowTabUITestSwitcherSelectedAppPreviewCandidate(
+            appID: workflowApp.appID,
+            bundleIdentifier:
+                workflowApp.identity.bundleIdentifier,
+            expectedTitles:
+                Set(workflowApp.expectedWindowTitles)
+        )
     }
 }

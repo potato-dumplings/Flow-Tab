@@ -46,38 +46,29 @@ extension FlowTabUITests {
             var observedAppIDs: [String] = []
             for workflowApp in workflow.apps {
                 selectSwitcherWorkflowApp(workflowApp, in: app, diagnosticsSummary: diagnosticsSummary)
-                app.typeKey(.downArrow, modifierFlags: [])
-                let selectedApp = try XCTUnwrap(
-                    matchedWorkflowAppForVisibleSwitcherPreview(
-                        workflow,
-                        diagnosticsSummaryElement: diagnosticsSummary,
-                        excludingAppIDs: Set(observedAppIDs)
-                    ),
-                    """
-                    Switcher preview did not stabilize to a single workflow app window set.
-
-                    \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-
-                    \(self.multiAppWorkflowSetupMessage(
-                        reason: "Resolved switcher workflow window titles did not match a single app.",
-                        scenarioSourceURL: SpaceFixtureMultiAppWorkflowDefaults.switcherWorkflowSourceURL
-                    ))
-                    """
-                )
+                guard
+                    performAndWaitForSwitcherSelectedAppPreviewTransition(
+                        workflowApp,
+                        in: app,
+                        diagnosticsSummaryElement:
+                            diagnosticsSummary,
+                        trigger: {
+                            app.typeKey(
+                                .downArrow,
+                                modifierFlags: []
+                            )
+                        }
+                    ) != nil
+                else {
+                    return
+                }
                 XCTAssertFalse(
-                    observedAppIDs.contains(selectedApp.appID),
-                    "Switcher app cycle repeated \(selectedApp.appName) before visiting every workflow app"
+                    observedAppIDs.contains(workflowApp.appID),
+                    "Switcher app cycle repeated \(workflowApp.appName) before visiting every workflow app"
                 )
-                observedAppIDs.append(selectedApp.appID)
-                let visibleTitles = switcherPreviewTitles(from: diagnosticsSummary)
-                XCTAssertEqual(Set(visibleTitles), Set(selectedApp.expectedWindowTitles))
-                assertSwitcherPreviewShowsOnlyExpectedTitles(
-                    selectedApp.expectedWindowTitles,
-                    in: diagnosticsSummary,
-                    timeout: 8
-                )
+                observedAppIDs.append(workflowApp.appID)
 
-                guard exitSwitcherPreview(selectedApp, in: app, diagnostics: diagnosticsSummary) else { return }
+                guard exitSwitcherPreview(workflowApp, in: app, diagnostics: diagnosticsSummary) else { return }
             }
 
             XCTAssertEqual(Set(observedAppIDs), Set(workflow.apps.map(\.appID)))
