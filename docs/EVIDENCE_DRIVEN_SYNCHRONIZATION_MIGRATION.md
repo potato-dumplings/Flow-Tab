@@ -553,7 +553,7 @@ and Process/Tooling.
 | SYNC-036JT | `testSwitcherPanelKeepsWindowLayerWhenSelectedFixtureWindowCloses`, `requireActiveSwitcherPreview`, and the post-contraction Window-layer retention readback | After the exact one-card projection succeeds, the caller waits another raw five seconds for any diagnostics `mode` beginning with `windowCycle`. The prior projection is already completion evidence for the close-driven UI update, while the generic prefix omits the exact selected bundle and a second wait treats elapsed opportunity as additional readiness. Evidence readback migration. | Immediately read one atomic diagnostics snapshot after the exact one-card projection and require both `selected=<fixture bundle ID>` and exact `mode=windowCycle(<same bundle ID>)`. Add a bundle-identifier overload of the existing active-preview readback helper and retain the workflow-App overload as a delegate. Failure reports expected bundle plus the final identifier/existence/raw selected/mode snapshot. No observer, cadence, timeout, retry, watchdog, or retained work remains; the call owns its synchronous snapshot. Exact applied-close generation/topology, one-card projection, and later runtime reconciliation remain independent Oracles. | M synchronous exact-state reuse after an already-completed high-risk contraction owner; deterministic exact/wrong-selected/wrong-mode/app-cycle readback regression, affected signed UI, strict signing/process evidence, semantic guard, source parse, raw-bound inventory, and Process/Tooling validation. FlowTabCore Unit, app Unit/Behavior, FlowTabTests, unrelated UI, and Pressure are not relevant because production behavior, fixture topology, module direction, configuration, path intent, and recurring work are unchanged. | completed |
 | SYNC-036JU | `testSwitcherPanelKeepsWindowLayerWhenSelectedFixtureWindowCloses`, `FlowTabUITestRuntimeLogObservationOwner`, and the exact Selected Mutation known AX-destroyed delivery | A runtime-log snapshot is frozen immediately after fixture launch, then the caller requests and applies the close, proves the one-card projection and exact retained mode, and only afterward starts a generic helper wait for up to eight seconds. The regex fixes the bundle text while accepting any PID and any AX PID prefix, and the broad baseline plus post-trigger observer construction can accept unrelated historical reconciliation. Evidence refinement plus retained-watchdog migration. | Immediately before the close, freeze a fresh runtime-log baseline and start the shared runtime-log owner beside the one-card owner. Reject even matching readbacks until the explicit close request returns, then request a trigger readback. Accept only a post-baseline `homeAXDestroyed known` line containing the escaped exact fixture bundle, exact scheduled fixture PID, and an AX identity with that same PID prefix. File events drive readback; retain the shared named cancellable 200ms fallback only while unresolved. Name the compatible eight seconds `selectedWindowMutationReconciliationWatchdog` solely as a failure bound reporting acceptance phase, exact pattern, baseline/file-event generations, contents count/tail, source, and waiter result. The invocation explicitly cancels the owner and fresh baseline and owns both App lifecycles. Exact applied-close generation/topology, one-card projection, and same-bundle retained mode are independent final-state Oracles that prove the delivered destruction was reconciled. | H observer-before-cross-process close trigger plus exact process identity in a shared runtime-log owner; named-policy compatibility, matching pre-trigger rejection, trigger readback, initial/event/regex/file-append/file-replacement evidence, cancellation, watchdog, 100-generation owner lifecycle and stale-trigger Pressure, affected signed UI, strict signing/process evidence, semantic guard, source parse, generic-helper/raw-bound inventory, and Process/Tooling validation. FlowTabCore Unit, app Unit/Behavior, FlowTabTests, unrelated UI, and additional production Pressure are not relevant because production reconciliation behavior, fixture close contract, module direction, configuration, path intent, and recurring work are unchanged. | completed |
 | SYNC-036JV | `testSwitcherPanelQuitShortcutKeepsRealFixtureAppUntilProcessTerminates`; exact Option+Q termination-request publication | A raw eight-second runtime-log wait follows Option+Q and accepts two substrings without proving they belong to one request record. Retained-watchdog plus evidence refinement. | Keep the pre-trigger log baseline, require one post-baseline record with the exact fixture app ID and `sent=true`, and name the compatible bound under the runtime-log owner. File events plus its cancellable fallback request readback; the test invocation cancels the baseline/owner. | M; runtime-log exact-record/initial/event/cancel/watchdog tests, affected signed quit-shortcut UI, Process/Tooling. | completed |
-| SYNC-036JW | `SpaceFixtureTerminationFaultObservationOwner.waitForScheduled`; delayed-termination scheduled evidence | The fixture observer is installed before launch, checks an initial evidence buffer, and waits on a typed expectation, while the caller supplies an anonymous eight-second terminal bound. Retained watchdog. | Add an owner policy for scheduled evidence and report the missing scheduled phase plus final typed evidence. The route-scoped observation owner owns token removal; success remains exact scheduled identity/source/delay/request generation. | M; named-policy, initial/event/duplicate/cancel/watchdog tests, affected signed quit-shortcut UI, Process/Tooling. | planned |
+| SYNC-036JW | `SpaceFixtureTerminationFaultObservationOwner.waitForScheduled`; delayed-termination scheduled evidence | The fixture observer is installed before launch, checks an initial evidence buffer, and waits on a typed expectation, while the caller supplies an anonymous eight-second terminal bound. Retained watchdog. | Add an owner policy for scheduled evidence and report the missing scheduled phase plus final typed evidence. The route-scoped observation owner owns token removal; success remains exact scheduled identity/source/delay/request generation. | M; named-policy, initial/event/duplicate/cancel/watchdog tests, 200-generation stale-callback Pressure, affected signed quit-shortcut UI, Process/Tooling. | completed |
 | SYNC-036JX | `SpaceFixtureTerminationFaultObservationOwner.waitForApplied`; delayed-termination applied evidence | The caller supplies an anonymous eight-second bound after scheduled evidence and matches generation only after the shared expectation wakes. Retained-watchdog plus evidence refinement. | Add an applied-evidence policy and resolve only the exact request generation from initial or event evidence; expiry reports expected generation and final typed evidence. The route owner cancels observation. | M; exact/out-of-order/duplicate/cancel/watchdog tests, affected signed quit-shortcut UI, Process/Tooling. | planned |
 | SYNC-036JY | `testSwitcherPanelQuitShortcutKeepsRealFixtureAppUntilProcessTerminates`; exact delayed fixture process exit | A raw eight-second XCTest application-state wait is followed by a final `.notRunning` readback. Success is evidence-driven, while watchdog ownership is implicit. | Route the compatible bound through the application-termination policy and preserve `.notRunning` as the sole Oracle with waiter/final-state diagnostics. The test owns the synchronous wait and fixture cleanup. | M; policy/final-readback tests, affected signed quit-shortcut UI, exact process evidence, Process/Tooling. | planned |
 | SYNC-036JZ | `testSwitcherPanelQuitShortcutKeepsRealFixtureAppUntilProcessTerminates`; exact post-termination projection refresh publication | A raw ten-second post-exit log wait accepts two substrings and does not bind the refresh to the scheduled fixture PID/request generation. Retained-watchdog plus evidence refinement. | Establish the runtime-log owner before Option+Q and accept only a post-trigger `terminate post-refresh` record with exact app ID, fixture PID, matched pending generation, and refreshed evidence. Name the terminal bound; the invocation owns cancellation. | H; exact-record/order/event/cancel/watchdog and slow-scheduling tests, affected signed quit-shortcut UI, Process/Tooling. | planned |
@@ -27126,6 +27126,63 @@ polling cadence, deadline, or timeout in the scoped paths.
   record and independent commit, followed by exact absence checks.
 - Commit subject:
   `refactor(sync): migrate SYNC-036JV quit request publication`.
+
+### SYNC-036JW Closure Record
+
+- Status and Oracle: completed. The route-scoped typed Distributed Notification
+  observer remains installed before fixture launch. `waitForScheduled` first
+  reads its evidence buffer, then accepts a later event only when the typed
+  phase is `scheduled`. The caller independently requires the exact fixture
+  bundle identity, live process, `.terminationSignal` source, 2.4-second fault
+  duration, and positive request generation before progressing.
+- Observation lifecycle: each `start()` creates fresh expectations and a new
+  observation generation. Exact duplicate evidence is recorded once and
+  fulfills at most once; cancelled-generation callbacks are rejected even if
+  an underlying source delivers them late. `cancel()`, restart, and deinit
+  remove the route token idempotently. Diagnostics report active ownership,
+  the requested scheduled phase, waiter result, and every final typed record.
+  Applied-phase generation matching remains the independent `SYNC-036JX`
+  contract.
+- Retained time: eight seconds is named `scheduledEvidenceWatchdog` under
+  `SpaceFixtureTerminationFaultObservationPolicy` and is solely the terminal
+  failure bound for absent scheduled evidence. Elapsed time cannot establish
+  scheduling or success. The fixture's 2.4-second delayed termination remains
+  an explicit domain-duration fault contract whose scheduled/applied evidence
+  and final process state are observed independently.
+- Deterministic and Pressure validation: the canonical rebuilt signed Runner
+  passed 6/6 tests in 1.070 seconds. Coverage includes finite-positive policy
+  compatibility, already-observed evidence, later event delivery, applied-
+  before-scheduled ordering, exact duplicate suppression, cancellation,
+  inactive and timed-out diagnostics with last typed evidence, and 200
+  cancel/restart generations with replayed stale callbacks. The generation
+  Pressure path passed in 0.163 seconds.
+- Affected UI: after the canonical installer rebuilt and signed the fixed-path
+  App, the real-Space-fixture quit-shortcut path passed 1/1 in 14.084 seconds.
+  It exercised scheduled identity/source/duration evidence, the fixture still
+  running before delay application, matching applied generation, exact process
+  exit, post-refresh publication, and final Switcher removal.
+- Validation scope: FlowTabCore Unit, app Unit/Behavior, FlowTabTests,
+  unrelated UI, and production Pressure are not relevant because production
+  behavior, fixture scheduling and duration, module direction, configuration,
+  path intent, and product recurring work are unchanged. UI-target XCTest owns
+  this observation state machine, real-topology path, and observer lifecycle
+  Pressure.
+- Signing and Process/Tooling: the canonical six-target test build and fixed-App
+  install completed successfully. Strict deep verification accepts the App and
+  Runner under Team `96PUA726W9` and Apple Development authority
+  `gobestsoft@qq.com (RF9WCUVKH8)`; their CDHashes are
+  `78a55012be48b3e401ae8351413f5c29e4b611f5` and
+  `dec2e999c10ee031c9d9143733508d66dba21206`. Swift parsing, project-file
+  `plutil -lint`, and `git diff --check` pass. The owner, tests, and affected
+  workflow contain 272, 283, and 761 lines with clear single
+  responsibilities. Exact App/Runner/fixture and repository-scoped xcodebuild
+  process readbacks are empty.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. The reproducible UI result bundle
+  is removed after this durable record and independent commit, followed by
+  exact absence and worktree-baseline checks.
+- Commit subject:
+  `refactor(sync): migrate SYNC-036JW scheduled termination evidence`.
 
 ### SYNC-001 Authorized Resume Closure Record
 

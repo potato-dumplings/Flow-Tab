@@ -180,7 +180,9 @@ extension FlowTabUITests {
         }
         let scheduledEvidence = try XCTUnwrap(
             terminationObservation.waitForScheduled(
-                timeout: 8
+                timeout:
+                    SpaceFixtureTerminationFaultObservationPolicy
+                        .scheduledEvidenceWatchdog
             ),
             "Fixture did not publish scheduled termination evidence: "
                 + terminationObservation.diagnosticSummary

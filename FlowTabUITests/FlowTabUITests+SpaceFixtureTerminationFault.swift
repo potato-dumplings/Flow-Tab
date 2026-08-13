@@ -13,50 +13,95 @@ struct SpaceFixtureTerminationFaultUITestRoute {
     }
 }
 
+enum SpaceFixtureTerminationFaultObservationPolicy {
+    static let scheduledEvidenceWatchdog: TimeInterval = 8
+}
+
+typealias SpaceFixtureTerminationFaultEvidenceRegistration =
+    (
+        @escaping (SpaceFixtureTerminationFaultEvidence) -> Void
+    ) -> FlowTabUITestObservationCancellation?
+
 final class SpaceFixtureTerminationFaultObservationOwner {
-    private let route:
-        SpaceFixtureTerminationFaultUITestRoute
-    private let center: DistributedNotificationCenter
-    private let scheduledExpectation =
-        XCTestExpectation(
-            description:
-                "fixture termination fault scheduled evidence"
-        )
-    private let appliedExpectation =
-        XCTestExpectation(
-            description:
-                "fixture termination fault applied evidence"
-        )
-    private var observationToken: NSObjectProtocol?
+    private let evidenceRegistration:
+        SpaceFixtureTerminationFaultEvidenceRegistration
+    private var nextObservationGeneration: UInt64 = 1
+    private var activeObservationGeneration: UInt64?
+    private var observationCancellation:
+        FlowTabUITestObservationCancellation?
+    private var scheduledExpectation: XCTestExpectation?
+    private var appliedExpectation: XCTestExpectation?
+    private var didFulfillScheduledExpectation = false
+    private var didFulfillAppliedExpectation = false
     private var observedEvidence:
         [SpaceFixtureTerminationFaultEvidence] = []
+    private var requestedPhase:
+        SpaceFixtureTerminationFaultEvidencePhase?
+    private var lastWaitResultDescription = "notStarted"
 
     init(
         route: SpaceFixtureTerminationFaultUITestRoute,
-        center: DistributedNotificationCenter = .default()
+        center: DistributedNotificationCenter = .default(),
+        evidenceRegistration:
+            SpaceFixtureTerminationFaultEvidenceRegistration? =
+                nil
     ) {
-        self.route = route
-        self.center = center
-        scheduledExpectation.assertForOverFulfill = true
-        appliedExpectation.assertForOverFulfill = true
+        if let evidenceRegistration {
+            self.evidenceRegistration = evidenceRegistration
+        } else {
+            self.evidenceRegistration = { callback in
+                let token = center.addObserver(
+                    forName: route.notificationName,
+                    object: nil,
+                    queue: .main
+                ) { notification in
+                    guard let evidence =
+                            SpaceFixtureTerminationFaultEvidenceTransport
+                                .evidence(from: notification)
+                    else {
+                        return
+                    }
+                    callback(evidence)
+                }
+                return FlowTabUITestObservationCancellation {
+                    center.removeObserver(token)
+                }
+            }
+        }
     }
 
     func start() {
         cancel()
         observedEvidence.removeAll()
-        observationToken = center.addObserver(
-            forName: route.notificationName,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            self?.observe(notification)
-        }
+        requestedPhase = nil
+        lastWaitResultDescription = "notStarted"
+        didFulfillScheduledExpectation = false
+        didFulfillAppliedExpectation = false
+        scheduledExpectation = makeExpectation(
+            description:
+                "fixture termination fault scheduled evidence"
+        )
+        appliedExpectation = makeExpectation(
+            description:
+                "fixture termination fault applied evidence"
+        )
+
+        let generation = nextObservationGeneration
+        nextObservationGeneration &+= 1
+        activeObservationGeneration = generation
+        observationCancellation =
+            evidenceRegistration { [weak self] evidence in
+                self?.observe(
+                    evidence,
+                    generation: generation
+                )
+            }
     }
 
     func cancel() {
-        guard let observationToken else { return }
-        center.removeObserver(observationToken)
-        self.observationToken = nil
+        activeObservationGeneration = nil
+        observationCancellation?.cancel()
+        observationCancellation = nil
     }
 
     func waitForScheduled(
@@ -88,54 +133,81 @@ final class SpaceFixtureTerminationFaultObservationOwner {
     }
 
     var diagnosticSummary: String {
-        guard !observedEvidence.isEmpty else {
-            return "unobserved"
-        }
-        return observedEvidence
-            .map(\.logFields)
-            .joined(separator: " | ")
+        let phase = requestedPhase?.rawValue ?? "none"
+        let records = observedEvidence.isEmpty
+            ? "none"
+            : observedEvidence
+                .map(\.logFields)
+                .joined(separator: " | ")
+        return "observationActive=\(isObservationActive) "
+            + "unmetCondition=phase=\(phase) "
+            + "waitResult=\(lastWaitResultDescription) "
+            + "observed=[\(records)]"
+    }
+
+    var isObservationActive: Bool {
+        activeObservationGeneration != nil
+    }
+
+    var observedEvidenceCount: Int {
+        observedEvidence.count
     }
 
     deinit {
-        if let observationToken {
-            center.removeObserver(observationToken)
-        }
+        cancel()
     }
 
-    private func observe(_ notification: Notification) {
-        guard let evidence =
-                SpaceFixtureTerminationFaultEvidenceTransport
-                    .evidence(from: notification)
+    private func observe(
+        _ evidence: SpaceFixtureTerminationFaultEvidence,
+        generation: UInt64
+    ) {
+        guard activeObservationGeneration == generation,
+              !observedEvidence.contains(evidence)
         else {
             return
         }
         observedEvidence.append(evidence)
         switch evidence.phase {
         case .scheduled:
-            scheduledExpectation.fulfill()
+            guard !didFulfillScheduledExpectation else {
+                return
+            }
+            didFulfillScheduledExpectation = true
+            scheduledExpectation?.fulfill()
         case .applied:
-            appliedExpectation.fulfill()
+            guard !didFulfillAppliedExpectation else {
+                return
+            }
+            didFulfillAppliedExpectation = true
+            appliedExpectation?.fulfill()
         }
     }
 
     private func wait(
-        for expectation: XCTestExpectation,
+        for expectation: XCTestExpectation?,
         phase: SpaceFixtureTerminationFaultEvidencePhase,
         timeout: TimeInterval
     ) -> SpaceFixtureTerminationFaultEvidence? {
+        requestedPhase = phase
+        guard activeObservationGeneration != nil,
+              let expectation
+        else {
+            lastWaitResultDescription = "inactive"
+            return nil
+        }
         if let evidence = matchingEvidence(
             phase: phase,
             requestGeneration: nil
         ) {
+            lastWaitResultDescription = "initialReadback"
             return evidence
         }
-        guard XCTWaiter.wait(
+        let waitResult = XCTWaiter.wait(
             for: [expectation],
             timeout: timeout
-        ) == .completed
-        else {
-            return nil
-        }
+        )
+        lastWaitResultDescription =
+            waitResultDescription(waitResult)
         return matchingEvidence(
             phase: phase,
             requestGeneration: nil
@@ -153,6 +225,34 @@ final class SpaceFixtureTerminationFaultObservationOwner {
                         || $0.requestGeneration
                             == requestGeneration
                 )
+        }
+    }
+
+    private func makeExpectation(
+        description: String
+    ) -> XCTestExpectation {
+        let expectation =
+            XCTestExpectation(description: description)
+        expectation.assertForOverFulfill = true
+        return expectation
+    }
+
+    private func waitResultDescription(
+        _ result: XCTWaiter.Result
+    ) -> String {
+        switch result {
+        case .completed:
+            return "completed"
+        case .timedOut:
+            return "timedOut"
+        case .incorrectOrder:
+            return "incorrectOrder"
+        case .invertedFulfillment:
+            return "invertedFulfillment"
+        case .interrupted:
+            return "interrupted"
+        @unknown default:
+            return "unknown"
         }
     }
 }
