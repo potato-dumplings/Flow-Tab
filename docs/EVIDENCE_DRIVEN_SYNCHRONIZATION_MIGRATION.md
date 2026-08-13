@@ -103,7 +103,7 @@ and Process/Tooling.
 | SYNC-000 | `docs/EVIDENCE_DRIVEN_SYNCHRONIZATION_MIGRATION.md`; migration ledger baseline | The repository previously had no stable, reviewable closure ledger for time-based synchronization contracts. Process contract. | Preserve the startup Git baseline, semantic classification, dependency order, per-slice validation, and local commit trace in this document. The migration task owns updates through final closure. | L; Process/Tooling (`git diff --check`, ID/path/source-scope review). | completed by the baseline commit |
 | SYNC-001 | `FlowTab/Infrastructure/Runtime/RuntimeAXRemoteWindowResolver.swift`; `windowScanResult(forPID:policy:)` | An 80–250ms wall-clock budget accepts a machine-dependent partial element-ID scan as usable output. Evidence migration. | Scan a deterministic policy-owned ID range and publish complete/unavailable evidence. Any watchdog must fail the scan with last scanned ID and observed windows rather than promote a partial result. The resolver call owns cancellation/termination. | H; Unit, Behavior, affected topology UI, runtime-topology Pressure. | completed after authorized signed UI/Pressure closure; implementation commit and validation evidence are recorded below |
 | SYNC-002 | `AppDelegate.installWorkspaceLifecycleObserver`, `RuntimeAppLaunchWindowEvidenceCoordinator`, `RuntimeProjectionService.signalAppLaunched`; app-launch convergence | A fixed 800ms delay was assumed to be enough for a launched app's windows to exist. Evidence migration. | Establish the exact app/PID AX observer before launch handling, use the launch repair as initial readback, and reconcile later AX transitions or a successful delayed observer installation. The AppDelegate-owned coordinator manages per-PID generation, exact appID/PID cancellation, monitor cleanup, and the named observer-install condition cadence. | H; Unit, Behavior, launch/topology UI, runtime-topology Pressure. | completed after authorized signed lifecycle UI/Pressure closure; implementation commit and validation evidence are recorded below |
-| SYNC-003 | `RuntimeReconciliationCoordinator`, `RuntimeProjectionReconciliationDrainer`, `RuntimeProjectionService`, `RuntimeTransientRepairObservationDriver`; transient-empty repair observation | Delayed `notBefore` values `[0.1, 0.3, 0.8]` waited for AX data to become non-empty, while unrelated maintenance could advance the retry. Conditional observation. | Perform the repair readback immediately, resume from an exact AX/Space/lifecycle signal, and use a service-owned cancellable condition observer only while the payload remains incomplete. Request ID, attempt, and exact appID/PID reject stale evidence. The named `[0.1, 0.3, 0.8]` cadence repeats its last value; a 30-second watchdog terminates one uninterrupted incomplete-evidence session and reports the unmet condition plus last payload. | H; Unit, Behavior, topology UI, runtime-topology Pressure. | blocked: implementation and Unit/Behavior/Process passed; UI/Pressure environment evidence is recorded below |
+| SYNC-003 | `RuntimeReconciliationCoordinator`, `RuntimeProjectionReconciliationDrainer`, `RuntimeProjectionService`, `RuntimeTransientRepairObservationDriver`; transient-empty repair observation | Delayed `notBefore` values `[0.1, 0.3, 0.8]` waited for AX data to become non-empty, while unrelated maintenance could advance the retry. Conditional observation. | Perform the repair readback immediately, resume from an exact AX/Space/lifecycle signal, and use a service-owned cancellable condition observer only while the payload remains incomplete. Request ID, attempt, and exact appID/PID reject stale evidence. The named `[0.1, 0.3, 0.8]` cadence repeats its last value; a 30-second watchdog terminates one uninterrupted incomplete-evidence session and reports the unmet condition plus last payload. | H; Unit, Behavior, topology UI, runtime-topology Pressure. | completed after authorized signed topology UI/Pressure closure; implementation commit and validation evidence are recorded below |
 | SYNC-004 | `FlowTab/Infrastructure/Runtime/RuntimeAXWindowChangeMonitor.swift`; observer install and `handleAXNotification` | Events during a 750ms warm-up are discarded and events inside a 160ms throttle window can lose the final state. Evidence migration. | Install observers, take an initial AX/window readback, and publish monotonically coalesced generations with a guaranteed trailing readback. The monitor owns observer removal; its delivery coordinator owns pending coalescing cancellation. | H; Unit, Behavior, Home/topology UI, runtime-topology Pressure. | completed |
 | SYNC-005 | `FlowTab/Infrastructure/Runtime/RuntimeChromeWindowFocusBridge.swift`; `focusWindowScript` | Two fixed 50ms AppleScript delays are assumed to propagate Chrome window ordering before front-window readback. Conditional observation. | Issue the Chrome focus commands once and immediately return the exact front-window ID readback. Exact equality is the bridge acceptance Oracle; mismatch, empty/invalid output, and execution error remain explicit evidence for `RuntimeActivator`. SYNC-006 owns later activation convergence under one cancellable activation generation. | H; Unit, Behavior, exact-window UI, runtime-topology Pressure. | completed |
 | SYNC-006 | `FlowTab/Infrastructure/Runtime/RuntimeActivator.swift`; `scheduleFocusRecovery` | Fixed 50ms/150ms retries probe whether the exact target became focused. Conditional observation. | Preserve exact AX/CG target readback as the sole success Oracle. Check immediately, consume usable focus/window notifications, and retain a named cancellable polling fallback plus diagnostic watchdog where macOS exposes no target-specific completion event. `RuntimeActivator` owns the task and activation generation. | H; Unit, Behavior, activation UI, runtime-topology Pressure. | completed |
@@ -27038,3 +27038,73 @@ polling cadence, deadline, or timeout in the scoped paths.
   (`refactor(sync): migrate SYNC-002 app launch readiness`).
 - Closure commit subject:
   `test(sync): close SYNC-002 signed lifecycle pressure`.
+
+### SYNC-003 Authorized Resume Closure Record
+
+- Status and authorization: completed. Before resuming the environment-blocked
+  slice, XCTest/Xcode Helper Accessibility execution was explicitly
+  re-authorized. The canonical installer rebuilt the fixed signed App from the
+  final source state, and the private identity manifest bound the subsequent
+  topology Pressure run to that exact App.
+- Oracle: deterministic Behavior coverage supplies the direct transient-empty
+  contract evidence: immediate repair readback, `waitingForEvidence`, exact
+  AX/Space/lifecycle wakeups, request/app/PID/generation filtering, conditional
+  cadence, cancellation, and diagnostic watchdog. The signed real-topology
+  layer independently proved the affected visible outcome: the exact fixture
+  bundle/PID exposed four expected AX/CG windows, and the Noisy Option+Tab path
+  round-tripped the normal, fullscreen workflow-sibling, incognito, and second
+  fullscreen identities across Spaces. Exact selected title, foreground state,
+  current mode, fixture topology, and WindowRecord confirmation supplied the
+  acceptance evidence; elapsed time and sampler state did not.
+- Retained time and lifecycle: the service-owned condition observer checks
+  immediately, then retains the named 100ms, 300ms, and repeated 800ms cadence
+  only while the exact current-App payload is incomplete. A 30-second watchdog
+  is the terminal failure bound and reports request ID, target, appID, attempt,
+  unmet non-empty condition, last payload, and last observation time. Exact
+  event evidence, completion, supersession, app termination, cancellation, and
+  service teardown own observer, cadence, and watchdog cleanup.
+- Unit and Behavior: the implementation slice's 15 focused tests and complete
+  526-test `FlowTabPriorityCoverageTests` run remain the applicable
+  deterministic validation. They cover initial state, event delivery,
+  stale/duplicate/out-of-order rejection, cancellation, PID reuse, slow
+  scheduling, cadence, watchdog diagnostics, and maintenance pressure.
+  FlowTabCore remains not relevant because the contract is owned by the
+  AppKit/ApplicationServices runtime projection boundary. This closure changes
+  documentation only.
+- UI and Pressure: the final canonical runtime-topology Pressure execution of
+  `testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows`
+  passed 1/1 in 43.714 seconds with zero failures. The wrapper reported
+  `stage=completed`, every exit code zero, and a valid successful xcresult. All
+  four target windows reached exact `verifiedFocusReadback` confirmation with
+  monotonic maintenance generations 2 through 5. All 59 identity checks
+  matched across 5,069.564 milliseconds, with 23 candidate observations and
+  zero rejected transient identities. CPU average/p95/max were
+  130.69/163.30/170.40 percent; RSS average/p95/max were
+  205.64/296.89/308.11 MiB. Scheduling and AX/CG load changed latency while
+  preserving the exact topology result.
+- Final-source repairs: the authorized run first exposed an app-scoped
+  projection completeness defect and then ordinary-queue admission of exact
+  focus evidence. Those independent contracts were repaired and committed as
+  `23fce63` (SYNC-026C1R) and `e6334a7` (SYNC-006R1). The final successful run
+  includes both fixes and leaves the SYNC-003 observer/cadence/watchdog contract
+  unchanged.
+- Signing and Process/Tooling: the installed App carried TeamIdentifier
+  `96PUA726W9`, Apple Development authority
+  `gobestsoft@qq.com (RF9WCUVKH8)`, CDHash
+  `ceada2fe783041f8be5e0381ea88ff8cd536bcee`, and private identity-manifest
+  SHA-256
+  `94447f96a0f202caf0cbbb5963184f6706d51b7b4e88407bfc5c89452714c4d9`.
+  `git diff --check` and project-file `plutil -lint` passed. The original
+  owner-scope audit found no `notBefore`, time-ready request selection,
+  retry-exhaustion success, or legacy retry-policy symbol.
+- Lifecycle cleanup: exact post-run fixed-App/Runner/fixture and
+  repository-scoped xcodebuild process readbacks were empty, wrapper
+  application and OS process cleanup both reached exact absence,
+  `.build-local/test-assets` remained absent, and startup baseline files stayed
+  outside the slice. The shared SYNC-006R1 evidence root was removed only after
+  its durable signing, semantic, resource, result, and cleanup record was
+  written.
+- Implementation commit: `de5f778`
+  (`refactor(sync): migrate SYNC-003 transient repair readiness`).
+- Closure commit subject:
+  `test(sync): close SYNC-003 signed topology pressure`.
