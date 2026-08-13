@@ -5,6 +5,7 @@ enum FlowTabUITestSwitcherAppProjectionPolicy {
     static let postLaunchWatchdog: TimeInterval = 10
     static let runtimeOrderWatchdog: TimeInterval = 5
     static let standardFixtureProjectionWatchdog: TimeInterval = 8
+    static let edgeInputsInitialProjectionWatchdog: TimeInterval = 10
     static let quitShortcutRemovalWatchdog: TimeInterval = 8
     static let quitShortcutInitialProjectionWatchdog: TimeInterval = 12
     static let openWindowMutationInitialProjectionWatchdog: TimeInterval = 12

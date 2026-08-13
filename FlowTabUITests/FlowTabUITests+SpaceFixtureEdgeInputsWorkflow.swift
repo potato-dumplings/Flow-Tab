@@ -42,7 +42,11 @@ extension FlowTabUITests {
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         ) { workflow, app in
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+            guard assertCurrentSwitcherAppProjection(
+                in: app,
+                exactEntry: "\(targetApp.identity.bundleIdentifier):2",
+                timeout: FlowTabUITestSwitcherAppProjectionPolicy.edgeInputsInitialProjectionWatchdog
+            ) else { return }
             XCTAssertTrue(
                 selectEdgeWorkflowAppInSwitcherAppLayer(
                     targetApp,
@@ -95,7 +99,11 @@ extension FlowTabUITests {
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         ) { _, app in
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+            guard assertCurrentSwitcherAppProjection(
+                in: app,
+                exactEntry: "\(targetApp.identity.bundleIdentifier):2",
+                timeout: FlowTabUITestSwitcherAppProjectionPolicy.edgeInputsInitialProjectionWatchdog
+            ) else { return }
             XCTAssertTrue(
                 selectEdgeWorkflowAppInSwitcherAppLayer(
                     targetApp,

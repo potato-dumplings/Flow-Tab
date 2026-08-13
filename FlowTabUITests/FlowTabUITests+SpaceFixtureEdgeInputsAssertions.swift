@@ -9,16 +9,6 @@ extension FlowTabUITests {
         diagnosticsSummary: XCUIElement,
         timeout: TimeInterval
     ) -> Bool {
-        let appTile = element(in: app, identifier: targetApp.identity.switcherAppAccessibilityIdentifier)
-        XCTAssertTrue(
-            appTile.waitForExistence(timeout: timeout),
-            """
-            Edge workflow app \(targetApp.appName) was not exposed in the switcher app layer.
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-
         do {
             try FlowTabUITestSwitcherCommandPayload.write(targetApp.identity.bundleIdentifier)
         } catch {

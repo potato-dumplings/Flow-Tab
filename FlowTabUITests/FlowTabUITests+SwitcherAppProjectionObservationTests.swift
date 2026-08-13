@@ -58,6 +58,14 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherAppProjectionEdgeInputsPolicyPreservesCompatibleBound() {
+        let watchdog =
+            FlowTabUITestSwitcherAppProjectionPolicy
+                .edgeInputsInitialProjectionWatchdog
+        XCTAssertEqual(watchdog, 10)
+        XCTAssertTrue(watchdog.isFinite && watchdog > 0)
+    }
+
     func testSwitcherAppProjectionQuitShortcutRemovalPolicyPreservesCompatibleBound() {
         XCTAssertEqual(
             FlowTabUITestSwitcherAppProjectionPolicy
