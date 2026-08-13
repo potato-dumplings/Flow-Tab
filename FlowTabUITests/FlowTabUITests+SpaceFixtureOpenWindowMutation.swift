@@ -108,12 +108,13 @@ extension FlowTabUITests {
                 "open-window-mutation-before-app-projection"
         )
 
-        let fixtureAppTile = element(
+        guard assertCurrentSwitcherAppProjection(
             in: app,
-            identifier:
-                identity.switcherAppAccessibilityIdentifier
-        )
-        XCTAssertTrue(fixtureAppTile.waitForExistence(timeout: 12))
+            exactEntry: "\(identity.bundleIdentifier):2",
+            timeout:
+                FlowTabUITestSwitcherAppProjectionPolicy
+                    .openWindowMutationInitialProjectionWatchdog
+        ) else { return }
         selectSwitcherAppDirectly(
             in: app,
             appID: identity.bundleIdentifier,
