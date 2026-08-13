@@ -968,21 +968,15 @@ extension FlowTabUITests {
             )
         }
 
-        XCTAssertTrue(
-            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10)
-        )
+        guard waitForSpaceFixtureHomeAppInventoryAfterNavigation(
+            workflow,
+            in: app
+        ) != nil else {
+            return
+        }
 
         for workflowApp in workflow.apps {
             let homeRows = app.buttons.matching(identifier: workflowApp.identity.homeAppAccessibilityIdentifier)
-            let homeRow = homeRows.firstMatch
-            let rowExists = homeRow.waitForExistence(timeout: 20)
-            if !rowExists, workflowApp.isFullscreenOnlyInHome {
-                continue
-            }
-            guard rowExists else {
-                XCTFail("FlowTab did not surface \(workflowApp.appName) on the home page")
-                return
-            }
             guard selectHomeWorkflowApp(workflowApp, in: app, timeout: 8) else {
                 XCTFail(
                     "FlowTab surfaced \(workflowApp.appName) on the home page, but its selection was not confirmed"
