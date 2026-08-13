@@ -161,6 +161,15 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherWindowTitleFullscreenMultiAppMutationWatchdogPolicyCompatibility() {
+        let watchdog =
+            FlowTabUITestSwitcherWindowTitleObservationPolicy
+                .fullscreenMultiAppWindowMutationProjectionWatchdog
+        XCTAssertEqual(watchdog, 45)
+        XCTAssertTrue(watchdog.isFinite)
+        XCTAssertGreaterThan(watchdog, 0)
+    }
+
     func testSwitcherWindowTitleSelectedMutationWatchdogPolicyCompatibility() {
         XCTAssertEqual(
             FlowTabUITestSwitcherWindowTitleObservationPolicy

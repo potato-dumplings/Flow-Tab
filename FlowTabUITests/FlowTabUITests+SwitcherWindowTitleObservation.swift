@@ -7,6 +7,8 @@ enum FlowTabUITestSwitcherWindowTitleObservationPolicy {
         TimeInterval = 8
     static let openWindowMutationProjectionWatchdog: TimeInterval = 25
     static let multiAppOpenWindowMutationProjectionWatchdog: TimeInterval = 40
+    static let fullscreenMultiAppWindowMutationProjectionWatchdog:
+        TimeInterval = 45
     static let selectedWindowMutationProjectionWatchdog: TimeInterval = 25
 }
 
