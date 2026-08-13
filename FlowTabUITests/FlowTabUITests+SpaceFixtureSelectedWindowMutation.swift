@@ -194,6 +194,18 @@ extension FlowTabUITests {
             return
         }
 
+        var acceptsPostCloseWindowProjection = false
+        let postCloseCards =
+            makeSwitcherWindowTitleObservation(
+                in: app,
+                expectedTitles: [allTitles[1]],
+                acceptsResolution: {
+                    acceptsPostCloseWindowProjection
+                }
+            )
+        postCloseCards.start()
+        defer { postCloseCards.cancel() }
+
         windowCloseObservation.requestClose(from: scheduledClose)
         guard let appliedClose =
                 windowCloseObservation.waitForApplied(
@@ -229,12 +241,19 @@ extension FlowTabUITests {
             appliedClose.snapshot.remainingWindowPlanIndices,
             [2]
         )
-
-        _ = waitForSwitcherWindowCards(
-            in: app,
-            expectedTitles: [allTitles[1]],
-            timeout: 25
-        )
+        acceptsPostCloseWindowProjection = true
+        postCloseCards.requestReadback(source: .triggerReadback)
+        guard postCloseCards.waitForResolution(
+            timeout:
+                FlowTabUITestSwitcherWindowTitleObservationPolicy
+                    .selectedWindowMutationProjectionWatchdog
+        ) != nil else {
+            XCTFail(
+                "Selected Mutation Window-card projection watchdog expired. "
+                    + postCloseCards.diagnosticSummary
+            )
+            return
+        }
         assertSwitcherWindowCycle(in: app, timeout: 5)
         waitForRuntimeLogFiles(
             matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=(none|[0-9]+)"#,
