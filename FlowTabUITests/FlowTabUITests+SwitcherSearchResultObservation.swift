@@ -634,50 +634,6 @@ extension FlowTabUITests {
         return identifiers
     }
 
-    func waitForSearchWindowResult(
-        in app: XCUIApplication,
-        title: String,
-        appName: String,
-        timeout: TimeInterval
-    ) -> SwitcherSearchWindowResultObservation? {
-        let expectation =
-            FlowTabUITestSwitcherSearchResultExpectation
-                .matchingWindow(
-                    title: title,
-                    appName: appName
-                )
-        let owner =
-            FlowTabUITestSwitcherSearchResultObservationOwner(
-                expectation: expectation,
-                readback: {
-                    FlowTabUITestSwitcherSearchResultSnapshot(
-                        results:
-                            self.searchWindowResultObservations(
-                                in: app
-                            )
-                    )
-                }
-            )
-        owner.start()
-        defer { owner.cancel() }
-
-        guard
-            let evidence = owner.waitForResolution(
-                timeout: timeout
-            ),
-            let result = expectation.matchingResult(
-                in: evidence.value
-            )
-        else {
-            XCTFail(
-                "Search result projection watchdog expired. "
-                    + owner.diagnosticSummary
-            )
-            return nil
-        }
-        return result
-    }
-
     func waitForSwitcherSearchResultSet(
         _ diagnosticsSummary: XCUIElement,
         appID: String,

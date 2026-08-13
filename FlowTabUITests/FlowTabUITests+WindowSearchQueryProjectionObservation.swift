@@ -1,6 +1,10 @@
 import Foundation
 import XCTest
 
+enum FlowTabUITestWindowSearchQueryProjectionPolicy {
+    static let multiAppResultPublicationWatchdog: TimeInterval = 8
+}
+
 private final class FlowTabUITestWindowSearchQueryProjectionState {
     let expectation:
         FlowTabUITestSwitcherSearchResultExpectation

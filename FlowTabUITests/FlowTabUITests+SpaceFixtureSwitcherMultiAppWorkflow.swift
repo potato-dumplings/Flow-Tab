@@ -172,13 +172,18 @@ extension FlowTabUITests {
                     observedBy: readiness
                 )
 
-            app.typeText(targetWindowTitle)
-
-            guard let result = waitForSearchWindowResult(
+            guard let result = performAndWaitForCommittedSearchWindowResult(
                 in: app,
+                scope: "window",
+                query: targetWindowTitle,
                 title: targetWindowTitle,
                 appName: targetApp.appName,
-                timeout: 8
+                timeout:
+                    FlowTabUITestWindowSearchQueryProjectionPolicy
+                        .multiAppResultPublicationWatchdog,
+                trigger: {
+                    app.typeText(targetWindowTitle)
+                }
             ) else { return }
             let targetWindowNumber = try XCTUnwrap(
                 result.windowNumber,
@@ -298,13 +303,18 @@ extension FlowTabUITests {
                 "The fullscreen activation scenario must start outside the target fixture app."
             )
 
-            app.typeText(targetWindowTitle)
-
-            guard let result = waitForSearchWindowResult(
+            guard let result = performAndWaitForCommittedSearchWindowResult(
                 in: app,
+                scope: "window",
+                query: targetWindowTitle,
                 title: targetWindowTitle,
                 appName: targetApp.appName,
-                timeout: 8
+                timeout:
+                    FlowTabUITestWindowSearchQueryProjectionPolicy
+                        .multiAppResultPublicationWatchdog,
+                trigger: {
+                    app.typeText(targetWindowTitle)
+                }
             ) else { return }
             let targetWindowNumber = try XCTUnwrap(
                 result.windowNumber,

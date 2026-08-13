@@ -8,6 +8,14 @@ private enum FlowTabUITestWindowSearchQueryProjectionTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testWindowSearchQueryProjectionPolicyCompatibility() {
+        let watchdog =
+            FlowTabUITestWindowSearchQueryProjectionPolicy
+                .multiAppResultPublicationWatchdog
+        XCTAssertEqual(watchdog, 8)
+        XCTAssertTrue(watchdog.isFinite && watchdog > 0)
+    }
+
     func testWindowSearchQueryProjectionAcceptsImmediatePostTriggerResult() {
         var scheduledRegistrationCount = 0
         var snapshot = windowSearchQueryProjectionTestSnapshot(
