@@ -258,8 +258,14 @@ extension FlowTabUITests {
             app,
             targetDescription: "runtime-lifecycle-after-fixture-launch"
         )
-        let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity, timeout: 12)
-        assertValue(of: fixtureAppRow, equals: "1w", timeout: 12)
+        _ = openHomeTabAndSelectSpaceFixtureApp(
+            in: app,
+            identity: identity,
+            expectedValue: "1w",
+            timeout:
+                FlowTabUITestSpaceFixtureHomeProjectionPolicy
+                    .runtimeLifecycleAppSummaryWatchdog
+        )
 
         let runningFixtureProcesses =
             NSRunningApplication.runningApplications(
@@ -739,25 +745,6 @@ extension FlowTabUITests {
             targetDescription: "standard-workflow-post-fixture-launch"
         )
         assertions(identity, app)
-    }
-
-    private func openHomeTabAndSelectSpaceFixtureApp(
-        in app: XCUIApplication,
-        identity: SpaceFixtureAppIdentity,
-        timeout: TimeInterval = 20
-    ) -> XCUIElement {
-        XCTAssertTrue(
-            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10)
-        )
-
-        let fixtureAppRows = app.buttons.matching(identifier: identity.homeAppAccessibilityIdentifier)
-        let fixtureAppRow = fixtureAppRows.firstMatch
-        XCTAssertTrue(fixtureAppRow.waitForExistence(timeout: timeout))
-        XCTAssertTrue(
-            tapFirstHittable(in: fixtureAppRows, timeout: timeout),
-            "FlowTab did not surface the real Space Fixture app on the home page"
-        )
-        return fixtureAppRow
     }
 
     private func assertSpaceFixtureWindowTitles(

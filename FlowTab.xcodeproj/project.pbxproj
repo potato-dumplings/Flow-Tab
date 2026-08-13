@@ -482,6 +482,7 @@
 		F7B8C9D635B8000100B0D737 /* FlowTabUITests+LaunchAtLoginSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7B8C9D535B8000100B0D737 /* FlowTabUITests+LaunchAtLoginSettings.swift */; };
 		B20011012FBD000100B0D737 /* FlowTabTests+HomeWindowActivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20001012FBD000100B0D737 /* FlowTabTests+HomeWindowActivation.swift */; };
 		B20012012FBD000100B0D737 /* FlowTabUITests+SpaceFixtureHomeActivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20002012FBD000100B0D737 /* FlowTabUITests+SpaceFixtureHomeActivation.swift */; };
+		A4CB00023DB1000100B0D737 /* FlowTabUITests+SpaceFixtureHomeProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4CB00013DB1000100B0D737 /* FlowTabUITests+SpaceFixtureHomeProjection.swift */; };
 		B21012012FC0000100B0D737 /* FlowTabUITests+WorkflowWindowObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B21002012FC0000100B0D737 /* FlowTabUITests+WorkflowWindowObservation.swift */; };
 		B22012012FC1000100B0D737 /* FlowTabUITests+SpaceFixtureInAppWindowSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22002012FC1000100B0D737 /* FlowTabUITests+SpaceFixtureInAppWindowSwitcher.swift */; };
 		B23012012FC2000100B0D737 /* FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23002012FC2000100B0D737 /* FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift */; };
@@ -886,6 +887,7 @@
 		F7B8C9D535B8000100B0D737 /* FlowTabUITests+LaunchAtLoginSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+LaunchAtLoginSettings.swift"; sourceTree = "<group>"; };
 		B20001012FBD000100B0D737 /* FlowTabTests+HomeWindowActivation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HomeWindowActivation.swift"; sourceTree = "<group>"; };
 		B20002012FBD000100B0D737 /* FlowTabUITests+SpaceFixtureHomeActivation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureHomeActivation.swift"; sourceTree = "<group>"; };
+		A4CB00013DB1000100B0D737 /* FlowTabUITests+SpaceFixtureHomeProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureHomeProjection.swift"; sourceTree = "<group>"; };
 		B21002012FC0000100B0D737 /* FlowTabUITests+WorkflowWindowObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+WorkflowWindowObservation.swift"; sourceTree = "<group>"; };
 		B22002012FC1000100B0D737 /* FlowTabUITests+SpaceFixtureInAppWindowSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureInAppWindowSwitcher.swift"; sourceTree = "<group>"; };
 		B23002012FC2000100B0D737 /* FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift"; sourceTree = "<group>"; };
@@ -1659,6 +1661,7 @@
 				F50000122F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift */,
 				F50000152FA1000100B0D737 /* FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift */,
 				B20002012FBD000100B0D737 /* FlowTabUITests+SpaceFixtureHomeActivation.swift */,
+				A4CB00013DB1000100B0D737 /* FlowTabUITests+SpaceFixtureHomeProjection.swift */,
 				ECD100053D1A000100B0D737 /* FlowTabUITests+HomeAppSummaryObservation.swift */,
 				F50000162FA1000100B0D737 /* FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift */,
 				B22002012FC1000100B0D737 /* FlowTabUITests+SpaceFixtureInAppWindowSwitcher.swift */,
@@ -2792,6 +2795,7 @@
 				F50001102F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift in Sources */,
 				F50001142FA1000100B0D737 /* FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift in Sources */,
 				B20012012FBD000100B0D737 /* FlowTabUITests+SpaceFixtureHomeActivation.swift in Sources */,
+				A4CB00023DB1000100B0D737 /* FlowTabUITests+SpaceFixtureHomeProjection.swift in Sources */,
 				ECD100063D1A000100B0D737 /* FlowTabUITests+HomeAppSummaryObservation.swift in Sources */,
 				F50001152FA1000100B0D737 /* FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift in Sources */,
 				B22012012FC1000100B0D737 /* FlowTabUITests+SpaceFixtureInAppWindowSwitcher.swift in Sources */,
