@@ -126,6 +126,13 @@ extension FlowTabUITests {
 
         let logSnapshot = makeRuntimeLogFileSnapshot()
         defer { logSnapshot.cancel() }
+        let postTerminationRefreshObservation =
+            SpaceFixturePostTerminationRefreshObservationOwner(
+                bundleIdentifier: identity.bundleIdentifier,
+                baseline: logSnapshot
+            )
+        postTerminationRefreshObservation.start()
+        defer { postTerminationRefreshObservation.cancel() }
         let terminationRequestPattern =
             FlowTabUITestRuntimeLogRecordPattern
                 .exactTerminationRequest(
@@ -199,6 +206,11 @@ extension FlowTabUITests {
             scheduledEvidence.identity.bundleIdentifier,
             identity.bundleIdentifier
         )
+        postTerminationRefreshObservation.bindTarget(
+            processIdentifier:
+                scheduledEvidence.identity.processIdentifier,
+            requestGeneration: scheduledEvidence.requestGeneration
+        )
         XCTAssertTrue(
             NSRunningApplication.runningApplications(
                 withBundleIdentifier:
@@ -251,14 +263,33 @@ extension FlowTabUITests {
                 + "waiterCompleted=\(terminationWaitCompleted) "
                 + "finalState=\(String(describing: finalFixtureState))"
         )
-        waitForRuntimeLogFiles(
-            containing: [
-                "terminate post-refresh reason=",
-                "appID=\(identity.bundleIdentifier)"
-            ],
-            since: logSnapshot,
-            timeout: 10
+        let refreshEvidence = try XCTUnwrap(
+            postTerminationRefreshObservation.waitForResolution(
+                timeout:
+                    SpaceFixturePostTerminationRefreshObservationPolicy
+                        .evidenceWatchdog
+            ),
+            "Post-termination projection refresh watchdog expired. "
+                + postTerminationRefreshObservation.diagnosticSummary
         )
+        XCTAssertEqual(
+            refreshEvidence.value.reason,
+            "workspace_notification"
+        )
+        XCTAssertEqual(
+            refreshEvidence.value.bundleIdentifier,
+            identity.bundleIdentifier
+        )
+        XCTAssertEqual(
+            refreshEvidence.value.processIdentifier,
+            scheduledEvidence.identity.processIdentifier
+        )
+        XCTAssertEqual(
+            refreshEvidence.value.pendingGeneration,
+            scheduledEvidence.requestGeneration
+        )
+        XCTAssertTrue(refreshEvidence.value.matchedPending)
+        XCTAssertTrue(refreshEvidence.value.refreshed)
         assertSwitcherAppRemoved(
             removalObservation,
             timeout:
