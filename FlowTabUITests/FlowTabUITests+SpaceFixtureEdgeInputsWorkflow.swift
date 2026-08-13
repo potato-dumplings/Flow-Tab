@@ -74,7 +74,9 @@ extension FlowTabUITests {
             let cards = performAndWaitForSwitcherWindowCards(
                 in: app,
                 expectedTitles: targetApp.expectedWindowTitles,
-                timeout: 8
+                timeout:
+                    FlowTabUITestSwitcherWindowCardPolicy
+                        .edgeInputsProjectionWatchdog
             ) {
                 app.typeKey(.downArrow, modifierFlags: [])
             }
@@ -132,7 +134,9 @@ extension FlowTabUITests {
             _ = performAndWaitForSwitcherWindowCards(
                 in: app,
                 expectedTitles: targetApp.expectedWindowTitles,
-                timeout: 8
+                timeout:
+                    FlowTabUITestSwitcherWindowCardPolicy
+                        .edgeInputsProjectionWatchdog
             ) {
                 app.typeKey(.downArrow, modifierFlags: [])
             }

@@ -90,6 +90,10 @@ struct FlowTabUITestSwitcherWindowCardExpectation: Equatable {
     }
 }
 
+enum FlowTabUITestSwitcherWindowCardPolicy {
+    static let edgeInputsProjectionWatchdog: TimeInterval = 8
+}
+
 struct FlowTabUITestSwitcherWindowPageCardExpectation: Equatable {
     let identifier: String
     let title: String

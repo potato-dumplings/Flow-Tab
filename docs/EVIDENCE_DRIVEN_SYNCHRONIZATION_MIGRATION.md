@@ -560,7 +560,7 @@ and Process/Tooling.
 | SYNC-036KA | `testSwitcherPanelShowsRealSpaceFixtureWorkflowWindowCards`; exact standard-fixture App-to-Window transition | A raw five-second helper bound accepts a semantic mode prefix after Down. Retained-watchdog plus evidence refinement. | Start the existing selection-transition owner before Down, require exact selected bundle and `windowCycle(<same bundle>)`, and name the compatible bound under the preview-transition policy. The helper invocation owns generation and cancellation. | M; exact baseline/transition/cancel/watchdog tests, affected signed workflow-card UI, Process/Tooling. | completed |
 | SYNC-036KB | Edge Inputs preview scenarios; exact initial duplicate-window App projection | Each path waits eight seconds for generic diagnostics, then ten seconds for one App row, without atomically proving the exact two-window logical entry. Evidence composition migration. | Reuse the Switcher App-projection owner for exact `bundleID:2` plus exact row identity and foreground state before selection. A named Edge projection watchdog is failure-only; the invocation owns the cancellable cadence. | M; exact entry/row/initial/delayed/cancel/watchdog tests, both signed Edge preview UIs, Process/Tooling. | completed |
 | SYNC-036KC | `selectEdgeWorkflowAppInSwitcherAppLayer`; exact Edge App-selection application | The helper writes its payload before installing a selected-field observer and accepts a state that may already match. Evidence-order migration. | Install the combined runtime-log/diagnostics App-selection owner before payload publication; require the exact applied-command record, selected bundle, and exact two-window App projection. The helper owns baseline, cadence, cancellation, and diagnostics. | H; stale-baseline/event/slow-scheduling/cancel/watchdog/Pressure tests, both signed Edge preview UIs, Process/Tooling. | completed |
-| SYNC-036KD | Edge Inputs preview scenarios and `performAndWaitForSwitcherWindowCards`; exact duplicate-title Window projection | The owner is installed before Down and succeeds from exact title multiplicity/card identities, while callers retain an anonymous eight-second terminal bound. Retained watchdog. | Name the Edge card-projection watchdog and retain exact multiplicity plus distinct identifiers as the Oracle. The invocation owns observer/cadence cancellation and terminal diagnostics. | M; policy/multiplicity/duplicate-ID/cancel/watchdog tests, both signed Edge preview UIs, Process/Tooling. | planned |
+| SYNC-036KD | Edge Inputs preview scenarios and `performAndWaitForSwitcherWindowCards`; exact duplicate-title Window projection | The owner is installed before Down and succeeds from exact title multiplicity/card identities, while callers retain an anonymous eight-second terminal bound. Retained watchdog. | Name the Edge card-projection watchdog and retain exact multiplicity plus distinct identifiers as the Oracle. The invocation owns observer/cadence cancellation and terminal diagnostics. | M; policy/multiplicity/duplicate-ID/cancel/watchdog tests, both signed Edge preview UIs, Process/Tooling. | completed |
 | SYNC-036KE | duplicate-title Edge preview; focused public-state identity publication | A raw eight-second regex wait starts from a prelaunch baseline and requires one internal first-assignment branch. A prior exact public binding can legitimately make later readbacks sticky, so scheduling changes the log shape and the test result. Evidence refinement plus retained watchdog. | Start one typed runtime-log owner before fixture launch and bind the exact bundle-derived PID when fixture readiness is available. Accept either one exact focused public-state tie-break or one snapshot joining the same focused PID/AX/CG topology with a `publicExactMatch` binding transition; both prove the intended distinct identity. Name the terminal bound, perform immediate post-bind readback, and let the scenario own baseline/owner cancellation. | H; exact parser/source/PID/initial/event/file-replacement/slow-scheduling/cancel/watchdog/Pressure tests, signed duplicate-title UI across both evidence shapes, Process/Tooling. | completed |
 | SYNC-036KF | minimized Edge preview; minimized AX source-to-window-layer propagation | Two sequential raw eight-second log waits separately observe source topology and output projection and can succeed from unrelated records. Evidence composition migration. | One prelaunch runtime-log owner requires both exact-PID minimized source evidence and its minimized WindowRecord projection after the preview trigger. File events drive readback; a named watchdog reports both missing stages. The scenario owns cancellation. | H; initial/ordered-or-duplicate events/wrong-PID/cancel/watchdog/slow-scheduling tests, signed minimized UI, Process/Tooling. | planned |
 | SYNC-036KG | Edge Window Search scenarios and `performAndWaitForSwitcherSearchWindowIdentifiers`; committed result projection | Both observer-before-typing paths already require exact scope/query/count/identity evidence, while callers supply anonymous eight-second bounds. Retained watchdog. | Name one Edge committed-result watchdog under the Search projection owner and preserve atomic scope/query/result identities as success. Each invocation cancels its owner/cadence. | M; policy/exact query/count/identifier/cancel/watchdog tests, both signed Edge Search UIs, Process/Tooling. | planned |
@@ -27580,6 +27580,57 @@ polling cadence, deadline, or timeout in the scoped paths.
   exact absence and worktree-baseline checks.
 - Commit subject:
   `refactor(sync): migrate SYNC-036KC Edge App selection`.
+
+### SYNC-036KD Closure Record
+
+- Status and Oracle: completed. Both Edge preview scenarios now pass the named
+  `edgeInputsProjectionWatchdog` to the existing Window-card owner. Success is
+  still established only by the exact expected card count, the complete title
+  multiset including two `Shared Docs` entries, one unique identifier per card,
+  excluded-title rejection, and fresh-identity rejection when prior identifiers
+  are supplied. The watchdog duration does not participate in acceptance.
+- Evidence ordering and lifecycle: `performAndWaitForSwitcherWindowCards`
+  constructs and starts the owner before Down, captures its initial readback,
+  rejects all evidence while the trigger is active, marks the trigger complete
+  only after the key operation returns, and immediately requests a trigger
+  readback. If unresolved, one named serial scheduled readback remains active.
+  The invocation owns the generation, expectation, scheduler cancellation, and
+  final diagnostic snapshot and cancels them idempotently on every return.
+- Retained time: eight seconds is named `edgeInputsProjectionWatchdog` under
+  `FlowTabUITestSwitcherWindowCardPolicy` and solely bounds missing exact card
+  evidence. XCUI exposes no card-collection publication callback, so the shared
+  `xcuiReadbackCadence` retains an immediately-checking, cancellable
+  100-millisecond fallback. Only the card projection can resolve the owner.
+- Deterministic and Pressure validation: the canonical rebuilt signed Runner
+  passed the policy, exact duplicate-title/fresh-identity, and lifecycle checks
+  3/3 in 0.570 seconds. The tests reject a prior identifier, wrong title,
+  duplicate identifier, cancellation callback, and watchdog final readback;
+  the 100-generation lifecycle Pressure check passed in 0.158 seconds.
+- Affected UI: after the canonical installer refreshed the fixed signed App,
+  one Runner invocation passed both real Edge fixture paths 2/2 in 24.300
+  seconds. The minimized path passed in 12.714 seconds with cards
+  `cg-22135-97290` and `cg-22135-97291`; the duplicate-title path passed in
+  11.586 seconds with cards `cg-22159-97345` and `cg-22159-97346`.
+- Validation scope: FlowTabCore Unit, app Unit/Behavior, FlowTabTests,
+  unrelated UI, and production Pressure are not relevant because this slice
+  changes only UI-test watchdog policy ownership and its two representative
+  callers. Production behavior, configuration, window identity, module
+  direction, path intent, and recurring product work remain unchanged.
+- Signing and Process/Tooling: the canonical six-target UI test build and
+  fixed-App install completed successfully. Sandbox-external strict deep
+  verification accepts the final App and Runner under Team `96PUA726W9` with
+  CDHashes `78a55012be48b3e401ae8351413f5c29e4b611f5` and
+  `5d73e86b37fd710767835d5835bd7d2f60caae9b`. Swift parsing and
+  `git diff --check` pass. The owner, tests, and affected workflow contain 649,
+  612, and 486 lines with clear single responsibilities. Exact
+  App/Runner/fixture and repository-scoped xcodebuild process readbacks are
+  empty.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. The reproducible UI result bundle
+  is removed after this durable record and independent commit, followed by
+  exact absence and worktree-baseline checks.
+- Commit subject:
+  `test(sync): migrate SYNC-036KD Edge card watchdog`.
 
 ### SYNC-001 Authorized Resume Closure Record
 

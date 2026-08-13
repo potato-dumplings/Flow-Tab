@@ -8,6 +8,23 @@ private enum FlowTabUITestSwitcherWindowCardTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testSwitcherWindowCardEdgeInputsPolicyPreservesCompatibleBound() {
+        XCTAssertEqual(
+            FlowTabUITestSwitcherWindowCardPolicy
+                .edgeInputsProjectionWatchdog,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestSwitcherWindowCardPolicy
+                .edgeInputsProjectionWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSwitcherWindowCardPolicy
+                .edgeInputsProjectionWatchdog,
+            0
+        )
+    }
+
     func testSwitcherWindowPageExpectationRequiresCompleteLayoutClosure() {
         let expectation = switcherWindowPageExpectation()
         let matching = switcherWindowPageSnapshot()
