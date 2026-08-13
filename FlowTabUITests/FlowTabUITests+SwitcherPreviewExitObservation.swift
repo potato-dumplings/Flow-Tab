@@ -8,6 +8,7 @@ enum FlowTabUITestSwitcherPreviewTransitionPolicy {
         TimeInterval = 15
     static let exitWatchdog: TimeInterval = 3
     static let openWindowMutationModeWatchdog: TimeInterval = 5
+    static let selectedWindowMutationModeWatchdog: TimeInterval = 5
 
     static func entryProjectionWatchdog(
         for expectation:

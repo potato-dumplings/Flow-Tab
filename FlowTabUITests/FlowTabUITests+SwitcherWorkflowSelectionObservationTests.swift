@@ -24,6 +24,23 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherPreviewSelectedWindowMutationModePolicyPreservesCompatibleBound() {
+        XCTAssertEqual(
+            FlowTabUITestSwitcherPreviewTransitionPolicy
+                .selectedWindowMutationModeWatchdog,
+            5
+        )
+        XCTAssertTrue(
+            FlowTabUITestSwitcherPreviewTransitionPolicy
+                .selectedWindowMutationModeWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSwitcherPreviewTransitionPolicy
+                .selectedWindowMutationModeWatchdog,
+            0
+        )
+    }
+
     func testSwitcherPreviewTransitionPolicyPreservesCompatibleBounds() {
         XCTAssertEqual(
             FlowTabUITestSwitcherPreviewTransitionPolicy
