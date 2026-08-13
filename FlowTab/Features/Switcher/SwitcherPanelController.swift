@@ -5,13 +5,13 @@ import SwiftUI
 import FlowTabCore
 
 struct PanelVisibilityRecoveryPolicy: Equatable {
-    var initialPresentationWatchdogInterval: TimeInterval
+    var initialPresentationRecoveryEscalationInterval: TimeInterval
     var interruptionMaximumAttemptCount: Int
     var interruptionConditionReadbackInterval: TimeInterval
     var interruptionWatchdogInterval: TimeInterval
 
     static let `default` = PanelVisibilityRecoveryPolicy(
-        initialPresentationWatchdogInterval: 0.35,
+        initialPresentationRecoveryEscalationInterval: 0.35,
         interruptionMaximumAttemptCount: 4,
         interruptionConditionReadbackInterval: 0.01,
         interruptionWatchdogInterval: 1.0
@@ -153,8 +153,9 @@ final class SwitcherPanelController {
     let activeSpaceTransitionPolicy: ActiveSpaceTransitionPolicy = .default
     let terminateInterruptionProtectionPolicy:
         TerminateInterruptionProtectionPolicy = .default
-    var initialPresentationVisibilityWatchdogInterval: TimeInterval {
-        panelVisibilityRecoveryPolicy.initialPresentationWatchdogInterval
+    var initialPresentationVisibilityRecoveryEscalationInterval: TimeInterval {
+        panelVisibilityRecoveryPolicy
+            .initialPresentationRecoveryEscalationInterval
     }
     var initialPresentationVisibilityGeneration: Int {
         initialPanelVisibilityObservationOwner.generation
@@ -162,13 +163,16 @@ final class SwitcherPanelController {
     var initialPresentationVisibilityTrigger: String? {
         initialPanelVisibilityObservationOwner.currentTrigger
     }
-    var hasPendingInitialPresentationVisibilityWatchdog: Bool {
-        initialPanelVisibilityObservationOwner.hasPendingWatchdog
+    var hasPendingInitialPresentationVisibilityObservation: Bool {
+        initialPanelVisibilityObservationOwner.isObserving
     }
-    var lastInitialPresentationVisibilityWatchdogFailure:
-        InitialPanelVisibilityWatchdogFailure?
+    var hasPendingInitialPresentationVisibilityRecoveryEscalation: Bool {
+        initialPanelVisibilityObservationOwner.hasPendingRecoveryEscalation
+    }
+    var lastInitialPresentationVisibilityRecoveryEscalation:
+        InitialPanelVisibilityRecoveryEscalation?
     {
-        initialPanelVisibilityObservationOwner.lastFailure
+        initialPanelVisibilityObservationOwner.lastRecoveryEscalation
     }
     var activeSpaceTransitionWatchdogInterval: TimeInterval {
         activeSpaceTransitionPolicy.topologyReadbackWatchdogInterval

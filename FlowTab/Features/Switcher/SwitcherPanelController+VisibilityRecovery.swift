@@ -170,6 +170,7 @@ extension SwitcherPanelController {
             evidence.presentationGeneration
         ) else { return }
         guard hasActivePresentationSession else { return }
+        clearInitialPresentationVisibilityTracking()
         completeActiveSpaceMigrationIfNeeded(
             presentationGeneration: evidence.presentationGeneration,
             reason: "panelVisible:\(evidence.source.rawValue)"

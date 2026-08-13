@@ -75,7 +75,7 @@ struct FlowTabUITestInitialPresentationInputReadinessSnapshot:
                 .hasPendingPanelPresentationDiagnosticProbe
         initialVisibilityPending =
             panelController
-                .hasPendingInitialPresentationVisibilityWatchdog
+                .hasPendingInitialPresentationVisibilityObservation
         panelVisibilityRecoveryPending =
             panelController
                 .hasPendingPanelVisibilityRecoveryObservation

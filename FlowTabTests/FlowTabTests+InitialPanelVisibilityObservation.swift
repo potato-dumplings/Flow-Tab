@@ -40,7 +40,7 @@ final class ManualInitialPanelVisibilityObservationScheduler:
             $0.token.isAvailable
         }) else {
             return XCTFail(
-                "Expected a pending initial-visibility watchdog."
+                "Expected a pending initial-visibility recovery escalation."
             )
         }
         scheduledAction.token.markFired()
@@ -54,6 +54,20 @@ final class ManualInitialPanelVisibilityObservationScheduler:
             scheduledAction.token.markFired()
             scheduledAction.action()
         }
+    }
+}
+
+@MainActor
+private final class ImmediateInitialPanelVisibilityObservationScheduler:
+    InitialPanelVisibilityObservationScheduling
+{
+    func schedule(
+        after interval: TimeInterval,
+        _ action: @escaping @MainActor @Sendable () -> Void
+    ) -> any InitialPanelVisibilityObservationCancellable {
+        let token = ManualInitialPanelVisibilityObservationToken()
+        action()
+        return token
     }
 }
 
@@ -89,12 +103,12 @@ extension FlowTabTests {
         let generation = owner.start(
             trigger: "already_visible",
             presentationGeneration: 7,
-            watchdogInterval: 0.35,
+            recoveryEscalationInterval: 0.35,
             readback: {
                 Self.initialPanelVisibilitySnapshot(userVisible: true)
             },
             onVisible: { visibleEvidence.append($0) },
-            onWatchdog: { _ in
+            onRecoveryEscalation: { _ in
                 XCTFail("Satisfied initial readback must complete.")
             }
         )
@@ -109,7 +123,8 @@ extension FlowTabTests {
             [7]
         )
         XCTAssertTrue(scheduler.pendingIntervals.isEmpty)
-        XCTAssertFalse(owner.hasPendingWatchdog)
+        XCTAssertFalse(owner.hasPendingRecoveryEscalation)
+        XCTAssertFalse(owner.isObserving)
     }
 
     @MainActor
@@ -125,10 +140,10 @@ extension FlowTabTests {
         let generation = owner.start(
             trigger: "window_event",
             presentationGeneration: 11,
-            watchdogInterval: 0.35,
+            recoveryEscalationInterval: 0.35,
             readback: { snapshot },
             onVisible: { visibleEvidence.append($0) },
-            onWatchdog: { _ in
+            onRecoveryEscalation: { _ in
                 XCTFail("Matching window evidence must complete.")
             }
         )
@@ -151,7 +166,8 @@ extension FlowTabTests {
             [.panelBecameKey]
         )
         XCTAssertTrue(scheduler.pendingIntervals.isEmpty)
-        XCTAssertFalse(owner.hasPendingWatchdog)
+        XCTAssertFalse(owner.hasPendingRecoveryEscalation)
+        XCTAssertFalse(owner.isObserving)
     }
 
     @MainActor
@@ -166,11 +182,11 @@ extension FlowTabTests {
         let generation = owner.start(
             trigger: "identity",
             presentationGeneration: 13,
-            watchdogInterval: 0.35,
+            recoveryEscalationInterval: 0.35,
             readback: { snapshot },
             onVisible: { _ in completionCount += 1 },
-            onWatchdog: { _ in
-                XCTFail("Current evidence completes before the watchdog.")
+            onRecoveryEscalation: { _ in
+                XCTFail("Current evidence completes before recovery escalation.")
             }
         )
 
@@ -207,7 +223,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testInitialPanelVisibilityWatchdogReportsLastEventAndFinalReadback() {
+    func testInitialPanelVisibilityRecoveryEscalationPreservesObservationForLaterEvidence() {
         let scheduler = ManualInitialPanelVisibilityObservationScheduler()
         let owner = InitialPanelVisibilityObservationOwner(
             scheduler: scheduler
@@ -215,16 +231,15 @@ extension FlowTabTests {
         var snapshot = Self.initialPanelVisibilitySnapshot(
             userVisible: false
         )
-        var failures: [InitialPanelVisibilityWatchdogFailure] = []
+        var visibleEvidence: [InitialPanelVisibilityEvidence] = []
+        var escalations: [InitialPanelVisibilityRecoveryEscalation] = []
         let generation = owner.start(
-            trigger: "watchdog",
+            trigger: "recovery_escalation",
             presentationGeneration: 17,
-            watchdogInterval: 0.35,
+            recoveryEscalationInterval: 0.35,
             readback: { snapshot },
-            onVisible: { _ in
-                XCTFail("Unsatisfied visibility must reach the watchdog.")
-            },
-            onWatchdog: { failures.append($0) }
+            onVisible: { visibleEvidence.append($0) },
+            onRecoveryEscalation: { escalations.append($0) }
         )
 
         snapshot = Self.initialPanelVisibilitySnapshot(
@@ -245,20 +260,36 @@ extension FlowTabTests {
         )
         scheduler.fireNext()
 
-        XCTAssertEqual(failures.count, 1)
-        XCTAssertEqual(failures[0].trigger, "watchdog")
-        XCTAssertEqual(failures[0].lastEventEvidence.source, .panelExposed)
-        XCTAssertTrue(failures[0].lastEventEvidence.snapshot.panelKey)
-        XCTAssertEqual(failures[0].finalEvidence.source, .watchdogReadback)
-        XCTAssertTrue(failures[0].finalEvidence.snapshot.appActive)
-        XCTAssertTrue(
-            failures[0].logFields.contains("condition=userVisible")
+        XCTAssertEqual(escalations.count, 1)
+        XCTAssertEqual(escalations[0].trigger, "recovery_escalation")
+        XCTAssertEqual(escalations[0].lastEventEvidence.source, .panelExposed)
+        XCTAssertTrue(escalations[0].lastEventEvidence.snapshot.panelKey)
+        XCTAssertEqual(
+            escalations[0].finalEvidence.source,
+            .recoveryEscalationReadback
         )
-        XCTAssertEqual(owner.lastFailure, failures[0])
+        XCTAssertTrue(escalations[0].finalEvidence.snapshot.appActive)
+        XCTAssertTrue(
+            escalations[0].logFields.contains("condition=userVisible")
+        )
+        XCTAssertEqual(owner.lastRecoveryEscalation, escalations[0])
+        XCTAssertTrue(owner.isObserving)
+        XCTAssertFalse(owner.hasPendingRecoveryEscalation)
+
+        snapshot = Self.initialPanelVisibilitySnapshot(userVisible: true)
+        XCTAssertTrue(
+            owner.observe(
+                source: .panelExposed,
+                observationGeneration: generation,
+                presentationGeneration: 17
+            )
+        )
+        XCTAssertEqual(visibleEvidence.map(\.source), [.panelExposed])
+        XCTAssertFalse(owner.isObserving)
     }
 
     @MainActor
-    func testInitialPanelVisibilityDelayedWatchdogAcceptsFinalVisibleReadback() {
+    func testInitialPanelVisibilityDelayedRecoveryEscalationAcceptsFinalVisibleReadback() {
         let scheduler = ManualInitialPanelVisibilityObservationScheduler()
         let owner = InitialPanelVisibilityObservationOwner(
             scheduler: scheduler
@@ -267,14 +298,14 @@ extension FlowTabTests {
             userVisible: false
         )
         var visibleEvidence: [InitialPanelVisibilityEvidence] = []
-        var failureCount = 0
+        var escalationCount = 0
         _ = owner.start(
             trigger: "slow_scheduler",
             presentationGeneration: 19,
-            watchdogInterval: 0.35,
+            recoveryEscalationInterval: 0.35,
             readback: { snapshot },
             onVisible: { visibleEvidence.append($0) },
-            onWatchdog: { _ in failureCount += 1 }
+            onRecoveryEscalation: { _ in escalationCount += 1 }
         )
 
         snapshot = Self.initialPanelVisibilitySnapshot(userVisible: true)
@@ -282,14 +313,15 @@ extension FlowTabTests {
 
         XCTAssertEqual(
             visibleEvidence.map(\.source),
-            [.watchdogReadback]
+            [.recoveryEscalationReadback]
         )
-        XCTAssertEqual(failureCount, 0)
-        XCTAssertNil(owner.lastFailure)
+        XCTAssertEqual(escalationCount, 0)
+        XCTAssertNil(owner.lastRecoveryEscalation)
+        XCTAssertFalse(owner.isObserving)
     }
 
     @MainActor
-    func testInitialPanelVisibilityCancellationInvalidatesPendingWatchdog() {
+    func testInitialPanelVisibilityCancellationInvalidatesPendingRecoveryEscalation() {
         let scheduler = ManualInitialPanelVisibilityObservationScheduler()
         let owner = InitialPanelVisibilityObservationOwner(
             scheduler: scheduler
@@ -298,12 +330,12 @@ extension FlowTabTests {
         _ = owner.start(
             trigger: "cancel",
             presentationGeneration: 23,
-            watchdogInterval: 0.35,
+            recoveryEscalationInterval: 0.35,
             readback: {
                 Self.initialPanelVisibilitySnapshot(userVisible: false)
             },
             onVisible: { _ in callbackCount += 1 },
-            onWatchdog: { _ in callbackCount += 1 }
+            onRecoveryEscalation: { _ in callbackCount += 1 }
         )
 
         owner.cancel(invalidate: true)
@@ -311,12 +343,13 @@ extension FlowTabTests {
 
         XCTAssertEqual(owner.generation, 2)
         XCTAssertNil(owner.currentTrigger)
-        XCTAssertFalse(owner.hasPendingWatchdog)
+        XCTAssertFalse(owner.hasPendingRecoveryEscalation)
+        XCTAssertFalse(owner.isObserving)
         XCTAssertEqual(callbackCount, 0)
     }
 
     @MainActor
-    func testInitialPanelVisibilityRapidReplacementPressureKeepsOneWatchdog() {
+    func testInitialPanelVisibilityRapidReplacementPressureKeepsOneRecoveryEscalation() {
         let scheduler = ManualInitialPanelVisibilityObservationScheduler()
         let owner = InitialPanelVisibilityObservationOwner(
             scheduler: scheduler
@@ -328,26 +361,59 @@ extension FlowTabTests {
             _ = owner.start(
                 trigger: "pressure_\(index)",
                 presentationGeneration: index,
-                watchdogInterval: 0.35,
+                recoveryEscalationInterval: 0.35,
                 readback: {
                     Self.initialPanelVisibilitySnapshot(
                         userVisible: false
                     )
                 },
                 onVisible: { _ in callbackCount += 1 },
-                onWatchdog: { _ in callbackCount += 1 }
+                onRecoveryEscalation: { _ in callbackCount += 1 }
             )
         }
 
         XCTAssertEqual(owner.generation, replacementCount)
         XCTAssertEqual(owner.currentTrigger, "pressure_1999")
         XCTAssertEqual(scheduler.pendingIntervals, [0.35])
-        XCTAssertTrue(owner.hasPendingWatchdog)
+        XCTAssertTrue(owner.hasPendingRecoveryEscalation)
 
         owner.cancel(invalidate: true)
         scheduler.fireAll()
         XCTAssertEqual(callbackCount, 0)
         XCTAssertTrue(scheduler.pendingIntervals.isEmpty)
+    }
+
+    @MainActor
+    func testInitialPanelVisibilitySynchronousRecoveryEscalationRetainsNoSchedule() {
+        let owner = InitialPanelVisibilityObservationOwner(
+            scheduler: ImmediateInitialPanelVisibilityObservationScheduler()
+        )
+        var snapshot = Self.initialPanelVisibilitySnapshot(userVisible: false)
+        var escalations: [InitialPanelVisibilityRecoveryEscalation] = []
+        var visibleEvidence: [InitialPanelVisibilityEvidence] = []
+
+        let generation = owner.start(
+            trigger: "synchronous_escalation",
+            presentationGeneration: 31,
+            recoveryEscalationInterval: 0.35,
+            readback: { snapshot },
+            onVisible: { visibleEvidence.append($0) },
+            onRecoveryEscalation: { escalations.append($0) }
+        )
+
+        XCTAssertEqual(escalations.count, 1)
+        XCTAssertTrue(owner.isObserving)
+        XCTAssertFalse(owner.hasPendingRecoveryEscalation)
+        snapshot = Self.initialPanelVisibilitySnapshot(userVisible: true)
+        XCTAssertTrue(
+            owner.observe(
+                source: .panelBecameKey,
+                observationGeneration: generation,
+                presentationGeneration: 31
+            )
+        )
+        XCTAssertEqual(visibleEvidence.map(\.source), [.panelBecameKey])
+        XCTAssertFalse(owner.isObserving)
     }
 
     private static func initialPanelVisibilitySnapshot(

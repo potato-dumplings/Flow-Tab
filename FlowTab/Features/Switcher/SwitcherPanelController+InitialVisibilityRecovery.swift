@@ -93,7 +93,8 @@ extension SwitcherPanelController {
         let generation = initialPanelVisibilityObservationOwner.start(
             trigger: trigger,
             presentationGeneration: presentationGeneration,
-            watchdogInterval: initialPresentationVisibilityWatchdogInterval,
+            recoveryEscalationInterval:
+                initialPresentationVisibilityRecoveryEscalationInterval,
             readback: { [unowned self] in
                 self.panelVisibilitySnapshot()
             },
@@ -103,9 +104,9 @@ extension SwitcherPanelController {
                     evidence: evidence
                 )
             },
-            onWatchdog: { [weak self] failure in
-                self?.handleInitialPresentationVisibilityWatchdog(
-                    failure
+            onRecoveryEscalation: { [weak self] escalation in
+                self?.handleInitialPresentationVisibilityRecoveryEscalation(
+                    escalation
                 )
             }
         )
@@ -119,7 +120,7 @@ extension SwitcherPanelController {
             )
         }
         logSearchTrace(
-            "presentationRecovery trigger=\(trigger) action=trackInitialVisibility generation=\(generation) presentationGeneration=\(presentationGeneration) watchdogMs=\(formatMilliseconds(initialPresentationVisibilityWatchdogInterval * 1_000)) \(searchTraceStateSummary())"
+            "presentationRecovery trigger=\(trigger) action=trackInitialVisibility generation=\(generation) presentationGeneration=\(presentationGeneration) recoveryEscalationMs=\(formatMilliseconds(initialPresentationVisibilityRecoveryEscalationInterval * 1_000)) \(searchTraceStateSummary())"
         )
         return generation
     }
@@ -171,6 +172,9 @@ extension SwitcherPanelController {
         guard isPresentationSessionGenerationCurrent(
             evidence.presentationGeneration
         ) else { return }
+        if hasPendingPanelVisibilityRecoveryObservation {
+            cancelPanelPresentationRecovery()
+        }
         panelVisibilityRecoveryState = .visibleConfirmed(
             trigger: trigger,
             generation: evidence.observationGeneration,
@@ -184,23 +188,23 @@ extension SwitcherPanelController {
         )
     }
 
-    private func handleInitialPresentationVisibilityWatchdog(
-        _ failure: InitialPanelVisibilityWatchdogFailure
+    private func handleInitialPresentationVisibilityRecoveryEscalation(
+        _ escalation: InitialPanelVisibilityRecoveryEscalation
     ) {
         guard hasActivePresentationSession else { return }
         guard isPresentationSessionGenerationCurrent(
-            failure.presentationGeneration
+            escalation.presentationGeneration
         ) else { return }
-        panelVisibilityRecoveryState = .failed(
-            trigger: failure.trigger,
-            generation: failure.observationGeneration,
-            reason: "visibilityWatchdog"
-        )
+        guard initialPanelVisibilityObservationOwner.isObserving(
+            observationGeneration: escalation.observationGeneration,
+            presentationGeneration: escalation.presentationGeneration
+        ) else { return }
         logSearchTrace(
-            "presentationRecovery trigger=\(failure.trigger) action=failed reason=visibilityWatchdog generation=\(failure.observationGeneration) presentationGeneration=\(failure.presentationGeneration) \(failure.logFields) \(searchTraceStateSummary())"
+            "presentationRecovery trigger=\(escalation.trigger) action=recoveryEscalated generation=\(escalation.observationGeneration) presentationGeneration=\(escalation.presentationGeneration) \(escalation.logFields) \(searchTraceStateSummary())"
         )
-        handleRecoverableSystemInterruption(
-            trigger: "\(failure.trigger)_visibilityWatchdog"
+        schedulePanelVisibilityRecovery(
+            trigger: "\(escalation.trigger)_initialVisibilityEscalation",
+            cancelSessionOnFailure: false
         )
     }
 

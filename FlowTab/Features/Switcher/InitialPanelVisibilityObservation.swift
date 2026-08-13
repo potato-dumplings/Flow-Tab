@@ -7,7 +7,7 @@ enum InitialPanelVisibilityEvidenceSource: String, Equatable {
     case panelBecameKey
     case panelExposed
     case recoveryReadback
-    case watchdogReadback
+    case recoveryEscalationReadback
 }
 
 struct InitialPanelVisibilityEvidence: Equatable {
@@ -17,7 +17,7 @@ struct InitialPanelVisibilityEvidence: Equatable {
     let snapshot: PanelVisibilitySnapshot
 }
 
-struct InitialPanelVisibilityWatchdogFailure: Equatable {
+struct InitialPanelVisibilityRecoveryEscalation: Equatable {
     let trigger: String
     let observationGeneration: Int
     let presentationGeneration: Int
@@ -100,10 +100,11 @@ final class InitialPanelVisibilityObservationOwner {
         let presentationGeneration: Int
         let readback: @MainActor () -> PanelVisibilitySnapshot
         let onVisible: @MainActor (InitialPanelVisibilityEvidence) -> Void
-        let onWatchdog:
-            @MainActor (InitialPanelVisibilityWatchdogFailure) -> Void
+        let onRecoveryEscalation:
+            @MainActor (InitialPanelVisibilityRecoveryEscalation) -> Void
         var lastEventEvidence: InitialPanelVisibilityEvidence?
-        var watchdogToken:
+        var didDeliverRecoveryEscalation: Bool
+        var recoveryEscalationToken:
             (any InitialPanelVisibilityObservationCancellable)?
     }
 
@@ -111,7 +112,8 @@ final class InitialPanelVisibilityObservationOwner {
     private var pending: PendingObservation?
 
     private(set) var generation = 0
-    private(set) var lastFailure: InitialPanelVisibilityWatchdogFailure?
+    private(set) var lastRecoveryEscalation:
+        InitialPanelVisibilityRecoveryEscalation?
 
     init(
         scheduler:
@@ -133,38 +135,46 @@ final class InitialPanelVisibilityObservationOwner {
         pending?.lastEventEvidence
     }
 
-    var hasPendingWatchdog: Bool {
-        pending?.watchdogToken != nil
+    var isObserving: Bool {
+        pending != nil
+    }
+
+    var hasPendingRecoveryEscalation: Bool {
+        pending?.recoveryEscalationToken != nil
     }
 
     @discardableResult
     func start(
         trigger: String,
         presentationGeneration: Int,
-        watchdogInterval: TimeInterval,
+        recoveryEscalationInterval: TimeInterval,
         readback: @escaping @MainActor () -> PanelVisibilitySnapshot,
         onVisible:
             @escaping @MainActor (InitialPanelVisibilityEvidence) -> Void,
-        onWatchdog:
-            @escaping @MainActor (InitialPanelVisibilityWatchdogFailure) -> Void
+        onRecoveryEscalation:
+            @escaping @MainActor (
+                InitialPanelVisibilityRecoveryEscalation
+            ) -> Void
     ) -> Int {
         precondition(
-            watchdogInterval > 0 && watchdogInterval.isFinite,
-            "Initial panel visibility watchdog interval must be finite and positive."
+            recoveryEscalationInterval > 0
+                && recoveryEscalationInterval.isFinite,
+            "Initial panel visibility recovery escalation interval must be finite and positive."
         )
         cancel(invalidate: false)
         generation += 1
         let observationGeneration = generation
-        lastFailure = nil
+        lastRecoveryEscalation = nil
         pending = PendingObservation(
             generation: observationGeneration,
             trigger: trigger,
             presentationGeneration: presentationGeneration,
             readback: readback,
             onVisible: onVisible,
-            onWatchdog: onWatchdog,
+            onRecoveryEscalation: onRecoveryEscalation,
             lastEventEvidence: nil,
-            watchdogToken: nil
+            didDeliverRecoveryEscalation: false,
+            recoveryEscalationToken: nil
         )
 
         if observe(
@@ -175,20 +185,21 @@ final class InitialPanelVisibilityObservationOwner {
             return observationGeneration
         }
 
-        let token = scheduler.schedule(after: watchdogInterval) {
+        let token = scheduler.schedule(after: recoveryEscalationInterval) {
             [weak self] in
-            self?.expireWatchdog(
+            self?.handleRecoveryEscalation(
                 observationGeneration: observationGeneration,
                 presentationGeneration: presentationGeneration
             )
         }
         guard var active = pending,
-              active.generation == observationGeneration
+              active.generation == observationGeneration,
+              !active.didDeliverRecoveryEscalation
         else {
             token.cancel()
             return observationGeneration
         }
-        active.watchdogToken = token
+        active.recoveryEscalationToken = token
         pending = active
         return observationGeneration
     }
@@ -222,7 +233,7 @@ final class InitialPanelVisibilityObservationOwner {
     }
 
     func cancel(invalidate: Bool) {
-        pending?.watchdogToken?.cancel()
+        pending?.recoveryEscalationToken?.cancel()
         pending = nil
         if invalidate {
             generation += 1
@@ -237,7 +248,7 @@ final class InitialPanelVisibilityObservationOwner {
             && pending?.presentationGeneration == presentationGeneration
     }
 
-    private func expireWatchdog(
+    private func handleRecoveryEscalation(
         observationGeneration: Int,
         presentationGeneration: Int
     ) {
@@ -249,12 +260,14 @@ final class InitialPanelVisibilityObservationOwner {
         }
         let previousEvidence = active.lastEventEvidence
         let finalEvidence = InitialPanelVisibilityEvidence(
-            source: .watchdogReadback,
+            source: .recoveryEscalationReadback,
             observationGeneration: observationGeneration,
             presentationGeneration: presentationGeneration,
             snapshot: active.readback()
         )
         active.lastEventEvidence = finalEvidence
+        active.didDeliverRecoveryEscalation = true
+        active.recoveryEscalationToken = nil
         pending = active
         if finalEvidence.snapshot.userVisible {
             finishVisible(
@@ -264,20 +277,15 @@ final class InitialPanelVisibilityObservationOwner {
             return
         }
 
-        guard let completed = takePending(
-            observationGeneration: observationGeneration
-        ) else {
-            return
-        }
-        let failure = InitialPanelVisibilityWatchdogFailure(
-            trigger: completed.trigger,
+        let escalation = InitialPanelVisibilityRecoveryEscalation(
+            trigger: active.trigger,
             observationGeneration: observationGeneration,
             presentationGeneration: presentationGeneration,
             lastEventEvidence: previousEvidence ?? finalEvidence,
             finalEvidence: finalEvidence
         )
-        lastFailure = failure
-        completed.onWatchdog(failure)
+        lastRecoveryEscalation = escalation
+        active.onRecoveryEscalation(escalation)
     }
 
     private func finishVisible(
@@ -300,7 +308,7 @@ final class InitialPanelVisibilityObservationOwner {
         else {
             return nil
         }
-        active.watchdogToken?.cancel()
+        active.recoveryEscalationToken?.cancel()
         pending = nil
         return active
     }
