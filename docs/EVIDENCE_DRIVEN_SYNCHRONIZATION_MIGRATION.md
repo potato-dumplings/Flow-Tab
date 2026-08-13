@@ -552,7 +552,7 @@ and Process/Tooling.
 | SYNC-036JS | `testSwitcherPanelKeepsWindowLayerWhenSelectedFixtureWindowCloses`, `FlowTabUITestSwitcherWindowTitleObservationOwner`, and the post-close one-card Selected Mutation Window projection | The caller requests the explicit close, waits for exact applied evidence, then creates the shared title owner through `waitForSwitcherWindowCards` with a raw twenty-five-second bound. The immediate readback can recover the settled projection, while the observation lifecycle begins after the close trigger and exact applied generation does not gate title acceptance. Retained-watchdog plus observer-order migration. | Create the exact remaining-title/cardinality owner before publishing the close trigger and keep acceptance closed through its initial and scheduled readbacks. After matching applied-close identity/generation confirms target index 1 absent and remaining topology `[2]`, open acceptance, request an immediate trigger readback, and accept only the exact single-card projection for title 2. XCUI exposes no collection-change callback, so retain the shared named cancellable 100ms cadence only while unresolved. Name the compatible twenty-five seconds `selectedWindowMutationProjectionWatchdog` solely as a failure bound reporting acceptance phase, expected multiplicity, final card count/title counts, generation, source, and waiter result. The title owner owns observation generation and scheduler cancellation; the invocation cancels it on every exit and owns both App lifecycles. Preserved exact Window-cycle mode and runtime reconciliation remain independent later Oracles. | H observer-before-cross-process close trigger composed with exact applied generation and gated XCUI contraction evidence; named-policy compatibility, initial mismatch, matching pre-trigger rejection, trigger readback, exact multiplicity, slow scheduling, cancellation, watchdog, 100-generation lifecycle and stale-callback Pressure, affected signed UI, strict signing/process evidence, semantic guard, source parse, raw-bound inventory, and Process/Tooling validation. FlowTabCore Unit, app Unit/Behavior, FlowTabTests, unrelated UI, and additional production Pressure are not relevant because production close/projection behavior, fixture topology, module direction, configuration, path intent, and recurring work are unchanged. | completed |
 | SYNC-036JT | `testSwitcherPanelKeepsWindowLayerWhenSelectedFixtureWindowCloses`, `requireActiveSwitcherPreview`, and the post-contraction Window-layer retention readback | After the exact one-card projection succeeds, the caller waits another raw five seconds for any diagnostics `mode` beginning with `windowCycle`. The prior projection is already completion evidence for the close-driven UI update, while the generic prefix omits the exact selected bundle and a second wait treats elapsed opportunity as additional readiness. Evidence readback migration. | Immediately read one atomic diagnostics snapshot after the exact one-card projection and require both `selected=<fixture bundle ID>` and exact `mode=windowCycle(<same bundle ID>)`. Add a bundle-identifier overload of the existing active-preview readback helper and retain the workflow-App overload as a delegate. Failure reports expected bundle plus the final identifier/existence/raw selected/mode snapshot. No observer, cadence, timeout, retry, watchdog, or retained work remains; the call owns its synchronous snapshot. Exact applied-close generation/topology, one-card projection, and later runtime reconciliation remain independent Oracles. | M synchronous exact-state reuse after an already-completed high-risk contraction owner; deterministic exact/wrong-selected/wrong-mode/app-cycle readback regression, affected signed UI, strict signing/process evidence, semantic guard, source parse, raw-bound inventory, and Process/Tooling validation. FlowTabCore Unit, app Unit/Behavior, FlowTabTests, unrelated UI, and Pressure are not relevant because production behavior, fixture topology, module direction, configuration, path intent, and recurring work are unchanged. | completed |
 | SYNC-036JU | `testSwitcherPanelKeepsWindowLayerWhenSelectedFixtureWindowCloses`, `FlowTabUITestRuntimeLogObservationOwner`, and the exact Selected Mutation known AX-destroyed delivery | A runtime-log snapshot is frozen immediately after fixture launch, then the caller requests and applies the close, proves the one-card projection and exact retained mode, and only afterward starts a generic helper wait for up to eight seconds. The regex fixes the bundle text while accepting any PID and any AX PID prefix, and the broad baseline plus post-trigger observer construction can accept unrelated historical reconciliation. Evidence refinement plus retained-watchdog migration. | Immediately before the close, freeze a fresh runtime-log baseline and start the shared runtime-log owner beside the one-card owner. Reject even matching readbacks until the explicit close request returns, then request a trigger readback. Accept only a post-baseline `homeAXDestroyed known` line containing the escaped exact fixture bundle, exact scheduled fixture PID, and an AX identity with that same PID prefix. File events drive readback; retain the shared named cancellable 200ms fallback only while unresolved. Name the compatible eight seconds `selectedWindowMutationReconciliationWatchdog` solely as a failure bound reporting acceptance phase, exact pattern, baseline/file-event generations, contents count/tail, source, and waiter result. The invocation explicitly cancels the owner and fresh baseline and owns both App lifecycles. Exact applied-close generation/topology, one-card projection, and same-bundle retained mode are independent final-state Oracles that prove the delivered destruction was reconciled. | H observer-before-cross-process close trigger plus exact process identity in a shared runtime-log owner; named-policy compatibility, matching pre-trigger rejection, trigger readback, initial/event/regex/file-append/file-replacement evidence, cancellation, watchdog, 100-generation owner lifecycle and stale-trigger Pressure, affected signed UI, strict signing/process evidence, semantic guard, source parse, generic-helper/raw-bound inventory, and Process/Tooling validation. FlowTabCore Unit, app Unit/Behavior, FlowTabTests, unrelated UI, and additional production Pressure are not relevant because production reconciliation behavior, fixture close contract, module direction, configuration, path intent, and recurring work are unchanged. | completed |
-| SYNC-036JV | `testSwitcherPanelQuitShortcutKeepsRealFixtureAppUntilProcessTerminates`; exact Option+Q termination-request publication | A raw eight-second runtime-log wait follows Option+Q and accepts two substrings without proving they belong to one request record. Retained-watchdog plus evidence refinement. | Keep the pre-trigger log baseline, require one post-baseline record with the exact fixture app ID and `sent=true`, and name the compatible bound under the runtime-log owner. File events plus its cancellable fallback request readback; the test invocation cancels the baseline/owner. | M; runtime-log exact-record/initial/event/cancel/watchdog tests, affected signed quit-shortcut UI, Process/Tooling. | planned |
+| SYNC-036JV | `testSwitcherPanelQuitShortcutKeepsRealFixtureAppUntilProcessTerminates`; exact Option+Q termination-request publication | A raw eight-second runtime-log wait follows Option+Q and accepts two substrings without proving they belong to one request record. Retained-watchdog plus evidence refinement. | Keep the pre-trigger log baseline, require one post-baseline record with the exact fixture app ID and `sent=true`, and name the compatible bound under the runtime-log owner. File events plus its cancellable fallback request readback; the test invocation cancels the baseline/owner. | M; runtime-log exact-record/initial/event/cancel/watchdog tests, affected signed quit-shortcut UI, Process/Tooling. | completed |
 | SYNC-036JW | `SpaceFixtureTerminationFaultObservationOwner.waitForScheduled`; delayed-termination scheduled evidence | The fixture observer is installed before launch, checks an initial evidence buffer, and waits on a typed expectation, while the caller supplies an anonymous eight-second terminal bound. Retained watchdog. | Add an owner policy for scheduled evidence and report the missing scheduled phase plus final typed evidence. The route-scoped observation owner owns token removal; success remains exact scheduled identity/source/delay/request generation. | M; named-policy, initial/event/duplicate/cancel/watchdog tests, affected signed quit-shortcut UI, Process/Tooling. | planned |
 | SYNC-036JX | `SpaceFixtureTerminationFaultObservationOwner.waitForApplied`; delayed-termination applied evidence | The caller supplies an anonymous eight-second bound after scheduled evidence and matches generation only after the shared expectation wakes. Retained-watchdog plus evidence refinement. | Add an applied-evidence policy and resolve only the exact request generation from initial or event evidence; expiry reports expected generation and final typed evidence. The route owner cancels observation. | M; exact/out-of-order/duplicate/cancel/watchdog tests, affected signed quit-shortcut UI, Process/Tooling. | planned |
 | SYNC-036JY | `testSwitcherPanelQuitShortcutKeepsRealFixtureAppUntilProcessTerminates`; exact delayed fixture process exit | A raw eight-second XCTest application-state wait is followed by a final `.notRunning` readback. Success is evidence-driven, while watchdog ownership is implicit. | Route the compatible bound through the application-termination policy and preserve `.notRunning` as the sole Oracle with waiter/final-state diagnostics. The test owns the synchronous wait and fixture cleanup. | M; policy/final-readback tests, affected signed quit-shortcut UI, exact process evidence, Process/Tooling. | planned |
@@ -27064,6 +27064,68 @@ polling cadence, deadline, or timeout in the scoped paths.
   durable record, followed by exact absence checks.
 - Commit subject:
   `test(sync): migrate SYNC-036JU exact runtime reconciliation`.
+
+### SYNC-036JV Authorized Resume Closure Record
+
+- Status and authorization: completed. Three initialization attempts recorded
+  XCTest's direct `Enable UI Automation` authentication request without a test
+  body starting. Before the permission-blocked slice changed from `blocked` to
+  `running`, the exact canonical signed UI command requested fresh
+  authorization. The authorized invocation then reached and passed the
+  deterministic test body; every later validation invocation remained within
+  that running slice.
+- Oracle: the workflow freezes a runtime-log baseline and starts the shared
+  observation owner before Option+Q. A trigger gate rejects pre-return
+  evidence. After the key action returns, an immediate readback closes the
+  event-during-trigger race. Resolution requires one post-baseline line whose
+  exact escaped fixture bundle identifier and `sent=true` belong to the same
+  `terminate request` record. Scheduled/applied termination generations,
+  delayed process exit, post-refresh evidence, and exact Switcher removal
+  remain independent Oracles.
+- Retained time and lifecycle: eight seconds is named
+  `quitShortcutTerminationRequestWatchdog` and solely bounds a missing exact
+  request record. Runtime-log file events drive readback; the shared named
+  cancellable 200ms fallback covers coalesced delivery only while unresolved.
+  The test invocation explicitly cancels the owner, its file-event and
+  scheduled-readback registrations, and the baseline. Watchdog expiry reports
+  the missing exact pattern plus the last observed generation and log tail.
+- Deterministic UI-target validation: the freshly rebuilt canonical signed
+  Runner passed all three slice tests in 0.772 seconds. They accept the escaped
+  exact single-record form, reject split and wrong-identity records, reject
+  matching pre-trigger evidence, accept the immediate trigger readback and a
+  later file event, cancel idempotently, preserve the compatible finite
+  watchdog, and report the last mismatched record on expiry.
+- Affected UI and Pressure: the canonical real-Space-fixture quit-shortcut path
+  passed 1/1 in 13.612 seconds. It exercised the exact request record, typed
+  2.4-second scheduled/applied termination evidence, running-process identity,
+  exact process exit, post-refresh publication, and final Switcher removal.
+  The reused runtime-log observation lifecycle Pressure passed 100/100 in
+  0.215 seconds, covering immediate and event-delivered resolution, cancelled
+  callbacks, one-shot cleanup, and terminal watchdog diagnostics.
+- Validation scope: FlowTabCore Unit, app Unit/Behavior, FlowTabTests,
+  unrelated UI, and additional production Pressure are not relevant because
+  production behavior, fixture topology and duration contract, module
+  direction, configuration, path intent, and shared scheduler mechanics are
+  unchanged. UI-target XCTest supplies the deterministic owner rules, visible
+  real-topology path, and recurring-observation Pressure required by this
+  test-orchestration slice.
+- Signing and Process/Tooling: the canonical build-for-testing compiled the new
+  test source and completed successfully. Sandbox-external strict deep
+  verification accepts the installed App and rebuilt Runner under Team
+  `96PUA726W9` and Apple Development authority
+  `gobestsoft@qq.com (RF9WCUVKH8)`; their CDHashes are
+  `78a55012be48b3e401ae8351413f5c29e4b611f5` and
+  `90ec6cf5439bfe224a517ad49b92947e1d18bf0b`. Swift parsing, project-file
+  `plutil -lint`, and `git diff --check` pass. The owner, slice tests, and
+  workflow contain 405, 222, and 759 lines with clear single
+  responsibilities. Exact post-run App/Runner/fixture and repository-scoped
+  xcodebuild process readbacks are empty.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. Reproducible result bundles and
+  superseded authorization-attempt evidence are removed after this durable
+  record and independent commit, followed by exact absence checks.
+- Commit subject:
+  `refactor(sync): migrate SYNC-036JV quit request publication`.
 
 ### SYNC-001 Authorized Resume Closure Record
 

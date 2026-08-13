@@ -3,10 +3,23 @@ import XCTest
 
 enum FlowTabUITestRuntimeLogObservationPolicy {
     static let defaultWatchdog: TimeInterval = 8
+    static let quitShortcutTerminationRequestWatchdog: TimeInterval = 8
     static let openWindowMutationReconciliationWatchdog: TimeInterval = 8
     static let selectedWindowMutationReconciliationWatchdog: TimeInterval = 8
     static let readbackCadence: TimeInterval = 0.2
     static let maximumDiagnosticCharacterCount = 4_000
+}
+
+enum FlowTabUITestRuntimeLogRecordPattern {
+    static func exactTerminationRequest(
+        bundleIdentifier: String
+    ) -> String {
+        let escapedBundleIdentifier =
+            NSRegularExpression.escapedPattern(
+                for: bundleIdentifier
+            )
+        return #"(?m)terminate request app=[^\r\n]* appID=\#(escapedBundleIdentifier) sent=true\r?$"#
+    }
 }
 
 struct FlowTabUITestRuntimeLogSnapshot: Equatable {

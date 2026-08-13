@@ -125,18 +125,59 @@ extension FlowTabUITests {
         defer { removalObservation.cancel() }
 
         let logSnapshot = makeRuntimeLogFileSnapshot()
+        defer { logSnapshot.cancel() }
+        let terminationRequestPattern =
+            FlowTabUITestRuntimeLogRecordPattern
+                .exactTerminationRequest(
+                    bundleIdentifier:
+                        identity.bundleIdentifier
+                )
+        let terminationRequestExpression =
+            try NSRegularExpression(
+                pattern: terminationRequestPattern
+            )
+        var acceptsTerminationRequest = false
+        let terminationRequestObservation =
+            FlowTabUITestRuntimeLogObservationOwner(
+                expectation:
+                    .regularExpression(
+                        terminationRequestExpression,
+                        pattern: terminationRequestPattern,
+                        description:
+                            "exact quit-shortcut termination request"
+                    ),
+                observationRegistration:
+                    logSnapshot.observationRegistration(),
+                acceptsResolution: {
+                    acceptsTerminationRequest
+                },
+                readback: logSnapshot.makeReadback
+            )
+        terminationRequestObservation.start()
+        defer { terminationRequestObservation.cancel() }
         app.activate()
         app.typeKey("q", modifierFlags: .option)
+        acceptsTerminationRequest = true
+        terminationRequestObservation.requestReadback(
+            source: .triggerReadback
+        )
         removalObservation.markTriggerCompleted()
 
-        waitForRuntimeLogFiles(
-            containing: [
-                "terminate request app=",
-                "appID=\(identity.bundleIdentifier) sent=true"
-            ],
-            since: logSnapshot,
-            timeout: 8
-        )
+        guard
+            terminationRequestObservation.waitForResolution(
+                timeout:
+                    FlowTabUITestRuntimeLogObservationPolicy
+                        .quitShortcutTerminationRequestWatchdog
+            ) != nil
+        else {
+            XCTFail(
+                "Quit-shortcut termination-request watchdog "
+                    + "expired. "
+                    + terminationRequestObservation
+                        .diagnosticSummary
+            )
+            return
+        }
         let scheduledEvidence = try XCTUnwrap(
             terminationObservation.waitForScheduled(
                 timeout: 8

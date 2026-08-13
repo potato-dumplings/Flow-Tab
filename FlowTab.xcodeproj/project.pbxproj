@@ -89,6 +89,7 @@
 		A44400023D4C000100B0D737 /* FlowTabUITests+RuntimeLogFileObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44400013D4C000100B0D737 /* FlowTabUITests+RuntimeLogFileObservation.swift */; };
 		A44400043D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44400033D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservation.swift */; };
 		A44400063D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44400053D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservationTests.swift */; };
+		A4F100023DC0000100B0D737 /* FlowTabUITests+SpaceFixtureQuitShortcutObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4F100013DC0000100B0D737 /* FlowTabUITests+SpaceFixtureQuitShortcutObservationTests.swift */; };
 		A44500023D4D000100B0D737 /* FlowTabUITests+WorkflowWindowActivationObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44500013D4D000100B0D737 /* FlowTabUITests+WorkflowWindowActivationObservation.swift */; };
 		A44500043D4D000100B0D737 /* FlowTabUITests+WorkflowWindowActivationObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44500033D4D000100B0D737 /* FlowTabUITests+WorkflowWindowActivationObservationTests.swift */; };
 		A44900023D51000100B0D737 /* FlowTabUITests+WorkflowSpaceWindowObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44900013D51000100B0D737 /* FlowTabUITests+WorkflowSpaceWindowObservation.swift */; };
@@ -1079,6 +1080,7 @@
 		A44400013D4C000100B0D737 /* FlowTabUITests+RuntimeLogFileObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+RuntimeLogFileObservation.swift"; sourceTree = "<group>"; };
 		A44400033D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+RuntimeLogObservation.swift"; sourceTree = "<group>"; };
 		A44400053D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+RuntimeLogObservationTests.swift"; sourceTree = "<group>"; };
+		A4F100013DC0000100B0D737 /* FlowTabUITests+SpaceFixtureQuitShortcutObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureQuitShortcutObservationTests.swift"; sourceTree = "<group>"; };
 		A44500013D4D000100B0D737 /* FlowTabUITests+WorkflowWindowActivationObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+WorkflowWindowActivationObservation.swift"; sourceTree = "<group>"; };
 		A44500033D4D000100B0D737 /* FlowTabUITests+WorkflowWindowActivationObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+WorkflowWindowActivationObservationTests.swift"; sourceTree = "<group>"; };
 		A44900013D51000100B0D737 /* FlowTabUITests+WorkflowSpaceWindowObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+WorkflowSpaceWindowObservation.swift"; sourceTree = "<group>"; };
@@ -1600,6 +1602,7 @@
 				A44400013D4C000100B0D737 /* FlowTabUITests+RuntimeLogFileObservation.swift */,
 				A44400033D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservation.swift */,
 				A44400053D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservationTests.swift */,
+				A4F100013DC0000100B0D737 /* FlowTabUITests+SpaceFixtureQuitShortcutObservationTests.swift */,
 				A44500013D4D000100B0D737 /* FlowTabUITests+WorkflowWindowActivationObservation.swift */,
 				A44500033D4D000100B0D737 /* FlowTabUITests+WorkflowWindowActivationObservationTests.swift */,
 				A44900013D51000100B0D737 /* FlowTabUITests+WorkflowSpaceWindowObservation.swift */,
@@ -2756,6 +2759,7 @@
 				A44400023D4C000100B0D737 /* FlowTabUITests+RuntimeLogFileObservation.swift in Sources */,
 				A44400043D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservation.swift in Sources */,
 				A44400063D4C000100B0D737 /* FlowTabUITests+RuntimeLogObservationTests.swift in Sources */,
+				A4F100023DC0000100B0D737 /* FlowTabUITests+SpaceFixtureQuitShortcutObservationTests.swift in Sources */,
 				A44500023D4D000100B0D737 /* FlowTabUITests+WorkflowWindowActivationObservation.swift in Sources */,
 				A44500043D4D000100B0D737 /* FlowTabUITests+WorkflowWindowActivationObservationTests.swift in Sources */,
 				A44900023D51000100B0D737 /* FlowTabUITests+WorkflowSpaceWindowObservation.swift in Sources */,
