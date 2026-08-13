@@ -403,8 +403,14 @@ extension FlowTabUITests {
         assertRealSpaceFixtureFlowTabIsForegroundReadyAfterFixtureLaunch(
             app, targetDescription: "window-set-mutation-after-fixture-launch"
         )
-        let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity, timeout: 12)
-        assertValue(of: fixtureAppRow, equals: "2w", timeout: 12)
+        let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(
+            in: app,
+            identity: identity,
+            expectedValue: "2w",
+            timeout:
+                FlowTabUITestSpaceFixtureHomeProjectionPolicy
+                    .runtimeWindowMutationInitialSummaryWatchdog
+        )
 
         let currentAppProjectionAcceptance =
             SpaceFixtureCurrentAppProjectionAcceptanceOwner(

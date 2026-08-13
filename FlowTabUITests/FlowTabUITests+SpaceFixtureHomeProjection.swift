@@ -5,6 +5,7 @@ enum FlowTabUITestSpaceFixtureHomeProjectionPolicy {
     static let homeTabNavigationWatchdog: TimeInterval = 10
     static let defaultAppRowProjectionWatchdog: TimeInterval = 20
     static let runtimeLifecycleAppSummaryWatchdog: TimeInterval = 12
+    static let runtimeWindowMutationInitialSummaryWatchdog: TimeInterval = 12
 }
 
 extension FlowTabUITests {
@@ -49,6 +50,23 @@ extension FlowTabUITests {
         XCTAssertGreaterThan(
             FlowTabUITestSpaceFixtureHomeProjectionPolicy
                 .runtimeLifecycleAppSummaryWatchdog,
+            0
+        )
+    }
+
+    func testSpaceFixtureHomeProjectionWindowMutationWatchdogPolicyCompatibility() {
+        XCTAssertEqual(
+            FlowTabUITestSpaceFixtureHomeProjectionPolicy
+                .runtimeWindowMutationInitialSummaryWatchdog,
+            12
+        )
+        XCTAssertTrue(
+            FlowTabUITestSpaceFixtureHomeProjectionPolicy
+                .runtimeWindowMutationInitialSummaryWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSpaceFixtureHomeProjectionPolicy
+                .runtimeWindowMutationInitialSummaryWatchdog,
             0
         )
     }
