@@ -15,6 +15,7 @@ struct SpaceFixtureTerminationFaultUITestRoute {
 
 enum SpaceFixtureTerminationFaultObservationPolicy {
     static let scheduledEvidenceWatchdog: TimeInterval = 8
+    static let appliedEvidenceWatchdog: TimeInterval = 8
 }
 
 typealias SpaceFixtureTerminationFaultEvidenceRegistration =
@@ -37,6 +38,7 @@ final class SpaceFixtureTerminationFaultObservationOwner {
         [SpaceFixtureTerminationFaultEvidence] = []
     private var requestedPhase:
         SpaceFixtureTerminationFaultEvidencePhase?
+    private var requestedGeneration: Int?
     private var lastWaitResultDescription = "notStarted"
 
     init(
@@ -74,6 +76,7 @@ final class SpaceFixtureTerminationFaultObservationOwner {
         cancel()
         observedEvidence.removeAll()
         requestedPhase = nil
+        requestedGeneration = nil
         lastWaitResultDescription = "notStarted"
         didFulfillScheduledExpectation = false
         didFulfillAppliedExpectation = false
@@ -110,6 +113,7 @@ final class SpaceFixtureTerminationFaultObservationOwner {
         wait(
             for: scheduledExpectation,
             phase: .scheduled,
+            requestGeneration: nil,
             timeout: timeout
         )
     }
@@ -118,22 +122,19 @@ final class SpaceFixtureTerminationFaultObservationOwner {
         requestGeneration: Int,
         timeout: TimeInterval
     ) -> SpaceFixtureTerminationFaultEvidence? {
-        guard wait(
+        wait(
             for: appliedExpectation,
             phase: .applied,
+            requestGeneration: requestGeneration,
             timeout: timeout
-        )?.requestGeneration == requestGeneration
-        else {
-            return nil
-        }
-        return matchingEvidence(
-            phase: .applied,
-            requestGeneration: requestGeneration
         )
     }
 
     var diagnosticSummary: String {
         let phase = requestedPhase?.rawValue ?? "none"
+        let generation =
+            requestedGeneration.map(String.init)
+                ?? "any"
         let records = observedEvidence.isEmpty
             ? "none"
             : observedEvidence
@@ -141,6 +142,7 @@ final class SpaceFixtureTerminationFaultObservationOwner {
                 .joined(separator: " | ")
         return "observationActive=\(isObservationActive) "
             + "unmetCondition=phase=\(phase) "
+            + "requestGeneration=\(generation) "
             + "waitResult=\(lastWaitResultDescription) "
             + "observed=[\(records)]"
     }
@@ -175,7 +177,11 @@ final class SpaceFixtureTerminationFaultObservationOwner {
             didFulfillScheduledExpectation = true
             scheduledExpectation?.fulfill()
         case .applied:
-            guard !didFulfillAppliedExpectation else {
+            guard !didFulfillAppliedExpectation,
+                  requestedPhase == .applied,
+                  requestedGeneration
+                    == evidence.requestGeneration
+            else {
                 return
             }
             didFulfillAppliedExpectation = true
@@ -186,9 +192,11 @@ final class SpaceFixtureTerminationFaultObservationOwner {
     private func wait(
         for expectation: XCTestExpectation?,
         phase: SpaceFixtureTerminationFaultEvidencePhase,
+        requestGeneration: Int?,
         timeout: TimeInterval
     ) -> SpaceFixtureTerminationFaultEvidence? {
         requestedPhase = phase
+        requestedGeneration = requestGeneration
         guard activeObservationGeneration != nil,
               let expectation
         else {
@@ -197,7 +205,7 @@ final class SpaceFixtureTerminationFaultObservationOwner {
         }
         if let evidence = matchingEvidence(
             phase: phase,
-            requestGeneration: nil
+            requestGeneration: requestGeneration
         ) {
             lastWaitResultDescription = "initialReadback"
             return evidence
@@ -210,7 +218,7 @@ final class SpaceFixtureTerminationFaultObservationOwner {
             waitResultDescription(waitResult)
         return matchingEvidence(
             phase: phase,
-            requestGeneration: nil
+            requestGeneration: requestGeneration
         )
     }
 

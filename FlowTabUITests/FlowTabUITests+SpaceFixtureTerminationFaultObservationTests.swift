@@ -199,6 +199,178 @@ extension FlowTabUITests {
         )
     }
 
+    func testSpaceFixtureTerminationFaultAppliedWatchdogPolicyCompatibility() {
+        let watchdog =
+            SpaceFixtureTerminationFaultObservationPolicy
+                .appliedEvidenceWatchdog
+        XCTAssertEqual(watchdog, 8)
+        XCTAssertTrue(watchdog.isFinite && watchdog > 0)
+    }
+
+    func testSpaceFixtureTerminationFaultUsesExactAppliedEvidenceAlreadyObserved() {
+        let source =
+            ManualSpaceFixtureTerminationFaultEvidenceSource()
+        let owner = makeTerminationFaultObservationOwner(
+            source: source
+        )
+        owner.start()
+        defer { owner.cancel() }
+        let wrongGeneration = terminationFaultEvidence(
+            generation: 19,
+            phase: .applied
+        )
+        let expected = terminationFaultEvidence(
+            generation: 21,
+            phase: .applied
+        )
+        source.send(wrongGeneration)
+        source.send(expected)
+
+        XCTAssertEqual(
+            owner.waitForApplied(
+                requestGeneration: 21,
+                timeout:
+                    SpaceFixtureTerminationFaultObservationTestPolicy
+                        .eventWatchdog
+            ),
+            expected
+        )
+        XCTAssertEqual(owner.observedEvidenceCount, 2)
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "requestGeneration=21"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "waitResult=initialReadback"
+            )
+        )
+    }
+
+    func testSpaceFixtureTerminationFaultWaitsForExactAppliedGeneration() {
+        let source =
+            ManualSpaceFixtureTerminationFaultEvidenceSource()
+        let owner = makeTerminationFaultObservationOwner(
+            source: source
+        )
+        owner.start()
+        defer { owner.cancel() }
+        let wrongGeneration = terminationFaultEvidence(
+            generation: 22,
+            phase: .applied
+        )
+        let expected = terminationFaultEvidence(
+            generation: 23,
+            phase: .applied
+        )
+        DispatchQueue.main.async {
+            source.send(wrongGeneration)
+            source.send(wrongGeneration)
+            source.send(expected)
+            source.send(expected)
+        }
+
+        XCTAssertEqual(
+            owner.waitForApplied(
+                requestGeneration: 23,
+                timeout:
+                    SpaceFixtureTerminationFaultObservationTestPolicy
+                        .eventWatchdog
+            ),
+            expected
+        )
+        XCTAssertEqual(owner.observedEvidenceCount, 2)
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "waitResult=completed"
+            )
+        )
+    }
+
+    func testSpaceFixtureTerminationFaultCancellationRejectsLaterAppliedEvidence() {
+        let source =
+            ManualSpaceFixtureTerminationFaultEvidenceSource()
+        let owner = makeTerminationFaultObservationOwner(
+            source: source
+        )
+        owner.start()
+
+        owner.cancel()
+        source.send(
+            terminationFaultEvidence(
+                generation: 25,
+                phase: .applied
+            )
+        )
+
+        XCTAssertNil(
+            owner.waitForApplied(
+                requestGeneration: 25,
+                timeout:
+                    SpaceFixtureTerminationFaultObservationTestPolicy
+                        .eventWatchdog
+            )
+        )
+        XCTAssertEqual(owner.observedEvidenceCount, 0)
+        XCTAssertEqual(source.cancellationCount, 1)
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "requestGeneration=25"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "waitResult=inactive"
+            )
+        )
+    }
+
+    func testSpaceFixtureTerminationFaultAppliedWatchdogReportsWrongGeneration() {
+        let source =
+            ManualSpaceFixtureTerminationFaultEvidenceSource()
+        let owner = makeTerminationFaultObservationOwner(
+            source: source
+        )
+        owner.start()
+        defer { owner.cancel() }
+        source.send(
+            terminationFaultEvidence(
+                generation: 27,
+                phase: .applied
+            )
+        )
+
+        XCTAssertNil(
+            owner.waitForApplied(
+                requestGeneration: 29,
+                timeout:
+                    SpaceFixtureTerminationFaultObservationTestPolicy
+                        .watchdog
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "unmetCondition=phase=applied"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "requestGeneration=29"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "waitResult=timedOut"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "generation=27 phase=applied"
+            )
+        )
+    }
+
     func testSpaceFixtureTerminationFaultRejectsCancelledGenerationsUnderPressure() {
         for iteration in
             0..<SpaceFixtureTerminationFaultObservationTestPolicy

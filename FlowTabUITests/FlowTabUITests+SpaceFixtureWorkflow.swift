@@ -222,7 +222,9 @@ extension FlowTabUITests {
             terminationObservation.waitForApplied(
                 requestGeneration:
                     scheduledEvidence.requestGeneration,
-                timeout: 8
+                timeout:
+                    SpaceFixtureTerminationFaultObservationPolicy
+                        .appliedEvidenceWatchdog
             ),
             "Fixture did not publish applied termination evidence: "
                 + terminationObservation.diagnosticSummary
