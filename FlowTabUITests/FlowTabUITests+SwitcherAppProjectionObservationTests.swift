@@ -58,6 +58,23 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherAppProjectionQuitShortcutRemovalPolicyPreservesCompatibleBound() {
+        XCTAssertEqual(
+            FlowTabUITestSwitcherAppProjectionPolicy
+                .quitShortcutRemovalWatchdog,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestSwitcherAppProjectionPolicy
+                .quitShortcutRemovalWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSwitcherAppProjectionPolicy
+                .quitShortcutRemovalWatchdog,
+            0
+        )
+    }
+
     func testSwitcherAppProjectionParsesBundleAndWindowCount() {
         let entry = FlowTabUITestSwitcherAppProjectionEntry(
             rawValue: "com.example.browser:2"
@@ -428,6 +445,261 @@ extension FlowTabUITests {
                 "excludedBundleIDs=[\"com.example.mail\"]"
             )
         )
+    }
+
+    func testSwitcherAppRemovalObservationUsesExactInitialAndTriggerEvidence() {
+        var entries = ["com.example.fixture:1"]
+        var rowExists = true
+        var scheduledRegistrationCount = 0
+        let owner =
+            FlowTabUITestSwitcherAppRemovalObservationOwner(
+                bundleIdentifier: "com.example.fixture",
+                expectedInitialWindowCount: 1,
+                scheduledRegistration: { _ in
+                    scheduledRegistrationCount += 1
+                    return FlowTabUITestObservationCancellation {}
+                },
+                projectionReadback: {
+                    self.switcherAppProjectionTestSnapshot(
+                        entries
+                    )
+                },
+                rowRepresentationCount: {
+                    rowExists ? 2 : 0
+                },
+                rowExists: { rowExists }
+            )
+        XCTAssertTrue(owner.start())
+        defer { owner.cancel() }
+
+        entries = []
+        rowExists = false
+        owner.markTriggerCompleted()
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .triggerReadback
+        )
+        XCTAssertEqual(
+            owner.resolvedEvidence?.value.entries,
+            []
+        )
+        XCTAssertEqual(scheduledRegistrationCount, 0)
+    }
+
+    func testSwitcherAppRemovalObservationRejectsMismatchedInitialBaseline() {
+        var scheduledRegistrationCount = 0
+        let owner =
+            FlowTabUITestSwitcherAppRemovalObservationOwner(
+                bundleIdentifier: "com.example.fixture",
+                expectedInitialWindowCount: 1,
+                scheduledRegistration: { _ in
+                    scheduledRegistrationCount += 1
+                    return FlowTabUITestObservationCancellation {}
+                },
+                projectionReadback: {
+                    self.switcherAppProjectionTestSnapshot(
+                        ["com.example.fixture:2"]
+                    )
+                },
+                rowRepresentationCount: { 2 },
+                rowExists: { true }
+            )
+
+        XCTAssertFalse(owner.start())
+        owner.markTriggerCompleted()
+
+        XCTAssertNil(owner.resolvedEvidence)
+        XCTAssertEqual(scheduledRegistrationCount, 0)
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "initialEvidenceSatisfied=false"
+            )
+        )
+        owner.cancel()
+    }
+
+    func testSwitcherAppRemovalObservationWaitsForProjectionAndFreshRowAbsence() {
+        var entries = ["com.example.fixture:1"]
+        var rowExists = true
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var cancellationCount = 0
+        let owner =
+            FlowTabUITestSwitcherAppRemovalObservationOwner(
+                bundleIdentifier: "com.example.fixture",
+                expectedInitialWindowCount: 1,
+                scheduledRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {
+                        cancellationCount += 1
+                    }
+                },
+                projectionReadback: {
+                    self.switcherAppProjectionTestSnapshot(
+                        entries
+                    )
+                },
+                rowRepresentationCount: {
+                    rowExists ? 2 : 0
+                },
+                rowExists: { rowExists }
+            )
+        XCTAssertTrue(owner.start())
+        defer { owner.cancel() }
+        owner.markTriggerCompleted()
+
+        for _ in 0..<5 {
+            scheduledReadback?(.scheduledReadback)
+            XCTAssertNil(owner.resolvedEvidence)
+        }
+        entries = []
+        scheduledReadback?(.scheduledReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        rowExists = false
+        scheduledReadback?(.scheduledReadback)
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .scheduledReadback
+        )
+        XCTAssertEqual(cancellationCount, 1)
+    }
+
+    func testSwitcherAppRemovalObservationCancellationRejectsLateReadback() {
+        var entries = ["com.example.fixture:1"]
+        var rowExists = true
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var cancellationCount = 0
+        let owner =
+            FlowTabUITestSwitcherAppRemovalObservationOwner(
+                bundleIdentifier: "com.example.fixture",
+                expectedInitialWindowCount: 1,
+                scheduledRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {
+                        cancellationCount += 1
+                    }
+                },
+                projectionReadback: {
+                    self.switcherAppProjectionTestSnapshot(
+                        entries
+                    )
+                },
+                rowRepresentationCount: {
+                    rowExists ? 2 : 0
+                },
+                rowExists: { rowExists }
+            )
+        XCTAssertTrue(owner.start())
+        owner.markTriggerCompleted()
+        owner.cancel()
+
+        entries = []
+        rowExists = false
+        scheduledReadback?(.scheduledReadback)
+
+        XCTAssertNil(owner.resolvedEvidence)
+        XCTAssertEqual(cancellationCount, 1)
+    }
+
+    func testSwitcherAppRemovalObservationWatchdogReportsFinalEvidence() {
+        let owner =
+            FlowTabUITestSwitcherAppRemovalObservationOwner(
+                bundleIdentifier: "com.example.fixture",
+                expectedInitialWindowCount: 1,
+                scheduledRegistration: { _ in
+                    FlowTabUITestObservationCancellation {}
+                },
+                projectionReadback: {
+                    self.switcherAppProjectionTestSnapshot(
+                        ["com.example.fixture:1"]
+                    )
+                },
+                rowRepresentationCount: { 2 },
+                rowExists: { true }
+            )
+        XCTAssertTrue(owner.start())
+        defer { owner.cancel() }
+        owner.markTriggerCompleted()
+
+        XCTAssertNil(
+            owner.waitForResolution(
+                timeout:
+                    FlowTabUITestSwitcherAppProjectionTestPolicy
+                        .watchdog
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "source=watchdogReadback"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "expectedInitialEntry=com.example.fixture:1"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "finalRepresentationCount=2"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains("finalExists=true")
+        )
+    }
+
+    func testSwitcherAppRemovalObservationRejectsStaleReadbacksUnderPressure() {
+        for _ in 0..<FlowTabUITestSwitcherAppProjectionTestPolicy
+            .pressureIterations
+        {
+            var entries = ["com.example.fixture:1"]
+            var rowExists = true
+            var scheduledReadbacks: [
+                (FlowTabUITestConditionObservationSource) -> Void
+            ] = []
+            let owner =
+                FlowTabUITestSwitcherAppRemovalObservationOwner(
+                    bundleIdentifier: "com.example.fixture",
+                    expectedInitialWindowCount: 1,
+                    scheduledRegistration: { callback in
+                        scheduledReadbacks.append(callback)
+                        return FlowTabUITestObservationCancellation {}
+                    },
+                    projectionReadback: {
+                        self.switcherAppProjectionTestSnapshot(
+                            entries
+                        )
+                    },
+                    rowRepresentationCount: {
+                        rowExists ? 2 : 0
+                    },
+                    rowExists: { rowExists }
+                )
+
+            XCTAssertTrue(owner.start())
+            owner.markTriggerCompleted()
+            let staleReadback = scheduledReadbacks[0]
+            owner.cancel()
+
+            XCTAssertTrue(owner.start())
+            owner.markTriggerCompleted()
+            let currentReadback = scheduledReadbacks[1]
+            entries = []
+            rowExists = false
+
+            staleReadback(.scheduledReadback)
+            XCTAssertNil(owner.resolvedEvidence)
+            currentReadback(.scheduledReadback)
+            XCTAssertEqual(
+                owner.resolvedEvidence?.generation,
+                2
+            )
+            owner.cancel()
+        }
     }
 
     private func switcherAppProjectionTestSnapshot(

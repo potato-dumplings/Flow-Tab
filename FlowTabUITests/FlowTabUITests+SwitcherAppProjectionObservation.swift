@@ -5,6 +5,7 @@ enum FlowTabUITestSwitcherAppProjectionPolicy {
     static let postLaunchWatchdog: TimeInterval = 10
     static let runtimeOrderWatchdog: TimeInterval = 5
     static let standardFixtureProjectionWatchdog: TimeInterval = 8
+    static let quitShortcutRemovalWatchdog: TimeInterval = 8
 }
 
 struct FlowTabUITestSwitcherAppProjectionEntry: Equatable {
@@ -234,6 +235,140 @@ final class FlowTabUITestSwitcherAppProjectionObservationOwner {
     }
 }
 
+private final class FlowTabUITestSwitcherAppRemovalState {
+    var initialEvidenceSatisfied = false
+    var triggerCompleted = false
+}
+
+final class FlowTabUITestSwitcherAppRemovalObservationOwner {
+    private let bundleIdentifier: String
+    private let expectedInitialEntry: String
+    private let state: FlowTabUITestSwitcherAppRemovalState
+    private let deferredReadbacks:
+        FlowTabUITestDeferredConditionReadbackRegistration
+    private let projection:
+        FlowTabUITestSwitcherAppProjectionObservationOwner
+    private let rowRepresentationCount: () -> Int
+    private let rowExists: () -> Bool
+
+    init(
+        bundleIdentifier: String,
+        expectedInitialWindowCount: Int,
+        scheduledRegistration:
+            @escaping FlowTabUITestConditionObservationRegistration =
+                FlowTabUITestConditionReadbackScheduler
+                    .mainRunLoopRegistration(
+                        cadence:
+                            FlowTabUITestConditionObservationPolicy
+                                .xcuiReadbackCadence
+                    ),
+        projectionReadback: @escaping () ->
+            FlowTabUITestSwitcherAppProjectionSnapshot,
+        rowRepresentationCount: @escaping () -> Int,
+        rowExists: @escaping () -> Bool
+    ) {
+        let state = FlowTabUITestSwitcherAppRemovalState()
+        let deferredReadbacks =
+            FlowTabUITestDeferredConditionReadbackRegistration(
+                downstreamRegistration: scheduledRegistration
+            )
+        self.bundleIdentifier = bundleIdentifier
+        expectedInitialEntry =
+            "\(bundleIdentifier):\(expectedInitialWindowCount)"
+        self.state = state
+        self.deferredReadbacks = deferredReadbacks
+        self.rowRepresentationCount = rowRepresentationCount
+        self.rowExists = rowExists
+        projection =
+            FlowTabUITestSwitcherAppProjectionObservationOwner(
+                expectation:
+                    .bundleIdentifiers(
+                        required: [],
+                        excluded: [bundleIdentifier]
+                    ),
+                observationRegistration: { callback in
+                    deferredReadbacks.register(callback)
+                },
+                acceptsResolution: {
+                    state.initialEvidenceSatisfied
+                        && state.triggerCompleted
+                        && !rowExists()
+                },
+                readback: projectionReadback
+            )
+    }
+
+    func start() -> Bool {
+        state.initialEvidenceSatisfied = false
+        state.triggerCompleted = false
+        projection.start()
+        guard
+            let initialEvidence = projection.latestEvidence,
+            initialEvidence.source == .initialReadback
+        else {
+            return false
+        }
+        let initialProjectionMatches =
+            FlowTabUITestSwitcherAppProjectionExpectation
+                .exactEntry(expectedInitialEntry)
+                .isSatisfied(by: initialEvidence.value)
+        state.initialEvidenceSatisfied =
+            initialProjectionMatches && rowExists()
+        return state.initialEvidenceSatisfied
+    }
+
+    func markTriggerCompleted() {
+        guard
+            state.initialEvidenceSatisfied,
+            !state.triggerCompleted
+        else {
+            return
+        }
+        state.triggerCompleted = true
+        projection.requestReadback(source: .triggerReadback)
+        if projection.resolvedEvidence == nil {
+            deferredReadbacks.activate()
+        }
+    }
+
+    func waitForResolution(
+        timeout: TimeInterval
+    ) -> FlowTabUITestConditionEvidence<
+        FlowTabUITestSwitcherAppProjectionSnapshot
+    >? {
+        projection.waitForResolution(timeout: timeout)
+    }
+
+    var resolvedEvidence: FlowTabUITestConditionEvidence<
+        FlowTabUITestSwitcherAppProjectionSnapshot
+    >? {
+        projection.resolvedEvidence
+    }
+
+    var diagnosticSummary: String {
+        "bundleID=\(bundleIdentifier) "
+            + "expectedInitialEntry=\(expectedInitialEntry) "
+            + "initialEvidenceSatisfied="
+            + "\(state.initialEvidenceSatisfied) "
+            + "triggerCompleted=\(state.triggerCompleted) "
+            + "finalRepresentationCount="
+            + "\(rowRepresentationCount()) "
+            + "finalExists=\(rowExists()) "
+            + projection.diagnosticSummary
+    }
+
+    func cancel() {
+        projection.cancel()
+        deferredReadbacks.cancel()
+        state.initialEvidenceSatisfied = false
+        state.triggerCompleted = false
+    }
+
+    deinit {
+        cancel()
+    }
+}
+
 extension FlowTabUITests {
     func assertInitialSwitcherAppProjectionAfterLaunch(
         in app: XCUIApplication,
@@ -439,6 +574,76 @@ extension FlowTabUITests {
             return false
         }
         return true
+    }
+
+    func startSwitcherAppRemovalObservation(
+        in app: XCUIApplication,
+        bundleIdentifier: String,
+        expectedInitialWindowCount: Int,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> FlowTabUITestSwitcherAppRemovalObservationOwner? {
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        let rowIdentifier = switcherAppRowIdentifier(
+            bundleIdentifier
+        )
+        let rowRepresentations = {
+            app.descendants(matching: .any)
+                .matching(identifier: rowIdentifier)
+        }
+        let owner =
+            FlowTabUITestSwitcherAppRemovalObservationOwner(
+                bundleIdentifier: bundleIdentifier,
+                expectedInitialWindowCount:
+                    expectedInitialWindowCount,
+                projectionReadback: {
+                    self.switcherAppProjectionSnapshot(
+                        in: app,
+                        diagnosticsSummaryElement:
+                            diagnosticsSummary
+                    )
+                },
+                rowRepresentationCount: {
+                    rowRepresentations().count
+                },
+                rowExists: {
+                    rowRepresentations().firstMatch.exists
+                }
+            )
+        guard owner.start() else {
+            XCTFail(
+                "Switcher App removal baseline was unavailable. "
+                    + owner.diagnosticSummary,
+                file: file,
+                line: line
+            )
+            owner.cancel()
+            return nil
+        }
+        return owner
+    }
+
+    func assertSwitcherAppRemoved(
+        _ observation:
+            FlowTabUITestSwitcherAppRemovalObservationOwner,
+        timeout: TimeInterval,
+        description: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard observation.waitForResolution(timeout: timeout) != nil
+        else {
+            XCTFail(
+                "\(description) watchdog expired. "
+                    + observation.diagnosticSummary,
+                file: file,
+                line: line
+            )
+            return
+        }
     }
 
     func waitForSwitcherAppsSummary(

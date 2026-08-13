@@ -106,10 +106,19 @@ extension FlowTabUITests {
             appID: identity.bundleIdentifier,
             traceLabel: "quitFixture.selectApp"
         )
+        guard let removalObservation =
+                startSwitcherAppRemovalObservation(
+                    in: app,
+                    bundleIdentifier: identity.bundleIdentifier,
+                    expectedInitialWindowCount: 1
+                )
+        else { return }
+        defer { removalObservation.cancel() }
 
         let logSnapshot = makeRuntimeLogFileSnapshot()
         app.activate()
         app.typeKey("q", modifierFlags: .option)
+        removalObservation.markTriggerCompleted()
 
         waitForRuntimeLogFiles(
             containing: [
@@ -194,11 +203,13 @@ extension FlowTabUITests {
             since: logSnapshot,
             timeout: 10
         )
-        let refreshedFixtureAppTile = element(
-            in: app,
-            identifier: identity.switcherAppAccessibilityIdentifier
+        assertSwitcherAppRemoved(
+            removalObservation,
+            timeout:
+                FlowTabUITestSwitcherAppProjectionPolicy
+                    .quitShortcutRemovalWatchdog,
+            description: "Quit-shortcut fixture App projection removal"
         )
-        XCTAssertTrue(waitForNonExistence(refreshedFixtureAppTile, timeout: 8))
     }
 
     func testRuntimeLifecycleRefreshesRealFixtureAppLaunchAndTermination() throws {
