@@ -8,6 +8,7 @@ enum FlowTabUITestSwitcherAppProjectionPolicy {
     static let quitShortcutRemovalWatchdog: TimeInterval = 8
     static let quitShortcutInitialProjectionWatchdog: TimeInterval = 12
     static let openWindowMutationInitialProjectionWatchdog: TimeInterval = 12
+    static let selectedWindowMutationInitialProjectionWatchdog: TimeInterval = 12
 }
 
 struct FlowTabUITestSwitcherAppProjectionEntry: Equatable {

@@ -109,6 +109,23 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherAppProjectionSelectedWindowMutationInitialPolicyPreservesCompatibleBound() {
+        XCTAssertEqual(
+            FlowTabUITestSwitcherAppProjectionPolicy
+                .selectedWindowMutationInitialProjectionWatchdog,
+            12
+        )
+        XCTAssertTrue(
+            FlowTabUITestSwitcherAppProjectionPolicy
+                .selectedWindowMutationInitialProjectionWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSwitcherAppProjectionPolicy
+                .selectedWindowMutationInitialProjectionWatchdog,
+            0
+        )
+    }
+
     func testSwitcherAppProjectionParsesBundleAndWindowCount() {
         let entry = FlowTabUITestSwitcherAppProjectionEntry(
             rawValue: "com.example.browser:2"
