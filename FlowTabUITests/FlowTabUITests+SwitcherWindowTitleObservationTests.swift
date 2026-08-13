@@ -9,6 +9,106 @@ private enum FlowTabUITestSwitcherWindowTitleTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testSwitcherWindowTitleOpenMutationInitialProjectionWatchdogPolicyCompatibility() {
+        XCTAssertEqual(
+            FlowTabUITestSwitcherWindowTitleObservationPolicy
+                .openWindowMutationInitialProjectionWatchdog,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestSwitcherWindowTitleObservationPolicy
+                .openWindowMutationInitialProjectionWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSwitcherWindowTitleObservationPolicy
+                .openWindowMutationInitialProjectionWatchdog,
+            0
+        )
+    }
+
+    func testSwitcherWindowTitleObserverRejectsMatchingPreTriggerEvidenceUnderPressure() {
+        let expectation =
+            FlowTabUITestSwitcherWindowTitleExpectation(
+                titles: ["Primary", "Secondary"]
+            )
+        let matchingSnapshot =
+            FlowTabUITestSwitcherWindowTitleSnapshot(
+                cardCount: 2,
+                titleCounts: expectation.titleCounts
+            )
+
+        for iteration in
+            0..<FlowTabUITestSwitcherWindowTitleTestPolicy
+                .pressureIterations
+        {
+            var acceptsResolution = false
+            var scheduledReadback:
+                ((FlowTabUITestConditionObservationSource) -> Void)?
+            var readbackCount = 0
+            var cancellationCount = 0
+            let owner =
+                FlowTabUITestSwitcherWindowTitleObservationOwner(
+                    expectation: expectation,
+                    observationRegistration: { callback in
+                        scheduledReadback = callback
+                        return FlowTabUITestObservationCancellation {
+                            cancellationCount += 1
+                        }
+                    },
+                    acceptsResolution: {
+                        acceptsResolution
+                    },
+                    readback: {
+                        readbackCount += 1
+                        return matchingSnapshot
+                    }
+                )
+            owner.start()
+
+            XCTAssertNil(
+                owner.resolvedEvidence,
+                "iteration=\(iteration)"
+            )
+            scheduledReadback?(.scheduledReadback)
+            XCTAssertNil(
+                owner.resolvedEvidence,
+                "iteration=\(iteration)"
+            )
+
+            acceptsResolution = true
+            owner.requestReadback(source: .triggerReadback)
+            let evidence = owner.waitForResolution(
+                timeout:
+                    FlowTabUITestSwitcherWindowTitleTestPolicy
+                        .watchdog
+            )
+            let resolvedReadbackCount = readbackCount
+            scheduledReadback?(.scheduledReadback)
+
+            XCTAssertEqual(
+                evidence?.source,
+                .triggerReadback,
+                "iteration=\(iteration)"
+            )
+            XCTAssertEqual(
+                evidence?.value,
+                matchingSnapshot,
+                "iteration=\(iteration)"
+            )
+            XCTAssertEqual(
+                readbackCount,
+                resolvedReadbackCount,
+                "iteration=\(iteration)"
+            )
+            XCTAssertEqual(
+                cancellationCount,
+                1,
+                "iteration=\(iteration)"
+            )
+            owner.cancel()
+        }
+    }
+
     func testSwitcherWindowTitleOpenMutationWatchdogPolicyCompatibility() {
         XCTAssertEqual(
             FlowTabUITestSwitcherWindowTitleObservationPolicy

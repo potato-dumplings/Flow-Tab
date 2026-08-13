@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 
 enum FlowTabUITestSwitcherWindowTitleObservationPolicy {
+    static let openWindowMutationInitialProjectionWatchdog: TimeInterval = 8
     static let openWindowMutationProjectionWatchdog: TimeInterval = 25
 }
 
@@ -86,15 +87,22 @@ final class FlowTabUITestSwitcherWindowTitleObservationOwner {
                             FlowTabUITestConditionObservationPolicy
                                 .xcuiReadbackCadence
                     ),
+        acceptsResolution: @escaping () -> Bool = {
+            true
+        },
         readback: @escaping () ->
             FlowTabUITestSwitcherWindowTitleSnapshot
     ) {
         conditionOwner = FlowTabUITestConditionObservationOwner(
             observationRegistration: observationRegistration,
             readback: readback,
-            isSatisfied: expectation.isSatisfied(by:),
+            isSatisfied: {
+                acceptsResolution()
+                    && expectation.isSatisfied(by: $0)
+            },
             describe: { snapshot in
-                "expected{\(expectation.diagnosticSummary)} "
+                "acceptsResolution=\(acceptsResolution()) "
+                    + "expected{\(expectation.diagnosticSummary)} "
                     + snapshot.diagnosticSummary
             }
         )
@@ -122,6 +130,12 @@ final class FlowTabUITestSwitcherWindowTitleObservationOwner {
         conditionOwner.resolvedEvidence
     }
 
+    func requestReadback(
+        source: FlowTabUITestConditionObservationSource
+    ) {
+        conditionOwner.requestReadback(source: source)
+    }
+
     func cancel() {
         conditionOwner.cancel()
     }
@@ -130,7 +144,10 @@ final class FlowTabUITestSwitcherWindowTitleObservationOwner {
 extension FlowTabUITests {
     func makeSwitcherWindowTitleObservation(
         in app: XCUIApplication,
-        expectedTitles: [String]
+        expectedTitles: [String],
+        acceptsResolution: @escaping () -> Bool = {
+            true
+        }
     ) -> FlowTabUITestSwitcherWindowTitleObservationOwner {
         let expectation =
             FlowTabUITestSwitcherWindowTitleExpectation(
@@ -139,6 +156,7 @@ extension FlowTabUITests {
         let observedTitles = Set(expectedTitles)
         return FlowTabUITestSwitcherWindowTitleObservationOwner(
             expectation: expectation,
+            acceptsResolution: acceptsResolution,
             readback: {
                 let cardQuery = app.descendants(matching: .any)
                     .matching(

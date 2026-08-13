@@ -148,6 +148,18 @@ extension FlowTabUITests {
             titlePrefix: "Open Mutation",
             windowCount: 2
         )
+        var acceptsInitialWindowProjection = false
+        let initialWindowCards =
+            makeSwitcherWindowTitleObservation(
+                in: app,
+                expectedTitles: allTitles,
+                acceptsResolution: {
+                    acceptsInitialWindowProjection
+                }
+            )
+        initialWindowCards.start()
+        defer { initialWindowCards.cancel() }
+
         app.activate()
         let diagnosticsSummary = element(
             in: app,
@@ -165,11 +177,23 @@ extension FlowTabUITests {
                 app.typeKey(.downArrow, modifierFlags: [])
             }
         ) else { return }
-        guard waitForSwitcherWindowCards(
-            in: app,
-            expectedTitles: allTitles,
-            timeout: 8
-        ) else { return }
+        acceptsInitialWindowProjection = true
+        initialWindowCards.requestReadback(
+            source: .triggerReadback
+        )
+        guard
+            initialWindowCards.waitForResolution(
+                timeout:
+                    FlowTabUITestSwitcherWindowTitleObservationPolicy
+                        .openWindowMutationInitialProjectionWatchdog
+            ) != nil
+        else {
+            XCTFail(
+                "Initial Open Mutation window projection watchdog expired. "
+                    + initialWindowCards.diagnosticSummary
+            )
+            return
+        }
 
         let postCloseCards = makeSwitcherWindowTitleObservation(
             in: app,
