@@ -562,7 +562,7 @@ and Process/Tooling.
 | SYNC-036KC | `selectEdgeWorkflowAppInSwitcherAppLayer`; exact Edge App-selection application | The helper writes its payload before installing a selected-field observer and accepts a state that may already match. Evidence-order migration. | Install the combined runtime-log/diagnostics App-selection owner before payload publication; require the exact applied-command record, selected bundle, and exact two-window App projection. The helper owns baseline, cadence, cancellation, and diagnostics. | H; stale-baseline/event/slow-scheduling/cancel/watchdog/Pressure tests, both signed Edge preview UIs, Process/Tooling. | completed |
 | SYNC-036KD | Edge Inputs preview scenarios and `performAndWaitForSwitcherWindowCards`; exact duplicate-title Window projection | The owner is installed before Down and succeeds from exact title multiplicity/card identities, while callers retain an anonymous eight-second terminal bound. Retained watchdog. | Name the Edge card-projection watchdog and retain exact multiplicity plus distinct identifiers as the Oracle. The invocation owns observer/cadence cancellation and terminal diagnostics. | M; policy/multiplicity/duplicate-ID/cancel/watchdog tests, both signed Edge preview UIs, Process/Tooling. | completed |
 | SYNC-036KE | duplicate-title Edge preview; focused public-state identity publication | A raw eight-second regex wait starts from a prelaunch baseline and requires one internal first-assignment branch. A prior exact public binding can legitimately make later readbacks sticky, so scheduling changes the log shape and the test result. Evidence refinement plus retained watchdog. | Start one typed runtime-log owner before fixture launch and bind the exact bundle-derived PID when fixture readiness is available. Accept either one exact focused public-state tie-break or one snapshot joining the same focused PID/AX/CG topology with a `publicExactMatch` binding transition; both prove the intended distinct identity. Name the terminal bound, perform immediate post-bind readback, and let the scenario own baseline/owner cancellation. | H; exact parser/source/PID/initial/event/file-replacement/slow-scheduling/cancel/watchdog/Pressure tests, signed duplicate-title UI across both evidence shapes, Process/Tooling. | completed |
-| SYNC-036KF | minimized Edge preview; minimized AX source-to-window-layer propagation | Two sequential raw eight-second log waits separately observe source topology and output projection and can succeed from unrelated records. Evidence composition migration. | One prelaunch runtime-log owner requires both exact-PID minimized source evidence and its minimized WindowRecord projection after the preview trigger. File events drive readback; a named watchdog reports both missing stages. The scenario owns cancellation. | H; initial/ordered-or-duplicate events/wrong-PID/cancel/watchdog/slow-scheduling tests, signed minimized UI, Process/Tooling. | planned |
+| SYNC-036KF | minimized Edge preview; minimized AX source-to-window-layer propagation | Two sequential raw eight-second log waits separately observe source topology and output projection and can succeed from unrelated records. Evidence composition migration. | One prelaunch runtime-log owner requires both exact-PID minimized source evidence and its minimized WindowRecord projection after the preview trigger. File events drive readback; a named watchdog reports both missing stages. The scenario owns cancellation. | H; initial/ordered-or-duplicate events/wrong-PID/cancel/watchdog/slow-scheduling tests, signed minimized UI, Process/Tooling. | completed |
 | SYNC-036KG | Edge Window Search scenarios and `performAndWaitForSwitcherSearchWindowIdentifiers`; committed result projection | Both observer-before-typing paths already require exact scope/query/count/identity evidence, while callers supply anonymous eight-second bounds. Retained watchdog. | Name one Edge committed-result watchdog under the Search projection owner and preserve atomic scope/query/result identities as success. Each invocation cancels its owner/cadence. | M; policy/exact query/count/identifier/cancel/watchdog tests, both signed Edge Search UIs, Process/Tooling. | planned |
 | SYNC-036KH | Edge-title Search confirmation; exact CG window activation | The activation owner is installed before confirmation and accepts exact bundle/window-number readback, while a raw ten-second bound lacks scenario policy ownership. Retained watchdog. | Name the Edge exact-window activation watchdog under the workflow-window owner; keep workspace/AX events plus cancellable fallback and exact frontmost readback as the Oracle. | M; policy/exact/wrong-window/cancel/watchdog tests, signed edge-title activation UI, Process/Tooling. | planned |
 | SYNC-036KI | `testHomePageShowsMultipleRealSpaceFixtureWorkflowAppsAndWindowCounts`; atomic multi-App Home projection | Home is tapped first, then each App row and count receives an independent 20-second wait, so success can combine different snapshots. Evidence composition migration. | Install one Home row-projection owner before Home navigation; after the trigger require foreground state and all exact row identities/count values in one snapshot. The named watchdog is failure-only and the invocation owns cancellation. | H; exact atomic projection/initial/stale/slow-scheduling/cancel/watchdog/Pressure tests, signed multi-App Home UI, Process/Tooling. | planned |
@@ -27631,6 +27631,70 @@ polling cadence, deadline, or timeout in the scoped paths.
   exact absence and worktree-baseline checks.
 - Commit subject:
   `test(sync): migrate SYNC-036KD Edge card watchdog`.
+
+### SYNC-036KF Closure Record
+
+- Status and Oracle: completed. The minimized Edge preview now starts one
+  typed runtime-log owner before any fixture process launches. Once fixture
+  readiness binds the exact Chrome PID, success requires a minimized AX source
+  record whose AX handle bridges to one exact offscreen CG window, followed by
+  a WindowRecord projection with the same app name, PID, title, AX handle, and
+  CG window ID and `minimized=1`. The exact two-card title and distinct CG
+  identities remain the independent visible Oracle.
+- Evidence ordering: the owner registers file events and performs its initial
+  readback before fixture launch. Immediately before Down it freezes the
+  existing projection-line multiplicities, then rejects resolution while the
+  key trigger is active. The post-trigger readback accepts only a newly
+  published projection line and only when a matching source line precedes it;
+  wrong PID, mismatched window identity, output-before-source, duplicate event,
+  and pre-trigger output evidence cannot resolve the contract.
+- Lifecycle ownership: the scenario owns the prelaunch runtime-log baseline,
+  typed owner, exact PID binding, trigger boundary, and terminal diagnostic.
+  Resolution stops the shared observation inputs. Every exit explicitly and
+  idempotently cancels the owner and baseline, while observation generations
+  reject callbacks retained from cancelled runs.
+- Retained time: eight seconds is named `evidenceWatchdog` under
+  `SpaceFixtureMinimizedAXPropagationObservationPolicy` and only bounds absent
+  exact propagation evidence. File events drive immediate readback. The shared
+  200-millisecond `readbackCadence` remains an immediately-checking,
+  cancellable fallback for platforms without a reliable log-file callback;
+  elapsed time cannot establish success. Watchdog diagnostics report the
+  expected app/PID/title, trigger state, both missing stages, parsed records,
+  file generation, and the final log tail.
+- Deterministic and Pressure validation: the canonical rebuilt signed Runner
+  passed the nine selected policy, exact minimized/offscreen parser,
+  initial-source, post-trigger boundary, ordered/duplicate event, exact
+  PID/window identity, cancellation, watchdog, and delayed-delivery checks 9/9
+  in 1.462 seconds. The 200-generation cancelled/restarted stale-callback
+  Pressure check passed in 0.268 seconds.
+- Affected UI: after the canonical installer refreshed the fixed signed App,
+  the real minimized Edge fixture path passed 1/1 in 15.719 seconds. The
+  accepted post-Down evidence bound PID `23717`, AX `ax:23717:1`, and CG
+  `97538`; source topology marked that exact window `min=1` and offscreen, and
+  the later WindowRecord projection published the same identity with
+  `off:minimized=1`. The two visible cards retained exact CG identities `97537`
+  and `97538`.
+- Validation scope: FlowTabCore Unit, app Unit/Behavior, FlowTabTests,
+  unrelated UI, and production Pressure are not relevant because production
+  mapping, logging, configuration, window identity, module direction, path
+  intent, and recurring product work are unchanged. This slice changes only
+  the UI-test evidence composition, observation lifecycle, deterministic
+  regression coverage, and its one affected real-topology assertion.
+- Signing and Process/Tooling: the canonical six-target UI test build and
+  fixed-App install completed successfully. Sandbox-external strict deep
+  verification accepts the App and Runner under Team `96PUA726W9` with
+  CDHashes `78a55012be48b3e401ae8351413f5c29e4b611f5` and
+  `0f27d7ec4c79fd6d200a00f12f3074cef9b43a84`. Swift parsing, project-file
+  lint, and `git diff --check` pass. The typed owner/parser, tests, and affected
+  workflow contain 672, 455, and 503 lines with clear single responsibilities.
+  Exact App/Runner/fixture and repository-scoped xcodebuild process readbacks
+  are empty.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. The reproducible UI result bundle
+  is removed after this durable record and independent commit, followed by
+  exact absence and worktree-baseline checks.
+- Commit subject:
+  `test(sync): migrate SYNC-036KF minimized AX propagation`.
 
 ### SYNC-001 Authorized Resume Closure Record
 
