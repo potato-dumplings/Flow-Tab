@@ -556,8 +556,11 @@ extension FlowTabUITests {
                 "--flowtab-ui-listen-switcher-trigger"
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         ) { identity, app in
-            let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
-            XCTAssertTrue(fixtureAppTile.waitForExistence(timeout: 8))
+            guard assertCurrentSwitcherAppProjection(
+                in: app,
+                exactEntry: "\(identity.bundleIdentifier):3",
+                timeout: FlowTabUITestSwitcherAppProjectionPolicy.standardFixtureProjectionWatchdog
+            ) else { return }
             selectSwitcherAppDirectly(
                 in: app,
                 appID: identity.bundleIdentifier,
