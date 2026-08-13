@@ -101,7 +101,7 @@ and Process/Tooling.
 | ID | File and owner/symbol | Current time assumption and classification | Target evidence or retained policy; lifecycle owner | Risk and required validation | Status |
 | --- | --- | --- | --- | --- | --- |
 | SYNC-000 | `docs/EVIDENCE_DRIVEN_SYNCHRONIZATION_MIGRATION.md`; migration ledger baseline | The repository previously had no stable, reviewable closure ledger for time-based synchronization contracts. Process contract. | Preserve the startup Git baseline, semantic classification, dependency order, per-slice validation, and local commit trace in this document. The migration task owns updates through final closure. | L; Process/Tooling (`git diff --check`, ID/path/source-scope review). | completed by the baseline commit |
-| SYNC-001 | `FlowTab/Infrastructure/Runtime/RuntimeAXRemoteWindowResolver.swift`; `windowScanResult(forPID:policy:)` | An 80–250ms wall-clock budget accepts a machine-dependent partial element-ID scan as usable output. Evidence migration. | Scan a deterministic policy-owned ID range and publish complete/unavailable evidence. Any watchdog must fail the scan with last scanned ID and observed windows rather than promote a partial result. The resolver call owns cancellation/termination. | H; Unit, Behavior, affected topology UI, runtime-topology Pressure. | blocked: implementation and Unit/Behavior/Process passed; UI/Pressure environment evidence is recorded below |
+| SYNC-001 | `FlowTab/Infrastructure/Runtime/RuntimeAXRemoteWindowResolver.swift`; `windowScanResult(forPID:policy:)` | An 80–250ms wall-clock budget accepts a machine-dependent partial element-ID scan as usable output. Evidence migration. | Scan a deterministic policy-owned ID range and publish complete/unavailable evidence. Any watchdog must fail the scan with last scanned ID and observed windows rather than promote a partial result. The resolver call owns cancellation/termination. | H; Unit, Behavior, affected topology UI, runtime-topology Pressure. | completed after authorized signed UI/Pressure closure; implementation commit and validation evidence are recorded below |
 | SYNC-002 | `AppDelegate.installWorkspaceLifecycleObserver`, `RuntimeAppLaunchWindowEvidenceCoordinator`, `RuntimeProjectionService.signalAppLaunched`; app-launch convergence | A fixed 800ms delay was assumed to be enough for a launched app's windows to exist. Evidence migration. | Establish the exact app/PID AX observer before launch handling, use the launch repair as initial readback, and reconcile later AX transitions or a successful delayed observer installation. The AppDelegate-owned coordinator manages per-PID generation, exact appID/PID cancellation, monitor cleanup, and the named observer-install condition cadence. | H; Unit, Behavior, launch/topology UI, runtime-topology Pressure. | blocked: implementation and Unit/Behavior/Process passed; UI/Pressure environment evidence is recorded below |
 | SYNC-003 | `RuntimeReconciliationCoordinator`, `RuntimeProjectionReconciliationDrainer`, `RuntimeProjectionService`, `RuntimeTransientRepairObservationDriver`; transient-empty repair observation | Delayed `notBefore` values `[0.1, 0.3, 0.8]` waited for AX data to become non-empty, while unrelated maintenance could advance the retry. Conditional observation. | Perform the repair readback immediately, resume from an exact AX/Space/lifecycle signal, and use a service-owned cancellable condition observer only while the payload remains incomplete. Request ID, attempt, and exact appID/PID reject stale evidence. The named `[0.1, 0.3, 0.8]` cadence repeats its last value; a 30-second watchdog terminates one uninterrupted incomplete-evidence session and reports the unmet condition plus last payload. | H; Unit, Behavior, topology UI, runtime-topology Pressure. | blocked: implementation and Unit/Behavior/Process passed; UI/Pressure environment evidence is recorded below |
 | SYNC-004 | `FlowTab/Infrastructure/Runtime/RuntimeAXWindowChangeMonitor.swift`; observer install and `handleAXNotification` | Events during a 750ms warm-up are discarded and events inside a 160ms throttle window can lose the final state. Evidence migration. | Install observers, take an initial AX/window readback, and publish monotonically coalesced generations with a guaranteed trailing readback. The monitor owns observer removal; its delivery coordinator owns pending coalescing cancellation. | H; Unit, Behavior, Home/topology UI, runtime-topology Pressure. | completed |
@@ -26784,3 +26784,53 @@ polling cadence, deadline, or timeout in the scoped paths.
   durable record, followed by exact absence checks.
 - Commit subject:
   `test(sync): migrate SYNC-036JU exact runtime reconciliation`.
+
+### SYNC-001 Authorized Resume Closure Record
+
+- Status and authorization: completed. Before resuming the environment-blocked
+  slice, the XCTest/Xcode Helper Accessibility execution was explicitly
+  re-authorized. The canonical installer then rebuilt and installed the fixed
+  signed App at `/Users/lk/Applications/Flow Tab UITest.app`, and the generated
+  identity manifest bound Pressure to that exact App identity.
+- Oracle: the Noisy Option+Tab real-topology scenario completed its fullscreen
+  workflow-sibling round trip across Spaces while AX-window enumeration was
+  suppressed and unrelated CG siblings remained present. Exact fixture bundle,
+  PID, window identities, selected titles, current mode, foreground state, and
+  fixture topology supplied the independent success evidence. Resolver output
+  remained authoritative only after the deterministic policy-owned element-ID
+  range completed.
+- Retained time and lifecycle: the production SYNC-001 contract retains no
+  duration, observer, timer, retry, wait task, or watchdog. The Pressure-only
+  0.5-second sampler cadence observes CPU/RSS and never decides test success;
+  the script owns its lifecycle and stopped it before aggregation and exact
+  cleanup.
+- Unit and Behavior: the implementation slice's three deterministic Unit tests
+  and six Behavior tests remain the applicable code validation. This
+  documentation-only closure changes no runtime or test behavior, so repeating
+  those layers is not relevant.
+- UI and Pressure: the canonical runtime-topology Pressure command passed 1/1;
+  the exact UI test completed in 31.669 seconds with zero failures. The wrapper
+  and UI-child status records both report `stage=completed` and every exit code
+  zero. The xcresult reports `status=succeeded`, `testsCount=1`, and an empty
+  issue summary. Forty stable identity checks and forty resource samples were
+  recorded; every identity verdict matched, the stable identity observation
+  measured 5052.220ms, and no transient identity was accepted. CPU
+  average/P95/max were 132.95/173.60/177.80 percent; RSS
+  average/P95/max were 221.66/277.95/312.69 MB.
+- Signing and Process/Tooling: sandbox-external strict deep verification accepts
+  the installed App and rebuilt Runner under Team `96PUA726W9` and Apple
+  Development authority `gobestsoft@qq.com (RF9WCUVKH8)`. Their CDHashes are
+  `7475193479b213efc866fb81e50d9ed13c372282` and
+  `a5a2e19a4a0632a22c9143822f99ecc4759479cf`. The owner-scope source search
+  finds no sleep, timer, run-loop advance, elapsed-clock cutoff, timeout,
+  deadline, or partial-scan completion path; `git diff --check` passes.
+- Lifecycle cleanup: the durable cleanup readback reports both application and
+  process verdicts `absent`, with both observation owners cancelled. Exact
+  post-run App/Runner/fixture and repository-scoped xcodebuild process readbacks
+  are empty, `.build-local/test-assets` remains absent, and startup baseline
+  files remain outside this slice. The 883,900 KB SYNC-001 evidence root is
+  removed after this record, followed by an exact absence check.
+- Implementation commit: `695f740`
+  (`refactor(sync): migrate SYNC-001 remote AX scan`).
+- Closure commit subject:
+  `test(sync): close SYNC-001 signed pressure validation`.
