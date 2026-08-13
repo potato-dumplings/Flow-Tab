@@ -114,12 +114,34 @@ extension FlowTabUITests {
                 FlowTabUITestSwitcherAppProjectionPolicy
                     .selectedWindowMutationInitialProjectionWatchdog
         ) else { return }
-        selectSwitcherAppDirectly(
-            in: app,
-            appID: identity.bundleIdentifier,
-            traceLabel: "selectedWindowMutation.selectApp",
-            timeout: 8
-        )
+        do {
+            guard try performAndWaitForSwitcherAppSelection(
+                in: app,
+                bundleIdentifier: identity.bundleIdentifier,
+                appProjectionExpectation:
+                    .exactEntry(
+                        "\(identity.bundleIdentifier):2"
+                    ),
+                timeout:
+                    FlowTabUITestSwitcherAppSelectionPolicy
+                        .selectedWindowMutationApplicationWatchdog,
+                trigger: {
+                    try FlowTabUITestSwitcherCommandPayload.write(
+                        identity.bundleIdentifier
+                    )
+                    postFlowTabUITestSwitcherCommand(
+                        .selectApp,
+                        traceLabel:
+                            "selectedWindowMutation.selectApp"
+                    )
+                }
+            ) else { return }
+        } catch {
+            XCTFail(
+                "Failed to select Selected Mutation fixture App: \(error)"
+            )
+            return
+        }
 
         let allTitles = expectedSpaceFixtureWorkflowWindowTitles(
             titlePrefix: "Selected Mutation",

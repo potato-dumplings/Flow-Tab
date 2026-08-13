@@ -3,6 +3,7 @@ import XCTest
 
 enum FlowTabUITestSwitcherAppSelectionPolicy {
     static let openWindowMutationApplicationWatchdog: TimeInterval = 8
+    static let selectedWindowMutationApplicationWatchdog: TimeInterval = 8
 }
 
 struct FlowTabUITestSwitcherAppSelectionSnapshot: Equatable {

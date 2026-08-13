@@ -25,6 +25,23 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherAppSelectionSelectedWindowMutationPolicyPreservesCompatibleBound() {
+        XCTAssertEqual(
+            FlowTabUITestSwitcherAppSelectionPolicy
+                .selectedWindowMutationApplicationWatchdog,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestSwitcherAppSelectionPolicy
+                .selectedWindowMutationApplicationWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSwitcherAppSelectionPolicy
+                .selectedWindowMutationApplicationWatchdog,
+            0
+        )
+    }
+
     func testSwitcherAppSelectionRequiresAppliedEventAfterMatchingBaseline() {
         var order: [String] = []
         var eventReadback:
