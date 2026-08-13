@@ -186,13 +186,19 @@ extension FlowTabTests {
             name: .runtimeAppSwitcherProjectionDidUpdate,
             object: nil
         )
+        XCTAssertTrue(published.isEmpty)
+
+        notificationCenter.post(
+            name: .runtimeCurrentAppWindowProjectionDidUpdate,
+            object: nil
+        )
         XCTAssertEqual(
             published.map(\.source),
-            [.runtimeProjectionDidUpdate]
+            [.runtimeCurrentAppProjectionDidUpdate]
         )
 
         notificationCenter.post(
-            name: .runtimeAppSwitcherProjectionDidUpdate,
+            name: .runtimeCurrentAppWindowProjectionDidUpdate,
             object: nil
         )
         XCTAssertEqual(published.count, 1)
@@ -204,7 +210,7 @@ extension FlowTabTests {
             )
         ]
         notificationCenter.post(
-            name: .runtimeAppSwitcherProjectionDidUpdate,
+            name: .runtimeCurrentAppWindowProjectionDidUpdate,
             object: nil
         )
         XCTAssertEqual(
@@ -244,11 +250,11 @@ extension FlowTabTests {
         ]
 
         notificationCenter.post(
-            name: .runtimeAppSwitcherProjectionDidUpdate,
+            name: .runtimeCurrentAppWindowProjectionDidUpdate,
             object: nil
         )
         XCTAssertFalse(
-            owner.observeProjectionDidUpdate(
+            owner.observeCurrentAppProjectionDidUpdate(
                 observationGeneration:
                     cancelledGeneration
             )
@@ -261,7 +267,7 @@ extension FlowTabTests {
             cancelledGeneration
         )
         XCTAssertFalse(
-            owner.observeProjectionDidUpdate(
+            owner.observeCurrentAppProjectionDidUpdate(
                 observationGeneration:
                     cancelledGeneration
             )
@@ -299,7 +305,7 @@ extension FlowTabTests {
                     )
                 ]
                 XCTAssertTrue(
-                    owner.observeProjectionDidUpdate(
+                    owner.observeCurrentAppProjectionDidUpdate(
                         observationGeneration: generation
                     )
                 )
@@ -307,7 +313,7 @@ extension FlowTabTests {
             owner.cancel()
             XCTAssertFalse(owner.isObserving)
             XCTAssertFalse(
-                owner.observeProjectionDidUpdate(
+                owner.observeCurrentAppProjectionDidUpdate(
                     observationGeneration: generation
                 )
             )

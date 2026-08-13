@@ -21,7 +21,7 @@ enum FlowTabUITestProjectionAcknowledgementSource:
     Equatable
 {
     case initialReadback
-    case runtimeProjectionDidUpdate
+    case runtimeCurrentAppProjectionDidUpdate
 }
 
 struct FlowTabUITestProjectionAcknowledgementEvidence:
@@ -107,12 +107,12 @@ final class FlowTabUITestProjectionAcknowledgementOwner {
         }
 
         notificationToken = notificationCenter.addObserver(
-            forName: .runtimeAppSwitcherProjectionDidUpdate,
+            forName: .runtimeCurrentAppWindowProjectionDidUpdate,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                _ = self?.observeProjectionDidUpdate(
+                _ = self?.observeCurrentAppProjectionDidUpdate(
                     observationGeneration: generation
                 )
             }
@@ -145,7 +145,7 @@ final class FlowTabUITestProjectionAcknowledgementOwner {
     }
 
     @discardableResult
-    func observeProjectionDidUpdate(
+    func observeCurrentAppProjectionDidUpdate(
         observationGeneration: UInt64
     ) -> Bool {
         guard activeObservationGeneration
@@ -154,7 +154,7 @@ final class FlowTabUITestProjectionAcknowledgementOwner {
             return false
         }
         resolveEligibleRoutes(
-            source: .runtimeProjectionDidUpdate,
+            source: .runtimeCurrentAppProjectionDidUpdate,
             observationGeneration:
                 observationGeneration
         )
@@ -248,10 +248,27 @@ final class FlowTabUITestProjectionAcknowledgementOwner {
 }
 
 extension FlowTabUITestProjectionAcknowledgementSnapshot {
-    static func makeSnapshots(
-        projection: RuntimeAppSwitcherProjection?
-    ) -> [Self] {
-        guard let projection else { return [] }
+    static func makeSnapshot(
+        projection: RuntimeCurrentAppWindowProjection?
+    ) -> Self? {
+        guard let projection else { return nil }
+        let payload = projection.currentAppWindowPayload
+        guard projection.appID == payload.summary.appID,
+              projection.appID == payload.candidate.id,
+              projection.appID == payload.context.appID,
+              payload.summary.pid == payload.context.ownerPID,
+              payload.context.runningApp.processIdentifier
+                == payload.context.ownerPID,
+              payload.summary.windowCount
+                == payload.candidate.windows.count,
+              let bundleIdentifier =
+                payload.context.runningApp.bundleIdentifier,
+              projection.appID == bundleIdentifier,
+              payload.summary.bundleIdentifier
+                == bundleIdentifier
+        else {
+            return nil
+        }
         let freshness = projection.freshness
         let sourceGeneration = [
             "appLifecycle=\(freshness.sourceGeneration.appLifecycle)",
@@ -260,24 +277,13 @@ extension FlowTabUITestProjectionAcknowledgementSnapshot {
             "axDirty=\(freshness.sourceGeneration.axDirty)",
             "projection=\(freshness.sourceGeneration.projection)"
         ].joined(separator: ",")
-        return projection.apps.compactMap { app in
-            guard let context =
-                    projection.contextsByID[app.id],
-                  let bundleIdentifier =
-                    context.runningApp.bundleIdentifier
-            else {
-                return nil
-            }
-            return Self(
-                bundleIdentifier: bundleIdentifier,
-                processIdentifier: context.ownerPID,
-                windowCount: app.windows.count,
-                sourceGeneration: sourceGeneration,
-                isComplete:
-                    freshness.isCompleteForScope
-                    && !freshness.isDirty
-            )
-        }
+        return Self(
+            bundleIdentifier: bundleIdentifier,
+            processIdentifier: payload.context.ownerPID,
+            windowCount: payload.candidate.windows.count,
+            sourceGeneration: sourceGeneration,
+            isComplete: freshness.isCompleteForScope
+        )
     }
 }
 
@@ -352,16 +358,23 @@ enum FlowTabUITestProjectionAcknowledgementBootstrap {
         }
 
         owner?.cancel()
+        let appIDs = Set(
+            routes.map(\.bundleIdentifier)
+        ).sorted()
         let nextOwner =
             FlowTabUITestProjectionAcknowledgementOwner(
                 routes: routes,
                 snapshotProvider: {
-                    FlowTabUITestProjectionAcknowledgementSnapshot
-                        .makeSnapshots(
-                            projection:
-                                service
-                                    .readAppSwitcherProjection()
-                        )
+                    appIDs.compactMap { appID in
+                        FlowTabUITestProjectionAcknowledgementSnapshot
+                            .makeSnapshot(
+                                projection:
+                                    service
+                                        .readCurrentAppWindowProjection(
+                                            appID: appID
+                                        )
+                            )
+                    }
                 },
                 acknowledgementPublisher: {
                     FlowTabUITestProjectionAcknowledgementTransport

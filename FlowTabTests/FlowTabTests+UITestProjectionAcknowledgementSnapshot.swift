@@ -5,12 +5,14 @@ import FlowTabCore
 
 extension FlowTabTests {
     @MainActor
-    func testProjectionAcknowledgementSnapshotUsesExactProjectionEvidence() throws {
+    func testProjectionAcknowledgementSnapshotUsesExactCurrentAppScopeEvidence() throws {
         let runningApp = NSRunningApplication.current
         let bundleIdentifier = try XCTUnwrap(
             runningApp.bundleIdentifier
         )
-        let appID = "com.example.snapshot"
+        let appID = bundleIdentifier
+        let processIdentifier =
+            runningApp.processIdentifier
         let windows = [
             WindowCandidate(
                 id: "snapshot-1",
@@ -35,68 +37,82 @@ extension FlowTabTests {
         let context = RuntimeAppContext(
             appID: appID,
             runningApp: runningApp,
-            ownerPID: 43_001,
+            ownerPID: processIdentifier,
             windowsByID: [:]
         )
-        let generation = RuntimeReadModelGeneration(
-            appLifecycle: 1,
-            cg: 2,
-            space: 3,
-            axDirty: 4,
-            projection: 5
+        let payload = RuntimeCurrentAppWindowPayload(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: candidate.displayName,
+                groupID: candidate.groupID,
+                lastActiveAt: candidate.lastActiveAt,
+                windowCount: windows.count,
+                pid: processIdentifier,
+                bundleIdentifier: bundleIdentifier,
+                bundleURL: runningApp.bundleURL
+            ),
+            candidate: candidate,
+            context: context,
+            appDirectoryEntries: []
         )
-        let cleanProjection = RuntimeAppSwitcherProjection(
-            apps: [candidate],
-            contextsByID: [appID: context],
-            freshness: projectionAcknowledgementFreshness(
-                generation: generation
+        let readModelStore = RuntimeReadModelStore()
+        readModelStore.markAppWindowsDirty(
+            appID: "com.example.unrelated",
+            pid: 43_002,
+            pendingScope:
+                "appWindows:com.example.unrelated"
+        )
+        readModelStore.commitCurrentAppWindowProjection(
+            payload,
+            clearsDirtyState: true,
+            generatedAt: 10
+        )
+        let exactScopeProjection = try XCTUnwrap(
+            readModelStore.readCurrentAppWindowProjection(
+                appID: appID
             )
+        )
+
+        XCTAssertTrue(exactScopeProjection.freshness.isDirty)
+        XCTAssertTrue(
+            exactScopeProjection.freshness
+                .isCompleteForScope
         )
 
         XCTAssertEqual(
             FlowTabUITestProjectionAcknowledgementSnapshot
-                .makeSnapshots(projection: cleanProjection),
-            [
-                FlowTabUITestProjectionAcknowledgementSnapshot(
-                    bundleIdentifier: bundleIdentifier,
-                    processIdentifier: 43_001,
-                    windowCount: 2,
-                    sourceGeneration:
-                        "appLifecycle=1,cg=2,space=3,"
-                        + "axDirty=4,projection=5",
-                    isComplete: true
-                )
-            ]
+                .makeSnapshot(
+                    projection: exactScopeProjection
+                ),
+            FlowTabUITestProjectionAcknowledgementSnapshot(
+                bundleIdentifier: bundleIdentifier,
+                processIdentifier: processIdentifier,
+                windowCount: 2,
+                sourceGeneration:
+                    "appLifecycle=0,cg=0,space=0,"
+                    + "axDirty=1,projection=1",
+                isComplete: true
+            )
         )
 
-        let dirtyProjection = RuntimeAppSwitcherProjection(
-            apps: [candidate],
-            contextsByID: [appID: context],
-            freshness: projectionAcknowledgementFreshness(
-                generation: generation,
-                dirtyAppIDs: [appID]
+        readModelStore.markAppWindowsDirty(
+            appID: appID,
+            pid: processIdentifier,
+            pendingScope: "appWindows:\(appID)"
+        )
+        let incompleteExactScopeProjection = try XCTUnwrap(
+            readModelStore.readCurrentAppWindowProjection(
+                appID: appID
             )
         )
         XCTAssertEqual(
             FlowTabUITestProjectionAcknowledgementSnapshot
-                .makeSnapshots(projection: dirtyProjection)
-                .map(\.isComplete),
-            [false]
-        )
-    }
-
-    private func projectionAcknowledgementFreshness(
-        generation: RuntimeReadModelGeneration,
-        dirtyAppIDs: Set<String> = []
-    ) -> RuntimeProjectionFreshness {
-        RuntimeProjectionFreshness(
-            generatedAt: 10,
-            sourceGeneration: generation,
-            dirtyAppIDs: dirtyAppIDs,
-            dirtyPIDs: [],
-            dirtyCGWindowIDs: [],
-            pendingRepairScopes: [],
-            isCompleteForScope: true
+                .makeSnapshot(
+                    projection:
+                        incompleteExactScopeProjection
+                )?
+                .isComplete,
+            false
         )
     }
 }
