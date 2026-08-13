@@ -100,11 +100,11 @@ extension FlowTabUITests {
             }
         }
 
-        XCTAssertTrue(
-            waitForFlowTabUITestApplicationToBecomeReady(
-                app,
-                timeout: 12
-            )
+        assertRealSpaceFixtureFlowTabIsForegroundReady(
+            app,
+            traceLabel: nil,
+            targetDescription:
+                "selected-window-mutation-before-app-projection"
         )
 
         let fixtureAppTile = element(

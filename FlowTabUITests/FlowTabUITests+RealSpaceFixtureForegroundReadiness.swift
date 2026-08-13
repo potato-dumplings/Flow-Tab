@@ -190,4 +190,28 @@ extension FlowTabUITests {
             )
         )
     }
+
+    func testRealSpaceFixtureSelectedWindowMutationReadinessReportsFinalState() {
+        var finalStateReadbackCount = 0
+        let evidence =
+            FlowTabUITestRealSpaceFixtureReadinessEvidence.resolve(
+                targetDescription:
+                    "selected-window-mutation-before-app-projection",
+                waiterCompleted: false,
+                finalStateReadback: {
+                    finalStateReadbackCount += 1
+                    return .runningBackground
+                }
+            )
+
+        XCTAssertFalse(evidence.isSatisfied)
+        XCTAssertEqual(finalStateReadbackCount, 1)
+        XCTAssertTrue(
+            evidence.diagnosticSummary.contains(
+                "target=selected-window-mutation-before-app-projection "
+                    + "unmetCondition=runningForeground "
+                    + "waiterCompleted=0 finalState="
+            )
+        )
+    }
 }
