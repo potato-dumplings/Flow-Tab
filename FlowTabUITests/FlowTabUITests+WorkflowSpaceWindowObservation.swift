@@ -2,6 +2,12 @@ import AppKit
 import Foundation
 import XCTest
 
+enum FlowTabUITestInAppWorkflowWindowObservationPolicy {
+    static let initialTopologyReadinessWatchdog: TimeInterval = 12
+    static let currentTopologyReadinessWatchdog: TimeInterval = 4
+    static let fixtureReactivationWatchdog: TimeInterval = 12
+}
+
 enum FlowTabUITestWorkflowSpaceWindowScope: Equatable {
     case frontmost(bundleIdentifier: String)
     case activeSpace

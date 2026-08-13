@@ -7,6 +7,29 @@ private enum FlowTabUITestWorkflowSpaceWindowTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testInAppWorkflowWindowPolicyUsesNamedTopologyWatchdogs() {
+        let initialWatchdog =
+            FlowTabUITestInAppWorkflowWindowObservationPolicy
+            .initialTopologyReadinessWatchdog
+        let currentWatchdog =
+            FlowTabUITestInAppWorkflowWindowObservationPolicy
+            .currentTopologyReadinessWatchdog
+        let reactivationWatchdog =
+            FlowTabUITestInAppWorkflowWindowObservationPolicy
+            .fixtureReactivationWatchdog
+
+        XCTAssertEqual(initialWatchdog, 12)
+        XCTAssertEqual(currentWatchdog, 4)
+        XCTAssertEqual(reactivationWatchdog, 12)
+        XCTAssertTrue(
+            [
+                initialWatchdog,
+                currentWatchdog,
+                reactivationWatchdog
+            ].allSatisfy { $0.isFinite && $0 > 0 }
+        )
+    }
+
     func testWorkflowSpaceWindowObserverAcceptsExactInitialState() {
         var order: [String] = []
         let snapshot = workflowSpaceWindowTestSnapshot(

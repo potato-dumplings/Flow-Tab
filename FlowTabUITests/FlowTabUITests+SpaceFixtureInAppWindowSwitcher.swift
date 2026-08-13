@@ -58,7 +58,9 @@ extension FlowTabUITests {
                         self.waitForWorkflowSpaceContainingCGWindow(
                             title: fullscreenTitle,
                             app: targetApp,
-                            timeout: 12
+                            timeout:
+                                FlowTabUITestInAppWorkflowWindowObservationPolicy
+                                .initialTopologyReadinessWatchdog
                         ),
                         "Control+Tab noisy roundtrip must start on a Space containing the fullscreen sibling."
                     )
@@ -67,7 +69,9 @@ extension FlowTabUITests {
                         self.waitForFrontmostWorkflowSpaceCGWindow(
                             title: fullscreenTitle,
                             app: targetApp,
-                            timeout: 12
+                            timeout:
+                                FlowTabUITestInAppWorkflowWindowObservationPolicy
+                                .initialTopologyReadinessWatchdog
                         ),
                         "Control+Tab roundtrip must start with the fullscreen sibling frontmost."
                     )
@@ -91,12 +95,16 @@ extension FlowTabUITests {
                     ? waitForWorkflowSpaceContainingCGWindow(
                         title: fullscreenTitle,
                         app: targetApp,
-                        timeout: 4
+                        timeout:
+                            FlowTabUITestInAppWorkflowWindowObservationPolicy
+                            .currentTopologyReadinessWatchdog
                     )
                     : waitForActiveSpaceWorkflowCGWindow(
                     title: fullscreenTitle,
                     app: targetApp,
-                    timeout: 4
+                    timeout:
+                        FlowTabUITestInAppWorkflowWindowObservationPolicy
+                        .currentTopologyReadinessWatchdog
                 ),
                 "Control+Tab first phase must open from the fullscreen sibling's Space."
             )
@@ -164,7 +172,9 @@ extension FlowTabUITests {
                     windowNumber: standardSelection.windowNumber,
                     title: standardTitle,
                     app: targetApp,
-                    timeout: 4
+                    timeout:
+                        FlowTabUITestInAppWorkflowWindowObservationPolicy
+                        .currentTopologyReadinessWatchdog
                 ),
                 "Control+Tab second phase must open from the focused normal sibling."
             )
@@ -315,7 +325,9 @@ extension FlowTabUITests {
                         windowNumber: currentSelection.windowNumber,
                         title: currentSelection.title,
                         app: targetApp,
-                        timeout: 4
+                        timeout:
+                            FlowTabUITestInAppWorkflowWindowObservationPolicy
+                            .currentTopologyReadinessWatchdog
                     ),
                     "Noisy Control+Tab \(phase.trace) phase must reopen from \(currentSelection.title)."
                 )
@@ -733,7 +745,9 @@ extension FlowTabUITests {
                 windowNumber: focusedWindow.windowNumber,
                 title: focusedWindow.title,
                 app: workflowApp,
-                timeout: 12,
+                timeout:
+                    FlowTabUITestInAppWorkflowWindowObservationPolicy
+                    .fixtureReactivationWatchdog,
                 trigger: {
                     fixtureApplication.activate()
                 }
