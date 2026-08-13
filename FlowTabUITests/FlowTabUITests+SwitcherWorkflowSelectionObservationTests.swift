@@ -7,6 +7,23 @@ private enum FlowTabUITestSwitcherSelectionTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testSwitcherPreviewOpenWindowMutationModePolicyPreservesCompatibleBound() {
+        XCTAssertEqual(
+            FlowTabUITestSwitcherPreviewTransitionPolicy
+                .openWindowMutationModeWatchdog,
+            5
+        )
+        XCTAssertTrue(
+            FlowTabUITestSwitcherPreviewTransitionPolicy
+                .openWindowMutationModeWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSwitcherPreviewTransitionPolicy
+                .openWindowMutationModeWatchdog,
+            0
+        )
+    }
+
     func testSwitcherPreviewTransitionPolicyPreservesCompatibleBounds() {
         XCTAssertEqual(
             FlowTabUITestSwitcherPreviewTransitionPolicy

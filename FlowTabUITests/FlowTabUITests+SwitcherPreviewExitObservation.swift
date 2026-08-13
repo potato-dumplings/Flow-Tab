@@ -7,6 +7,7 @@ enum FlowTabUITestSwitcherPreviewTransitionPolicy {
     static let noisyEntryProjectionWatchdog:
         TimeInterval = 15
     static let exitWatchdog: TimeInterval = 3
+    static let openWindowMutationModeWatchdog: TimeInterval = 5
 
     static func entryProjectionWatchdog(
         for expectation:
@@ -136,6 +137,24 @@ extension FlowTabUITests {
         timeout: TimeInterval,
         trigger: () -> Void
     ) -> Bool {
+        enterSwitcherPreview(
+            expectedBundleIdentifier:
+                workflowApp.identity.bundleIdentifier,
+            diagnostics: diagnostics,
+            previewExpectation: previewExpectation,
+            timeout: timeout,
+            trigger: trigger
+        )
+    }
+
+    func enterSwitcherPreview(
+        expectedBundleIdentifier: String,
+        diagnostics: XCUIElement,
+        previewExpectation:
+            FlowTabUITestSwitcherPreviewProjectionExpectation?,
+        timeout: TimeInterval,
+        trigger: () -> Void
+    ) -> Bool {
         let baselineSnapshot =
             switcherDiagnosticsSnapshot(
                 diagnostics,
@@ -143,8 +162,6 @@ extension FlowTabUITests {
                     FlowTabUITestSwitcherSelectionState
                         .diagnosticsKeys
             )
-        let expectedBundleIdentifier =
-            workflowApp.identity.bundleIdentifier
         guard
             let transition =
                 FlowTabUITestSwitcherSelectionTransition

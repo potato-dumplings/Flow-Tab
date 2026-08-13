@@ -149,9 +149,22 @@ extension FlowTabUITests {
             windowCount: 2
         )
         app.activate()
-        assertSwitcherWindowCycle(in: app, timeout: 5) {
-            app.typeKey(.downArrow, modifierFlags: [])
-        }
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        guard enterSwitcherPreview(
+            expectedBundleIdentifier:
+                identity.bundleIdentifier,
+            diagnostics: diagnosticsSummary,
+            previewExpectation: nil,
+            timeout:
+                FlowTabUITestSwitcherPreviewTransitionPolicy
+                    .openWindowMutationModeWatchdog,
+            trigger: {
+                app.typeKey(.downArrow, modifierFlags: [])
+            }
+        ) else { return }
         guard waitForSwitcherWindowCards(
             in: app,
             expectedTitles: allTitles,
