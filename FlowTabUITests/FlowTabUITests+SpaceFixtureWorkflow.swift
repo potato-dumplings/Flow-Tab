@@ -17,8 +17,7 @@ extension FlowTabUITests {
 
     func testHomePageShowsRealSpaceFixtureWorkflowWindows() throws {
         runRealSpaceFixtureWorkflow { identity, app in
-            let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity)
-            assertValue(of: fixtureAppRow, equals: "3w", timeout: 20)
+            _ = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity, expectedValue: "3w")
             assertSpaceFixtureWindowTitles(
                 expectedSpaceFixtureWorkflowWindowTitles(titlePrefix: "Workflow", windowCount: 3),
                 in: app
