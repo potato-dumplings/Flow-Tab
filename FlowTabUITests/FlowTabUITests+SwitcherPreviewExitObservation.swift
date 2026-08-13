@@ -2,6 +2,8 @@ import Foundation
 import XCTest
 
 enum FlowTabUITestSwitcherPreviewTransitionPolicy {
+    static let standardFixtureEntryWatchdog:
+        TimeInterval = 5
     static let exactEntryProjectionWatchdog:
         TimeInterval = 11
     static let noisyEntryProjectionWatchdog:
@@ -84,6 +86,29 @@ extension FlowTabUITestSwitcherSelectionTransition {
 }
 
 extension FlowTabUITests {
+    func enterSwitcherWindowCycle(
+        expectedBundleIdentifier: String,
+        in app: XCUIApplication,
+        timeout: TimeInterval
+    ) -> Bool {
+        let diagnostics = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        return enterSwitcherPreview(
+            expectedBundleIdentifier:
+                expectedBundleIdentifier,
+            diagnostics: diagnostics,
+            previewExpectation: nil,
+            timeout: timeout
+        ) {
+            app.typeKey(
+                .downArrow,
+                modifierFlags: []
+            )
+        }
+    }
+
     func enterSwitcherPreview(
         _ workflowApp:
             SpaceFixtureResolvedWorkflow.App,

@@ -645,9 +645,13 @@ extension FlowTabUITests {
                 traceLabel: "workflowWindowCards.selectApp"
             )
 
-            assertSwitcherWindowCycle(in: app, timeout: 5) {
-                app.typeKey(.downArrow, modifierFlags: [])
-            }
+            XCTAssertTrue(
+                enterSwitcherWindowCycle(
+                    expectedBundleIdentifier: identity.bundleIdentifier,
+                    in: app,
+                    timeout: FlowTabUITestSwitcherPreviewTransitionPolicy.standardFixtureEntryWatchdog
+                )
+            )
 
             assertSpaceFixtureSwitcherWindowCards(
                 expectedSpaceFixtureWorkflowWindowTitles(titlePrefix: "Workflow", windowCount: 3),

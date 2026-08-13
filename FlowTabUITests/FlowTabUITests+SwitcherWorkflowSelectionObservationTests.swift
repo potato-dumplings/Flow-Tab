@@ -42,14 +42,13 @@ extension FlowTabUITests {
     }
 
     func testSwitcherPreviewTransitionPolicyPreservesCompatibleBounds() {
-        XCTAssertEqual(
+        let bounds = [
+            FlowTabUITestSwitcherPreviewTransitionPolicy
+                .standardFixtureEntryWatchdog,
             FlowTabUITestSwitcherPreviewTransitionPolicy
                 .entryProjectionWatchdog(
                     for: .exactTitles(["Primary"])
                 ),
-            11
-        )
-        XCTAssertEqual(
             FlowTabUITestSwitcherPreviewTransitionPolicy
                 .entryProjectionWatchdog(
                     for:
@@ -58,12 +57,12 @@ extension FlowTabUITests {
                             fullscreenTitles: ["Fullscreen"]
                         )
                 ),
-            15
-        )
-        XCTAssertEqual(
             FlowTabUITestSwitcherPreviewTransitionPolicy
                 .exitWatchdog,
-            3
+        ]
+        XCTAssertEqual(bounds, [5, 11, 15, 3])
+        XCTAssertTrue(
+            bounds.allSatisfy { $0.isFinite && $0 > 0 }
         )
     }
 
