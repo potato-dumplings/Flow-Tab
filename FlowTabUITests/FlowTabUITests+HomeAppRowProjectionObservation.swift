@@ -27,18 +27,26 @@ struct FlowTabUITestHomeAppRowProjectionExpectation: Equatable {
 
     let rows: [Row]
     let frameOrder: FrameOrder
+    let requiredApplicationState: XCUIApplication.State?
 
     init(
         rows: [Row],
-        frameOrder: FrameOrder = .expectationOrder
+        frameOrder: FrameOrder = .expectationOrder,
+        requiredApplicationState: XCUIApplication.State? = nil
     ) {
         self.rows = rows
         self.frameOrder = frameOrder
+        self.requiredApplicationState = requiredApplicationState
     }
 
     func isSatisfied(
         by snapshot: FlowTabUITestHomeAppRowProjectionSnapshot
     ) -> Bool {
+        if let requiredApplicationState,
+           snapshot.applicationState != requiredApplicationState
+        {
+            return false
+        }
         guard snapshot.rows.count == rows.count else {
             return false
         }
@@ -70,6 +78,8 @@ struct FlowTabUITestHomeAppRowProjectionExpectation: Equatable {
 
     var diagnosticSummary: String {
         "frameOrder=\(frameOrder.rawValue) "
+            + "requiredApplicationState="
+            + "\(String(describing: requiredApplicationState)) "
             + rows.map {
                 "identifier=\($0.identifier) "
                     + "expectedValue=\($0.value ?? "any")"
@@ -86,7 +96,16 @@ struct FlowTabUITestHomeAppRowProjectionSnapshot: Equatable {
         let frameMinY: Double?
     }
 
+    let applicationState: XCUIApplication.State?
     let rows: [Row]
+
+    init(
+        applicationState: XCUIApplication.State? = nil,
+        rows: [Row]
+    ) {
+        self.applicationState = applicationState
+        self.rows = rows
+    }
 
     func row(
         identifier: String
@@ -95,13 +114,14 @@ struct FlowTabUITestHomeAppRowProjectionSnapshot: Equatable {
     }
 
     var diagnosticSummary: String {
-        rows.map {
-            "identifier=\($0.identifier) "
-                + "exists=\($0.exists) "
-                + "value=\($0.value ?? "nil") "
-                + "frameMinY=\($0.frameMinY.map { String($0) } ?? "nil")"
-        }
-        .joined(separator: ";")
+        "applicationState=\(String(describing: applicationState)) "
+            + rows.map {
+                "identifier=\($0.identifier) "
+                    + "exists=\($0.exists) "
+                    + "value=\($0.value ?? "nil") "
+                    + "frameMinY=\($0.frameMinY.map { String($0) } ?? "nil")"
+            }
+            .joined(separator: ";")
     }
 
     var identifiersByAscendingFrame: [String]? {
@@ -265,6 +285,7 @@ extension FlowTabUITests {
         frameOrder:
             FlowTabUITestHomeAppRowProjectionExpectation.FrameOrder =
                 .expectationOrder,
+        requiredApplicationState: XCUIApplication.State? = nil,
         acceptsEvidence: @escaping () -> Bool = {
             true
         },
@@ -290,7 +311,9 @@ extension FlowTabUITests {
             expectation:
                 FlowTabUITestHomeAppRowProjectionExpectation(
                     rows: rows,
-                    frameOrder: frameOrder
+                    frameOrder: frameOrder,
+                    requiredApplicationState:
+                        requiredApplicationState
                 ),
             acceptsEvidence: acceptsEvidence,
             acceptsSnapshot: acceptsSnapshot,
@@ -298,16 +321,22 @@ extension FlowTabUITests {
                 snapshotExpectationDescription,
             readback: {
                 self.homeAppRowProjectionSnapshot(
-                    for: elements
+                    for: elements,
+                    applicationState:
+                        requiredApplicationState == nil
+                            ? nil
+                            : app.state
                 )
             }
         )
     }
 
     func homeAppRowProjectionSnapshot(
-        for elements: [FlowTabUITestHomeAppRowProjectionElement]
+        for elements: [FlowTabUITestHomeAppRowProjectionElement],
+        applicationState: XCUIApplication.State? = nil
     ) -> FlowTabUITestHomeAppRowProjectionSnapshot {
         FlowTabUITestHomeAppRowProjectionSnapshot(
+            applicationState: applicationState,
             rows: elements.map { item in
                 let exists = item.element.exists
                 return .init(

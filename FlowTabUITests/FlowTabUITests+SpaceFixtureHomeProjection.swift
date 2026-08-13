@@ -7,6 +7,17 @@ enum FlowTabUITestSpaceFixtureHomeProjectionPolicy {
     static let runtimeLifecycleAppSummaryWatchdog: TimeInterval = 12
     static let runtimeWindowMutationInitialSummaryWatchdog: TimeInterval = 12
     static let runtimeWindowMutationFinalSummaryWatchdog: TimeInterval = 15
+
+    static func multiAppAtomicRowProjectionWatchdog(
+        rowCount: Int
+    ) -> TimeInterval {
+        let compatibleRowCount = max(rowCount, 1)
+        let compatibleBoundsPerRow = 2
+        return defaultAppRowProjectionWatchdog
+            * TimeInterval(
+                compatibleRowCount * compatibleBoundsPerRow
+            )
+    }
 }
 
 fileprivate final class FlowTabUITestSpaceFixtureHomeTransitionState {
@@ -108,6 +119,12 @@ extension FlowTabUITests {
                 .runtimeLifecycleAppSummaryWatchdog,
             0
         )
+        let multiAppWatchdog =
+            FlowTabUITestSpaceFixtureHomeProjectionPolicy
+            .multiAppAtomicRowProjectionWatchdog(rowCount: 3)
+        XCTAssertEqual(multiAppWatchdog, 120)
+        XCTAssertTrue(multiAppWatchdog.isFinite)
+        XCTAssertGreaterThan(multiAppWatchdog, 0)
     }
 
     func testSpaceFixtureHomeProjectionWindowMutationWatchdogPolicyCompatibility() {
@@ -169,6 +186,87 @@ extension FlowTabUITests {
             state: state,
             projection: projection
         )
+    }
+
+    func makeSpaceFixtureHomeTransitionObservation(
+        in app: XCUIApplication,
+        rows: [FlowTabUITestHomeAppRowProjectionExpectation.Row],
+        requiredApplicationState: XCUIApplication.State? = nil
+    ) -> FlowTabUITestSpaceFixtureHomeTransitionObservationOwner {
+        let state =
+            FlowTabUITestSpaceFixtureHomeTransitionState()
+        let projection =
+            makeHomeAppRowProjectionObservation(
+                in: app,
+                rows: rows,
+                frameOrder: .unconstrained,
+                requiredApplicationState:
+                    requiredApplicationState,
+                acceptsEvidence: {
+                    state.acceptsPostTriggerEvidence
+                }
+            )
+        return FlowTabUITestSpaceFixtureHomeTransitionObservationOwner(
+            state: state,
+            projection: projection
+        )
+    }
+
+    @discardableResult
+    func waitForSpaceFixtureHomeAppRowsAfterNavigation(
+        _ workflow: SpaceFixtureResolvedWorkflow,
+        in app: XCUIApplication
+    ) -> FlowTabUITestHomeAppRowProjectionSnapshot? {
+        let rows = workflow.apps.map {
+            FlowTabUITestHomeAppRowProjectionExpectation.Row(
+                identifier:
+                    $0.identity.homeAppAccessibilityIdentifier,
+                value: "\($0.windowCount)w"
+            )
+        }
+        let observation =
+            makeSpaceFixtureHomeTransitionObservation(
+                in: app,
+                rows: rows,
+                requiredApplicationState: .runningForeground
+            )
+        observation.start()
+        defer { observation.cancel() }
+
+        let homeTabButtons = app.buttons.matching(
+            identifier: Identifier.homeTabButton
+        )
+        guard tapFirstHittable(
+            in: homeTabButtons,
+            timeout:
+                FlowTabUITestSpaceFixtureHomeProjectionPolicy
+                .homeTabNavigationWatchdog
+        ) else {
+            XCTFail(
+                "Space Fixture multi-App Home navigation watchdog expired. "
+                    + "finalCandidateCount=\(homeTabButtons.count) "
+                    + observation.diagnosticSummary
+            )
+            return nil
+        }
+
+        observation.markTriggerCompleted()
+        let watchdog =
+            FlowTabUITestSpaceFixtureHomeProjectionPolicy
+            .multiAppAtomicRowProjectionWatchdog(
+                rowCount: rows.count
+            )
+        guard let evidence = observation.waitForResolution(
+            timeout: watchdog
+        ) else {
+            XCTFail(
+                "Space Fixture multi-App Home row-projection watchdog "
+                    + "expired. "
+                    + observation.diagnosticSummary
+            )
+            return nil
+        }
+        return evidence.value
     }
 
     func openHomeTabAndSelectSpaceFixtureApp(

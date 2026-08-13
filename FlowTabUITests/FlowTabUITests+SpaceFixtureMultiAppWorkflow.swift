@@ -637,20 +637,12 @@ extension FlowTabUITests {
 
     func testHomePageShowsMultipleRealSpaceFixtureWorkflowAppsAndWindowCounts() throws {
         try runRealSpaceFixtureMultiAppWorkflow { workflow, app in
-            XCTAssertTrue(
-                tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10)
-            )
-
-            for workflowApp in workflow.apps {
-                let homeRow = app.buttons
-                    .matching(identifier: workflowApp.identity.homeAppAccessibilityIdentifier)
-                    .firstMatch
-                XCTAssertTrue(
-                    homeRow.waitForExistence(timeout: 20),
-                    "FlowTab did not surface \(workflowApp.appName) on the home page"
+            XCTAssertNotNil(
+                waitForSpaceFixtureHomeAppRowsAfterNavigation(
+                    workflow,
+                    in: app
                 )
-                assertValue(of: homeRow, equals: "\(workflowApp.windowCount)w", timeout: 20)
-            }
+            )
         }
     }
 

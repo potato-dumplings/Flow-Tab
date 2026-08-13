@@ -565,7 +565,7 @@ and Process/Tooling.
 | SYNC-036KF | minimized Edge preview; minimized AX source-to-window-layer propagation | Two sequential raw eight-second log waits separately observe source topology and output projection and can succeed from unrelated records. Evidence composition migration. | One prelaunch runtime-log owner requires both exact-PID minimized source evidence and its minimized WindowRecord projection after the preview trigger. File events drive readback; a named watchdog reports both missing stages. The scenario owns cancellation. | H; initial/ordered-or-duplicate events/wrong-PID/cancel/watchdog/slow-scheduling tests, signed minimized UI, Process/Tooling. | completed |
 | SYNC-036KG | Edge Window Search scenarios and `performAndWaitForSwitcherSearchWindowIdentifiers`; committed result projection | Both observer-before-typing paths already require exact scope/query/count/identity evidence, while callers supply anonymous eight-second bounds. Retained watchdog. | Name one Edge committed-result watchdog under the Search projection owner and preserve atomic scope/query/result identities as success. Each invocation cancels its owner/cadence. | M; policy/exact query/count/identifier/cancel/watchdog tests, both signed Edge Search UIs, Process/Tooling. | completed |
 | SYNC-036KH | Edge-title Search confirmation; exact CG window activation | The activation owner is installed before confirmation and accepts exact bundle/window-number readback, while a raw ten-second bound lacks scenario policy ownership. Retained watchdog. | Name the Edge exact-window activation watchdog under the workflow-window owner; keep workspace/AX events plus cancellable fallback and exact frontmost readback as the Oracle. | M; policy/exact/wrong-window/cancel/watchdog tests, signed edge-title activation UI, Process/Tooling. | completed |
-| SYNC-036KI | `testHomePageShowsMultipleRealSpaceFixtureWorkflowAppsAndWindowCounts`; atomic multi-App Home projection | Home is tapped first, then each App row and count receives an independent 20-second wait, so success can combine different snapshots. Evidence composition migration. | Install one Home row-projection owner before Home navigation; after the trigger require foreground state and all exact row identities/count values in one snapshot. The named watchdog is failure-only and the invocation owns cancellation. | H; exact atomic projection/initial/stale/slow-scheduling/cancel/watchdog/Pressure tests, signed multi-App Home UI, Process/Tooling. | planned |
+| SYNC-036KI | `testHomePageShowsMultipleRealSpaceFixtureWorkflowAppsAndWindowCounts`; atomic multi-App Home projection | Home is tapped first, then each App row and count receives an independent 20-second wait, so success can combine different snapshots. Evidence composition migration. | Install one Home row-projection owner before Home navigation; after the trigger require foreground state and all exact row identities/count values in one snapshot. The named watchdog is failure-only and the invocation owns cancellation. | H; exact atomic projection/initial/stale/slow-scheduling/cancel/watchdog/Pressure tests, signed multi-App Home UI, Process/Tooling. | completed |
 | SYNC-036KJ | `assertHomePageShowsOnlySelectedWorkflowAppTitles`; fullscreen-aware Home App inventory | Each row receives a 20-second existence wait, and absence of a fullscreen-only App is inferred from watchdog expiry. Evidence migration. | Before Home navigation, observe one complete Home App inventory containing every eligible exact row/count and explicitly excluding fullscreen-only rows, with count-label readback on both sides. The owner gates post-trigger evidence and owns cadence cancellation. | H; include/exclude/count/initial/stale/cancel/watchdog/Pressure tests, signed standard/fullscreen-only Home UIs, Process/Tooling. | planned |
 | SYNC-036KK | `assertHomePageShowsOnlySelectedWorkflowAppTitles`; exact selected-App Home window projection | Selection waits for one title, then independent count, per-title presence, and other-title absence waits can resolve from different snapshots. Evidence composition migration. | Start one exact window-projection owner before tapping each App row; after trigger require all selected-App titles visible and every other workflow title absent in one snapshot, while the proven inventory supplies the row count. Name the compatible selection/projection watchdog and cancel per iteration. | H; atomic visible/excluded/initial/stale/slow-scheduling/cancel/watchdog/Pressure tests, signed Home isolation UIs, Process/Tooling. | planned |
 | SYNC-036KL | Switcher multi-App workflows; exact initial App strip projection | Several paths independently wait for diagnostics and individual App rows (2/8 seconds), omitting exact logical counts and atomic all-App readiness. Evidence composition migration. | Reuse a multi-entry Switcher App-projection owner requiring every exact `bundleID:windowCount` plus each exact row identity in one foreground snapshot. One named watchdog covers all representative paths; each invocation owns cancellation. | H; exact multi-entry/row/count/prefix/stale/cancel/watchdog/Pressure tests, affected signed multi-App Switcher UIs, Process/Tooling. | planned |
@@ -27801,6 +27801,64 @@ polling cadence, deadline, or timeout in the scoped paths.
   exact absence and worktree-baseline checks.
 - Commit subject:
   `test(sync): migrate SYNC-036KH Edge activation watchdog`.
+
+### SYNC-036KI Closure Record
+
+- Status and Oracle: completed. The multi-App Home scenario now uses one
+  `FlowTabUITestHomeAppRowProjectionObservationOwner` to accept a single
+  post-navigation snapshot only when FlowTab is foreground and all three exact
+  fixture row identifiers simultaneously expose their exact `1w`, `3w`, and
+  `1w` window-count values. Row order is unconstrained, preserving the visible
+  behavior while preventing evidence from different snapshots from composing
+  a false success.
+- Evidence ordering and lifecycle: the Space Fixture Home transition owner is
+  constructed and started before tapping Home. Its initial readback records
+  the baseline while the transition state rejects acceptance. Trigger return
+  opens the gate and requests immediate readback; the shared named
+  100-millisecond schedule continues only until exact evidence, cancellation,
+  or watchdog expiry. The invocation owns the projection generation,
+  transition state, scheduled work, waiter, and idempotent cancellation on
+  every exit.
+- Retained time: Home navigation keeps its named ten-second condition bound.
+  The three-row projection uses a 120-second named compatibility watchdog,
+  calculated from the prior existence and value failure bounds for each row.
+  Both durations terminate missing evidence with diagnostics; elapsed time
+  cannot establish navigation, foreground state, row identity, or count.
+- Deterministic validation: the canonical rebuilt signed Runner passed the 11
+  selected atomic row, foreground-state, unconstrained-order, initial readback,
+  trigger-gate, scheduled readback, additional-snapshot, slow-scheduling,
+  cancellation, policy, and final-watchdog checks in 1.636 seconds. The four
+  remaining shared row-policy and position-rule compatibility tests passed in
+  0.736 seconds, closing the complete 15-test row-projection set.
+- Pressure validation: the 200-generation replaced-readback test passed 1/1
+  in 0.228 seconds while requiring the exact foreground snapshot. A stale
+  generation could not resolve the replacement owner.
+- Affected UI: after the canonical installer refreshed the fixed signed App,
+  the real Finder/Chrome/Notes workflow passed 1/1 in 19.189 seconds. The owner
+  was live before Home navigation and resolved from one foreground snapshot
+  containing the exact three fixture identities and `1w/3w/1w` values.
+- Validation scope: FlowTabCore Unit, app Unit/Behavior, FlowTabTests,
+  unrelated UI, and production Pressure are not relevant because production
+  Home behavior, configuration, runtime mapping, window identity, module
+  direction, path intent, and recurring work are unchanged. This slice changes
+  the UI-test row projection, its deterministic and lifecycle coverage, and
+  one real-topology consumer.
+- Signing and Process/Tooling: both incremental and final canonical six-target
+  UI builds passed, and the fixed-App install completed successfully.
+  Sandbox-external strict deep verification accepts the App and Runner under
+  Team `96PUA726W9` with CDHashes
+  `78a55012be48b3e401ae8351413f5c29e4b611f5` and
+  `489652fcb016926b1a974b14769b9998adf7ad96`. Swift parsing and
+  `git diff --check` pass. The shared owner, tests, extracted Space Fixture
+  Home helper, and reduced oversized workflow contain 355, 669, 340, and 1,069
+  lines. Exact App/Runner/fixture and repository-scoped xcodebuild process
+  readbacks are empty.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. The reproducible UI result bundle
+  is removed after this durable record and independent commit, followed by
+  exact absence and worktree-baseline checks.
+- Commit subject:
+  `test(sync): migrate SYNC-036KI atomic Home rows`.
 
 ### SYNC-001 Authorized Resume Closure Record
 
