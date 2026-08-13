@@ -158,6 +158,10 @@ final class RuntimeUITestFrontmostProjectionService: RuntimeProjectionServing, @
         baseService.signalAppTerminated(appID: appID, pid: pid)
     }
 
+    func scheduleWorkspaceAppTerminated(appID: String, pid: pid_t) {
+        baseService.scheduleWorkspaceAppTerminated(appID: appID, pid: pid)
+    }
+
     func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification) {
         baseService.signalWindowFocusVerified(verification)
     }

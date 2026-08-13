@@ -10,11 +10,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         case preservingActivationFreshness
     }
 
-    private let maintenanceQueue: DispatchQueue
-    private let maintenanceQueueSpecificKey = DispatchSpecificKey<Void>()
+    private let maintenanceOwner: RuntimeProjectionMaintenanceOwner
     private let repairProvider: RuntimeProjectionRepairProviding
     private let mainTableProjectionBuilder: RuntimeMainTableProjectionBuilding
-    private let readModelStore: RuntimeReadModelStore
+    let readModelStore: RuntimeReadModelStore
     private let appDirectoryProvider: RuntimeAppDirectoryProviding?
     private let reconciliationDrainer: RuntimeProjectionReconciliationDrainer
     private let transientRepairObservationDriver:
@@ -48,8 +47,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             }
             return true
         }
-        maintenanceQueue = DispatchQueue(label: label, qos: .utility)
-        maintenanceQueue.setSpecific(key: maintenanceQueueSpecificKey, value: ())
+        maintenanceOwner = RuntimeProjectionMaintenanceOwner(label: label)
         if let repairProvider {
             self.repairProvider = repairProvider
             self.mainTableProjectionBuilder = mainTableProjectionBuilder
@@ -75,54 +73,19 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             reconciliationExecutor: reconciliationExecutor
         )
         transientRepairObservationDriver = RuntimeTransientRepairObservationDriver(
-            ownerQueue: maintenanceQueue,
+            ownerQueue: maintenanceOwner.queue,
             scheduler: transientRepairObservationScheduler,
             policy: transientRepairObservationPolicy
         )
     }
 
     deinit {
+        maintenanceOwner.cancelPendingPriorityWork()
         transientRepairObservationDriver.cancelAll(reason: "serviceDeinit")
     }
 
-    func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection? {
-        readModelStore.readAppSwitcherProjection()
-    }
-
-    func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection? {
-        readModelStore.readHomeSummaryProjection()
-    }
-
-    func readHomeAppDetailProjection(appID: String) -> RuntimeHomeAppDetailProjection? {
-        readModelStore.readHomeAppDetailProjection(appID: appID)
-    }
-
-    func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection? {
-        readModelStore.readCurrentAppWindowProjection(appID: appID)
-    }
-
-    func readFocusedCurrentAppWindowProjection() -> RuntimeFocusedCurrentAppWindowProjectionRead? {
-        readModelStore.readFocusedCurrentAppWindowProjection()
-    }
-
-    func readActivationTargetProjection() -> RuntimeActivationTargetProjection? {
-        readModelStore.readActivationTargetProjection()
-    }
-
-    func readSpaceTopologyProjection() -> RuntimeSpaceTopologyProjection? {
-        readModelStore.readSpaceTopologyProjection()
-    }
-
-    func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead {
-        readModelStore.readCommittedSearchIndexForSearch()
-    }
-
-    func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics {
-        readModelStore.diagnostics()
-    }
-
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason) {
-        maintenanceQueue.async { [self] in
+        maintenanceOwner.enqueue { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             let appDirectoryProviderEvidenceCount = commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             var mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
@@ -186,7 +149,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason) {
-        maintenanceQueue.async { [self] in
+        maintenanceOwner.enqueue { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             transientRepairObservationDriver.cancelScoped(
                 reason: "searchFreshnessBarrier"
@@ -279,7 +242,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func signalSpaceTopologyChanged() {
-        maintenanceQueue.async { [self] in
+        maintenanceOwner.enqueue { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             transientRepairObservationDriver.cancel(
                 target: .spaceTopology,
@@ -310,33 +273,19 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         pid: pid_t,
         appDirectoryEntry: RuntimeAppDirectoryEntry? = nil
     ) {
-        maintenanceQueue.async { [self] in
-            let now = Date.timeIntervalSinceReferenceDate
-            transientRepairObservationDriver.cancel(
-                target: .app(pid),
-                reason: "appLaunched"
-            )
-            readModelStore.markAppLifecycleDirty(
+        maintenanceOwner.enqueuePriority { [weak self] generation in
+            self?.applyAppLaunchSignalLocked(
                 appID: appID,
                 pid: pid,
-                pendingScope: "appLaunched:\(appID)",
                 appDirectoryEntry: appDirectoryEntry,
-                generatedAt: now
+                generation: generation
             )
-            commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
-            commitMainTableAppSwitcherProjectionLocked(
-                generatedAt: now,
-                requiresExistingProjectionCoverage: true
-            )
-            repairProvider.recordAppLaunched(appID: appID, pid: pid, now: now)
-            RuntimeLog.debug(.projection, "runtimeLifecycle appLaunched appID=\(appID) pid=\(pid)")
-            drainReadyReconciliationRequestsLocked(now: now)
         }
     }
 
     func signalAppWindowsChanged(appID: String, pid: pid_t) {
         guard canScheduleAXWindowRepair else { return }
-        maintenanceQueue.async { [self] in
+        maintenanceOwner.enqueue { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             transientRepairObservationDriver.cancel(
                 target: .app(pid),
@@ -361,7 +310,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     func signalSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t) {
         guard canScheduleAXWindowRepair else { return }
-        maintenanceQueue.async { [self] in
+        maintenanceOwner.enqueue { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             transientRepairObservationDriver.cancel(
                 target: .app(pid),
@@ -386,7 +335,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     func signalFocusedCurrentAppWindowsChanged() {
         guard canScheduleAXWindowRepair else { return }
-        maintenanceQueue.async { [self] in
+        maintenanceOwner.enqueue { [self] in
             var focusedRead = readModelStore.readFocusedCurrentAppWindowProjection()
             let now = Date.timeIntervalSinceReferenceDate
             if focusedRead == nil {
@@ -426,7 +375,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func signalAXWindowDestroyed(appID: String, pid: pid_t, axWindowID: String) {
-        maintenanceQueue.async { [self] in
+        maintenanceOwner.enqueue { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             transientRepairObservationDriver.cancel(
                 target: .app(pid),
@@ -460,33 +409,89 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     func signalAppTerminated(appID: String, pid: pid_t) {
         performMaintenanceSynchronously { [self] in
-            let now = Date.timeIntervalSinceReferenceDate
-            guard repairProvider.recordAppTerminated(
-                appID: appID,
-                processIdentifier: pid
-            ) else {
-                return
-            }
-            transientRepairObservationDriver.cancelApp(
+            applyAppTerminationSignalLocked(
                 appID: appID,
                 pid: pid,
-                reason: "appTerminated"
+                generation: nil
             )
-            commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
-            readModelStore.markAppTerminatedForMainTableProjection(appID: appID, pid: pid)
-            commitMainTableAppSwitcherProjectionLocked(
-                generatedAt: now,
-                requiresExistingProjectionCoverage: true,
-                permittedMissingAppIDs: [appID],
-                clearsDirtyForAppID: appID,
-                clearsDirtyForPID: pid
-            )
-            RuntimeLog.debug(.projection, "runtimeLifecycle appTerminated appID=\(appID) pid=\(pid)")
         }
     }
 
+    func scheduleWorkspaceAppTerminated(appID: String, pid: pid_t) {
+        maintenanceOwner.enqueuePriority { [weak self] generation in
+            self?.applyAppTerminationSignalLocked(
+                appID: appID,
+                pid: pid,
+                generation: generation
+            )
+        }
+    }
+
+    private func applyAppLaunchSignalLocked(
+        appID: String,
+        pid: pid_t,
+        appDirectoryEntry: RuntimeAppDirectoryEntry?,
+        generation: RuntimeProjectionMaintenanceGeneration
+    ) {
+        let now = Date.timeIntervalSinceReferenceDate
+        transientRepairObservationDriver.cancel(
+            target: .app(pid),
+            reason: "appLaunched"
+        )
+        readModelStore.markAppLifecycleDirty(
+            appID: appID,
+            pid: pid,
+            pendingScope: "appLaunched:\(appID)",
+            appDirectoryEntry: appDirectoryEntry,
+            generatedAt: now
+        )
+        commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
+        commitMainTableAppSwitcherProjectionLocked(
+            generatedAt: now,
+            requiresExistingProjectionCoverage: true
+        )
+        repairProvider.recordAppLaunched(appID: appID, pid: pid, now: now)
+        RuntimeLog.debug(
+            .projection,
+            "runtimeLifecycle appLaunched appID=\(appID) pid=\(pid) maintenanceGeneration=\(generation)"
+        )
+        drainReadyReconciliationRequestsLocked(now: now)
+    }
+
+    private func applyAppTerminationSignalLocked(
+        appID: String,
+        pid: pid_t,
+        generation: RuntimeProjectionMaintenanceGeneration?
+    ) {
+        let now = Date.timeIntervalSinceReferenceDate
+        guard repairProvider.recordAppTerminated(
+            appID: appID,
+            processIdentifier: pid
+        ) else {
+            return
+        }
+        transientRepairObservationDriver.cancelApp(
+            appID: appID,
+            pid: pid,
+            reason: "appTerminated"
+        )
+        commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
+        readModelStore.markAppTerminatedForMainTableProjection(appID: appID, pid: pid)
+        commitMainTableAppSwitcherProjectionLocked(
+            generatedAt: now,
+            requiresExistingProjectionCoverage: true,
+            permittedMissingAppIDs: [appID],
+            clearsDirtyForAppID: appID,
+            clearsDirtyForPID: pid
+        )
+        RuntimeLog.debug(
+            .projection,
+            "runtimeLifecycle appTerminated appID=\(appID) pid=\(pid) maintenanceGeneration=\(generation?.description ?? "synchronous")"
+        )
+    }
+
     func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification) {
-        maintenanceQueue.async { [self] in
+        maintenanceOwner.enqueue { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             transientRepairObservationDriver.cancel(
                 target: .app(verification.ownerPID),
@@ -526,7 +531,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func signalWindowFocusReadbackMismatch(_ diagnostic: WindowBindingReadbackDiagnostic) {
-        maintenanceQueue.async { [self] in
+        maintenanceOwner.enqueue { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             transientRepairObservationDriver.cancel(
                 target: .app(diagnostic.ownerPID),
@@ -568,13 +573,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     func drainReadyReconciliationRequestsSynchronouslyForTesting(
         now: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) -> [RuntimeReconciliationRequest] {
-        maintenanceQueue.sync {
+        maintenanceOwner.performSynchronously {
             drainReadyReconciliationRequestsLocked(now: now)
         }
     }
 
     func waitForMaintenanceQueueForTesting() {
-        maintenanceQueue.sync {}
+        maintenanceOwner.performSynchronously {}
     }
 
     @discardableResult
@@ -1036,11 +1041,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     private func performMaintenanceSynchronously(_ work: () -> Void) {
-        if DispatchQueue.getSpecific(key: maintenanceQueueSpecificKey) != nil {
-            work()
-            return
-        }
-        maintenanceQueue.sync(execute: work)
+        maintenanceOwner.performSynchronously(work)
     }
 
 }

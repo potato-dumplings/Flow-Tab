@@ -93,7 +93,14 @@ protocol RuntimeProjectionServing: Sendable {
     func signalFocusedCurrentAppWindowsChanged()
     func signalAXWindowDestroyed(appID: String, pid: pid_t, axWindowID: String)
     func signalAppTerminated(appID: String, pid: pid_t)
+    func scheduleWorkspaceAppTerminated(appID: String, pid: pid_t)
     func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification)
     func signalWindowFocusVerified(appID: String, pid: pid_t)
     func signalWindowFocusReadbackMismatch(_ diagnostic: WindowBindingReadbackDiagnostic)
+}
+
+extension RuntimeProjectionServing {
+    func scheduleWorkspaceAppTerminated(appID: String, pid: pid_t) {
+        signalAppTerminated(appID: appID, pid: pid)
+    }
 }

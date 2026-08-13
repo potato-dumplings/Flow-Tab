@@ -438,7 +438,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 appID: appID,
                 pid: app.processIdentifier
             )
-            self.resolvedRuntimeProjectionService.signalAppTerminated(
+            self.resolvedRuntimeProjectionService.scheduleWorkspaceAppTerminated(
                 appID: appID,
                 pid: app.processIdentifier
             )

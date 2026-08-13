@@ -133,6 +133,18 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(terminationSignals.count, 1)
         XCTAssertEqual(terminationSignals.first?.appID, expectedAppID)
         XCTAssertEqual(terminationSignals.first?.pid, expectedPID)
+        let workspaceTerminationSchedules =
+            runtimeProjectionService
+                .workspaceAppTerminationSchedulesRecorded()
+        XCTAssertEqual(workspaceTerminationSchedules.count, 1)
+        XCTAssertEqual(
+            workspaceTerminationSchedules.first?.appID,
+            expectedAppID
+        )
+        XCTAssertEqual(
+            workspaceTerminationSchedules.first?.pid,
+            expectedPID
+        )
         XCTAssertTrue(observationPrecededLaunchSignal)
         XCTAssertEqual(
             appLaunchWindowEvidenceCoordinator.preparedObservations.map(\.appID),
@@ -173,6 +185,11 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertEqual(
             runtimeProjectionService.appTerminationSignalsRecorded().count,
+            1
+        )
+        XCTAssertEqual(
+            runtimeProjectionService
+                .workspaceAppTerminationSchedulesRecorded().count,
             1
         )
     }

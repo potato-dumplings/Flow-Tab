@@ -508,6 +508,7 @@ and Process/Tooling.
 | SYNC-036IM | `testRuntimeLifecycleRefreshesRealFixtureWindowSetMutation`; exact FlowTab foreground readiness before installing the window-close observer and launching the mutation fixture | The test passes a raw 12-second bound to the FlowTab application-state waiter before creating its close-fault route, starting the observer, capturing the runtime-log baseline, and triggering a two-window fixture. Exact `.runningForeground` evidence already determines FlowTab readiness; later close scheduling, explicit trigger, applied generation, window identities, and runtime reconciliation are separate evidence contracts. Retained watchdog caller migration. | Delegate the pre-observer FlowTab readiness call to the corrected real-Space-fixture helper with an exact `window-set-mutation-before-observer` target. Reuse the named terminal watchdog and exact waiter evidence, with one final state readback only after an unsatisfied wait. Preserve observer installation and immediate readiness before fixture launch, the scheduled 250ms fault-policy readback, explicit close trigger, matching applied generation/PID/window number, exact visible/on-screen/remaining-window states, Home `2w` to `1w` transition, and AX-destroyed runtime markers. The test invocation owns observer cancellation and both App teardowns. | H observer-before-trigger real-topology lifecycle with multiple exact window identities; inherited deterministic exact-state/readback-count coverage, affected signed mutation UI, exact signing/process evidence, and Process/Tooling validation. FlowTabCore Unit, app Unit/Behavior, FlowTabTests, non-Space UI, and additional Pressure are not relevant because production behavior, the explicit fixture fault policy, fixture topology, lifecycle event generation, module wiring, configuration, path resolution, and recurring work are unchanged. | completed |
 | SYNC-036IM1 | `testRuntimeLifecycleRefreshesRealFixtureWindowSetMutation`, `RuntimeProjectionService.commitCurrentAppWindowProjection`, `FlowTabUITestCurrentAppProjectionEvidenceObservationOwner`, and `SpaceFixtureCurrentAppProjectionAcceptanceOwner`; exact post-close current-App window projection | Three sequential raw eight-second runtime-log waits treat internal diagnostic-line arrival as completion evidence after the exact fixture close. The unchanged signed baseline reached scheduled/applied close evidence, exact remaining-window identity, Home `2w` to `1w`, and the current projection while one diagnostic marker remained scheduling-sensitive. Evidence migration plus terminal-watchdog classification. | Attach an immutable appID/PID/window-ID/completeness/source-generation snapshot to every successful current-App projection notification. Under `FLOWTAB_TESTING`, a bootstrap-owned standalone observer bound to the exact resolved service object writes atomic route readback and emits a monotonically generated distributed event without wrapping the service. Pass the route before FlowTab launch. After Home proves the exact two-window fixture projection, install the baseline owner and complete it from event or initial readback; then install the target generation before `requestClose`. Success requires the exact bundle/appID/PID, unique two-window baseline, later evidence and component-wise later source generation, and an exact one-window strict subset. Fixture applied-close generation, exact closed-window disappearance, remaining-window identity, and Home `1w` are independent Oracles; completeness remains diagnostic because a valid scoped repair may commit a dirty projection. Cross-process delivery has no reliable callback, so retain a named cancellable 100ms readback cadence with immediate checks plus named eight- and fifteen-second watchdogs solely as failure upper bounds reporting baseline, accepted, last event, and final readback. The UI invocation owns both phase observers, cadence cancellation, route-file cleanup, and App teardown; bootstrap owns local-observer replacement/cancellation. | H shared runtime notification and TestingSupport process boundary under repeated topology mutation; deterministic route/parser/initial/event/generation/duplicate/out-of-order/cancel/watchdog coverage, exact service publication and service-identity Behavior, 2,000-generation owner/publisher Pressure, affected signed mutation UI plus three repeated signed topology iterations, strict signing/process evidence, semantic guard, and Process/Tooling validation. | completed |
 | SYNC-036IN | `testRuntimeLifecycleRefreshesRealFixtureWindowSetMutation` and `assertRealSpaceFixtureFlowTabIsForegroundReadyAfterFixtureLaunch`; exact FlowTab foreground readiness after the mutation fixture launch | After the scheduled close proves the exact fixture PID and initial topology, the test activates FlowTab and passes a raw five-second bound to `XCUIApplication.wait` before opening Home. Exact `.runningForeground` state already determines readiness, while watchdog ownership and boundary diagnostics are implicit. Retained-watchdog migration. | Retain the compatible five seconds as a real-Space-fixture-owned `postFixtureActivationWatchdog`. Delegate this single post-fixture boundary to the corrected foreground helper: accept the exact waiter result directly, perform one final application-state readback only after an unsatisfied wait, and report the lifecycle target, waiter result, and final state on expiry. The synchronous helper owns no observer, timer, retry, cadence, or retained work. The test invocation owns App/fixture teardown; exact Home `2w`, scheduled/applied close generations, window identities, Home `1w`, and later current-App projection remain independent Oracles. | M one real-topology lifecycle boundary with shared helper reuse; named-policy and inherited deterministic zero/one-readback coverage, affected signed mutation UI, exact signing/process evidence, semantic guard, static timeout inventory, and Process/Tooling validation. FlowTabCore Unit, app Unit/Behavior, FlowTabTests, non-Space UI, and Pressure are not relevant because production behavior, fixture topology, close/projection event sources, module wiring, configuration, path resolution, and recurring work are unchanged. | completed |
+| SYNC-036IP | `AppDelegate.installWorkspaceLifecycleObserver`, `RuntimeProjectionService`, and `testRuntimeLifecycleRefreshesRealFixtureAppLaunchAndTermination`; ordered workspace lifecycle handoff under runtime-maintenance backpressure | The main-queue workspace termination observer synchronously waits for the utility maintenance queue before publishing exact appID/PID termination evidence. A long or backlogged window/topology reconciliation therefore blocks the App main thread and lets the UI test's eight-second terminal watchdog expire even though an observer installed before the trigger proves that `NSWorkspace.didTerminateApplicationNotification` arrived. Completion and visible responsiveness depend on unrelated AX/CG scheduling load. Evidence-driven orchestration defect discovered while validating a retained readiness watchdog. | Give `RuntimeProjectionService` a lifecycle-aware maintenance owner. Workspace launch and termination signals enter an immediately registered, monotonically generated, FIFO priority lane; the owner drains that lane when idle and before/after each normal maintenance item, so a signal arriving during expensive work waits only for the active item and cannot sit behind unrelated queued repairs. AppDelegate schedules the exact termination signal without synchronously blocking MainActor. Preserve the existing synchronous `signalAppTerminated` contract used by switcher read-after-write paths, exact appID/PID identity, launch-before-termination order, projection commits, module direction, and logging. The service owns queued work, generation, cancellation, and deinit cleanup; observers remain installed before triggers and AppDelegate owns token removal. | H production workspace observer and shared hot runtime queue; deterministic immediate/active-work/backlog/FIFO/duplicate/out-of-order/cancel/deinit and slow-work invariance Unit coverage, AppDelegate Behavior proving nonblocking exact scheduling and observer cleanup, FlowTabTests through the canonical wrapper, signed real-fixture launch/termination UI plus repeated queue-pressure UI, strict signing/process evidence, semantic guard, and Process/Tooling validation. FlowTabCore and non-Space UI are not relevant because core algorithms, path intent, configuration, and unrelated visible routes are unchanged. | completed |
 | SYNC-037 | `scripts/perf/tab-switch-stress.sh`, `search-committed-index-pressure.sh`, `runtime-topology-pressure.sh`, `lib/runtime-topology-target.sh` | Sampling duration/cadence and identity stability windows are pressure/safety protocols; process termination loops use unnamed 100ms cadence and attempt bounds. Domain duration/conditional observation/watchdog. | Retain measurement durations and sample cadence as named protocol inputs. Name process polling cadence/watchdogs, check state immediately, terminate from PID/start-identity/readback, and report the final `ps`/identity/status evidence. Traps own cancellation and cleanup. | M tooling/hot path; Pressure and Process/Tooling. | completed through SYNC-037A tab-switch, SYNC-037B Search pressure, SYNC-037C runtime-topology runner-tree cleanup, SYNC-037D independent application cleanup, SYNC-037D1 exact application-process cleanup, SYNC-037E target-exit completion, and SYNC-037F target-launch readiness |
 | SYNC-037A | `tab-switch-stress.sh`, `lib/process-exit-observation.sh`, and `test-process-exit-observation.sh`; tab-switch stress child termination and trap cleanup | After TERM, twenty unnamed 100ms attempts infer when the child is safe to reap or whether KILL escalation is required. A scheduling slowdown changes the observed opportunity count and diagnostics omit the expected process identity. | Capture the launched child PID and start identity, check `ps` state immediately, and accept only exact absence or zombie state before the owning shell performs `wait PID`. Retain a named 100ms conditional observation cadence while the child remains active. A named two-second monotonic watchdog only controls KILL escalation and reports the unmet exit condition, expected start identity, final PID/PPID/state/start/command record, and readback status. The synchronous trap owner supplies cancellation and reaping. Sampling duration, switch cadence, and sample cadence remain explicit pressure protocol inputs. | M perf process owner; deterministic initial/delayed/slow-scheduling/final-readback/watchdog/readback-error/identity/cancel tests, real child readiness/TERM/reap integration, normal and interrupted tab-switch Pressure, Process/Tooling. | completed |
 | SYNC-037B | `search-committed-index-pressure.sh`, `lib/process-exit-observation.sh`, and `test-process-exit-observation.sh`; Search pressure test-process-tree termination and trap cleanup | After TERM and after optional KILL, two independent twenty-attempt 100ms loops watch only the root shell PID. Attempt count and scheduler availability determine escalation and completion, while surviving descendants and PID reuse lack exact evidence. | Capture and deduplicate every observed PID plus `lstart` identity before signalling. Perform an immediate exact readback before each TERM/KILL, then observe the complete captured identity set immediately and at a named 100ms cadence. Exact absence, zombie state, or a changed identity proves the captured record inactive; readback, identity-capture, and monotonic-clock failures remain unmet evidence. A named 2,000ms TERM grace only controls exact-record KILL escalation, and a separate 2,000ms watchdog bounds KILL confirmation; each reports `processTreeExited` and final PID/PPID/state/start/command evidence. The synchronous trap owns capture, signalling, observation, cancellation, `wait PID`, atomic status persistence, and cleanup. Caller-selected sampling duration and cadence remain explicit pressure protocol inputs. | M perf process-tree owner/shared helper; deterministic initial/dedup/exact-signal/slow-scheduling/cancel/final-readback/watchdog/readback-error tests, real child integration, completed and interrupted Search Pressure, Process/Tooling. | completed |
@@ -24875,3 +24876,107 @@ polling cadence, deadline, or timeout in the scoped paths.
   readback.
 - Commit subject:
   `test(sync): migrate SYNC-036IN post-fixture foreground`.
+
+### SYNC-036IP Diagnostic Record
+
+- Reproduction: after Xcode Helper Accessibility returned exact `value=1`, the
+  complete six-target UI build and two deterministic readiness tests passed.
+  Five independent signed runs of
+  `testRuntimeLifecycleRefreshesRealFixtureAppLaunchAndTermination` then
+  crossed the scoped post-fixture foreground boundary, found the exact Home
+  row and `1w`, terminated the exact fixture PID, and expired only while
+  waiting for `runtimeLifecycle appTerminated` within the existing eight-second
+  terminal watchdog. Each FlowTab log contains the matching app launch marker
+  and no termination marker before App teardown.
+- Event-source evidence: a separate exact-bundle observer was installed before
+  the third trigger with an empty initial PID readback. It received
+  `LAUNCHED pid=10292` followed by `TERMINATED pid=10292` while the same FlowTab
+  process omitted its termination marker. This isolates the defect after the
+  platform event source and inside the FlowTab lifecycle handoff.
+- Queue evidence: a two-second sample began immediately after exact fixture
+  PID 13728 exited. All 1,238 samples of the FlowTab main thread were in
+  `AppDelegate.installWorkspaceLifecycleObserver` ->
+  `RuntimeProjectionService.signalAppTerminated` ->
+  `performMaintenanceSynchronously` -> `__DISPATCH_WAIT_FOR_QUEUE__`. In 1,236
+  samples the serial `FlowTab.RuntimeProjectionService` queue was still inside
+  `signalAppWindowsChanged`, draining reconciliation and executing
+  `reconcileSpaceTopology`. Thus the notification had arrived, but unrelated
+  AX/CG work controlled when termination could become observable and blocked
+  MainActor in the meantime.
+- Ownership and slice boundary: SYNC-036IP owns the workspace lifecycle to
+  runtime-maintenance handoff. The post-fixture foreground caller migration is
+  deferred until this prerequisite is independently implemented, validated,
+  and committed. The diagnostic NSWorkspace observer and process sampler are
+  stopped; their temporary sample is rebuildable and will be removed with the
+  slice evidence root after durable closure evidence is recorded.
+
+### SYNC-036IP Closure Record
+
+- Status: completed. Workspace launch and termination now enter one exact,
+  monotonic FIFO priority lane, and AppDelegate schedules termination without
+  synchronously waiting on runtime maintenance. Parent SYNC-036 remains open;
+  the deferred post-fixture foreground caller is the next independent slice.
+- Oracle and design: `NSWorkspace` remains the authoritative lifecycle event
+  source, with the observer installed before fixture launch. Exact appID/PID,
+  FIFO maintenance generation, projection commit, Home row/window count, exact
+  fixture process exit, and `runtimeLifecycle appTerminated` are independent
+  Oracles. Priority work drains when idle and immediately before and after each
+  normal maintenance item, so a signal that arrives during AX/CG work waits
+  only for the active item and then precedes unrelated queued repairs. The
+  synchronous `signalAppTerminated` read-after-write contract remains available
+  to switcher paths.
+- Lifecycle and time policy: `RuntimeProjectionMaintenanceOwner` owns its
+  serial queue, priority generations, pending FIFO, acceptance state, and
+  cancellation. Service deinitialization rejects and removes pending priority
+  work; queued owner callbacks retain no owner after deinitialization.
+  AppDelegate owns workspace observer-token removal. No production duration,
+  polling cadence, retry, timer, or watchdog is introduced. Named XCTest and UI
+  watchdogs remain terminal failure bounds; success comes only from the exact
+  state and lifecycle evidence above.
+- Deterministic Unit and Behavior validation: the final canonical targeted run
+  passed 6/6 in 0.580 seconds. Owner coverage proves immediate idle delivery,
+  active-work handoff, launch/termination/duplicate FIFO generations, normal-
+  backlog priority, cancellation, deinitialization cleanup, and 2,000-item
+  pressure with zero normal backlog observed at priority delivery. AppDelegate
+  Behavior proves exact workspace scheduling and observer cleanup. The final
+  full canonical FlowTabTests run passed 1,093/1,093 in 43.315 seconds.
+- Signed real-topology UI and Pressure: after rebuilding and installing the
+  fixed-path signed App, the exact real-fixture lifecycle passed 1/1 in 11.063
+  seconds. Three signed `test-without-building` iterations then passed 3/3 in
+  28.186 seconds, with individual durations of 9.726, 9.210, and 9.250 seconds.
+  Every iteration reached exact fixture readiness, Home identity and `1w`,
+  terminated the exact PID, and observed the matching runtime termination
+  marker. Scheduling variation changed latency while preserving the result.
+- Validation scope: shared production runtime infrastructure required targeted
+  Unit/Behavior, the full canonical FlowTabTests suite, signed real-Space UI,
+  queue Pressure, repeated signed UI Pressure, strict signing/process checks,
+  semantic guard, and Process/Tooling validation. FlowTabCore and unrelated UI
+  routes are not relevant because core algorithms, configuration, path intent,
+  fixture topology, and unrelated visible behavior are unchanged.
+- Signing and result evidence: the fixed App and Runner use Team `96PUA726W9`
+  and certificate fingerprint
+  `1BF0E48A99836282230C3A10EAF6ADC83A4AED82`. System-trust strict deep
+  verification accepts both bundles. Their final CDHashes are
+  `27f23b1b88d3ea798671ae494eed2d0382f1aa9c` and
+  `60634a89c3a0ea58306942cbaf47a676b81b4cfb`. Final targeted, full Behavior,
+  exact UI, and UI Pressure status records all complete with exit zero and
+  retain result bundles.
+- Diagnostics and Process/Tooling: `plutil` accepts the project file, every
+  changed Swift source parses, and `git diff --check` passes. New production
+  owner and projection-read files are 132 and 43 lines; the final owner test
+  file is 293 lines. Read extraction keeps the touched 1,047-line legacy
+  service focused on maintenance orchestration. The existing-test semantic
+  guard authorization `52ef878977f7a14a` records the explicit evidence-driven
+  product requirement. Successful-root fatal-error, unexpected-failure,
+  crash, abort, sanitizer, main-thread-checker, compiler, linker, runtime-log-
+  watchdog, and actionable permission-denial scans are empty.
+- Process and evidence lifecycle: exact post-validation readback finds no Flow
+  Tab UI test App, Runner, repository-scoped xcodebuild, Space fixture, or
+  generated fixture process. `.build-local/test-assets` remains absent.
+  Startup `prompts.zip` and the three pre-existing local Skill/reference edits
+  remain unchanged and outside this slice. The 1,385,024 KB SYNC-036IP root
+  contains only rebuildable results and logs. It and the temporary diagnostic
+  sample are removed after this durable record, followed by exact root absence,
+  test-asset absence, and empty process readback.
+- Commit subject:
+  `refactor(sync): migrate SYNC-036IP workspace lifecycle handoff`.

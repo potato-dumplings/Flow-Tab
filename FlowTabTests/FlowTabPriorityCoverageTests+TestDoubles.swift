@@ -179,6 +179,9 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private var selectedCurrentAppWindowChangeSignalHandler:
         ((String, pid_t) -> Void)?
     private var appTerminationSignals: [(appID: String, pid: pid_t)] = []
+    private var workspaceAppTerminationSchedules: [
+        (appID: String, pid: pid_t)
+    ] = []
     private var appTerminationSignalHandler: ((String, pid_t) -> Void)?
     private var windowFocusVerifiedSignals: [(appID: String, pid: pid_t)] = []
     private var windowFocusVerificationSignals: [RuntimeWindowFocusVerification] = []
@@ -427,6 +430,14 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         return appTerminationSignals
     }
 
+    func workspaceAppTerminationSchedulesRecorded()
+        -> [(appID: String, pid: pid_t)]
+    {
+        lock.lock()
+        defer { lock.unlock() }
+        return workspaceAppTerminationSchedules
+    }
+
     func setAppTerminationSignalHandler(
         _ handler: ((String, pid_t) -> Void)?
     ) {
@@ -660,6 +671,13 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         }
         lock.unlock()
         handler?(appID, pid)
+    }
+
+    func scheduleWorkspaceAppTerminated(appID: String, pid: pid_t) {
+        lock.lock()
+        workspaceAppTerminationSchedules.append((appID, pid))
+        lock.unlock()
+        signalAppTerminated(appID: appID, pid: pid)
     }
 
     private func shouldRemoveTerminatedApp(appID: String, pid: pid_t) -> Bool {
