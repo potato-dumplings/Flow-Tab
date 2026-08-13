@@ -92,6 +92,7 @@ struct FlowTabUITestSwitcherWindowCardExpectation: Equatable {
 
 enum FlowTabUITestSwitcherWindowCardPolicy {
     static let edgeInputsProjectionWatchdog: TimeInterval = 8
+    static let multiAppCardIdentityProjectionWatchdog: TimeInterval = 8
 }
 
 struct FlowTabUITestSwitcherWindowPageCardExpectation: Equatable {

@@ -25,6 +25,23 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherWindowCardMultiAppIdentityPolicyPreservesCompatibleBound() {
+        XCTAssertEqual(
+            FlowTabUITestSwitcherWindowCardPolicy
+                .multiAppCardIdentityProjectionWatchdog,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestSwitcherWindowCardPolicy
+                .multiAppCardIdentityProjectionWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSwitcherWindowCardPolicy
+                .multiAppCardIdentityProjectionWatchdog,
+            0
+        )
+    }
+
     func testSwitcherWindowPageExpectationRequiresCompleteLayoutClosure() {
         let expectation = switcherWindowPageExpectation()
         let matching = switcherWindowPageSnapshot()

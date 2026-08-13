@@ -570,7 +570,7 @@ and Process/Tooling.
 | SYNC-036KK | `assertHomePageShowsOnlySelectedWorkflowAppTitles`; exact selected-App Home window projection | Selection waits for one title, then independent count, per-title presence, and other-title absence waits can resolve from different snapshots. Evidence composition migration. | Start one exact window-projection owner before tapping each App row; accept an exact initial projection or, after trigger return, require foreground state, stable exact row count, selected-App bundle identity for every row, required selected-App titles present, and every other workflow title absent in one snapshot. The proven SYNC-036KJ inventory supplies each App-row count. Name the compatible selection/projection watchdog and cancel per iteration. | H; atomic visible/excluded/initial/stale/slow-scheduling/cancel/watchdog/Pressure tests, signed Home isolation UIs, Process/Tooling. | completed |
 | SYNC-036KL | Switcher multi-App workflows; exact initial App strip projection | Several paths independently wait for diagnostics and individual App rows (2/8 seconds), omitting exact logical counts and atomic all-App readiness. Evidence composition migration. | Reuse one parsed `apps + selected` Switcher readback inside a fixture owner that bookends all target-row reads. Require the selected workflow App's exact configured window count, zero session windows for every unselected workflow App, every exact logical App-row identity, and foreground state in one snapshot; normalize duplicate XCUITest representations by row identity. The explicit global-trigger path installs the owner first; launch-open paths accept exact initial state. One named watchdog covers all representative paths; each invocation owns cancellation. | H; exact multi-entry/selection/row/count/prefix/stale/cancel/watchdog/Pressure tests, affected signed multi-App Switcher UIs, Process/Tooling. | completed |
 | SYNC-036KM | `testSwitcherPanelPreviewCyclesThroughWorkflowAppsWithoutMixingWindowCards`; exact selected-App preview transition | Down is sent before constructing the selected-App preview owner, then a redundant eight-second title wait rechecks evidence in another snapshot. Evidence-order migration. | Start one candidate-bound preview owner before Down, gate acceptance until input returns, and require the exact selected and preview bundle identities plus exact title set and count atomically. Remove the second wait; the per-iteration invocation owns cancellation. | H; pretrigger-match rejection/exact candidate/duplicate/out-of-order/cancel/watchdog/Pressure tests, signed preview-cycle UI, Process/Tooling. | completed |
-| SYNC-036KN | `assertSwitcherPreviewWindowCards`; multi-App real card identity projection | The helper correctly installs an exact card owner before Down, while its default eight-second literal has no named owner. Retained watchdog. | Name the card-identity projection watchdog and retain exact titles, exclusions, and new identifiers as success. The helper cancels its owner and reports the final snapshot. | M; policy/identity/exclusion/cancel/watchdog tests, signed card-anchor UI, Process/Tooling. | planned |
+| SYNC-036KN | `assertSwitcherPreviewWindowCards`; multi-App real card identity projection | The helper correctly installs an exact card owner before Down, while its default eight-second literal has no named owner. Retained watchdog. | Name the card-identity projection watchdog and retain exact titles, exclusions, and new identifiers as success. The helper cancels its owner and reports the final snapshot. | M; policy/identity/exclusion/cancel/watchdog tests, signed card-anchor UI, Process/Tooling. | completed |
 | SYNC-036KO | standard multi-App open-window mutation; explicit close and gated one-card projection | A 30-second fixture auto-close supplies orchestration slack and a 40-second projection wait infers completion. Evidence migration. | Install the typed close observer before fixture launch, configure zero delay with explicit trigger, prove exact scheduled PID/window topology, start the one-card owner before triggering, and accept only matching applied generation plus exact remaining projection. Owners are cancelled by the scenario. | H; typed close/order/identity/cancel/watchdog and projection Pressure tests, signed standard mutation UI, Process/Tooling. | planned |
 | SYNC-036KP | standard multi-App open-window mutation; exact runtime AX-destroyed reconciliation | A prelaunch log snapshot and post-projection raw eight-second substring wait can accept a different fixture/window record. Evidence refinement. | Start an exact runtime-log owner immediately before the close and require the target bundle, scheduled PID, target AX/CG identity, and post-trigger delivery. Name the terminal bound; the scenario cancels the owner. | H; exact PID/window/event/cancel/watchdog tests, signed standard mutation UI, Process/Tooling. | planned |
 | SYNC-036KQ | fullscreen multi-App target-window mutation; explicit close and gated projection | A 30-second auto-close and 45-second projection wait substitute elapsed time for exact fullscreen-window completion. Evidence migration. | Use the typed close route before launch, explicit zero-delay trigger, exact fullscreen target number/index/PID, matching applied generation, and preinstalled exact remaining-card projection. The scenario owns both cancellations. | H; typed fullscreen identity/order/cancel/watchdog and projection Pressure tests, signed fullscreen mutation UI, Process/Tooling. | planned |
@@ -28166,6 +28166,73 @@ polling cadence, deadline, or timeout in the scoped paths.
   independent commit, followed by exact absence and worktree-baseline checks.
 - Commit subject:
   `test(sync): migrate SYNC-036KM selected App preview`.
+
+### SYNC-036KN Closure Record
+
+- Status and Oracle: completed. The multi-App card-anchor workflow retains one
+  `FlowTabUITestSwitcherWindowCardObservationOwner` per selected workflow App.
+  Success requires one atomic snapshot with the exact configured title
+  multiplicities and card count, one distinct stable identifier per card, no
+  title owned by another workflow App, and complete identifier disjointness
+  from the preceding App's card projection. The resolved snapshot continues to
+  supply the downstream title, frame, and preview-image assertions.
+- Evidence ordering and lifecycle: the helper constructs and starts the exact
+  owner before Down and keeps matching initial evidence gated while input is
+  active. After input synthesis returns, it opens the acceptance gate and now
+  requests an immediate `triggerReadback`; the named serial XCUI cadence runs
+  only while exact evidence remains incomplete. The invocation owns the
+  expectation, generation, scheduled readback, waiter, and final snapshot and
+  cancels the owner through `defer` on every return. The final diagnostic
+  includes acceptance state, expected title counts, excluded titles, previous
+  identifiers, observed count, identities, titles, values, frames, image
+  evidence, generation, source, cancellation, and waiter result.
+- Retained time: the compatible eight seconds is named
+  `multiAppCardIdentityProjectionWatchdog` under
+  `FlowTabUITestSwitcherWindowCardPolicy`. It solely bounds missing exact card
+  evidence. XCUI exposes no card-collection publication callback, so the
+  shared immediately-checking, cancellable 100-millisecond cadence remains the
+  platform fallback. Elapsed time cannot resolve the owner.
+- Deterministic and lifecycle Pressure validation: the canonical rebuilt and
+  signed Runner passed the new policy check plus the shared exact-identity and
+  lifecycle checks 3/3 with zero failures in 0.536 seconds under
+  `.build-local/sync-036kn-deterministic`. These checks reject excluded titles,
+  previous identifiers, wrong multiplicity, and duplicate identities; cover
+  trigger-gated resolution, explicit cancellation, and watchdog final
+  readback; and complete 100 independently resolved and cancelled owner
+  generations while ignoring callbacks delivered after resolution.
+- Affected UI: the first signed card-anchor attempt reached the exact
+  SYNC-036KL App-strip prerequisite and expired there before any SYNC-036KN
+  owner was constructed. Its final atomic prerequisite snapshot recorded
+  selected `com.example.fixture.notes`, all three exact fixture rows, and
+  runtime counts `2/2/2`; teardown left the exact process queries empty. A
+  fresh fixture topology and independent result directory then passed the
+  complete card-anchor path 1/1 with zero failures in 32.656 seconds under
+  `.build-local/sync-036kn-ui-v2`. The successful path entered all three KN
+  owner lifetimes and resolved exact fresh, mutually exclusive Finder, Chrome,
+  and Notes card identities.
+- Validation scope: FlowTabCore Unit, app Unit/Behavior, FlowTabTests, unrelated
+  UI, and production process Pressure are not relevant because this slice
+  changes only UI-test watchdog policy ownership and immediate post-trigger
+  evidence acquisition. Production behavior, fixture topology, configuration,
+  window identity, module direction, path intent, and recurring product work
+  remain unchanged.
+- Signing and Process/Tooling: the canonical installer refreshed the fixed App,
+  and the canonical six-target UI build, deterministic run, lifecycle Pressure,
+  and affected UI run completed. Sandbox-external strict deep verification
+  accepts the App and final Runner under Team `96PUA726W9` with CDHashes
+  `567242cbcd5225964de4e8208be1ef1ba0c1bab3` and
+  `0b41a95b8633d926d06ce2df6db621dcff1631a9`. Swift parsing, project plist lint,
+  named-policy/raw-default inventory, and `git diff --check` pass. The shared
+  owner, its tests, and the affected existing workflow contain 650, 629, and
+  800 lines with clear single responsibilities. Exact App/Runner/fixture and
+  repository-scoped xcodebuild process readbacks are empty.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. Reproducible build, installer,
+  deterministic, failed prerequisite, and successful UI evidence roots are
+  removed after this durable record and independent commit, followed by exact
+  absence and worktree-baseline checks.
+- Commit subject:
+  `test(sync): migrate SYNC-036KN card identity watchdog`.
 
 ### SYNC-001 Authorized Resume Closure Record
 

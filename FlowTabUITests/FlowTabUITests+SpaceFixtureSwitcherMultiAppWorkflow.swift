@@ -663,7 +663,6 @@ extension FlowTabUITests {
         selectedApp: SpaceFixtureResolvedWorkflow.App,
         excludedTitles: [String],
         previousWindowCardIdentifiers: Set<String>,
-        timeout: TimeInterval = 8,
         trigger: () -> Void
     ) throws -> [SwitcherWindowCardObservation] {
         let expectation =
@@ -693,9 +692,10 @@ extension FlowTabUITests {
         defer { owner.cancel() }
         trigger()
         triggerDidComplete = true
+        owner.requestReadback(source: .triggerReadback)
 
         if let evidence = owner.waitForResolution(
-            timeout: timeout
+            timeout: FlowTabUITestSwitcherWindowCardPolicy.multiAppCardIdentityProjectionWatchdog
         ) {
             return evidence.value.cards
         }
