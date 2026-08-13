@@ -251,7 +251,10 @@ extension FlowTabUITests {
         )
 
         app.activate()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
+        assertRealSpaceFixtureFlowTabIsForegroundReadyAfterFixtureLaunch(
+            app,
+            targetDescription: "runtime-lifecycle-after-fixture-launch"
+        )
         let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity, timeout: 12)
         assertValue(of: fixtureAppRow, equals: "1w", timeout: 12)
 
