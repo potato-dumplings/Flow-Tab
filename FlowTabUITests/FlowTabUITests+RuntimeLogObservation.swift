@@ -1,3 +1,5 @@
+import CoreGraphics
+import Darwin
 import Foundation
 import XCTest
 
@@ -5,6 +7,7 @@ enum FlowTabUITestRuntimeLogObservationPolicy {
     static let defaultWatchdog: TimeInterval = 8
     static let quitShortcutTerminationRequestWatchdog: TimeInterval = 8
     static let openWindowMutationReconciliationWatchdog: TimeInterval = 8
+    static let multiAppOpenWindowMutationReconciliationWatchdog: TimeInterval = 8
     static let selectedWindowMutationReconciliationWatchdog: TimeInterval = 8
     static let readbackCadence: TimeInterval = 0.2
     static let maximumDiagnosticCharacterCount = 4_000
@@ -19,6 +22,22 @@ enum FlowTabUITestRuntimeLogRecordPattern {
                 for: bundleIdentifier
             )
         return #"(?m)terminate request app=[^\r\n]* appID=\#(escapedBundleIdentifier) sent=true\r?$"#
+    }
+
+    static func exactRuntimeAXDestroyed(
+        bundleIdentifier: String,
+        processIdentifier: pid_t,
+        affectedCGWindowID: CGWindowID
+    ) -> String {
+        let escapedBundleIdentifier =
+            NSRegularExpression.escapedPattern(
+                for: bundleIdentifier
+            )
+        return "(?m)runtimeAXDestroyed "
+            + "appID=\(escapedBundleIdentifier) "
+            + "pid=\(processIdentifier) "
+            + "axWindowID=ax:\(processIdentifier):[0-9]+ "
+            + "affectedCGWindowID=\(affectedCGWindowID)\\r?$"
     }
 }
 
@@ -88,6 +107,28 @@ enum FlowTabUITestRuntimeLogExpectation {
             return "missingPattern=\(description) "
                 + "pattern=\(pattern)"
         }
+    }
+}
+
+extension FlowTabUITestRuntimeLogExpectation {
+    static func exactRuntimeAXDestroyed(
+        bundleIdentifier: String,
+        processIdentifier: pid_t,
+        affectedCGWindowID: CGWindowID
+    ) throws -> Self {
+        let pattern =
+            FlowTabUITestRuntimeLogRecordPattern
+                .exactRuntimeAXDestroyed(
+                    bundleIdentifier: bundleIdentifier,
+                    processIdentifier: processIdentifier,
+                    affectedCGWindowID: affectedCGWindowID
+                )
+        return .regularExpression(
+            try NSRegularExpression(pattern: pattern),
+            pattern: pattern,
+            description:
+                "exact runtime AX-destroyed bundle/PID/CG reconciliation"
+        )
     }
 }
 
