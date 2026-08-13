@@ -28,7 +28,6 @@ extension FlowTabUITests {
             fixtureAdditionalArguments:
                 windowCloseRoute.fixtureLaunchArguments
         )
-        let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
         defer {
             if fixtureApp.state == .runningForeground
                 || fixtureApp.state == .runningBackground
@@ -206,7 +205,48 @@ extension FlowTabUITests {
         postCloseCards.start()
         defer { postCloseCards.cancel() }
 
+        let axDestructionLogBaseline =
+            makeRuntimeLogFileSnapshot()
+        defer { axDestructionLogBaseline.cancel() }
+        let appIDPattern =
+            NSRegularExpression.escapedPattern(
+                for: identity.bundleIdentifier
+            )
+        let axDestructionPattern =
+            "homeAXDestroyed known appID=\(appIDPattern) "
+            + "pid=\(fixturePID) "
+            + "axWindowID=ax:\(fixturePID):[0-9]+"
+        let axDestructionExpression =
+            try NSRegularExpression(
+                pattern: axDestructionPattern
+            )
+        var acceptsAXDestructionDelivery = false
+        let axDestructionDelivery =
+            FlowTabUITestRuntimeLogObservationOwner(
+                expectation:
+                    .regularExpression(
+                        axDestructionExpression,
+                        pattern: axDestructionPattern,
+                        description:
+                            "exact Selected Mutation bundle/PID known AX-destroyed delivery"
+                    ),
+                observationRegistration:
+                    axDestructionLogBaseline
+                        .observationRegistration(),
+                acceptsResolution: {
+                    acceptsAXDestructionDelivery
+                },
+                readback:
+                    axDestructionLogBaseline.makeReadback
+            )
+        axDestructionDelivery.start()
+        defer { axDestructionDelivery.cancel() }
+
         windowCloseObservation.requestClose(from: scheduledClose)
+        acceptsAXDestructionDelivery = true
+        axDestructionDelivery.requestReadback(
+            source: .triggerReadback
+        )
         guard let appliedClose =
                 windowCloseObservation.waitForApplied(
                     requestGeneration:
@@ -259,13 +299,19 @@ extension FlowTabUITests {
                 identity.bundleIdentifier,
             diagnostics: diagnosticsSummary
         ) else { return }
-        waitForRuntimeLogFiles(
-            matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=(none|[0-9]+)"#,
-            since: mutationLogSnapshot,
-            timeout: 8,
-            description:
-                "selected fixture window close should preserve open Switcher window-layer through shared runtime reconciliation"
-        )
+        guard
+            axDestructionDelivery.waitForResolution(
+                timeout:
+                    FlowTabUITestRuntimeLogObservationPolicy
+                        .selectedWindowMutationReconciliationWatchdog
+            ) != nil
+        else {
+            XCTFail(
+                "Selected Mutation AX-destruction delivery watchdog expired. "
+                    + axDestructionDelivery.diagnosticSummary
+            )
+            return
+        }
         XCTAssertNotEqual(fixtureApp.state, .notRunning)
     }
 }

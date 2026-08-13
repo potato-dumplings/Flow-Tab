@@ -69,6 +69,23 @@ extension FlowTabUITests {
         XCTAssertEqual(cancellationCount, 1)
     }
 
+    func testRuntimeLogSelectedMutationReconciliationPolicyPreservesCompatibleBound() {
+        XCTAssertEqual(
+            FlowTabUITestRuntimeLogObservationPolicy
+                .selectedWindowMutationReconciliationWatchdog,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestRuntimeLogObservationPolicy
+                .selectedWindowMutationReconciliationWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestRuntimeLogObservationPolicy
+                .selectedWindowMutationReconciliationWatchdog,
+            0
+        )
+    }
+
     func testRuntimeLogObservationPolicyPreservesCompatibleDefaults() {
         XCTAssertEqual(
             FlowTabUITestRuntimeLogObservationPolicy.defaultWatchdog,

@@ -4,6 +4,7 @@ import XCTest
 enum FlowTabUITestRuntimeLogObservationPolicy {
     static let defaultWatchdog: TimeInterval = 8
     static let openWindowMutationReconciliationWatchdog: TimeInterval = 8
+    static let selectedWindowMutationReconciliationWatchdog: TimeInterval = 8
     static let readbackCadence: TimeInterval = 0.2
     static let maximumDiagnosticCharacterCount = 4_000
 }
