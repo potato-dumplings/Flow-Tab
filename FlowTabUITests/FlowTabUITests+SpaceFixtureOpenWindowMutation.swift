@@ -27,7 +27,6 @@ extension FlowTabUITests {
             fixtureAdditionalArguments:
                 windowCloseRoute.fixtureLaunchArguments
         )
-        let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
         defer {
             if fixtureApp.state == .runningForeground
                 || fixtureApp.state == .runningBackground
@@ -202,7 +201,49 @@ extension FlowTabUITests {
         postCloseCards.start()
         defer { postCloseCards.cancel() }
 
+        let reconciliationLogBaseline =
+            makeRuntimeLogFileSnapshot()
+        defer { reconciliationLogBaseline.cancel() }
+        let appIDPattern =
+            NSRegularExpression.escapedPattern(
+                for: identity.bundleIdentifier
+            )
+        let reconciliationPattern =
+            "runtimeAXDestroyed appID=\(appIDPattern) "
+            + "pid=\(fixturePID) "
+            + "axWindowID=ax:\(fixturePID):[0-9]+ "
+            + "affectedCGWindowID=(none|[0-9]+)"
+        let reconciliationExpression =
+            try NSRegularExpression(
+                pattern: reconciliationPattern
+            )
+        var acceptsRuntimeReconciliation = false
+        let runtimeReconciliation =
+            FlowTabUITestRuntimeLogObservationOwner(
+                expectation:
+                    .regularExpression(
+                        reconciliationExpression,
+                        pattern: reconciliationPattern,
+                        description:
+                            "exact Open Mutation bundle/PID AX-destroyed reconciliation"
+                    ),
+                observationRegistration:
+                    reconciliationLogBaseline
+                        .observationRegistration(),
+                acceptsResolution: {
+                    acceptsRuntimeReconciliation
+                },
+                readback:
+                    reconciliationLogBaseline.makeReadback
+            )
+        runtimeReconciliation.start()
+        defer { runtimeReconciliation.cancel() }
+
         windowCloseObservation.requestClose(from: scheduledClose)
+        acceptsRuntimeReconciliation = true
+        runtimeReconciliation.requestReadback(
+            source: .triggerReadback
+        )
         guard let appliedClose =
                 windowCloseObservation.waitForApplied(
                     requestGeneration:
@@ -247,12 +288,19 @@ extension FlowTabUITests {
             return
         }
 
-        waitForRuntimeLogFiles(
-            matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=(none|[0-9]+)"#,
-            since: mutationLogSnapshot,
-            timeout: 8,
-            description: "open Switcher window-layer mutation should flow through shared runtime AX destroyed reconciliation"
-        )
+        guard
+            runtimeReconciliation.waitForResolution(
+                timeout:
+                    FlowTabUITestRuntimeLogObservationPolicy
+                        .openWindowMutationReconciliationWatchdog
+            ) != nil
+        else {
+            XCTFail(
+                "Open Mutation runtime reconciliation watchdog expired. "
+                    + runtimeReconciliation.diagnosticSummary
+            )
+            return
+        }
         XCTAssertNotEqual(fixtureApp.state, .notRunning)
     }
 }

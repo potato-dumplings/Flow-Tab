@@ -23,6 +23,52 @@ private enum FlowTabUITestRuntimeLogObservationTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testRuntimeLogOpenMutationReconciliationRequiresPostTriggerEvidence() {
+        XCTAssertEqual(
+            FlowTabUITestRuntimeLogObservationPolicy
+                .openWindowMutationReconciliationWatchdog,
+            8
+        )
+        var acceptsResolution = false
+        var callback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var cancellationCount = 0
+        let matchingSnapshot = FlowTabUITestRuntimeLogSnapshot(
+            baselineFileEventGeneration: 7,
+            fileEventGeneration: 8,
+            contents: "runtimeAXDestroyed exact"
+        )
+        let owner = FlowTabUITestRuntimeLogObservationOwner(
+            expectation: .allMarkers(["runtimeAXDestroyed exact"]),
+            observationRegistration: { registered in
+                callback = registered
+                return FlowTabUITestObservationCancellation {
+                    cancellationCount += 1
+                }
+            },
+            acceptsResolution: { acceptsResolution },
+            readback: { matchingSnapshot }
+        )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertNil(owner.resolvedEvidence)
+        callback?(.notificationReadback)
+        XCTAssertNil(owner.resolvedEvidence)
+        acceptsResolution = true
+        owner.requestReadback(source: .triggerReadback)
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .triggerReadback
+        )
+        XCTAssertEqual(
+            owner.resolvedEvidence?.value,
+            matchingSnapshot
+        )
+        XCTAssertEqual(cancellationCount, 1)
+    }
+
     func testRuntimeLogObservationPolicyPreservesCompatibleDefaults() {
         XCTAssertEqual(
             FlowTabUITestRuntimeLogObservationPolicy.defaultWatchdog,
