@@ -107,6 +107,7 @@ and Process/Tooling.
 | SYNC-004 | `FlowTab/Infrastructure/Runtime/RuntimeAXWindowChangeMonitor.swift`; observer install and `handleAXNotification` | Events during a 750ms warm-up are discarded and events inside a 160ms throttle window can lose the final state. Evidence migration. | Install observers, take an initial AX/window readback, and publish monotonically coalesced generations with a guaranteed trailing readback. The monitor owns observer removal; its delivery coordinator owns pending coalescing cancellation. | H; Unit, Behavior, Home/topology UI, runtime-topology Pressure. | completed |
 | SYNC-005 | `FlowTab/Infrastructure/Runtime/RuntimeChromeWindowFocusBridge.swift`; `focusWindowScript` | Two fixed 50ms AppleScript delays are assumed to propagate Chrome window ordering before front-window readback. Conditional observation. | Issue the Chrome focus commands once and immediately return the exact front-window ID readback. Exact equality is the bridge acceptance Oracle; mismatch, empty/invalid output, and execution error remain explicit evidence for `RuntimeActivator`. SYNC-006 owns later activation convergence under one cancellable activation generation. | H; Unit, Behavior, exact-window UI, runtime-topology Pressure. | completed |
 | SYNC-006 | `FlowTab/Infrastructure/Runtime/RuntimeActivator.swift`; `scheduleFocusRecovery` | Fixed 50ms/150ms retries probe whether the exact target became focused. Conditional observation. | Preserve exact AX/CG target readback as the sole success Oracle. Check immediately, consume usable focus/window notifications, and retain a named cancellable polling fallback plus diagnostic watchdog where macOS exposes no target-specific completion event. `RuntimeActivator` owns the task and activation generation. | H; Unit, Behavior, activation UI, runtime-topology Pressure. | completed |
+| SYNC-006R1 | `RuntimeProjectionService.signalWindowFocusVerified`; verified-focus evidence admission to the maintenance owner | Exact target AX/CG focus verification was enqueued as ordinary maintenance. Under topology pressure, unrelated queued repairs could postpone exact WindowRecord relearning behind the visible activation and its subsequent projection work, so queue load changed whether downstream consumers observed `verifiedFocusReadback` in the activation lifecycle. Evidence-delivery repair. | Preserve the exact AX/CG focus readback established by SYNC-006. Admit that verification through the service-owned monotonic priority generation: it runs after the currently executing maintenance operation and before ordinary backlog, records the exact WindowRecord evidence, commits the corresponding projection, and logs the applied generation and identities. FIFO priority ordering preserves lifecycle causality with launch/termination signals; service teardown cancels unowned pending work. | H shared projection owner and real noisy Space topology; Behavior covers in-flight maintenance, ordinary backlog, exact WindowRecord readback, generation ordering, and owner cleanup; affected signed Noisy Option+Tab UI plus runtime-topology Pressure, signing/process evidence, and Process/Tooling. FlowTabCore Unit is not relevant because the contract remains inside AppKit/ApplicationServices and the app runtime projection boundary. | completed |
 | SYNC-007 | `FlowTab/Infrastructure/Runtime/RuntimeWindowPreviewProvider.swift`; ScreenCaptureKit callback bridges | One-second semaphore timeouts terminate callback waits; success already comes only from callback content. Watchdog. | Retain as a named bridge-watchdog policy. The synchronous bridge state owns late-callback rejection; tests must cover callback, error, timeout, and callback-after-timeout evidence. | M; Unit, Behavior, preview Pressure. | closed-retained |
 | SYNC-008 | `FlowTab/Infrastructure/Runtime/RuntimeLogging.swift`; `scheduleFlushLocked` | A 50ms delay batches disk writes and does not establish write success. Domain duration. | Retain the named batching policy and cancellable `DispatchWorkItem`; explicit snapshot/read APIs flush synchronously before returning evidence. The diagnostics store owns the work item. | M; Unit, Behavior, log-write Pressure if changed. | closed-retained |
 | SYNC-009 | `FlowTab/Features/Logs/RuntimeLogsSection.swift`; `RuntimeLogLinesViewModel` | The Logs surface polls once per second to discover appended or cleared lines. Evidence migration. | Publish append/flush/clear generations from the diagnostics owner, subscribe before the initial snapshot, and reload from the later generation. View-model start/stop owns the subscription and task. | M; Unit, Behavior, Logs UI, tab-switch Pressure. | completed |
@@ -901,6 +902,65 @@ polling cadence, deadline, or timeout in the scoped paths.
   cancellable policies whose tests advance by explicit scheduler delivery.
 - Commit: `96daf6f`
   (`refactor(sync): migrate SYNC-006 activation convergence`).
+
+### SYNC-006R1 Closure Record
+
+- Design and Oracle: the exact AX/CG focus verification established by
+  SYNC-006 now enters `RuntimeProjectionMaintenanceOwner` as monotonic priority
+  work. It drains after the active maintenance operation and before ordinary
+  repair backlog, then records `verifiedFocusReadback`, commits the affected
+  projection, and drains ready reconciliation requests. Exact WindowRecord
+  state remains the independent acceptance Oracle; elapsed time and queue depth
+  cannot establish success.
+- Lifecycle and ordering: `RuntimeProjectionService` owns the maintenance owner
+  and the priority generation. FIFO priority delivery preserves ordering with
+  app-launch and app-termination evidence. The queued closure captures the
+  service weakly, and owner cancellation or deinitialization rejects or removes
+  pending priority work. This slice adds no duration, retry, poll, or watchdog.
+- Audit diagnosis: the first signed topology observation ended before the
+  activation repair point because fixture window order changed. The next run
+  reproduced the downstream failure after exact `ax-direct` verification and
+  an exact focused CG readback for window `89946`; the corresponding
+  `verifiedFocusReadback` transition was absent before the UI watchdog. This
+  separated successful focus evidence generation from delayed projection
+  admission and identified ordinary maintenance backlog as the failed
+  synchronization contract.
+- Unit and Behavior: the final canonical FlowTabTests selection passed 8/8 in
+  0.497 seconds under
+  `.build-local/evidence-driven-sync/SYNC-006R1/targeted-attempt-003`. It covers
+  the new service-level in-flight-maintenance and ordinary-backlog regression,
+  FIFO priority generation, cancellation, owner cleanup, exact WindowRecord
+  seeding and readback, projection coordination, and exact AX evidence
+  propagation. The included owner Pressure regression queued 2,000 ordinary
+  maintenance operations and observed priority evidence before that backlog.
+- FlowTabCore: not relevant because the contract remains inside the
+  AppKit/ApplicationServices application runtime projection boundary.
+- UI and Pressure: the final canonical signed noisy-CG-sibling, cross-Space
+  fullscreen Option+Tab topology workflow passed 1/1 in 43.714 seconds under
+  `.build-local/evidence-driven-sync/SYNC-006R1/runtime-topology-pressure-attempt-003`.
+  All four target windows reached exact `stickyBinding` to
+  `verifiedFocusReadback` transitions with maintenance generations 2 through
+  5. The identity contract matched all 59 checks across 5,069.564 milliseconds,
+  with 23 candidate observations and zero rejected transient identities.
+  Resource sampling recorded CPU average/p95/max 130.69/163.30/170.40 percent
+  and RSS average/p95/max 205.64/296.89/308.11 MiB.
+- Signing and process evidence: the rebuilt installed app carried TeamIdentifier
+  `96PUA726W9`, Apple Development authority
+  `gobestsoft@qq.com (RF9WCUVKH8)`, and CDHash
+  `ceada2fe783041f8be5e0381ea88ff8cd536bcee`. The private identity manifest
+  SHA-256 was
+  `94447f96a0f202caf0cbbb5963184f6706d51b7b4e88407bfc5c89452714c4d9`.
+  Exact pre-run and post-run app/fixture/runner and repository `xcodebuild`
+  process checks were empty, and the wrapper reported exact application and OS
+  process cleanup.
+- Process/Tooling: `git diff --check` and project-file `plutil -lint` passed.
+  The source diff is confined to priority admission, injectable owner setup,
+  applied-generation diagnostics, the deterministic regression, project test
+  membership, and this ledger entry. `.build-local/test-assets` remained
+  absent, and the startup worktree baseline remained untouched. Heavy local
+  validation artifacts were removed after this durable record was written.
+- Commit: this slice is committed independently as
+  `fix(sync): repair SYNC-006R1 focus evidence priority`.
 
 ### SYNC-009 Closure Record
 

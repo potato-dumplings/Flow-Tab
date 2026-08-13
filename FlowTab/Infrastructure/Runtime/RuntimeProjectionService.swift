@@ -27,6 +27,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     init(
         label: String = "FlowTab.RuntimeProjectionService",
+        maintenanceOwner: RuntimeProjectionMaintenanceOwner? = nil,
         repairProvider: RuntimeProjectionRepairProviding? = nil,
         mainTableProjectionBuilder: RuntimeMainTableProjectionBuilding? = nil,
         appDirectoryProvider: RuntimeAppDirectoryProviding? = nil,
@@ -47,7 +48,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             }
             return true
         }
-        maintenanceOwner = RuntimeProjectionMaintenanceOwner(label: label)
+        self.maintenanceOwner = maintenanceOwner
+            ?? RuntimeProjectionMaintenanceOwner(label: label)
         if let repairProvider {
             self.repairProvider = repairProvider
             self.mainTableProjectionBuilder = mainTableProjectionBuilder
@@ -73,7 +75,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             reconciliationExecutor: reconciliationExecutor
         )
         transientRepairObservationDriver = RuntimeTransientRepairObservationDriver(
-            ownerQueue: maintenanceOwner.queue,
+            ownerQueue: self.maintenanceOwner.queue,
             scheduler: transientRepairObservationScheduler,
             policy: transientRepairObservationPolicy
         )
@@ -491,27 +493,54 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification) {
-        maintenanceOwner.enqueue { [self] in
-            let now = Date.timeIntervalSinceReferenceDate
-            transientRepairObservationDriver.cancel(
-                target: .app(verification.ownerPID),
-                reason: "windowFocusVerified"
-            )
-            let affectedCGWindowIDs = repairProvider.recordWindowFocusVerification(verification, now: now)
-            readModelStore.markWindowFocusVerified(
+        maintenanceOwner.enqueuePriority { [weak self] generation in
+            self?.applyWindowFocusVerificationLocked(
                 verification,
-                affectedCGWindowIDs: affectedCGWindowIDs,
-                generatedAt: now
+                generation: generation
             )
-            commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
-            commitMainTableCurrentAppProjectionLocked(
-                appID: verification.appID,
-                pid: verification.ownerPID,
-                clearsDirtyState: false,
-                generatedAt: now
-            )
-            drainReadyReconciliationRequestsLocked(now: now)
         }
+    }
+
+    private func applyWindowFocusVerificationLocked(
+        _ verification: RuntimeWindowFocusVerification,
+        generation: RuntimeProjectionMaintenanceGeneration
+    ) {
+        let now = Date.timeIntervalSinceReferenceDate
+        transientRepairObservationDriver.cancel(
+            target: .app(verification.ownerPID),
+            reason: "windowFocusVerified"
+        )
+        let affectedCGWindowIDs = repairProvider.recordWindowFocusVerification(
+            verification,
+            now: now
+        )
+        readModelStore.markWindowFocusVerified(
+            verification,
+            affectedCGWindowIDs: affectedCGWindowIDs,
+            generatedAt: now
+        )
+        commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
+        commitMainTableCurrentAppProjectionLocked(
+            appID: verification.appID,
+            pid: verification.ownerPID,
+            clearsDirtyState: false,
+            generatedAt: now
+        )
+        drainReadyReconciliationRequestsLocked(now: now)
+        RuntimeLog.debug(
+            .projection,
+            [
+                "runtimeWindowFocusVerified",
+                "maintenanceGeneration=\(generation)",
+                "appID=\(verification.appID)",
+                "pid=\(verification.ownerPID)",
+                "windowID=\(verification.windowID)",
+                "targetCG=\(verification.targetCGWindowID.map(String.init) ?? "nil")",
+                "focusedCG=\(verification.focusedCGWindowID.map(String.init) ?? "nil")",
+                "focusedAX=\(verification.focusedAXWindow == nil ? 0 : 1)",
+                "affectedCGWindowIDs=\(affectedCGWindowIDs.map(String.init).sorted().joined(separator: ","))"
+            ].joined(separator: " ")
+        )
     }
 
     func signalWindowFocusVerified(appID: String, pid: pid_t) {
