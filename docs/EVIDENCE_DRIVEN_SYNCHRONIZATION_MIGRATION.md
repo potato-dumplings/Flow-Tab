@@ -576,7 +576,7 @@ and Process/Tooling.
 | SYNC-036KQ | fullscreen multi-App target-window mutation; explicit close and gated projection | A 30-second auto-close and 45-second projection wait substitute elapsed time for exact fullscreen-window completion. Evidence migration. | Use the typed close route before launch, explicit zero-delay trigger, exact fullscreen target number/index/PID, matching applied generation, and preinstalled exact remaining-card projection. The scenario owns both cancellations. | H; typed fullscreen identity/order/cancel/watchdog and projection Pressure tests, signed fullscreen mutation UI, Process/Tooling. | completed |
 | SYNC-036KR | fullscreen multi-App mutation; exact runtime reconciliation | A broad prelaunch baseline and raw eight-second substring wait do not bind destruction to the exact fullscreen target. Evidence refinement. | Observe before explicit close and require exact bundle/PID/AX or CG target identity in one post-trigger reconciliation record. Name the watchdog and cancel with the scenario. | H; exact target/event/cancel/watchdog tests, signed fullscreen mutation UI, Process/Tooling. | completed |
 | SYNC-036KS | standard and fullscreen multi-App Window Search; committed result projection | Both paths type before constructing `waitForSearchWindowResult`, allowing a stale matching row and losing the committed scope/query boundary. Evidence-order migration. | Reuse `performAndWaitForCommittedSearchWindowResult` with the owner installed before typing; require exact window scope, decoded query, app/title/result identity, and row publication. Name the shared watchdog; invocation owns cancellation. | H; stale-baseline/query/scope/identity/event/cancel/watchdog/Pressure tests, both signed Window Search UIs, Process/Tooling. | completed |
-| SYNC-036KT | standard/fullscreen Window Search confirmation; exact activation and fullscreen panel dismissal | Exact activation uses raw 10/12-second bounds, and the fullscreen dismissal observer is constructed after confirmation. Evidence composition/order migration. | Before confirmation, install exact workflow-window activation and, for fullscreen, exact panel-nonexistence owners; accept only exact bundle/window number plus dismissal readback. Name compatible bounds and cancel both owners on every exit. | H; initial/stale/wrong-window/event/cancel/watchdog/Pressure tests, both signed activation UIs, Process/Tooling. | planned |
+| SYNC-036KT | standard/fullscreen Window Search confirmation; exact activation and fullscreen panel dismissal | Exact activation uses raw 10/12-second bounds, and the fullscreen dismissal observer is constructed after confirmation. Evidence composition/order migration. | Before confirmation, install exact workflow-window activation and, for fullscreen, exact panel-nonexistence owners; accept only exact bundle/window number plus dismissal readback. Name compatible bounds and cancel both owners on every exit. | H; initial/stale/wrong-window/event/cancel/watchdog/Pressure tests, both signed activation UIs, Process/Tooling. | completed |
 | SYNC-036KU | multi-App App Search; committed result projection | Text is typed before an eight-second raw row-existence wait, so a row alone proves neither committed app scope nor query. Evidence-order migration. | Install the committed Search result owner before typing and require exact app scope/query/result identifier plus row publication. Name the watchdog and cancel with the invocation. | H; stale-baseline/scope/query/row/cancel/watchdog/Pressure tests, signed App Search UI, Process/Tooling. | planned |
 | SYNC-036KV | multi-App App Search confirmation; exact frontmost application | The observer is installed before confirmation and succeeds only from exact workspace/frontmost readback, while the raw ten-second bound is anonymous. Retained watchdog. | Name the App-Search activation watchdog under the application-frontmost owner; preserve initial readback, activation notification, final exact bundle readback, and cancellation. | M; policy/exact/wrong-app/cancel/watchdog tests, signed App Search UI, Process/Tooling. | planned |
 | SYNC-036KW | In-App Control+Tab roundtrip; exact workflow Space/window topology readiness | Raw 12/4-second bounds qualify prelaunch, first-phase, reopened-phase, and fixture reactivation topology. Predicates are exact, while operation-class policy and final diagnostics are scattered. Retained-watchdog consolidation. | Name In-App initial/current/reactivation watchdogs under the workflow-window owners, preserve immediate readback plus workspace/AX events and cancellable fallback, and report exact bundle/window/title/Space evidence. Callers own each synchronous observation. | H; policy/initial/event/wrong-space/cancel/watchdog tests, both signed In-App roundtrips, Process/Tooling. | planned |
@@ -28604,6 +28604,82 @@ polling cadence, deadline, or timeout in the scoped paths.
   baseline checks.
 - Commit subject:
   `test(sync): migrate SYNC-036KS committed Window Search`.
+
+### SYNC-036KT Closure Record
+
+- Status and Oracle: completed. Standard `Docs` Window Search confirmation now
+  resolves only when the exact fixture bundle is frontmost and the exact
+  decoded result CG window number is topmost. Fullscreen `Notes Focus` requires
+  the same exact bundle/window identity and an independent post-confirmation
+  readback showing the exact diagnostics panel no longer exists. Title
+  observability remains diagnostic context and cannot replace window identity.
+- Evidence ordering and lifecycle: both activation invocations construct the
+  workflow-window owner before confirmation. Its workspace-activation, target
+  AX focused/main-window, and scheduled readback sources are active before the
+  Enter input, while its acceptance gate rejects a matching baseline until the
+  trigger returns. The fullscreen path additionally starts the exact panel
+  nonexistence owner, captures an `exists=1` baseline, and owns cancellation
+  before confirmation. Confirmation return opens its gate, requests an
+  immediate readback, and activates the deferred schedule only while evidence
+  remains unresolved. The activation helper and fullscreen invocation each
+  use `defer` to cancel their owner on every exit; owner generations reject
+  replaced or late callbacks.
+- Retained time policy: standard and fullscreen activation preserve compatible
+  terminal bounds as
+  `multiAppWindowSearchActivationWatchdog` at ten seconds and
+  `fullscreenMultiAppWindowSearchActivationWatchdog` at twelve seconds. The
+  fullscreen panel bound is named
+  `fullscreenMultiAppWindowSearchPanelDismissalWatchdog` at four seconds.
+  Workspace and AX notifications drive activation readback, with the shared
+  named cancellable 100-millisecond cadence covering CG-window publication for
+  which the platform supplies no complete callback. XCUI supplies no element
+  disappearance callback, so the panel owner uses the same named conditional
+  cadence only after an unresolved immediate readback. Expiry reports the
+  unmet exact identity or existence condition and final observation evidence;
+  elapsed time never resolves either owner.
+- Deterministic and lifecycle Pressure validation: the canonical rebuilt and
+  signed Runner passed 15/15 selected checks with zero failures in 2.332
+  seconds under `.build-local/sync-036kt-owner-tests`. Coverage includes named
+  policy compatibility, exact initial state, observer-before-readback and
+  baseline gating, wrong bundle/window rejection, notification and delayed
+  scheduled evidence, slow scheduling, explicit cancellation, watchdog final
+  readback, 100 replaced activation generations, and 200 replaced panel
+  generations.
+- Affected UI: the final current-source canonical signed fixture invocation
+  passed both paths 2/2 with zero failures in 76.632 seconds under
+  `.build-local/sync-036kt-signed-ui`. Fullscreen `Notes Focus` passed in
+  25.146 seconds across Spaces with both exact activation and preinstalled
+  panel-dismissal evidence; standard `Docs` passed in 51.486 seconds with the
+  exact activation identity. Different XCU scheduling load changed completion
+  latency while preserving both results.
+- Validation scope: UI-target deterministic state tests, lifecycle Pressure,
+  and both signed visible paths are the applicable layers. FlowTabCore Unit,
+  app Unit/Behavior, and FlowTabTests are not relevant because this slice
+  changes UI-test synchronization policy and orchestration only. Production
+  Search behavior, fixture behavior, configuration compatibility, window
+  identity semantics, module direction, and path-intent resolution remain
+  unchanged.
+- Signing and Process/Tooling: both status ledgers report `completed`; every
+  applicable fixture, signing, build, and test stage exited zero, and both
+  result bundles are present. Sandbox-external strict deep verification accepts
+  the fixed App and final Runner under Team `96PUA726W9`, with CDHashes
+  `78a55012be48b3e401ae8351413f5c29e4b611f5` and
+  `f08347e2b72ac637cabe3fe03e7cb5359123e249`; executable SHA-256 values are
+  `c998d98178c6261312744292760802ea23e50b3e95cc2c058a75c59952075ef1`
+  and `1f809242d891672debed1abe2c288712d1c587183ae2d2c74f145879152edbe7`.
+  Swift parsing, project plist lint, scoped raw-bound inventory, failure scan,
+  and `git diff --check` pass. The multi-App workflow, activation owner/tests,
+  and panel owner/tests contain 665, 380/357, and 166/227 lines with clear
+  responsibilities. The remaining raw ten-second bound in this workflow is
+  owned by the separately scoped App Search confirmation candidate
+  SYNC-036KV. Exact App/Runner/fixture and repository-scoped xcodebuild process
+  readbacks are empty.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. Installer, deterministic, and
+  signed UI evidence roots are removed after this durable record and
+  independent commit, followed by exact absence and worktree-baseline checks.
+- Commit subject:
+  `test(sync): migrate SYNC-036KT exact Window Search confirmation`.
 
 ### SYNC-001 Authorized Resume Closure Record
 

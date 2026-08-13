@@ -6,6 +6,15 @@ private enum FlowTabUITestElementNonExistenceObservationTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testElementNonExistenceObservationPolicyUsesNamedFullscreenSearchWatchdog() {
+        let watchdog =
+            FlowTabUITestElementNonExistenceObservationPolicy
+            .fullscreenMultiAppWindowSearchPanelDismissalWatchdog
+
+        XCTAssertEqual(watchdog, 4)
+        XCTAssertTrue(watchdog.isFinite && watchdog > 0)
+    }
+
     func testElementNonExistenceObservationRequiresPostTriggerReadback() {
         var scheduledRegistrationCount = 0
         let owner =

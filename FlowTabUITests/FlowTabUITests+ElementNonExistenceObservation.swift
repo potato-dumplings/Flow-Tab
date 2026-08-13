@@ -1,6 +1,10 @@
 import Foundation
 import XCTest
 
+enum FlowTabUITestElementNonExistenceObservationPolicy {
+    static let fullscreenMultiAppWindowSearchPanelDismissalWatchdog: TimeInterval = 4
+}
+
 private enum FlowTabUITestElementNonExistencePhase: String {
     case initialReadback
     case awaitingTrigger

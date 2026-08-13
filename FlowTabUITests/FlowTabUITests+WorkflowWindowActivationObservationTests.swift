@@ -15,6 +15,24 @@ extension FlowTabUITests {
         XCTAssertTrue(watchdog.isFinite && watchdog > 0)
     }
 
+    func testWorkflowWindowActivationPolicyUsesNamedMultiAppSearchWatchdogs() {
+        let standardWatchdog =
+            FlowTabUITestWorkflowWindowActivationObservationPolicy
+            .multiAppWindowSearchActivationWatchdog
+        let fullscreenWatchdog =
+            FlowTabUITestWorkflowWindowActivationObservationPolicy
+            .fullscreenMultiAppWindowSearchActivationWatchdog
+
+        XCTAssertEqual(standardWatchdog, 10)
+        XCTAssertEqual(fullscreenWatchdog, 12)
+        XCTAssertTrue(
+            standardWatchdog.isFinite && standardWatchdog > 0
+        )
+        XCTAssertTrue(
+            fullscreenWatchdog.isFinite && fullscreenWatchdog > 0
+        )
+    }
+
     func testWorkflowWindowActivationObserverAcceptsExactInitialState() {
         var registrationOrder: [String] = []
         let owner =

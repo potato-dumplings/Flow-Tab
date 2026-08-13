@@ -195,7 +195,9 @@ extension FlowTabUITests {
                     windowNumber: targetWindowNumber,
                     title: targetWindowTitle,
                     app: targetApp,
-                    timeout: 10,
+                    timeout:
+                        FlowTabUITestWorkflowWindowActivationObservationPolicy
+                            .multiAppWindowSearchActivationWatchdog,
                     trigger: {
                         confirmSwitcherSearchSelection(
                             in: app,
@@ -321,26 +323,56 @@ extension FlowTabUITests {
                 "Search result \(result.identifier) did not expose a CG window number."
             )
 
-            XCTAssertTrue(
+            let panelDismissal =
+                FlowTabUITestElementNonExistenceObservationOwner(
+                    elementIdentifier: diagnosticsSummary.identifier,
+                    readback: {
+                        diagnosticsSummary.exists
+                    }
+                )
+            panelDismissal.start()
+            defer { panelDismissal.cancel() }
+            guard panelDismissal.latestEvidence?.value.exists == true else {
+                XCTFail(
+                    "Fullscreen Window Search panel baseline mismatch; "
+                        + "expectedExists=1. "
+                        + panelDismissal.diagnosticSummary
+                )
+                return
+            }
+
+            guard
                 triggerAndWaitForFrontmostWorkflowWindow(
                     windowNumber: targetWindowNumber,
                     title: targetWindowTitle,
                     app: targetApp,
-                    timeout: 12,
+                    timeout:
+                        FlowTabUITestWorkflowWindowActivationObservationPolicy
+                            .fullscreenMultiAppWindowSearchActivationWatchdog,
                     trigger: {
                         confirmSwitcherSearchSelection(
                             in: app,
                             searchInput: searchInput,
                             expectedQuery: targetWindowTitle
                         )
+                        panelDismissal.markTriggerCompleted()
                     }
-                ),
-                "Search confirmation did not activate the fullscreen \(targetWindowTitle) fixture window."
-            )
-            XCTAssertTrue(
-                waitForNonExistence(diagnosticsSummary, timeout: 4),
-                "FlowTab panel remained visible after confirming the fullscreen window target."
-            )
+                )
+            else { return }
+            guard
+                panelDismissal.waitForResolution(
+                    timeout:
+                        FlowTabUITestElementNonExistenceObservationPolicy
+                            .fullscreenMultiAppWindowSearchPanelDismissalWatchdog
+                ) != nil
+            else {
+                XCTFail(
+                    "FlowTab panel remained visible after confirming the "
+                        + "fullscreen window target. "
+                        + panelDismissal.diagnosticSummary
+                )
+                return
+            }
         }
     }
 

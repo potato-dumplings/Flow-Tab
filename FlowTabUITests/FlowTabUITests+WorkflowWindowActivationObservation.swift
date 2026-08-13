@@ -5,6 +5,8 @@ import XCTest
 
 enum FlowTabUITestWorkflowWindowActivationObservationPolicy {
     static let edgeInputsExactWindowWatchdog: TimeInterval = 10
+    static let multiAppWindowSearchActivationWatchdog: TimeInterval = 10
+    static let fullscreenMultiAppWindowSearchActivationWatchdog: TimeInterval = 12
 }
 
 struct FlowTabUITestWorkflowWindowActivationSnapshot: Equatable {
