@@ -327,6 +327,47 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherActivePreviewReadbackRequiresExactSelectedWindowCycleState() {
+        let expectedBundleIdentifier = "com.example.notes"
+        let exactMode = "windowCycle(\(expectedBundleIdentifier))"
+        func readback(
+            _ selected: String,
+            _ mode: String
+        ) -> FlowTabUITestSwitcherSelectionState? {
+            FlowTabUITestSwitcherSelectionState
+                .exactWindowCycle(
+                    expectedBundleIdentifier:
+                        expectedBundleIdentifier,
+                    from:
+                        switcherSelectionTestSnapshot(
+                            selected: selected,
+                            mode: mode
+                        )
+                )
+        }
+
+        XCTAssertEqual(
+            readback(expectedBundleIdentifier, exactMode),
+            FlowTabUITestSwitcherSelectionState(
+                selectedBundleIdentifier:
+                    expectedBundleIdentifier,
+                mode: exactMode
+            )
+        )
+        XCTAssertNil(
+            readback("com.example.browser", exactMode)
+        )
+        XCTAssertNil(
+            readback(
+                expectedBundleIdentifier,
+                "windowCycle(com.example.browser)"
+            )
+        )
+        XCTAssertNil(
+            readback(expectedBundleIdentifier, "appCycle")
+        )
+    }
+
     func testSwitcherSelectionTransitionRequiresPostTriggerEvidence() {
         let baseline =
             FlowTabUITestSwitcherSelectionState(

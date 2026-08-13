@@ -200,6 +200,17 @@ extension FlowTabUITests {
             SpaceFixtureResolvedWorkflow.App,
         diagnostics: XCUIElement
     ) -> Bool {
+        requireActiveSwitcherPreview(
+            expectedBundleIdentifier:
+                workflowApp.identity.bundleIdentifier,
+            diagnostics: diagnostics
+        )
+    }
+
+    func requireActiveSwitcherPreview(
+        expectedBundleIdentifier: String,
+        diagnostics: XCUIElement
+    ) -> Bool {
         let snapshot =
             switcherDiagnosticsSnapshot(
                 diagnostics,
@@ -207,8 +218,6 @@ extension FlowTabUITests {
                     FlowTabUITestSwitcherSelectionState
                         .diagnosticsKeys
             )
-        let expectedBundleIdentifier =
-            workflowApp.identity.bundleIdentifier
         guard
             FlowTabUITestSwitcherSelectionState
                 .exactWindowCycle(

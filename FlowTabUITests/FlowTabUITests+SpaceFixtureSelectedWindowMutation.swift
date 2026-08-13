@@ -254,7 +254,11 @@ extension FlowTabUITests {
             )
             return
         }
-        assertSwitcherWindowCycle(in: app, timeout: 5)
+        guard requireActiveSwitcherPreview(
+            expectedBundleIdentifier:
+                identity.bundleIdentifier,
+            diagnostics: diagnosticsSummary
+        ) else { return }
         waitForRuntimeLogFiles(
             matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=(none|[0-9]+)"#,
             since: mutationLogSnapshot,
