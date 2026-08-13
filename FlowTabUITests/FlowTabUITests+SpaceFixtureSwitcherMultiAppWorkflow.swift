@@ -241,15 +241,29 @@ extension FlowTabUITests {
                 "The app-scope activation scenario must start outside the target fixture app."
             )
 
-            app.typeText(targetApp.identity.switcherSearchQuery)
-
-            let result = element(
-                in: app,
-                identifier: targetApp.identity.switcherSearchAppAccessibilityIdentifier
-            )
             XCTAssertTrue(
-                result.waitForExistence(timeout: 8),
-                "FlowTab did not expose \(targetApp.appName) as a real app-scope search result."
+                performAndWaitForCommittedSearchResultRow(
+                    in: app,
+                    scope: "app",
+                    query:
+                        targetApp.identity.switcherSearchQuery,
+                    resultID:
+                        "app:"
+                        + targetApp.identity.bundleIdentifier,
+                    rowIdentifier:
+                        targetApp.identity
+                            .switcherSearchAppAccessibilityIdentifier,
+                    timeout:
+                        FlowTabUITestSwitcherSearchResultObservationPolicy
+                            .multiAppAppSearchResultPublicationWatchdog,
+                    trigger: {
+                        app.typeText(
+                            targetApp.identity.switcherSearchQuery
+                        )
+                    }
+                ),
+                "FlowTab did not publish \(targetApp.appName) as the "
+                    + "exact committed App Search result."
             )
 
             assertTriggerMakesApplicationFrontmost(

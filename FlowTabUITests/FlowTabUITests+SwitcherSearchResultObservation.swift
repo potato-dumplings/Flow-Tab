@@ -4,6 +4,7 @@ import XCTest
 
 enum FlowTabUITestSwitcherSearchResultObservationPolicy {
     static let edgeInputsCommittedResultWatchdog: TimeInterval = 8
+    static let multiAppAppSearchResultPublicationWatchdog: TimeInterval = 8
 }
 
 struct SwitcherSearchWindowResultObservation: Equatable {

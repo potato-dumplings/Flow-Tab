@@ -5,6 +5,15 @@ private enum FlowTabUITestCommittedSearchResultRowsTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testSwitcherSearchResultPolicyUsesNamedMultiAppAppSearchWatchdog() {
+        let watchdog =
+            FlowTabUITestSwitcherSearchResultObservationPolicy
+            .multiAppAppSearchResultPublicationWatchdog
+
+        XCTAssertEqual(watchdog, 8)
+        XCTAssertTrue(watchdog.isFinite && watchdog > 0)
+    }
+
     func testCommittedSearchResultRowsRequireUniqueProjectionIdentities() {
         let first = FlowTabUITestSwitcherSearchExpectedResultRow(
             resultID: "app:com.example.first",
@@ -42,6 +51,53 @@ extension FlowTabUITests {
                         rowIdentifier: first.rowIdentifier
                     )
                 ])
+        )
+    }
+
+    func testCommittedSearchResultRowsClassifyMatchingBaselineAsStale() {
+        let rows = committedSearchResultRowsTestExpectations()
+        let expectation =
+            FlowTabUITestSwitcherSearchResultExpectation
+                .committedResultRows(
+                    scope: "app",
+                    query: "cs",
+                    rows: rows
+                )
+        func snapshot(
+            scope: String = "app",
+            query: String = "cs",
+            resultIDs: [String]? = nil
+        ) -> FlowTabUITestSwitcherSearchResultSnapshot {
+            FlowTabUITestSwitcherSearchResultSnapshot(
+                results: [],
+                resultsScope: scope,
+                resultsQuery: query,
+                committedResultIDs:
+                    resultIDs ?? rows.map(\.resultID)
+            )
+        }
+
+        XCTAssertTrue(
+            expectation.hasCommittedIdentity(
+                in: snapshot()
+            )
+        )
+        XCTAssertFalse(
+            expectation.hasCommittedIdentity(
+                in: snapshot(scope: "window")
+            )
+        )
+        XCTAssertFalse(
+            expectation.hasCommittedIdentity(
+                in: snapshot(query: "stale")
+            )
+        )
+        XCTAssertFalse(
+            expectation.hasCommittedIdentity(
+                in: snapshot(
+                    resultIDs: [rows[0].resultID]
+                )
+            )
         )
     }
 
