@@ -7,6 +7,53 @@ private enum FlowTabUITestSwitcherWindowTitleTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testSwitcherWindowTitleCountReadbackRefreshesCollectionContractionEvidence() {
+        var cardCount = 2
+        var counts = [
+            "Primary": 1,
+            "Secondary": 1
+        ]
+        var cardCountReadbacks = 0
+        var titleReadbacks: [String] = []
+        let readback = FlowTabUITestSwitcherWindowTitleCountReadback(
+            cardCount: {
+                cardCountReadbacks += 1
+                return cardCount
+            },
+            titleCount: { title in
+                titleReadbacks.append(title)
+                return counts[title, default: 0]
+            }
+        )
+        let observedTitles: Set<String> = [
+            "Primary",
+            "Secondary"
+        ]
+
+        XCTAssertEqual(
+            readback.snapshot(observing: observedTitles),
+            FlowTabUITestSwitcherWindowTitleSnapshot(
+                cardCount: 2,
+                titleCounts: counts
+            )
+        )
+
+        cardCount = 1
+        counts["Secondary"] = 0
+        XCTAssertEqual(
+            readback.snapshot(observing: observedTitles),
+            FlowTabUITestSwitcherWindowTitleSnapshot(
+                cardCount: 1,
+                titleCounts: ["Primary": 1]
+            )
+        )
+        XCTAssertEqual(cardCountReadbacks, 2)
+        XCTAssertEqual(
+            titleReadbacks,
+            ["Primary", "Secondary", "Primary", "Secondary"]
+        )
+    }
+
     func testSwitcherWindowTitleObserverUsesExactMultiplicityEvidence() {
         let expectation =
             FlowTabUITestSwitcherWindowTitleExpectation(

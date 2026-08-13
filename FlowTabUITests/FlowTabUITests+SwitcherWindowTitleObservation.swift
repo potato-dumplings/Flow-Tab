@@ -35,6 +35,28 @@ struct FlowTabUITestSwitcherWindowTitleExpectation: Equatable {
     }
 }
 
+struct FlowTabUITestSwitcherWindowTitleCountReadback {
+    let cardCount: () -> Int
+    let titleCount: (String) -> Int
+
+    func snapshot(
+        observing titles: Set<String>
+    ) -> FlowTabUITestSwitcherWindowTitleSnapshot {
+        let observedCardCount = cardCount()
+        var titleCounts: [String: Int] = [:]
+        for title in titles.sorted() {
+            let count = titleCount(title)
+            if count > 0 {
+                titleCounts[title] = count
+            }
+        }
+        return FlowTabUITestSwitcherWindowTitleSnapshot(
+            cardCount: observedCardCount,
+            titleCounts: titleCounts
+        )
+    }
+}
+
 private func titleCountSummary(
     _ counts: [String: Int]
 ) -> String {
@@ -111,28 +133,30 @@ extension FlowTabUITests {
             FlowTabUITestSwitcherWindowTitleExpectation(
                 titles: expectedTitles
             )
-        let cardQuery = app.descendants(matching: .any)
-            .matching(
-                NSPredicate(
-                    format: "identifier BEGINSWITH %@",
-                    "flowtab.switcher.window."
-                )
-            )
+        let observedTitles = Set(expectedTitles)
         let owner =
             FlowTabUITestSwitcherWindowTitleObservationOwner(
                 expectation: expectation,
                 readback: {
-                    let titles = cardQuery
-                        .allElementsBoundByIndex
-                        .map(\.label)
-                    let titleCounts = titles.reduce(
-                        into: [:]
-                    ) { counts, title in
-                        counts[title, default: 0] += 1
-                    }
-                    return FlowTabUITestSwitcherWindowTitleSnapshot(
-                        cardCount: titles.count,
-                        titleCounts: titleCounts
+                    let cardQuery = app.descendants(matching: .any)
+                        .matching(
+                            NSPredicate(
+                                format: "identifier BEGINSWITH %@",
+                                "flowtab.switcher.window."
+                            )
+                        )
+                    return FlowTabUITestSwitcherWindowTitleCountReadback(
+                        cardCount: { cardQuery.count },
+                        titleCount: { title in
+                            cardQuery.matching(
+                                NSPredicate(
+                                    format: "label == %@",
+                                    title
+                                )
+                            ).count
+                        }
+                    ).snapshot(
+                        observing: observedTitles
                     )
                 }
             )
