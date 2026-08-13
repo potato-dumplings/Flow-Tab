@@ -115,12 +115,34 @@ extension FlowTabUITests {
                 FlowTabUITestSwitcherAppProjectionPolicy
                     .openWindowMutationInitialProjectionWatchdog
         ) else { return }
-        selectSwitcherAppDirectly(
-            in: app,
-            appID: identity.bundleIdentifier,
-            traceLabel: "openWindowLayerMutation.selectApp",
-            timeout: 8
-        )
+        do {
+            guard try performAndWaitForSwitcherAppSelection(
+                in: app,
+                bundleIdentifier: identity.bundleIdentifier,
+                appProjectionExpectation:
+                    .exactEntry(
+                        "\(identity.bundleIdentifier):2"
+                    ),
+                timeout:
+                    FlowTabUITestSwitcherAppSelectionPolicy
+                        .openWindowMutationApplicationWatchdog,
+                trigger: {
+                    try FlowTabUITestSwitcherCommandPayload.write(
+                        identity.bundleIdentifier
+                    )
+                    postFlowTabUITestSwitcherCommand(
+                        .selectApp,
+                        traceLabel:
+                            "openWindowLayerMutation.selectApp"
+                    )
+                }
+            ) else { return }
+        } catch {
+            XCTFail(
+                "Failed to select Open Mutation fixture App: \(error)"
+            )
+            return
+        }
 
         let allTitles = expectedSpaceFixtureWorkflowWindowTitles(
             titlePrefix: "Open Mutation",

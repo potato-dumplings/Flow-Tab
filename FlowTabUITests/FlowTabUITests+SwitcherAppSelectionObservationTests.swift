@@ -8,6 +8,23 @@ private enum FlowTabUITestSwitcherAppSelectionTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testSwitcherAppSelectionOpenWindowMutationPolicyPreservesCompatibleBound() {
+        XCTAssertEqual(
+            FlowTabUITestSwitcherAppSelectionPolicy
+                .openWindowMutationApplicationWatchdog,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestSwitcherAppSelectionPolicy
+                .openWindowMutationApplicationWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSwitcherAppSelectionPolicy
+                .openWindowMutationApplicationWatchdog,
+            0
+        )
+    }
+
     func testSwitcherAppSelectionRequiresAppliedEventAfterMatchingBaseline() {
         var order: [String] = []
         var eventReadback:

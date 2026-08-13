@@ -1,6 +1,10 @@
 import Foundation
 import XCTest
 
+enum FlowTabUITestSwitcherAppSelectionPolicy {
+    static let openWindowMutationApplicationWatchdog: TimeInterval = 8
+}
+
 struct FlowTabUITestSwitcherAppSelectionSnapshot: Equatable {
     let runtimeLog: FlowTabUITestRuntimeLogSnapshot
     let diagnostics: FlowTabUITestSwitcherDiagnosticsSnapshot
