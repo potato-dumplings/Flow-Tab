@@ -7,6 +7,14 @@ private enum FlowTabUITestSwitcherSearchResultTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testSwitcherSearchResultPolicyUsesNamedEdgeWatchdog() {
+        let watchdog =
+            FlowTabUITestSwitcherSearchResultObservationPolicy
+            .edgeInputsCommittedResultWatchdog
+        XCTAssertEqual(watchdog, 8)
+        XCTAssertTrue(watchdog.isFinite && watchdog > 0)
+    }
+
     func testSwitcherSearchResultDiagnosticsParserPreservesExactWindowIdentity() {
         let resultID =
             "window:com.example.chrome#123"

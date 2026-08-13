@@ -204,7 +204,9 @@ extension FlowTabUITests {
                     scope: "window",
                     query: sharedTitle,
                     expectedCount: expectedSharedCount,
-                    timeout: 8
+                    timeout:
+                        FlowTabUITestSwitcherSearchResultObservationPolicy
+                        .edgeInputsCommittedResultWatchdog
                 ) {
                     app.typeText(sharedTitle)
                 }
@@ -257,7 +259,9 @@ extension FlowTabUITests {
                             for: targetApp
                         ),
                     expectedCount: 1,
-                    timeout: 8
+                    timeout:
+                        FlowTabUITestSwitcherSearchResultObservationPolicy
+                        .edgeInputsCommittedResultWatchdog
                 ) {
                     app.typeText(query)
                 }

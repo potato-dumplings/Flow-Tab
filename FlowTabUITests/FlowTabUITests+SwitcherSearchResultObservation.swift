@@ -2,6 +2,10 @@ import CoreGraphics
 import Foundation
 import XCTest
 
+enum FlowTabUITestSwitcherSearchResultObservationPolicy {
+    static let edgeInputsCommittedResultWatchdog: TimeInterval = 8
+}
+
 struct SwitcherSearchWindowResultObservation: Equatable {
     let identifier: String
     let searchableText: String
