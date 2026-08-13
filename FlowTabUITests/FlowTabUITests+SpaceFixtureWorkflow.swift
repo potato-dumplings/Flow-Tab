@@ -434,6 +434,15 @@ extension FlowTabUITests {
             return
         }
 
+        let postCloseHomeProjection =
+            makeSpaceFixtureHomeTransitionObservation(
+                in: app,
+                rowIdentifier: fixtureAppRow.identifier,
+                expectedValue: "1w"
+            )
+        postCloseHomeProjection.start()
+        defer { postCloseHomeProjection.cancel() }
+
         let closedFixtureWindow = fixtureApp.windows[
             "flowtab.spacefixture.window.2"
         ]
@@ -448,6 +457,7 @@ extension FlowTabUITests {
             windowCloseObservation.requestClose(
                 from: scheduledClose
             )
+            postCloseHomeProjection.markTriggerCompleted()
         }
         guard let appliedClose =
                 windowCloseObservation.waitForApplied(
@@ -498,7 +508,17 @@ extension FlowTabUITests {
                 "flowtab.spacefixture.window.1"
             ].exists
         )
-        assertValue(of: fixtureAppRow, equals: "1w", timeout: 15)
+        guard postCloseHomeProjection.waitForResolution(
+            timeout:
+                FlowTabUITestSpaceFixtureHomeProjectionPolicy
+                    .runtimeWindowMutationFinalSummaryWatchdog
+        ) != nil else {
+            XCTFail(
+                "Space Fixture post-close Home projection watchdog expired. "
+                    + postCloseHomeProjection.diagnosticSummary
+            )
+            return
+        }
         guard assertSpaceFixtureCurrentAppProjectionAccepted(
             by: currentAppProjectionAcceptance,
             identity: identity,

@@ -6,6 +6,62 @@ enum FlowTabUITestSpaceFixtureHomeProjectionPolicy {
     static let defaultAppRowProjectionWatchdog: TimeInterval = 20
     static let runtimeLifecycleAppSummaryWatchdog: TimeInterval = 12
     static let runtimeWindowMutationInitialSummaryWatchdog: TimeInterval = 12
+    static let runtimeWindowMutationFinalSummaryWatchdog: TimeInterval = 15
+}
+
+fileprivate final class FlowTabUITestSpaceFixtureHomeTransitionState {
+    var acceptsPostTriggerEvidence = false
+}
+
+final class FlowTabUITestSpaceFixtureHomeTransitionObservationOwner {
+    private let state:
+        FlowTabUITestSpaceFixtureHomeTransitionState
+    private let projection:
+        FlowTabUITestHomeAppRowProjectionObservationOwner
+
+    fileprivate init(
+        state: FlowTabUITestSpaceFixtureHomeTransitionState,
+        projection:
+            FlowTabUITestHomeAppRowProjectionObservationOwner
+    ) {
+        self.state = state
+        self.projection = projection
+    }
+
+    func start() {
+        state.acceptsPostTriggerEvidence = false
+        projection.start()
+    }
+
+    func markTriggerCompleted() {
+        guard !state.acceptsPostTriggerEvidence else {
+            return
+        }
+        state.acceptsPostTriggerEvidence = true
+        projection.requestReadback(source: .triggerReadback)
+    }
+
+    func waitForResolution(
+        timeout: TimeInterval
+    ) -> FlowTabUITestConditionEvidence<
+        FlowTabUITestHomeAppRowProjectionSnapshot
+    >? {
+        projection.waitForResolution(timeout: timeout)
+    }
+
+    var diagnosticSummary: String {
+        "acceptsPostTriggerEvidence="
+            + "\(state.acceptsPostTriggerEvidence) "
+            + projection.diagnosticSummary
+    }
+
+    func cancel() {
+        projection.cancel()
+    }
+
+    deinit {
+        cancel()
+    }
 }
 
 extension FlowTabUITests {
@@ -68,6 +124,50 @@ extension FlowTabUITests {
             FlowTabUITestSpaceFixtureHomeProjectionPolicy
                 .runtimeWindowMutationInitialSummaryWatchdog,
             0
+        )
+    }
+
+    func testSpaceFixtureHomeProjectionWindowMutationFinalWatchdogPolicyCompatibility() {
+        XCTAssertEqual(
+            FlowTabUITestSpaceFixtureHomeProjectionPolicy
+                .runtimeWindowMutationFinalSummaryWatchdog,
+            15
+        )
+        XCTAssertTrue(
+            FlowTabUITestSpaceFixtureHomeProjectionPolicy
+                .runtimeWindowMutationFinalSummaryWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSpaceFixtureHomeProjectionPolicy
+                .runtimeWindowMutationFinalSummaryWatchdog,
+            0
+        )
+    }
+
+    func makeSpaceFixtureHomeTransitionObservation(
+        in app: XCUIApplication,
+        rowIdentifier: String,
+        expectedValue: String
+    ) -> FlowTabUITestSpaceFixtureHomeTransitionObservationOwner {
+        let state =
+            FlowTabUITestSpaceFixtureHomeTransitionState()
+        let projection =
+            makeHomeAppRowProjectionObservation(
+                in: app,
+                rows: [
+                    .init(
+                        identifier: rowIdentifier,
+                        value: expectedValue
+                    )
+                ],
+                frameOrder: .unconstrained,
+                acceptsEvidence: {
+                    state.acceptsPostTriggerEvidence
+                }
+            )
+        return FlowTabUITestSpaceFixtureHomeTransitionObservationOwner(
+            state: state,
+            projection: projection
         )
     }
 
