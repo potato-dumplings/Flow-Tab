@@ -19,6 +19,7 @@ struct SpaceFixtureWindowCloseFaultUITestRoute {
 
 enum SpaceFixtureWindowCloseFaultObservationPolicy {
     static let scheduledEvidenceWatchdog: TimeInterval = 8
+    static let appliedEvidenceWatchdog: TimeInterval = 15
 }
 
 typealias SpaceFixtureWindowCloseFaultEvidenceRegistration =
@@ -214,7 +215,10 @@ final class SpaceFixtureWindowCloseFaultObservationOwner {
             didFulfillScheduledExpectation = true
             scheduledExpectation?.fulfill()
         case .applied:
-            guard !didFulfillAppliedExpectation
+            guard !didFulfillAppliedExpectation,
+                  requestedPhase == .applied,
+                  requestedGeneration
+                    == evidence.requestGeneration
             else {
                 return
             }

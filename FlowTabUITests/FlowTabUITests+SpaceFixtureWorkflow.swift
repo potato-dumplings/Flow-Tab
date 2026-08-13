@@ -435,7 +435,9 @@ extension FlowTabUITests {
                 windowCloseObservation.waitForApplied(
                     requestGeneration:
                         scheduledClose.requestGeneration,
-                    timeout: 15
+                    timeout:
+                        SpaceFixtureWindowCloseFaultObservationPolicy
+                            .appliedEvidenceWatchdog
                 )
         else {
             XCTFail(

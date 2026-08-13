@@ -1,13 +1,13 @@
 import Foundation
 import XCTest
 
-private enum SpaceFixtureWindowCloseFaultObservationTestPolicy {
+enum SpaceFixtureWindowCloseFaultObservationTestPolicy {
     static let watchdog: TimeInterval = 0.01
     static let eventWatchdog: TimeInterval = 1
     static let pressureIterations = 200
 }
 
-private final class ManualSpaceFixtureWindowCloseFaultEvidenceSource {
+final class ManualSpaceFixtureWindowCloseFaultEvidenceSource {
     private(set) var registrations:
         [(SpaceFixtureWindowCloseFaultEvidence) -> Void] = []
     private var activeRegistrationIndices: Set<Int> = []
@@ -249,7 +249,7 @@ extension FlowTabUITests {
         }
     }
 
-    private func makeWindowCloseFaultObservationOwner(
+    func makeWindowCloseFaultObservationOwner(
         source:
             ManualSpaceFixtureWindowCloseFaultEvidenceSource
     ) -> SpaceFixtureWindowCloseFaultObservationOwner {
@@ -269,7 +269,7 @@ extension FlowTabUITests {
         )
     }
 
-    private func windowCloseFaultEvidence(
+    func windowCloseFaultEvidence(
         generation: Int,
         phase: SpaceFixtureWindowCloseFaultEvidencePhase
     ) -> SpaceFixtureWindowCloseFaultEvidence {
