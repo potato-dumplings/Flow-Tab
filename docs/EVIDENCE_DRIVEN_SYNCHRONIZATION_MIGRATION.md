@@ -116,7 +116,7 @@ and Process/Tooling.
 | SYNC-012 | `FlowTab/Features/Settings/AppSettingsView.swift`; permission prompt observation | Forty 500ms attempts inferred post-prompt TCC convergence; the first condition check occurred after a sleep and cancellation was swallowed. Conditional observation plus watchdog. | Install the shared app-activation observer before an immediate readback, take an independent post-request readback, and use a named cancellable fallback cadence for TCC transitions without callbacks. The terminal watchdog reports target, generation, readbacks, elapsed time, bundle identity, and final evidence. Settings visibility owns both target observations. | H; Unit, Behavior, permission UI, tab-switch Pressure. | completed |
 | SYNC-013 | `HomeLandingView.scheduleInitialAppSummariesRefresh`, `HomeInitialProjectionObservationOwner`; initial Home app-summary readiness | A fixed 900ms startup delay assumed the runtime app-switcher projection had committed before the Home readback. Evidence migration. | Install the exact service-object projection observer before the initial readback and maintenance request. Accept an initial complete projection, a later monotonic source generation, or a same-generation completeness transition. Home active visibility owns the observation generation, subscription, cancellation, and cleanup. | H; Unit, Behavior, Home UI, runtime-topology Pressure. | completed |
 | SYNC-040 | `HomeLandingView.scheduleAppSummariesRefresh`, `HomeAppSummaryProjectionObservationOwner`; general Home app-summary refresh | A fixed 220ms post-signal delay assumed app-switcher projection commits had followed workspace and runtime refresh signals. Evidence migration. | Install the exact runtime-service observer before the baseline readback. Apply committed notification readbacks only for a newly available projection, a monotonic source generation, or same-generation completeness. App activation and permission changes request service-owned maintenance, followed by an independent request-return readback. Home active visibility owns the observation generation, subscription, cancellation, and initial-owner handoff. | H; Unit, Behavior, Home UI, runtime-topology Pressure. | completed |
-| SYNC-041 | `HomeLandingView.requestSelectedAppRefresh`, `requestAppDetailProjection`, `HomeAppDetailProjectionObservationOwner`; selected/scoped Home detail | Fixed 120ms and 220ms post-selection or AX-signal delays assumed the requested current-app projection had committed. Evidence migration. | Install the exact runtime-service observer before the initial readback and selected/app-window/AX-destroy signal. Filter by exact appID and projection identity; apply an exact complete baseline immediately while retaining the trigger observation, then accept a newly available projection, monotonic source generation, or same-generation completeness transition. Independent request-return readback closes synchronous completion races. Home visibility and per-app request generations own subscriptions, cancellation, and stale-event rejection. | H; Unit, Behavior, selected-app Home UI, runtime-topology Pressure. | blocked: implementation, focused Unit/Behavior, full FlowTabTests, tab-switch Pressure, and Process passed; UI automation and full Priority order-isolation evidence are recorded below |
+| SYNC-041 | `HomeLandingView.requestSelectedAppRefresh`, `requestAppDetailProjection`, `HomeAppDetailProjectionObservationOwner`; selected/scoped Home detail | Fixed 120ms and 220ms post-selection or AX-signal delays assumed the requested current-app projection had committed. Evidence migration. | Install the exact runtime-service observer before the initial readback and selected/app-window/AX-destroy signal. Filter by exact appID and projection identity; apply an exact complete baseline immediately while retaining the trigger observation, then accept a newly available projection, monotonic source generation, or same-generation completeness transition. Independent request-return readback closes synchronous completion races. Home visibility and per-app request generations own subscriptions, cancellation, and stale-event rejection. | H; Unit, Behavior, selected-app Home UI, runtime-topology Pressure. | completed after freshly authorized signed selected-app UI and real-topology Pressure closure |
 | SYNC-014 | `FlowTab/App/AppFoundation.swift`; `AppWindowCoordinator.scheduleAccessoryPolicyRestoration` | Up to 250 polls at 20ms infer that a status-item-opened regular window is active and visible. Conditional observation plus watchdog. | Register app/window observers before presentation, perform immediate visibility/activation readback, and complete on the matching window transition. A named cancellable condition observer is the fallback; watchdog diagnostics include app-active, visible, miniaturized, and activation-policy state. `AppWindowCoordinator` owns the task/observers. | H; Unit, Behavior, status-item UI. | completed; the expanded full Priority run's assigned SYNC-032/SYNC-033 order-isolation failure is recorded below |
 | SYNC-015 | `SwitcherSearchCoordinator.scheduleRebuild`, `LiveSwitcherModel.scheduleSearchComputation` | 10–45ms delays debounce query work; result publication already requires revision and query/scope equality. Domain duration. | Retain as one named search scheduling policy with injectable scheduler/clock, cancellation, and revision Oracle. Remove duplicate scheduling ownership if both paths serve the same contract. | H hot path; Unit, Behavior, Search UI, realistic/stress Search Pressure. | completed; the expanded full Priority run's assigned SYNC-032/SYNC-033 order-isolation failure is recorded below |
 | SYNC-016 | `AppDelegate.setupHotkeyMonitors`, `HotkeyRegistrationObservationOwner`, `HotkeySettingsCardAppKitView.updateTakeoverStatus`; Command+Tab registration status | A 250ms delay was treated as confirmation that Command+Tab takeover stayed inactive. Evidence migration. | Publish a monotonic registration generation with exact request ID, configurations, and takeover result after reconciliation and monitor setup. Settings observes before persistence/registration, closes synchronous delivery with readback, and renders only matching evidence. Settings active visibility owns observer cleanup and stale-generation rejection. | M; Unit, Behavior, Settings UI. | completed; the expanded full Priority run's assigned SYNC-032/SYNC-033 order-isolation failure is recorded below |
@@ -27437,3 +27437,67 @@ polling cadence, deadline, or timeout in the scoped paths.
   (`fix(sync): repair SYNC-023R1 manual window readiness`).
 - Closure commit subject:
   `test(sync): close SYNC-021 signed Space pressure`.
+
+### SYNC-041 Authorized Resume Closure Record
+
+- Status and authorization: completed. Before this permission-blocked slice
+  changed from `blocked` to `running`, the exact canonical signed UI command
+  directly requested fresh XCTest/Xcode Helper Accessibility authorization.
+  The authorized run reached the real fixture and selected-app Home test body,
+  and the private final-App identity manifest has SHA-256
+  `38ceeb14be193fb6a5c753ee1fe8649d552a0d3b4be7a19a3f17cd01507eae8e`.
+- Design and Oracle: the implementation and lifecycle described in the
+  original SYNC-041 closure record remain unchanged. The exact runtime-service
+  object, appID, process/projection identity, source-generation transition,
+  scope completeness, and request-return readback determine Home detail
+  application. Home visibility and per-app observation generations own
+  subscription replacement, cancellation, stale-event rejection, and final
+  observer removal.
+- Retained time policy: the Home detail consumer owns no duration. The removed
+  120ms and 220ms delays remain absent. SYNC-003 continues to own the underlying
+  named transient-repair cadence and terminal diagnostic watchdog; elapsed
+  time cannot establish Home detail success.
+- Unit and Behavior: the implementation slice's focused run passed 9/9 and
+  its complete `FlowTabTests` class passed 269/269. The final current-source
+  canonical run recorded by SYNC-023R1 passed 1,103/1,103 in 44.494 seconds,
+  including the complete Priority coverage that had previously exposed an
+  order-isolation failure. This closes the earlier full-Priority validation
+  gap at the final source state. FlowTabCore remains not relevant because this
+  AppKit/SwiftUI Runtime projection contract belongs to the app target.
+- UI: the freshly authorized canonical
+  `testRuntimeLifecycleRefreshesRealFixtureWindowSetMutation` path passed 1/1
+  in 10.685 seconds. The test reached the real fixture, observed the exact
+  selected application and its window-set mutation, and accepted the Home
+  update only from the resulting exact projection evidence. Its wrapper
+  status is `completed`, every stage exited zero, and the result bundle is
+  present.
+- Pressure: the canonical 500ms-sampled noisy-CG-sibling cross-Space path
+  passed 1/1 in 41.194 seconds. All 54 PID/signature identity checks matched
+  across a 5,044.165ms stable identity window, with 24 candidate observations,
+  zero rejected transient identities, and 54 resource samples. CPU
+  average/p95/max were 67.20/140.20/145.90 percent; RSS average/p95/max were
+  163.90/205.39/245.44 MB. The immediately preceding same-source, same-path
+  SYNC-023R1 run passed in 41.607 seconds at materially higher CPU and RSS
+  levels, while preserving the same exact fixture-window and Space result.
+  The first resume attempt separately recorded a real pointer-selection input
+  changing the selected application after the exact fixture projection had
+  settled; the transition owner correctly rejected that wrong-identity state.
+  A clean invocation produced the required terminal Pressure evidence.
+  Existing Home tab-switch Pressure also remains green at both 50ms and 20ms
+  cadences with exact terminal workload evidence.
+- Signing and Process/Tooling: strict deep verification accepted both the
+  installed App and the final rebuilt Runner and their designated
+  requirements. The fixed App executable SHA-256 is
+  `9ec9b8f40391c9952843ba7a5b05b75f056ba1e5558fd3da4f73f2e37a5411c6`.
+  Exact App/Runner/fixture and repository xcodebuild process readbacks were
+  empty, independent wrapper cleanup reached application and OS-process
+  absence, and `.build-local/test-assets` remained absent. This closure changes
+  only the migration ledger; `git diff --check`, exact row/record review,
+  startup-baseline preservation, and staged-content review are its final
+  Process/Tooling gate.
+- Lifecycle cleanup: the SYNC-041 authorized-resume evidence root is removed
+  after this durable closure commit, followed by exact absence checks.
+- Implementation commit: `113f9bd`
+  (`refactor(sync): migrate SYNC-041 home detail updates`).
+- Closure commit subject:
+  `test(sync): close SYNC-041 signed Home detail pressure`.
