@@ -1,6 +1,10 @@
 import Foundation
 import XCTest
 
+enum FlowTabUITestSwitcherWindowTitleObservationPolicy {
+    static let openWindowMutationProjectionWatchdog: TimeInterval = 25
+}
+
 struct FlowTabUITestSwitcherWindowTitleSnapshot: Equatable {
     let cardCount: Int
     let titleCounts: [String: Int]
@@ -124,41 +128,51 @@ final class FlowTabUITestSwitcherWindowTitleObservationOwner {
 }
 
 extension FlowTabUITests {
-    func waitForSwitcherWindowCards(
+    func makeSwitcherWindowTitleObservation(
         in app: XCUIApplication,
-        expectedTitles: [String],
-        timeout: TimeInterval
-    ) -> Bool {
+        expectedTitles: [String]
+    ) -> FlowTabUITestSwitcherWindowTitleObservationOwner {
         let expectation =
             FlowTabUITestSwitcherWindowTitleExpectation(
                 titles: expectedTitles
             )
         let observedTitles = Set(expectedTitles)
-        let owner =
-            FlowTabUITestSwitcherWindowTitleObservationOwner(
-                expectation: expectation,
-                readback: {
-                    let cardQuery = app.descendants(matching: .any)
-                        .matching(
-                            NSPredicate(
-                                format: "identifier BEGINSWITH %@",
-                                "flowtab.switcher.window."
-                            )
+        return FlowTabUITestSwitcherWindowTitleObservationOwner(
+            expectation: expectation,
+            readback: {
+                let cardQuery = app.descendants(matching: .any)
+                    .matching(
+                        NSPredicate(
+                            format: "identifier BEGINSWITH %@",
+                            "flowtab.switcher.window."
                         )
-                    return FlowTabUITestSwitcherWindowTitleCountReadback(
-                        cardCount: { cardQuery.count },
-                        titleCount: { title in
-                            cardQuery.matching(
-                                NSPredicate(
-                                    format: "label == %@",
-                                    title
-                                )
-                            ).count
-                        }
-                    ).snapshot(
-                        observing: observedTitles
                     )
-                }
+                return FlowTabUITestSwitcherWindowTitleCountReadback(
+                    cardCount: { cardQuery.count },
+                    titleCount: { title in
+                        cardQuery.matching(
+                            NSPredicate(
+                                format: "label == %@",
+                                title
+                            )
+                        ).count
+                    }
+                ).snapshot(
+                    observing: observedTitles
+                )
+            }
+        )
+    }
+
+    func waitForSwitcherWindowCards(
+        in app: XCUIApplication,
+        expectedTitles: [String],
+        timeout: TimeInterval
+    ) -> Bool {
+        let owner =
+            makeSwitcherWindowTitleObservation(
+                in: app,
+                expectedTitles: expectedTitles
             )
         owner.start()
         defer { owner.cancel() }

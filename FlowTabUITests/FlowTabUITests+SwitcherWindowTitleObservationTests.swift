@@ -3,10 +3,128 @@ import XCTest
 
 private enum FlowTabUITestSwitcherWindowTitleTestPolicy {
     static let watchdog: TimeInterval = 0.01
+    static let eventWatchdog: TimeInterval = 1
+    static let queuePressureTurns = 100
     static let pressureIterations = 100
 }
 
 extension FlowTabUITests {
+    func testSwitcherWindowTitleOpenMutationWatchdogPolicyCompatibility() {
+        XCTAssertEqual(
+            FlowTabUITestSwitcherWindowTitleObservationPolicy
+                .openWindowMutationProjectionWatchdog,
+            25
+        )
+        XCTAssertTrue(
+            FlowTabUITestSwitcherWindowTitleObservationPolicy
+                .openWindowMutationProjectionWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSwitcherWindowTitleObservationPolicy
+                .openWindowMutationProjectionWatchdog,
+            0
+        )
+    }
+
+    func testSwitcherWindowTitleObserverStartsBeforeExplicitContractionTrigger() {
+        let expectation =
+            FlowTabUITestSwitcherWindowTitleExpectation(
+                titles: ["Primary"]
+            )
+        var snapshot = FlowTabUITestSwitcherWindowTitleSnapshot(
+            cardCount: 2,
+            titleCounts: ["Primary": 1, "Secondary": 1]
+        )
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var readbackCount = 0
+        var triggerCompleted = false
+        let owner =
+            FlowTabUITestSwitcherWindowTitleObservationOwner(
+                expectation: expectation,
+                observationRegistration: { callback in
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: {
+                    readbackCount += 1
+                    return snapshot
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertNil(owner.resolvedEvidence)
+        XCTAssertEqual(readbackCount, 1)
+        for _ in
+            0..<FlowTabUITestSwitcherWindowTitleTestPolicy
+                .queuePressureTurns
+        {
+            DispatchQueue.main.async {}
+        }
+        DispatchQueue.main.async {
+            triggerCompleted = true
+            snapshot = FlowTabUITestSwitcherWindowTitleSnapshot(
+                cardCount: 1,
+                titleCounts: ["Primary": 1]
+            )
+            scheduledReadback?(.scheduledReadback)
+        }
+
+        let evidence = owner.waitForResolution(
+            timeout:
+                FlowTabUITestSwitcherWindowTitleTestPolicy
+                    .eventWatchdog
+        )
+
+        XCTAssertTrue(triggerCompleted)
+        XCTAssertEqual(evidence?.source, .scheduledReadback)
+        XCTAssertEqual(evidence?.value, snapshot)
+        XCTAssertEqual(readbackCount, 2)
+    }
+
+    func testSwitcherWindowTitleOpenMutationWatchdogReportsPreTriggerBaseline() {
+        let owner =
+            FlowTabUITestSwitcherWindowTitleObservationOwner(
+                expectation:
+                    FlowTabUITestSwitcherWindowTitleExpectation(
+                        titles: ["Primary"]
+                    ),
+                observationRegistration: { _ in
+                    FlowTabUITestObservationCancellation {}
+                },
+                readback: {
+                    FlowTabUITestSwitcherWindowTitleSnapshot(
+                        cardCount: 2,
+                        titleCounts: [
+                            "Primary": 1,
+                            "Secondary": 1
+                        ]
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertNil(
+            owner.waitForResolution(
+                timeout:
+                    FlowTabUITestSwitcherWindowTitleTestPolicy
+                        .watchdog
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "expected{cardCount=1 titleCounts=Primary=1}"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "cardCount=2 titleCounts=Primary=1,Secondary=1"
+            )
+        )
+    }
+
     func testSwitcherWindowTitleCountReadbackRefreshesCollectionContractionEvidence() {
         var cardCount = 2
         var counts = [

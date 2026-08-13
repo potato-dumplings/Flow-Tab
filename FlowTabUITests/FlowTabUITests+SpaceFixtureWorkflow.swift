@@ -578,76 +578,6 @@ extension FlowTabUITests {
         }
     }
 
-    func testSwitcherPanelRefreshesOpenWindowLayerAfterRealFixtureWindowSetMutation() throws {
-        let identity = spaceFixtureAppIdentity
-
-        guard assertSpaceFixtureWorkflowPermissionsAvailable() else { return }
-
-        let fixtureApp = launchSpaceFixtureWorkflow(
-            identity: identity,
-            windowCount: 2,
-            fullscreenWindowIndex: nil,
-            titlePrefix: "Open Mutation",
-            enterFullscreenDelayMilliseconds: 0,
-            closeWindowIndex: 2,
-            closeWindowDelayMilliseconds: 15_000
-        )
-        let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
-        defer {
-            if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
-                terminateSpaceFixtureApplicationAndWait(fixtureApp, identity: identity)
-            }
-        }
-
-        let app = makeRealRuntimeFlowTabApp(
-            additionalArguments: [
-                "--flowtab-ui-open-switcher",
-                "--flowtab-ui-runtime-log-level",
-                "DEBUG",
-                "--flowtab-ui-enable-verbose-logs",
-                "--flowtab-ui-listen-switcher-trigger",
-                "-windowLayerAutoEnterDelay", "30.0"
-            ] + FlowTabUITestSwitcherCommandPayload.launchArguments
-        )
-        launchFlowTabUITestApplication(app)
-        defer {
-            if app.state == .runningForeground || app.state == .runningBackground {
-                app.terminate()
-            }
-        }
-
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
-
-        let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
-        XCTAssertTrue(fixtureAppTile.waitForExistence(timeout: 12))
-        selectSwitcherAppDirectly(
-            in: app,
-            appID: identity.bundleIdentifier,
-            traceLabel: "openWindowLayerMutation.selectApp",
-            timeout: 8
-        )
-
-        let allTitles = expectedSpaceFixtureWorkflowWindowTitles(titlePrefix: "Open Mutation", windowCount: 2)
-        app.activate()
-        assertSwitcherWindowCycle(in: app, timeout: 5) {
-            app.typeKey(.downArrow, modifierFlags: [])
-        }
-        _ = waitForSwitcherWindowCards(in: app, expectedTitles: allTitles, timeout: 8)
-
-        _ = waitForSwitcherWindowCards(
-            in: app,
-            expectedTitles: [allTitles[0]],
-            timeout: 25
-        )
-        waitForRuntimeLogFiles(
-            matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=(none|[0-9]+)"#,
-            since: mutationLogSnapshot,
-            timeout: 8,
-            description: "open Switcher window-layer mutation should flow through shared runtime AX destroyed reconciliation"
-        )
-        XCTAssertNotEqual(fixtureApp.state, .notRunning)
-    }
-
     func testSwitcherPanelKeepsWindowLayerWhenSelectedFixtureWindowCloses() throws {
         let identity = spaceFixtureAppIdentity
 
@@ -719,7 +649,7 @@ extension FlowTabUITests {
         XCTAssertNotEqual(fixtureApp.state, .notRunning)
     }
 
-    private func selectSwitcherAppDirectly(
+    func selectSwitcherAppDirectly(
         in app: XCUIApplication,
         appID: String,
         traceLabel: String,
