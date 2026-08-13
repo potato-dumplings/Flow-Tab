@@ -571,7 +571,7 @@ and Process/Tooling.
 | SYNC-036KL | Switcher multi-App workflows; exact initial App strip projection | Several paths independently wait for diagnostics and individual App rows (2/8 seconds), omitting exact logical counts and atomic all-App readiness. Evidence composition migration. | Reuse one parsed `apps + selected` Switcher readback inside a fixture owner that bookends all target-row reads. Require the selected workflow App's exact configured window count, zero session windows for every unselected workflow App, every exact logical App-row identity, and foreground state in one snapshot; normalize duplicate XCUITest representations by row identity. The explicit global-trigger path installs the owner first; launch-open paths accept exact initial state. One named watchdog covers all representative paths; each invocation owns cancellation. | H; exact multi-entry/selection/row/count/prefix/stale/cancel/watchdog/Pressure tests, affected signed multi-App Switcher UIs, Process/Tooling. | completed |
 | SYNC-036KM | `testSwitcherPanelPreviewCyclesThroughWorkflowAppsWithoutMixingWindowCards`; exact selected-App preview transition | Down is sent before constructing the selected-App preview owner, then a redundant eight-second title wait rechecks evidence in another snapshot. Evidence-order migration. | Start one candidate-bound preview owner before Down, gate acceptance until input returns, and require the exact selected and preview bundle identities plus exact title set and count atomically. Remove the second wait; the per-iteration invocation owns cancellation. | H; pretrigger-match rejection/exact candidate/duplicate/out-of-order/cancel/watchdog/Pressure tests, signed preview-cycle UI, Process/Tooling. | completed |
 | SYNC-036KN | `assertSwitcherPreviewWindowCards`; multi-App real card identity projection | The helper correctly installs an exact card owner before Down, while its default eight-second literal has no named owner. Retained watchdog. | Name the card-identity projection watchdog and retain exact titles, exclusions, and new identifiers as success. The helper cancels its owner and reports the final snapshot. | M; policy/identity/exclusion/cancel/watchdog tests, signed card-anchor UI, Process/Tooling. | completed |
-| SYNC-036KO | standard multi-App open-window mutation; explicit close and gated one-card projection | A 30-second fixture auto-close supplies orchestration slack and a 40-second projection wait infers completion. Evidence migration. | Install the typed close observer before fixture launch, configure zero delay with explicit trigger, prove exact scheduled PID/window topology, start the one-card owner before triggering, and accept only matching applied generation plus exact remaining projection. Owners are cancelled by the scenario. | H; typed close/order/identity/cancel/watchdog and projection Pressure tests, signed standard mutation UI, Process/Tooling. | planned |
+| SYNC-036KO | standard multi-App open-window mutation; explicit close and gated one-card projection | A 30-second fixture auto-close supplies orchestration slack and a 40-second projection wait infers completion. Evidence migration. | Install the typed close observer before fixture launch, configure zero delay with explicit trigger, prove exact scheduled PID/window topology, start the one-card owner before triggering, and accept only matching applied generation plus exact remaining projection. Owners are cancelled by the scenario. | H; typed close/order/identity/cancel/watchdog and projection Pressure tests, signed standard mutation UI, Process/Tooling. | completed |
 | SYNC-036KP | standard multi-App open-window mutation; exact runtime AX-destroyed reconciliation | A prelaunch log snapshot and post-projection raw eight-second substring wait can accept a different fixture/window record. Evidence refinement. | Start an exact runtime-log owner immediately before the close and require the target bundle, scheduled PID, target AX/CG identity, and post-trigger delivery. Name the terminal bound; the scenario cancels the owner. | H; exact PID/window/event/cancel/watchdog tests, signed standard mutation UI, Process/Tooling. | planned |
 | SYNC-036KQ | fullscreen multi-App target-window mutation; explicit close and gated projection | A 30-second auto-close and 45-second projection wait substitute elapsed time for exact fullscreen-window completion. Evidence migration. | Use the typed close route before launch, explicit zero-delay trigger, exact fullscreen target number/index/PID, matching applied generation, and preinstalled exact remaining-card projection. The scenario owns both cancellations. | H; typed fullscreen identity/order/cancel/watchdog and projection Pressure tests, signed fullscreen mutation UI, Process/Tooling. | planned |
 | SYNC-036KR | fullscreen multi-App mutation; exact runtime reconciliation | A broad prelaunch baseline and raw eight-second substring wait do not bind destruction to the exact fullscreen target. Evidence refinement. | Observe before explicit close and require exact bundle/PID/AX or CG target identity in one post-trigger reconciliation record. Name the watchdog and cancel with the scenario. | H; exact target/event/cancel/watchdog tests, signed fullscreen mutation UI, Process/Tooling. | planned |
@@ -28233,6 +28233,89 @@ polling cadence, deadline, or timeout in the scoped paths.
   absence and worktree-baseline checks.
 - Commit subject:
   `test(sync): migrate SYNC-036KN card identity watchdog`.
+
+### SYNC-036KO Closure Record
+
+- Status and Oracle: completed. The standard multi-App open-window mutation
+  now launches the Chrome-style fixture with zero configured close delay and
+  an explicit typed trigger. Scheduled evidence binds the exact fixture bundle,
+  running PID, request generation, target plan index `2`, positive AppKit
+  window number, visible target state, and plan topology `[1, 2]`. Applied
+  evidence must preserve that identity, generation, index, and window number
+  while reading back target visibility and CG on-screen state as false and the
+  remaining plan topology as `[1]`. The downstream projection then resolves
+  only from one exact remaining title with cardinality one.
+- Evidence ordering and lifecycle: the scenario constructs and starts one
+  `SpaceFixtureWindowCloseFaultObservationOwner` before any workflow fixture
+  launches. After the exact scheduled topology and initial three-App strip are
+  established, it enters the target preview, starts one
+  `FlowTabUITestSwitcherWindowTitleObservationOwner`, and proves the matching
+  one-card snapshot remains gated. It publishes the typed close trigger, waits
+  for the matching applied generation, opens projection acceptance, and
+  requests an immediate `triggerReadback`. Scenario `defer` blocks cancel both
+  owners on every return; their generation guards reject queued work after
+  cancellation or resolution. CG on-screen membership at scheduling time is a
+  contextual background-App observation, while the stable AppKit window
+  identity and coordinator plan membership provide the exact pre-trigger
+  topology.
+- Retained time: `scheduledEvidenceWatchdog` at eight seconds,
+  `appliedEvidenceWatchdog` at 15 seconds, and the new
+  `multiAppOpenWindowMutationProjectionWatchdog` at 40 seconds are terminal
+  failure bounds with last-observation diagnostics. Elapsed time never resolves
+  their owners. AppKit and Core Graphics expose no close-completion callback for
+  this fixture boundary, so the fixture-owned immediate readback, named
+  50-millisecond cancellable retry cadence, and ten-second watchdog remain the
+  platform fallback; success comes only from the exact topology readback. The
+  `windowLayerAutoEnterDelay` value of 30 seconds remains a product test
+  configuration that reserves manual preview entry and supplies no completion
+  evidence. The downstream raw eight-second runtime-log wait remains assigned
+  to SYNC-036KP, and the fullscreen 30-second close configuration remains
+  assigned to SYNC-036KQ.
+- Deterministic and Pressure validation: the canonical final signed Runner
+  passed 18/18 selected checks with zero failures in 2.868 seconds under
+  `.build-local/sync-036ko-deterministic-final`. The set covers scheduled and
+  applied initial evidence, matching generation, queued and out-of-order
+  delivery, cancellation, stale-generation watchdog diagnostics, named-policy
+  compatibility, 200 cancelled scheduled generations, 200 applied-generation
+  filters, 100 pre-trigger matching projections, and 100 independently
+  resolved and cancelled title-owner lifetimes.
+- Affected UI: an initial diagnostic run expired in the previously completed
+  SYNC-036KL App-strip prerequisite before consuming KO scheduled evidence,
+  publishing the close trigger, or constructing the one-card projection owner;
+  its final snapshot retained all three exact rows and runtime counts `2/2/2`,
+  followed by clean teardown. A fresh topology reached the KO scheduled
+  evidence and established that the background target's CG on-screen flag is
+  contextual while its AppKit identity remains visible and present in `[1, 2]`.
+  The final rebuilt signed path then passed 1/1 with zero failures in 21.619
+  seconds under `.build-local/sync-036ko-ui-v3`, including matching applied
+  generation and exact one-card projection.
+- Validation scope: FlowTabCore Unit, app Unit/Behavior, FlowTabTests, unrelated
+  UI, and production process Pressure are not relevant because this slice
+  changes only UI-test orchestration, watchdog ownership, and a cohesive test
+  file placement while reusing already validated typed fixture infrastructure.
+  Production behavior, fixture behavior, configuration compatibility, window
+  identity semantics, module direction, path intent, and recurring product work
+  remain unchanged.
+- Signing and Process/Tooling: the canonical installer refreshed the fixed App,
+  and the canonical six-target UI build, deterministic run, lifecycle Pressure,
+  and affected UI run completed. Sandbox-external strict deep verification
+  accepts the App and Runner under Team `96PUA726W9` with CDHashes
+  `9b5e6050c1aacf2584da7ee0d924da4ccb21449d` and
+  `d859cbe4b691963c39a7f835c9322979953fd709`; executable SHA-256 values are
+  `132276b271203dffefaa8724adea1a7e7b4f1ec7ea0e774e254c44dc46916dc4`
+  and `1529772e04bb019e756f79c51f23c766d5207a859217da66af3b9b959ec0fab7`.
+  Swift parsing, project plist lint, scoped duration inventory, and
+  `git diff --check` pass. The multi-App workflow, open-window mutation owner,
+  title observer, and its deterministic tests contain 714, 512, 213, and 456
+  lines with clear single responsibilities. Exact App/Runner/fixture and
+  repository-scoped xcodebuild process readbacks are empty.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. Installer, deterministic,
+  diagnostic, and successful UI evidence roots are removed after this durable
+  record and independent commit, followed by exact absence and
+  worktree-baseline checks.
+- Commit subject:
+  `test(sync): migrate SYNC-036KO explicit window close`.
 
 ### SYNC-001 Authorized Resume Closure Record
 

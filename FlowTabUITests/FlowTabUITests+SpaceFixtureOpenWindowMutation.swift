@@ -303,4 +303,210 @@ extension FlowTabUITests {
         }
         XCTAssertNotEqual(fixtureApp.state, .notRunning)
     }
+
+    func testSwitcherPanelRefreshesOpenWorkflowAppWindowLayerAfterMultiAppWindowSetMutation() throws {
+        let workflow = try configuredSwitcherSpaceFixtureWorkflow()
+        let targetApp = try XCTUnwrap(
+            workflow.apps.first { $0.appID == "chrome" },
+            "Switcher workflow must include the Chrome-style fixture app for multi-app mutation proof"
+        )
+        let remainingTitles = Array(
+            targetApp.expectedWindowTitles.prefix(1)
+        )
+        XCTAssertEqual(targetApp.expectedWindowTitles.count, 2)
+        XCTAssertEqual(remainingTitles.count, 1)
+
+        let windowCloseRoute =
+            makeSpaceFixtureWindowCloseFaultRoute()
+        let windowCloseObservation =
+            SpaceFixtureWindowCloseFaultObservationOwner(
+                route: windowCloseRoute
+            )
+        windowCloseObservation.start()
+        defer { windowCloseObservation.cancel() }
+
+        try runRealSpaceFixtureWorkflow(
+            workflow,
+            flowTabAdditionalArguments: [
+                "--flowtab-ui-open-switcher",
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs",
+                "--flowtab-ui-listen-switcher-trigger",
+                "-windowLayerAutoEnterDelay", "30.0"
+            ] + FlowTabUITestSwitcherCommandPayload.launchArguments,
+            workflowAppLaunchArguments: { workflowApp in
+                guard workflowApp.appID == targetApp.appID else {
+                    return []
+                }
+                return [
+                    "--close-window-index", "2",
+                    "--close-window-delay-ms", "0"
+                ] + windowCloseRoute.fixtureLaunchArguments
+            }
+        ) { workflow, app in
+            let diagnosticsSummary = element(
+                in: app,
+                identifier: Identifier.switcherSummary
+            )
+            guard waitForSpaceFixtureSwitcherAppStripProjection(
+                workflow,
+                in: app
+            ) != nil else { return }
+            guard let scheduledClose =
+                    windowCloseObservation.waitForScheduled(
+                        timeout:
+                            SpaceFixtureWindowCloseFaultObservationPolicy
+                                .scheduledEvidenceWatchdog
+                    )
+            else {
+                XCTFail(
+                    "Missing scheduled multi-App Open Mutation close evidence: "
+                        + windowCloseObservation.diagnosticSummary
+                )
+                return
+            }
+
+            let targetProcessIdentifier =
+                try runningWorkflowApplicationProcessIdentifier(
+                    targetApp
+                )
+            XCTAssertEqual(scheduledClose.delayMilliseconds, 0)
+            XCTAssertTrue(scheduledClose.awaitsExplicitTrigger)
+            XCTAssertEqual(
+                scheduledClose.identity.bundleIdentifier,
+                targetApp.identity.bundleIdentifier
+            )
+            XCTAssertEqual(
+                scheduledClose.identity.processIdentifier,
+                targetProcessIdentifier
+            )
+            XCTAssertEqual(
+                scheduledClose.snapshot.targetWindowPlanIndex,
+                2
+            )
+            XCTAssertGreaterThan(
+                scheduledClose.snapshot.targetWindowNumber,
+                0
+            )
+            XCTAssertTrue(
+                scheduledClose.snapshot.targetWindowIsVisible
+            )
+            XCTAssertEqual(
+                scheduledClose.snapshot.remainingWindowPlanIndices,
+                [1, 2]
+            )
+
+            let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
+            selectSwitcherWorkflowApp(
+                targetApp,
+                in: app,
+                diagnosticsSummary: diagnosticsSummary
+            )
+            app.activate()
+            guard enterSwitcherPreview(
+                targetApp,
+                in: app,
+                diagnostics: diagnosticsSummary,
+                allowsNoisyCGSiblings: false
+            ) else { return }
+
+            var acceptsPostCloseProjection = false
+            let postCloseCards =
+                makeSwitcherWindowTitleObservation(
+                    in: app,
+                    expectedTitles: remainingTitles,
+                    acceptsResolution: {
+                        acceptsPostCloseProjection
+                    }
+                )
+            postCloseCards.start()
+            defer { postCloseCards.cancel() }
+            XCTAssertNil(postCloseCards.resolvedEvidence)
+
+            windowCloseObservation.requestClose(
+                from: scheduledClose
+            )
+            guard let appliedClose =
+                    windowCloseObservation.waitForApplied(
+                        requestGeneration:
+                            scheduledClose.requestGeneration,
+                        timeout:
+                            SpaceFixtureWindowCloseFaultObservationPolicy
+                                .appliedEvidenceWatchdog
+                    )
+            else {
+                XCTFail(
+                    "Missing applied multi-App Open Mutation close evidence: "
+                        + windowCloseObservation.diagnosticSummary
+                )
+                return
+            }
+            XCTAssertEqual(
+                appliedClose.identity,
+                scheduledClose.identity
+            )
+            XCTAssertEqual(
+                appliedClose.requestGeneration,
+                scheduledClose.requestGeneration
+            )
+            XCTAssertEqual(
+                appliedClose.snapshot.targetWindowPlanIndex,
+                2
+            )
+            XCTAssertEqual(
+                appliedClose.snapshot.targetWindowNumber,
+                scheduledClose.snapshot.targetWindowNumber
+            )
+            XCTAssertFalse(
+                appliedClose.snapshot.targetWindowIsVisible
+            )
+            XCTAssertFalse(
+                appliedClose.snapshot.targetCGWindowIsOnScreen
+            )
+            XCTAssertEqual(
+                appliedClose.snapshot.remainingWindowPlanIndices,
+                [1]
+            )
+
+            acceptsPostCloseProjection = true
+            postCloseCards.requestReadback(
+                source: .triggerReadback
+            )
+            guard let projectionEvidence =
+                    postCloseCards.waitForResolution(
+                        timeout:
+                            FlowTabUITestSwitcherWindowTitleObservationPolicy
+                                .multiAppOpenWindowMutationProjectionWatchdog
+                    )
+            else {
+                XCTFail(
+                    "Multi-App Open Mutation Window-card projection watchdog expired. "
+                        + postCloseCards.diagnosticSummary
+                )
+                return
+            }
+            XCTAssertEqual(projectionEvidence.value.cardCount, 1)
+            XCTAssertEqual(
+                projectionEvidence.value.titleCounts,
+                [remainingTitles[0]: 1]
+            )
+            guard requireActiveSwitcherPreview(
+                targetApp,
+                diagnostics: diagnosticsSummary
+            ) else { return }
+            waitForRuntimeLogFiles(
+                containing: [
+                    "runtimeAXDestroyed appID=\(targetApp.identity.bundleIdentifier)",
+                    "affectedCGWindowID="
+                ],
+                since: mutationLogSnapshot,
+                timeout: 8
+            )
+            assertWorkflowApplicationProcessRemainsRunning(
+                targetApp,
+                processIdentifier: targetProcessIdentifier
+            )
+        }
+    }
 }
