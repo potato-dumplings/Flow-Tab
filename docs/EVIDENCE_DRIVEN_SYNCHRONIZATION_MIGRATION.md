@@ -561,7 +561,7 @@ and Process/Tooling.
 | SYNC-036KB | Edge Inputs preview scenarios; exact initial duplicate-window App projection | Each path waits eight seconds for generic diagnostics, then ten seconds for one App row, without atomically proving the exact two-window logical entry. Evidence composition migration. | Reuse the Switcher App-projection owner for exact `bundleID:2` plus exact row identity and foreground state before selection. A named Edge projection watchdog is failure-only; the invocation owns the cancellable cadence. | M; exact entry/row/initial/delayed/cancel/watchdog tests, both signed Edge preview UIs, Process/Tooling. | completed |
 | SYNC-036KC | `selectEdgeWorkflowAppInSwitcherAppLayer`; exact Edge App-selection application | The helper writes its payload before installing a selected-field observer and accepts a state that may already match. Evidence-order migration. | Install the combined runtime-log/diagnostics App-selection owner before payload publication; require the exact applied-command record, selected bundle, and exact two-window App projection. The helper owns baseline, cadence, cancellation, and diagnostics. | H; stale-baseline/event/slow-scheduling/cancel/watchdog/Pressure tests, both signed Edge preview UIs, Process/Tooling. | planned |
 | SYNC-036KD | Edge Inputs preview scenarios and `performAndWaitForSwitcherWindowCards`; exact duplicate-title Window projection | The owner is installed before Down and succeeds from exact title multiplicity/card identities, while callers retain an anonymous eight-second terminal bound. Retained watchdog. | Name the Edge card-projection watchdog and retain exact multiplicity plus distinct identifiers as the Oracle. The invocation owns observer/cadence cancellation and terminal diagnostics. | M; policy/multiplicity/duplicate-ID/cancel/watchdog tests, both signed Edge preview UIs, Process/Tooling. | planned |
-| SYNC-036KE | duplicate-title Edge preview; focused public-state tie-break publication | A raw eight-second regex wait starts from a prelaunch baseline and proves a log marker, while policy ownership and exact bundle/PID diagnostics are implicit. Retained-watchdog plus evidence refinement. | Start the runtime-log owner before fixture launch, require one post-baseline focused public-state tie-break record for the exact fixture PID, and name the terminal bound. The scenario owns baseline/owner cancellation. | H; exact regex/event/file replacement/cancel/watchdog tests, signed duplicate-title UI, Process/Tooling. | planned |
+| SYNC-036KE | duplicate-title Edge preview; focused public-state identity publication | A raw eight-second regex wait starts from a prelaunch baseline and requires one internal first-assignment branch. A prior exact public binding can legitimately make later readbacks sticky, so scheduling changes the log shape and the test result. Evidence refinement plus retained watchdog. | Start one typed runtime-log owner before fixture launch and bind the exact bundle-derived PID when fixture readiness is available. Accept either one exact focused public-state tie-break or one snapshot joining the same focused PID/AX/CG topology with a `publicExactMatch` binding transition; both prove the intended distinct identity. Name the terminal bound, perform immediate post-bind readback, and let the scenario own baseline/owner cancellation. | H; exact parser/source/PID/initial/event/file-replacement/slow-scheduling/cancel/watchdog/Pressure tests, signed duplicate-title UI across both evidence shapes, Process/Tooling. | completed |
 | SYNC-036KF | minimized Edge preview; minimized AX source-to-window-layer propagation | Two sequential raw eight-second log waits separately observe source topology and output projection and can succeed from unrelated records. Evidence composition migration. | One prelaunch runtime-log owner requires both exact-PID minimized source evidence and its minimized WindowRecord projection after the preview trigger. File events drive readback; a named watchdog reports both missing stages. The scenario owns cancellation. | H; initial/ordered-or-duplicate events/wrong-PID/cancel/watchdog/slow-scheduling tests, signed minimized UI, Process/Tooling. | planned |
 | SYNC-036KG | Edge Window Search scenarios and `performAndWaitForSwitcherSearchWindowIdentifiers`; committed result projection | Both observer-before-typing paths already require exact scope/query/count/identity evidence, while callers supply anonymous eight-second bounds. Retained watchdog. | Name one Edge committed-result watchdog under the Search projection owner and preserve atomic scope/query/result identities as success. Each invocation cancels its owner/cadence. | M; policy/exact query/count/identifier/cancel/watchdog tests, both signed Edge Search UIs, Process/Tooling. | planned |
 | SYNC-036KH | Edge-title Search confirmation; exact CG window activation | The activation owner is installed before confirmation and accepts exact bundle/window-number readback, while a raw ten-second bound lacks scenario policy ownership. Retained watchdog. | Name the Edge exact-window activation watchdog under the workflow-window owner; keep workspace/AX events plus cancellable fallback and exact frontmost readback as the Oracle. | M; policy/exact/wrong-window/cancel/watchdog tests, signed edge-title activation UI, Process/Tooling. | planned |
@@ -27451,6 +27451,73 @@ polling cadence, deadline, or timeout in the scoped paths.
   exact absence and worktree-baseline checks.
 - Commit subject:
   `refactor(sync): migrate SYNC-036KB exact Edge App projection`.
+
+### SYNC-036KE Closure Record
+
+- Status and Oracle: completed. The duplicate-title Edge scenario now starts a
+  typed focused-public-state owner before any fixture process launches. Once
+  fixture readiness supplies the exact Chrome bundle PID, success requires
+  either an exact `state=focused` tie-break with at least two AX and CG
+  candidates, or one snapshot joining the same PID/AX/CG focused topology with
+  a `none->publicExactMatch` or
+  `publicExactMatch->stickyBinding` transition and no verified-focus fallback.
+  The two distinct card identifiers and exact duplicate title multiplicity
+  remain the independent visible Oracle.
+- Evidence diagnosis: a pre-migration signed run reproduced the defect 1/1 in
+  21.803 seconds. Its exact App projection, selection, and cards completed,
+  while the raw regex expired after the target had already reached a valid
+  sticky binding. The target PID `19246` exposed focused AX
+  `ax:19246:0` mapped to CG `96706` through
+  `publicExactMatch->stickyBinding`, which the former branch-specific Oracle
+  discarded.
+- Observation lifecycle: the test owns the runtime-log baseline and typed
+  owner. Registration and initial readback occur before fixture launch. PID
+  binding performs an immediate trigger readback, so evidence already written
+  during launch is retained; later file events and serialized readbacks cover
+  replacement and append races. Resolution stops observation inputs, and both
+  owner and baseline are cancelled idempotently on every exit.
+- Retained time: eight seconds is named `evidenceWatchdog` under
+  `SpaceFixtureFocusedPublicStateObservationPolicy` and solely bounds missing
+  exact evidence. The inherited 200-millisecond `readbackCadence` is an
+  immediately-checking, cancellable fallback owned by the runtime-log
+  registration; only parsed PID/AX/CG evidence can establish success.
+- Deterministic and Pressure validation: the final canonical rebuilt signed
+  Runner passed the eight selected checks 8/8 in 1.403 seconds. They cover both
+  accepted sources, exact parser rejection, exact PID filtering, evidence
+  present before PID binding, log-file replacement, delayed event delivery,
+  cancellation, final-evidence watchdog diagnostics including exact bundle
+  and PID, and 200 cancelled/restarted generations. The stale-callback
+  Pressure passed in 0.188 seconds.
+- Affected UI: the migrated owner passed the signed real fixture path twice
+  under both observed runtime shapes. PID `19889` resolved focused AX
+  `ax:19889:0` to CG `96785` through the reusable public-exact binding path and
+  the UI passed 1/1 in 13.647 seconds. A second run resolved PID `20224`, AX
+  `ax:20224:0`, and CG `96864` through the focused tie-break path and passed
+  1/1 in 13.279 seconds. The final tightened parser run published both the
+  focused tie-break and exact public binding for PID `20658`, AX `ax:20658:0`,
+  and CG `96943`; it passed 1/1 in 12.538 seconds with the two `Shared Docs`
+  cards retaining distinct CG identities `96943` and `96944`.
+- Validation scope: FlowTabCore Unit, app Unit/Behavior, FlowTabTests,
+  unrelated UI, and production Pressure are not relevant because production
+  mapping and logging behavior are unchanged. This slice changes only the
+  UI-test evidence parser, observation lifecycle, and affected real-topology
+  assertion while preserving configuration, window identity, module
+  direction, path intent, and recurring product work.
+- Signing and Process/Tooling: the canonical six-target test build and
+  fixed-App install completed successfully. Sandbox-external strict deep
+  verification accepts the final App and Runner under Team `96PUA726W9`;
+  their CDHashes are `78a55012be48b3e401ae8351413f5c29e4b611f5` and
+  `f5752fb3b400213ed8ac5924ea5b7f8adf5291ee`. Swift parsing, project-file
+  lint, and `git diff --check` pass. The typed owner, its tests, and affected
+  workflow remain within the repository file-size guardrails with clear
+  single responsibilities. Exact App/Runner/fixture and repository-scoped
+  xcodebuild process readbacks are empty.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. The reproducible UI result bundle
+  is removed after this durable record and independent commit, followed by
+  exact absence and worktree-baseline checks.
+- Commit subject:
+  `refactor(sync): migrate SYNC-036KE focused public-state evidence`.
 
 ### SYNC-001 Authorized Resume Closure Record
 

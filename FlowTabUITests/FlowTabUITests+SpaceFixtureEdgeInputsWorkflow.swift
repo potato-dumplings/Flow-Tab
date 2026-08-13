@@ -23,13 +23,24 @@ private enum SpaceFixtureEdgeInputsWorkflowDefaults {
 extension FlowTabUITests {
     func testSwitcherPanelPreviewKeepsIdenticalRealWorkflowWindowsDistinct() throws {
         let workflow = try configuredSwitcherEdgeInputsWorkflow()
-        let logSnapshot = makeRuntimeLogFileSnapshot()
         let targetApp = try XCTUnwrap(
             workflow.apps.first {
                 $0.expectedWindowTitles.filter { $0 == SpaceFixtureEdgeInputsWorkflowDefaults.sharedWindowTitle }.count == 2
             },
             "Edge workflow must include one app with duplicate same-title windows."
         )
+        let logBaseline = makeRuntimeLogFileSnapshot()
+        let focusedPublicState =
+            SpaceFixtureFocusedPublicStateObservationOwner(
+                bundleIdentifier:
+                    targetApp.identity.bundleIdentifier,
+                baseline: logBaseline
+            )
+        focusedPublicState.start()
+        defer {
+            focusedPublicState.cancel()
+            logBaseline.cancel()
+        }
 
         try runRealSpaceFixtureEdgeInputsWorkflow(
             workflow,
@@ -40,7 +51,13 @@ extension FlowTabUITests {
                 "--flowtab-ui-open-switcher",
                 "--flowtab-ui-listen-switcher-trigger"
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
-        ) { workflow, app in
+        ) { _, app in
+            let targetPID = try targetProcessIdentifier(
+                for: targetApp
+            )
+            focusedPublicState.bindTarget(
+                processIdentifier: targetPID
+            )
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
             guard assertCurrentSwitcherAppProjection(
                 in: app,
@@ -68,13 +85,17 @@ extension FlowTabUITests {
             XCTAssertEqual(cards.count, targetApp.expectedWindowTitles.count)
             XCTAssertEqual(Set(cards.map(\.identifier)).count, cards.count)
             XCTAssertEqual(edgeTitleCounts(cards.map(\.title)), edgeTitleCounts(targetApp.expectedWindowTitles))
-            let targetPID = try targetProcessIdentifier(for: targetApp)
-            waitForRuntimeLogFiles(
-                matching: #"binding-assignment public-state-tiebreak state=focused ax=ax:\#(targetPID):[0-9]+ cg=[0-9]+ axCandidates=[2-9][0-9]* cgCandidates=[2-9][0-9]*"#,
-                since: logSnapshot,
-                timeout: 8,
-                description: "real edge workflow resolves identical AX/CG candidates through the target app's focused public AX state"
-            )
+            guard focusedPublicState.waitForResolution(
+                timeout:
+                    SpaceFixtureFocusedPublicStateObservationPolicy
+                        .evidenceWatchdog
+            ) != nil else {
+                XCTFail(
+                    "Focused public-state evidence watchdog expired. "
+                        + focusedPublicState.diagnosticSummary
+                )
+                return
+            }
         }
     }
 
