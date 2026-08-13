@@ -393,6 +393,11 @@
 		FDD100043D2A000100B0D737 /* FlowTabTests+SettingsAppVisibilityNavigationAnimationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDD100033D2A000100B0D737 /* FlowTabTests+SettingsAppVisibilityNavigationAnimationPolicy.swift */; };
 		FED100023D2B000100B0D737 /* PanelPresentationDiagnosticProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = FED100013D2B000100B0D737 /* PanelPresentationDiagnosticProbe.swift */; };
 		FED100043D2B000100B0D737 /* FlowTabTests+PanelPresentationDiagnosticProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = FED100033D2B000100B0D737 /* FlowTabTests+PanelPresentationDiagnosticProbe.swift */; };
+		A2E200023D2C000100B0D737 /* ManualWindowLayerEntryObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E200013D2C000100B0D737 /* ManualWindowLayerEntryObservation.swift */; };
+		A2E200043D2C000100B0D737 /* SwitcherPanelController+ManualWindowLayerEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E200033D2C000100B0D737 /* SwitcherPanelController+ManualWindowLayerEntry.swift */; };
+		A2E200063D2C000100B0D737 /* FlowTabTests+ManualWindowLayerEntryObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E200053D2C000100B0D737 /* FlowTabTests+ManualWindowLayerEntryObservation.swift */; };
+		A2E200083D2C000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerReadiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E200073D2C000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerReadiness.swift */; };
+		A2E2000A3D2C000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerProjectionRefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E200093D2C000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerProjectionRefresh.swift */; };
 		D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000022FF500100B0D737 /* RuntimeProjectionService.swift */; };
 		A0361F043E01000100B0D737 /* RuntimeProjectionService+ProjectionReads.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0361F033E01000100B0D737 /* RuntimeProjectionService+ProjectionReads.swift */; };
 		D10000032FF500200B0D737 /* RuntimeProjectionServing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000042FF500200B0D737 /* RuntimeProjectionServing.swift */; };
@@ -777,6 +782,11 @@
 		FDD100033D2A000100B0D737 /* FlowTabTests+SettingsAppVisibilityNavigationAnimationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SettingsAppVisibilityNavigationAnimationPolicy.swift"; sourceTree = "<group>"; };
 		FED100013D2B000100B0D737 /* PanelPresentationDiagnosticProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelPresentationDiagnosticProbe.swift; sourceTree = "<group>"; };
 		FED100033D2B000100B0D737 /* FlowTabTests+PanelPresentationDiagnosticProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+PanelPresentationDiagnosticProbe.swift"; sourceTree = "<group>"; };
+		A2E200013D2C000100B0D737 /* ManualWindowLayerEntryObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualWindowLayerEntryObservation.swift; sourceTree = "<group>"; };
+		A2E200033D2C000100B0D737 /* SwitcherPanelController+ManualWindowLayerEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+ManualWindowLayerEntry.swift"; sourceTree = "<group>"; };
+		A2E200053D2C000100B0D737 /* FlowTabTests+ManualWindowLayerEntryObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+ManualWindowLayerEntryObservation.swift"; sourceTree = "<group>"; };
+		A2E200073D2C000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+ManualWindowLayerReadiness.swift"; sourceTree = "<group>"; };
+		A2E200093D2C000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerProjectionRefresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+ManualWindowLayerProjectionRefresh.swift"; sourceTree = "<group>"; };
 		F6E7E20135C4000100B0D737 /* RuntimeSearchIndexReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSearchIndexReadModel.swift; sourceTree = "<group>"; };
 		F6E7E30135C4000200B0D737 /* RuntimeProjectionReadModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionReadModels.swift; sourceTree = "<group>"; };
 		D10000022FF500100B0D737 /* RuntimeProjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionService.swift; sourceTree = "<group>"; };
@@ -1358,6 +1368,9 @@
 				F8D100093D25000100B0D737 /* FlowTabTests+DelayedWindowLayerEntryObservation.swift */,
 				F8D1000B3D25000100B0D737 /* FlowTabPriorityCoverageTests+DelayedWindowLayerEntry.swift */,
 				F8D100073D25000100B0D737 /* DelayedWindowLayerEntryTestSupport.swift */,
+				A2E200053D2C000100B0D737 /* FlowTabTests+ManualWindowLayerEntryObservation.swift */,
+				A2E200073D2C000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerReadiness.swift */,
+				A2E200093D2C000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerProjectionRefresh.swift */,
 				F9D100033D26000100B0D737 /* FlowTabTests+TerminatePressFeedbackCompletion.swift */,
 				FAD100033D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealObservation.swift */,
 				FAD100053D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift */,
@@ -1774,6 +1787,8 @@
 				F7D1000D3D24000100B0D737 /* TerminateInterruptionProtectionObservation+Evidence.swift */,
 				F8D100013D25000100B0D737 /* DelayedWindowLayerEntryObservation+Scheduling.swift */,
 				F8D100033D25000100B0D737 /* DelayedWindowLayerEntryObservation.swift */,
+				A2E200013D2C000100B0D737 /* ManualWindowLayerEntryObservation.swift */,
+				A2E200033D2C000100B0D737 /* SwitcherPanelController+ManualWindowLayerEntry.swift */,
 				F9D100013D26000100B0D737 /* TerminatePressFeedbackCompletion.swift */,
 				FAD100013D27000100B0D737 /* InitialWindowOnlyPreviewRevealObservation.swift */,
 				FBD100013D28000100B0D737 /* SwitcherAppRemovalAnimationPolicy.swift */,
@@ -2405,6 +2420,8 @@
 				F8D100023D25000100B0D737 /* DelayedWindowLayerEntryObservation+Scheduling.swift in Sources */,
 				F8D100043D25000100B0D737 /* DelayedWindowLayerEntryObservation.swift in Sources */,
 				F8D100063D25000100B0D737 /* SwitcherPanelController+DelayedWindowLayerEntry.swift in Sources */,
+				A2E200023D2C000100B0D737 /* ManualWindowLayerEntryObservation.swift in Sources */,
+				A2E200043D2C000100B0D737 /* SwitcherPanelController+ManualWindowLayerEntry.swift in Sources */,
 				F9D100023D26000100B0D737 /* TerminatePressFeedbackCompletion.swift in Sources */,
 				FAD100023D27000100B0D737 /* InitialWindowOnlyPreviewRevealObservation.swift in Sources */,
 				FBD100023D28000100B0D737 /* SwitcherAppRemovalAnimationPolicy.swift in Sources */,
@@ -2484,6 +2501,9 @@
 				F8D1000A3D25000100B0D737 /* FlowTabTests+DelayedWindowLayerEntryObservation.swift in Sources */,
 				F8D1000C3D25000100B0D737 /* FlowTabPriorityCoverageTests+DelayedWindowLayerEntry.swift in Sources */,
 				F8D100083D25000100B0D737 /* DelayedWindowLayerEntryTestSupport.swift in Sources */,
+				A2E200063D2C000100B0D737 /* FlowTabTests+ManualWindowLayerEntryObservation.swift in Sources */,
+				A2E200083D2C000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerReadiness.swift in Sources */,
+				A2E2000A3D2C000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerProjectionRefresh.swift in Sources */,
 				F9D100043D26000100B0D737 /* FlowTabTests+TerminatePressFeedbackCompletion.swift in Sources */,
 				FAD100043D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealObservation.swift in Sources */,
 				FAD100063D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift in Sources */,

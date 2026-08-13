@@ -81,6 +81,7 @@ extension SwitcherPanelController {
             self.globalMouseMovedMonitor = nil
         }
         clearDelayedWindowLayerEntryState()
+        cancelManualWindowLayerEntryObservation()
     }
 
     func handleKeyDown(_ event: NSEvent) -> Bool {
@@ -150,6 +151,7 @@ extension SwitcherPanelController {
             of: .application(appID: appID),
             currentLocation: currentLocation
         ) else { return }
+        cancelManualWindowLayerEntryObservation()
         guard model.selectAppFromPointer(appID: appID) else { return }
         updatePanelSize()
         scheduleDelayedWindowLayerEntryIfNeeded()
@@ -160,6 +162,7 @@ extension SwitcherPanelController {
             of: .window(appID: appID, windowID: windowID),
             currentLocation: currentLocation
         ) else { return }
+        cancelManualWindowLayerEntryObservation()
         guard model.selectWindowFromPointer(appID: appID, windowID: windowID) else { return }
         updatePanelSize()
     }
@@ -495,9 +498,23 @@ extension SwitcherPanelController {
     }
 
     @discardableResult
-    func handleCurrentAppWindowProjectionDidUpdate(appID: String?) -> Bool {
+    func handleCurrentAppWindowProjectionDidUpdate(
+        appID: String?,
+        evidence: RuntimeCurrentAppWindowProjectionUpdateEvidence? = nil
+    ) -> Bool {
         guard isPanelPresented else { return false }
-        guard model.handleCurrentAppWindowProjectionDidUpdate(appID: appID) else { return false }
+        let manualEntrySettled =
+            observeManualWindowLayerProjectionUpdate(
+                appID: appID,
+                evidence: evidence
+            )
+        let projectionApplied =
+            model.handleCurrentAppWindowProjectionDidUpdate(
+                appID: appID
+            )
+        guard manualEntrySettled || projectionApplied else {
+            return false
+        }
         observeDelayedWindowLayerProjectionUpdate(
             source: .currentAppWindowProjectionUpdated,
             appID: appID

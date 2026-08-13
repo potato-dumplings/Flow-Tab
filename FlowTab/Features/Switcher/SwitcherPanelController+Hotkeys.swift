@@ -237,6 +237,11 @@ extension SwitcherPanelController {
         }
 
         cancelPendingModifierReleaseConfirmation()
+        if keyInput == .downArrow,
+           beginManualWindowLayerEntryIfNeeded() {
+            return
+        }
+        cancelManualWindowLayerEntryObservation()
         model.handle(keyInput)
         resetPointerSelectionGate()
         RuntimeLog.debug(.session, "advance key=\(keyInput.debugName) \(self.model.debugSelectionSummary())")

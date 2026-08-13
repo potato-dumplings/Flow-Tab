@@ -117,6 +117,8 @@ final class SwitcherPanelController {
         TerminateInterruptionProtectionObservationOwner
     let delayedWindowLayerEntryObservationOwner:
         DelayedWindowLayerEntryObservationOwner
+    let manualWindowLayerEntryObservationOwner:
+        ManualWindowLayerEntryObservationOwner
     let terminatePressFeedbackCompletionOwner:
         TerminatePressFeedbackCompletionOwner
     let terminatePressFeedbackPolicy: TerminatePressFeedbackPolicy
@@ -337,6 +339,8 @@ final class SwitcherPanelController {
             DelayedWindowLayerEntryObservationOwner(
                 scheduler: delayedWindowLayerEntryScheduler
             )
+        manualWindowLayerEntryObservationOwner =
+            ManualWindowLayerEntryObservationOwner()
         terminatePressFeedbackCompletionOwner =
             TerminatePressFeedbackCompletionOwner(
                 scheduler: terminatePressFeedbackScheduler
@@ -401,6 +405,7 @@ final class SwitcherPanelController {
             self.resetPointerSelectionGate()
             if self.model.isSearchActive {
                 self.clearDelayedWindowLayerEntryState()
+                self.cancelManualWindowLayerEntryObservation()
             }
             guard self.isPanelPresented else { return }
             self.updatePanelSize()
@@ -479,8 +484,15 @@ final class SwitcherPanelController {
             queue: nil
         ) { [weak self] notification in
             let appID = notification.userInfo?[RuntimeProjectionNotificationUserInfoKey.appID] as? String
+            let evidence = notification.userInfo?[
+                RuntimeProjectionNotificationUserInfoKey
+                    .currentAppWindowProjectionUpdateEvidence
+            ] as? RuntimeCurrentAppWindowProjectionUpdateEvidence
             Task { @MainActor [weak self] in
-                self?.handleCurrentAppWindowProjectionDidUpdate(appID: appID)
+                self?.handleCurrentAppWindowProjectionDidUpdate(
+                    appID: appID,
+                    evidence: evidence
+                )
             }
         }
         committedSearchIndexDidUpdateObserver = NotificationCenter.default.addObserver(
@@ -646,8 +658,14 @@ final class SwitcherPanelController {
     }
 
     @discardableResult
-    func handleCurrentAppWindowProjectionDidUpdateForTesting(appID: String? = nil) -> Bool {
-        handleCurrentAppWindowProjectionDidUpdate(appID: appID)
+    func handleCurrentAppWindowProjectionDidUpdateForTesting(
+        appID: String? = nil,
+        evidence: RuntimeCurrentAppWindowProjectionUpdateEvidence? = nil
+    ) -> Bool {
+        handleCurrentAppWindowProjectionDidUpdate(
+            appID: appID,
+            evidence: evidence
+        )
     }
 
     @discardableResult

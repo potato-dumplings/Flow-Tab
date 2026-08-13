@@ -1,6 +1,6 @@
 # Evidence-Driven Synchronization Migration
 
-Updated: 2026-07-31
+Updated: 2026-08-13
 
 ## Goal
 
@@ -128,6 +128,7 @@ and Process/Tooling.
 | SYNC-021 | `ActiveSpaceTransitionObservationOwner`, `SwitcherPanelController+ActiveSpaceTransition.swift`; active-Space ignore and activation-suppression windows | 350ms/500ms windows assume which Space notifications belong to FlowTab's own presentation/migration. Evidence migration plus watchdog. | Establish the observation and exact runtime-service baseline before requesting topology refresh. Resolve only after the Space projection generation advances, then correlate current-Space identity, presentation generation, and exact panel visibility. Independent request-return and projection-notification readbacks close synchronous and missed-event races. The presentation session owns replacement, cancellation, activation suppression, and a one-second diagnostic watchdog. | H; Unit, Behavior, cross-Space UI, runtime-topology Pressure. | blocked: implementation, Unit/Behavior, deterministic Pressure, and Process passed; macOS LocalAuthentication blocked cross-Space UI and real-topology Pressure before test start |
 | SYNC-022 | `TerminateInterruptionProtectionObservationOwner`, `SwitcherPanelController+TerminateInterruptionProtection.swift`, `+Hotkeys.swift`, `+InputHandling.swift`; terminate interruption protection | Five-second and 500ms uptime windows inferred that termination, projection refresh, and related AppKit presentation interruptions had finished. Evidence migration plus watchdog. | Establish an exact appID/PID/request-generation and projection baseline before sending the terminate request. Latch target completion only from matching workspace termination or terminated-process readback plus exact projection removal/replacement. Cancel the completion watchdog at that point, then retain an untimed presentation latch until active-Space, panel-visibility, or consumed interruption evidence is followed by a stable visible/active readback. The presentation session owns replacement and cancellation. | H; Unit, Behavior, termination UI, runtime-topology Pressure. | completed |
 | SYNC-023 | `SwitcherPanelController+Hotkeys.swift`, `AppPreferences.swift`; delayed window-layer entry | The user-configured delay is the product contract. A secondary 350ms timer currently probes projection readiness. Domain duration plus evidence migration. | Retain the persisted auto-entry deadline under a named injectable scheduler. Enter only when both the user deadline and matching projection readiness are observed; remove the secondary readiness timer and react to projection generation events. The panel session owns timer cancellation. | H; Unit, Behavior, switcher UI, interaction Pressure. | completed |
+| SYNC-023R1 | `ManualWindowLayerEntryObservationOwner`, `SwitcherPanelController.beginManualWindowLayerEntryIfNeeded`, and current-app projection notification routing; manual Down-arrow window-layer entry | A complete cached projection could be consumed as proof that a newly requested current-app topology repair had finished. Under cross-Space scheduling, the stale normal-first ordering could enter the window layer before the exact fullscreen-first projection committed. Evidence-race repair. | Establish the exact appID/PID/presentation observation before signaling maintenance. Treat runtime and current-app projection readbacks as the request baseline, then accept only a complete exact current-app projection whose source generation is strictly later than both baselines. Notification and request-return readbacks close event and synchronous-return races. The panel presentation owns observation replacement and cancellation; no duration, poll, retry, or watchdog is retained. | H visible Switcher ordering and repeated runtime projection path; deterministic Unit, controller Behavior, affected signed cross-Space UI, runtime-topology Pressure, all-six-target build, and Process/Tooling. FlowTabCore is not relevant because AppKit presentation and runtime projection service ownership remain in the app feature boundary. | completed |
 | SYNC-024 | Composite visual-timing baseline | Semantic owner review found five independent animation or degraded-reveal contracts in the baseline row. Migration routing. | Preserve the baseline ID as the parent and close each lifecycle independently through SYNC-024A–SYNC-024E. | M aggregate; child rows define required validation. | completed: SYNC-024A–SYNC-024E closed independently |
 | SYNC-024A | `TerminatePressFeedbackCompletionOwner`, `SwitcherPanelController.terminateSelectedApp`, `AppTileView`; terminate press feedback | An 80ms task sleep gated the terminate request while the rendered press animation used an unrelated 120ms duration. Domain duration plus scheduler-completion evidence. | Use one named 120ms press-feedback policy for the animation and an injectable completion scheduler. The panel controller owns one generation, cancellable token, request continuation, and late-callback rejection through session cancellation. | M; Unit, Behavior, termination UI, deterministic Pressure. | completed |
 | SYNC-024B | `InitialWindowOnlyPreviewRevealObservationOwner`, `SwitcherPanelController.prepareInitialWindowOnlyPanelReveal`; initial preview reveal | A 250ms task sleep forced a degraded reveal when preview readiness had not arrived. Watchdog migration. | Use preview-batch completion plus pending-capture readback as the success Oracle. The named injectable watchdog performs a final readback and reports the last event plus unmet condition before degraded reveal; the presentation session owns cancellation and generation replacement. | M; Unit, Behavior, in-app switcher UI, deterministic Pressure. | completed |
@@ -2232,6 +2233,93 @@ polling cadence, deadline, or timeout in the scoped paths.
   lines. The startup `prompts.zip` remains unchanged and outside the slice.
 - Commit: `6c3f3810a6a4090018b7587904417f10a4a55754`
   (`refactor(sync): migrate SYNC-023 delayed window-layer entry`).
+
+### SYNC-023R1 Closure Record
+
+- Pre-change signal and Oracle: the signed exact cross-Space regression
+  reproduced in 16.943 seconds. The fixture contract and exact selected-title
+  observer required `Fullscreen Tab`, while the visible Switcher projection
+  entered `windowCycle` with `Normal Tab` selected and the stale
+  `Normal Tab|Fullscreen Tab` ordering. The exact fixture topology and title
+  expectation are independent of the cached app-switcher projection. Runtime
+  diagnostics showed that manual Down-arrow entry consumed the already
+  complete initial cache before the selected-current-app repair published its
+  later exact ordering.
+- Design and evidence ordering: `ManualWindowLayerEntryObservationOwner`
+  captures the runtime read-model generation, current-app projection
+  generation, exact appID/PID, selected windows, and presentation state before
+  `signalSelectedCurrentAppWindowsChanged`. The initial projection remains the
+  request baseline. Resolution requires the same presentation, selected
+  appID/PID, visible app layer, inactive Search, and a complete exact
+  current-app projection whose source generation is strictly later than both
+  baseline generations. The request-return readback closes synchronous repair;
+  exact current-app projection notifications request later readbacks and close
+  missed-event ordering. Projection readback remains the acceptance Oracle.
+- Lifecycle: the panel controller owns one observation generation. A new
+  manual entry replaces the previous generation. Pointer app/window selection,
+  Search activation, any other handled key, event-monitor removal, presentation
+  cancellation, session end, and controller teardown cancel it. Exact appID,
+  PID, observation generation, and presentation generation reject unrelated,
+  stale, duplicate, and out-of-order events. After entry, later exact
+  projection commits continue to refresh the frozen window layer and preserve
+  a valid selected-window identity when a window disappears.
+- Retained time policy: none. This repair adds no duration, polling cadence,
+  retry, timer, deadline, or watchdog. Scheduling pressure can postpone the
+  later generation and therefore entry latency; it cannot select from the
+  request baseline.
+- Unit and Behavior: the final focused owner/controller run passed 8/8 in
+  0.110 seconds under
+  `.build-local/evidence-driven-sync/SYNC-023R1/targeted-attempt-003`. It covers
+  the initially complete baseline, later completeness, request-return
+  completion, exact app/PID filtering, stale/duplicate notification rejection,
+  observer-before-signal ordering, presentation cancellation, and 2,000
+  replacements/cancellations. The expanded app regression selection passed
+  27/27 in 0.426 seconds under
+  `.build-local/evidence-driven-sync/SYNC-023R1/regression-attempt-002`.
+  Two extracted open-window-layer refresh regressions passed 2/2 in 0.091
+  seconds under
+  `.build-local/evidence-driven-sync/SYNC-023R1/projection-refresh-attempt-002`.
+  The complete canonical `FlowTabTests` run passed 1,103/1,103 in 44.494
+  seconds under
+  `.build-local/evidence-driven-sync/SYNC-023R1/full-attempt-002`.
+- FlowTabCore: not relevant because the deterministic owner depends on AppKit
+  panel presentation and the app runtime projection service; no reusable core
+  selection rule or dependency direction changed.
+- UI: the exact signed regression passed 1/1 in 79.851 seconds under
+  `.build-local/evidence-driven-sync/SYNC-023R1/ui-exact-attempt-002`. The final
+  affected signed matrix passed 4/4 in 273.729 seconds under
+  `.build-local/evidence-driven-sync/SYNC-023R1/ui-affected-attempt-003`,
+  covering persisted hotkeys, representative global-hotkey presentation,
+  explicit/fallback in-app presentation, and the fullscreen workflow sibling
+  across Spaces. Every wrapper stage and result-bundle check completed with
+  zero exit status.
+- Pressure: the canonical noisy-CG-sibling runtime-topology scenario passed
+  1/1 in 41.607 seconds under
+  `.build-local/evidence-driven-sync/SYNC-023R1/runtime-topology-pressure-attempt-001`.
+  It exercised the four-window fullscreen/off-Space fixture with 55 samples at
+  500ms cadence. All 55 identity checks matched after 5,001.759ms stability,
+  with 25 candidate observations and zero rejected transient identities. CPU
+  average/p95/max were 129.05/162.90/180.00 percent; RSS average/p95/max were
+  212.00/289.30/298.28 MB. Against the same-machine, same-scenario SYNC-006R1
+  baseline, CPU average and p95 changed by -1.64 and -0.40 percentage points,
+  RSS average/p95/max changed by +6.36/-7.59/-9.83 MB, and CPU max recorded one
+  +9.60-point peak. The average/p95 CPU and ending RSS evidence show no
+  sustained CPU regression or warm-state RSS growth.
+- Signing and Process/Tooling: the fixed-path Apple Development-signed App has
+  executable SHA-256
+  `9ec9b8f40391c9952843ba7a5b05b75f056ba1e5558fd3da4f73f2e37a5411c6`;
+  the immutable private identity manifest has SHA-256
+  `38ceeb14be193fb6a5c753ee1fe8649d552a0d3b4be7a19a3f17cd01507eae8e`.
+  The final canonical build-for-testing compiled the six-target graph under
+  `.build-local/evidence-driven-sync/SYNC-023R1/build-for-testing-attempt-001`.
+  Project-file lint, `git diff --check`, fixed-delay owner-scope audit,
+  source-size checks, signature verification, exact process cleanup, absent
+  `.build-local/test-assets`, startup-baseline preservation, and staged-content
+  review are the commit gate. Both new production files and all three new test
+  files remain below 400 lines; extracting the two refresh regressions reduces
+  the oversized panel-session test file by 171 lines.
+- Commit: this slice is committed independently as
+  `fix(sync): repair SYNC-023R1 manual window readiness`.
 
 ### SYNC-024A Closure Record
 
