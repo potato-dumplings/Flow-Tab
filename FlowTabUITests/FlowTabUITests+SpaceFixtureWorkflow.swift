@@ -239,12 +239,14 @@ extension FlowTabUITests {
         )
         let terminationWaitCompleted = fixtureApp.wait(
             for: .notRunning,
-            timeout: 8
+            timeout:
+                FlowTabUITestApplicationTerminationPolicy
+                    .quitShortcutFixtureWatchdog
         )
         let finalFixtureState = fixtureApp.state
-        XCTAssertTrue(
-            terminationWaitCompleted
-                && finalFixtureState == .notRunning,
+        XCTAssertEqual(
+            finalFixtureState,
+            .notRunning,
             "Fixture process termination evidence was not satisfied. "
                 + "waiterCompleted=\(terminationWaitCompleted) "
                 + "finalState=\(String(describing: finalFixtureState))"

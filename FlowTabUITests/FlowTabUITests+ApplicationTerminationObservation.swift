@@ -6,6 +6,7 @@ enum FlowTabUITestApplicationTerminationPolicy {
     static let delayedEvidenceOverrideWatchdog: TimeInterval = 9
     static let statusItemMenuQuitWatchdog: TimeInterval = 8
     static let runtimeLifecycleFixtureWatchdog: TimeInterval = 8
+    static let quitShortcutFixtureWatchdog: TimeInterval = 8
 }
 
 private enum FlowTabUITestApplicationCleanupTestPolicy {
@@ -212,6 +213,14 @@ extension FlowTabUITests {
                 .runtimeLifecycleFixtureWatchdog,
             0
         )
+    }
+
+    func testApplicationTerminationPolicyPreservesQuitShortcutFixtureWatchdog() {
+        let watchdog =
+            FlowTabUITestApplicationTerminationPolicy
+                .quitShortcutFixtureWatchdog
+        XCTAssertEqual(watchdog, 8)
+        XCTAssertTrue(watchdog.isFinite && watchdog > 0)
     }
 
     func testApplicationCleanupAcceptsAlreadyStoppedInitialState() {
