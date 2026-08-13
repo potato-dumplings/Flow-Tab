@@ -261,6 +261,17 @@ extension FlowTabUITests {
         let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity, timeout: 12)
         assertValue(of: fixtureAppRow, equals: "1w", timeout: 12)
 
+        let runningFixtureProcesses =
+            NSRunningApplication.runningApplications(
+                withBundleIdentifier: identity.bundleIdentifier
+            ).filter { !$0.isTerminated }
+        let fixturePID = try XCTUnwrap(
+            runningFixtureProcesses.count == 1
+                ? runningFixtureProcesses.first?.processIdentifier
+                : nil,
+            "Expected one active lifecycle fixture process before termination. "
+                + "observedPIDs=\(runningFixtureProcesses.map(\.processIdentifier))"
+        )
         let terminationLogSnapshot = makeRuntimeLogFileSnapshot()
         terminateSpaceFixtureApplicationAndWait(
             fixtureApp,
@@ -268,12 +279,11 @@ extension FlowTabUITests {
             timeout: 8
         )
         waitForRuntimeLogFiles(
-            containing: [
-                "runtimeLifecycle appTerminated appID=\(identity.bundleIdentifier)",
-                "pid="
-            ],
+            matching:
+                #"runtimeLifecycle appTerminated appID=\#(escapedLifecycleAppID) "#
+                + #"pid=\#(fixturePID) maintenanceGeneration=[1-9][0-9]*"#,
             since: terminationLogSnapshot,
-            timeout: 8
+            description: "exact workspace lifecycle termination evidence"
         )
     }
 
