@@ -228,6 +228,10 @@ extension FlowTabUITests {
         )
 
         let launchLogSnapshot = makeRuntimeLogFileSnapshot()
+        let escapedLifecycleAppID =
+            NSRegularExpression.escapedPattern(
+                for: identity.bundleIdentifier
+            )
         let fixtureApp = launchSpaceFixtureWorkflow(
             identity: identity,
             windowCount: 1,
@@ -242,12 +246,11 @@ extension FlowTabUITests {
         }
 
         waitForRuntimeLogFiles(
-            containing: [
-                "runtimeLifecycle appLaunched appID=\(identity.bundleIdentifier)",
-                "pid="
-            ],
+            matching:
+                #"runtimeLifecycle appLaunched appID=\#(escapedLifecycleAppID) "#
+                + #"pid=[1-9][0-9]* maintenanceGeneration=[1-9][0-9]*"#,
             since: launchLogSnapshot,
-            timeout: 8
+            description: "exact workspace lifecycle launch evidence"
         )
 
         app.activate()
