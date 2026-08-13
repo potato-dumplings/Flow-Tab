@@ -292,6 +292,10 @@ struct FlowTabUITestFrontmostApplicationSnapshot: Equatable {
     }
 }
 
+enum FlowTabUITestFrontmostApplicationObservationPolicy {
+    static let multiAppAppSearchActivationWatchdog: TimeInterval = 10
+}
+
 final class FlowTabUITestFrontmostApplicationObservationOwner {
     private let expectedBundleIdentifier: String
     private let conditionOwner:

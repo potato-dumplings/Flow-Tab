@@ -268,7 +268,9 @@ extension FlowTabUITests {
 
             assertTriggerMakesApplicationFrontmost(
                 targetApp.identity.bundleIdentifier,
-                timeout: 10,
+                timeout:
+                    FlowTabUITestFrontmostApplicationObservationPolicy
+                        .multiAppAppSearchActivationWatchdog,
                 message:
                     "Search confirmation did not activate "
                     + "the \(targetApp.appName) fixture app."

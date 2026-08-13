@@ -13,6 +13,104 @@ private enum FlowTabUITestConditionObservationTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testFrontmostApplicationPolicyUsesNamedMultiAppAppSearchWatchdog() {
+        let watchdog =
+            FlowTabUITestFrontmostApplicationObservationPolicy
+            .multiAppAppSearchActivationWatchdog
+
+        XCTAssertEqual(watchdog, 10)
+        XCTAssertTrue(watchdog.isFinite && watchdog > 0)
+    }
+
+    func testFrontmostApplicationObserverAcceptsExactInitialReadback() {
+        let owner =
+            FlowTabUITestFrontmostApplicationObservationOwner(
+                expectedBundleIdentifier: "com.example.target",
+                notificationCenter: NotificationCenter(),
+                readback: {
+                    "com.example.target"
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .initialReadback
+        )
+        XCTAssertEqual(
+            owner.resolvedEvidence?.value.bundleIdentifier,
+            "com.example.target"
+        )
+    }
+
+    func testFrontmostApplicationObserverCancellationRejectsLateActivation() {
+        let notificationCenter = NotificationCenter()
+        let notificationName = Notification.Name(
+            "FlowTabUITestCancelledFrontmostApplicationDidActivate"
+        )
+        var frontmostBundleIdentifier = "com.example.other"
+        let owner =
+            FlowTabUITestFrontmostApplicationObservationOwner(
+                expectedBundleIdentifier: "com.example.target",
+                notificationCenter: notificationCenter,
+                activationNotificationName: notificationName,
+                readback: {
+                    frontmostBundleIdentifier
+                }
+            )
+        owner.start()
+        owner.cancel()
+
+        frontmostBundleIdentifier = "com.example.target"
+        notificationCenter.post(
+            name: notificationName,
+            object: nil
+        )
+
+        XCTAssertNil(owner.resolvedEvidence)
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "frontmostBundleIdentifier=com.example.other"
+            )
+        )
+    }
+
+    func testFrontmostApplicationObserverWatchdogReportsFinalExactReadback() {
+        var readbackCount = 0
+        let owner =
+            FlowTabUITestFrontmostApplicationObservationOwner(
+                expectedBundleIdentifier: "com.example.target",
+                notificationCenter: NotificationCenter(),
+                readback: {
+                    defer { readbackCount += 1 }
+                    return readbackCount == 0
+                        ? "com.example.other"
+                        : "com.example.target"
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertNil(
+            owner.waitForResolution(
+                timeout:
+                    FlowTabUITestConditionObservationTestPolicy
+                        .watchdog
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "source=watchdogReadback"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "frontmostBundleIdentifier=com.example.target"
+            )
+        )
+    }
+
     func testUIConditionObserverUsesInitialReadbackAndPreinstalledEvents() {
         var registrationOrder: [String] = []
         var eventHandler: (() -> Void)?
