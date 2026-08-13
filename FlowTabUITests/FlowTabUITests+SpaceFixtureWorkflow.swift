@@ -39,11 +39,11 @@ extension FlowTabUITests {
         runRealSpaceFixtureWorkflow(
             flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
         ) { identity, app in
-            let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
-            XCTAssertTrue(
-                fixtureAppTile.waitForExistence(timeout: 8),
-                "FlowTab did not surface the Space Fixture app in the switcher app strip"
-            )
+            XCTAssertTrue(assertCurrentSwitcherAppProjection(
+                in: app,
+                exactEntry: "\(identity.bundleIdentifier):3",
+                timeout: FlowTabUITestSwitcherAppProjectionPolicy.standardFixtureProjectionWatchdog
+            ))
         }
     }
 

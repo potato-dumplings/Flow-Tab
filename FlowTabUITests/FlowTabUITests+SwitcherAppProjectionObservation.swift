@@ -4,6 +4,7 @@ import XCTest
 enum FlowTabUITestSwitcherAppProjectionPolicy {
     static let postLaunchWatchdog: TimeInterval = 10
     static let runtimeOrderWatchdog: TimeInterval = 5
+    static let standardFixtureProjectionWatchdog: TimeInterval = 8
 }
 
 struct FlowTabUITestSwitcherAppProjectionEntry: Equatable {
@@ -366,6 +367,78 @@ extension FlowTabUITests {
     func switcherAppRowIdentifier(_ bundleIdentifier: String) -> String {
         Identifier.switcherAppPrefix
             + bundleIdentifier.flowTabUITestAccessibilityIdentifierComponent
+    }
+
+    func assertCurrentSwitcherAppProjection(
+        in app: XCUIApplication,
+        exactEntry: String,
+        timeout: TimeInterval
+    ) -> Bool {
+        let expectedEntry =
+            FlowTabUITestSwitcherAppProjectionEntry(
+                rawValue: exactEntry
+            )
+        guard
+            !expectedEntry.bundleIdentifier.isEmpty,
+            expectedEntry.windowCount != nil
+        else {
+            XCTFail(
+                "Switcher App projection target was invalid. "
+                    + expectedEntry.diagnosticSummary
+            )
+            return false
+        }
+
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        let rowIdentifier = switcherAppRowIdentifier(
+            expectedEntry.bundleIdentifier
+        )
+        let rowRepresentations = app.descendants(matching: .any)
+            .matching(identifier: rowIdentifier)
+        let row = rowRepresentations.firstMatch
+        let owner =
+            FlowTabUITestSwitcherAppProjectionObservationOwner(
+                expectation: .exactEntry(exactEntry),
+                acceptsResolution: {
+                    row.exists
+                },
+                readback: {
+                    self.switcherAppProjectionSnapshot(
+                        in: app,
+                        diagnosticsSummaryElement:
+                            diagnosticsSummary
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        guard owner.waitForResolution(timeout: timeout) != nil
+        else {
+            XCTFail(
+                "Current Switcher App projection watchdog expired. "
+                    + "rowIdentifier=\(rowIdentifier) "
+                    + "finalRepresentationCount=\(rowRepresentations.count) "
+                    + "finalExists=\(row.exists) "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+
+        guard row.exists else {
+            XCTFail(
+                "Current Switcher App row disagreed with the projection. "
+                    + "identifier=\(rowIdentifier) "
+                    + "representationCount=\(rowRepresentations.count) "
+                    + "finalExists=\(row.exists) "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+        return true
     }
 
     func waitForSwitcherAppsSummary(
