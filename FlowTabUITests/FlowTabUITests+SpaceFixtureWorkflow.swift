@@ -434,9 +434,21 @@ extension FlowTabUITests {
             return
         }
 
-        windowCloseObservation.requestClose(
-            from: scheduledClose
-        )
+        let closedFixtureWindow = fixtureApp.windows[
+            "flowtab.spacefixture.window.2"
+        ]
+        assertElementDoesNotExistAfterTrigger(
+            closedFixtureWindow,
+            timeout:
+                SpaceFixtureWindowCloseFaultObservationPolicy
+                    .closedWindowDisappearanceWatchdog,
+            description:
+                "Exact Space fixture Window 2 disappearance"
+        ) {
+            windowCloseObservation.requestClose(
+                from: scheduledClose
+            )
+        }
         guard let appliedClose =
                 windowCloseObservation.waitForApplied(
                     requestGeneration:
@@ -485,15 +497,6 @@ extension FlowTabUITests {
             fixtureApp.windows[
                 "flowtab.spacefixture.window.1"
             ].exists
-        )
-        XCTAssertTrue(
-            waitForNonExistence(
-                fixtureApp.windows[
-                    "flowtab.spacefixture.window.2"
-                ],
-                timeout: 5
-            ),
-            windowCloseObservation.diagnosticSummary
         )
         assertValue(of: fixtureAppRow, equals: "1w", timeout: 15)
         guard assertSpaceFixtureCurrentAppProjectionAccepted(

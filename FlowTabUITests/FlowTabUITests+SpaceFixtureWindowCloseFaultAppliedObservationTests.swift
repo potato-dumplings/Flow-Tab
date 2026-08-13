@@ -26,6 +26,23 @@ extension FlowTabUITests {
         )
     }
 
+    func testSpaceFixtureWindowCloseFaultDisappearanceWatchdogPolicyCompatibility() {
+        XCTAssertEqual(
+            SpaceFixtureWindowCloseFaultObservationPolicy
+                .closedWindowDisappearanceWatchdog,
+            5
+        )
+        XCTAssertTrue(
+            SpaceFixtureWindowCloseFaultObservationPolicy
+                .closedWindowDisappearanceWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            SpaceFixtureWindowCloseFaultObservationPolicy
+                .closedWindowDisappearanceWatchdog,
+            0
+        )
+    }
+
     func testSpaceFixtureWindowCloseFaultUsesMatchingAppliedEvidenceAlreadyObserved() {
         let source =
             ManualSpaceFixtureWindowCloseFaultEvidenceSource()

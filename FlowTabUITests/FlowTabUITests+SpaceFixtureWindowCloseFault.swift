@@ -20,6 +20,7 @@ struct SpaceFixtureWindowCloseFaultUITestRoute {
 enum SpaceFixtureWindowCloseFaultObservationPolicy {
     static let scheduledEvidenceWatchdog: TimeInterval = 8
     static let appliedEvidenceWatchdog: TimeInterval = 15
+    static let closedWindowDisappearanceWatchdog: TimeInterval = 5
 }
 
 typealias SpaceFixtureWindowCloseFaultEvidenceRegistration =
