@@ -125,7 +125,7 @@ and Process/Tooling.
 | SYNC-019 | `InitialPanelVisibilityObservationOwner`, `SwitcherPanelController+InitialVisibilityRecovery.swift`; initial panel visibility | A grace duration decides whether occlusion is stale and later triggers failure. Evidence migration plus watchdog. | Install panel occlusion, become-key, and expose observers during controller initialization. Start the session observation before the first order-front action, and accept only an exact visible `PanelVisibilitySnapshot` from the initial readback, matching presentation action, window event, or recovery readback. An unsatisfied 350ms readback only escalates recovery and keeps the exact observation active; SYNC-019R1 owns the final cross-owner lifecycle repair. | H; Unit, Behavior, switcher UI, runtime-topology Pressure. | completed through implementation commit `a0b746b` and the SYNC-019R1 repair; deterministic Unit/Behavior, full FlowTabTests, focused signed UI, and noisy runtime-topology Pressure passed |
 | SYNC-019R1 | `InitialPanelVisibilityObservationOwner`, `SwitcherPanelController+InitialVisibilityRecovery`, `SwitcherPanelController+VisibilityRecovery`, and initial-presentation TestingSupport readback; slow initial panel exposure | The SYNC-019 350ms terminal watchdog removed the exact visibility observation and routed its unsatisfied final readback through modifier-state interruption handling. A real topology presentation scheduled at 372.550ms therefore cancelled after the modifier had been released, even though later AppKit visibility evidence could still arrive. Evidence-lifecycle repair plus domain recovery timing. | Retain 350ms only as the named initial-presentation recovery-escalation policy. Check exact visibility on delivery; a visible readback completes normally, while an unsatisfied readback starts the existing hard-reorder recovery without cancelling the session and leaves the original exact visibility observer active. Initial or later panel evidence remains the sole presentation-success Oracle. Exact recovery evidence cancels the initial observer; exact initial evidence cancels recovery. The recovery owner's one-second watchdog terminates and diagnoses only that bounded recovery action, while presentation/session end, selection, cancellation, replacement, and controller release own the persistent observation and every scheduler token. | H production switcher presentation and shared UI readiness readback; deterministic initial/event/escalation/synchronous-delivery/late-evidence/cross-owner-cancel/modifier-release-result/cancellation plus 2,000 replacement and 200 presentation lifecycle Pressure, focused and full FlowTabTests, affected signed switcher UI and noisy cross-Space runtime-topology Pressure, signing/process evidence, and Process/Tooling. FlowTabCore is not relevant because the contract remains inside AppKit presentation and app TestingSupport boundaries. | completed: exact-evidence lifecycle repair, full 1,095-test app suite, focused signed UI, 50ms-sampled real-topology Pressure, signing, and process cleanup passed |
 | SYNC-020 | `PanelVisibilityRecoveryObservationOwner`, `SwitcherPanelController+VisibilityRecovery.swift`; visibility recovery attempts and hard reorder | Fixed `[0, 50ms, 150ms, 300ms]` attempt waits and a fixed 10ms order-out/order-front gap assumed AppKit had committed window ordering. Evidence migration plus conditional observation. | Use the controller-lifetime occlusion/key/expose observers established by SYNC-019, an immediate exact readback, and an ordered state machine that must observe `panelPresented == false` before order-front and exact `userVisible == true` before success. The local AppKit SDK has no public order-on/off notification, so the presentation session owns one named cancellable 10ms condition-readback cadence, a four-attempt action policy, matching recovery/presentation generations, and a 1-second diagnostic watchdog. | H; Unit, Behavior, switcher UI, runtime-topology Pressure. | completed: authorized Unit/Behavior 10/10, focused signed UI 1/1, real-topology Pressure 1/1 with 54/54 identity checks, strict signing, exact cleanup, and Process/Tooling evidence passed |
-| SYNC-021 | `ActiveSpaceTransitionObservationOwner`, `SwitcherPanelController+ActiveSpaceTransition.swift`; active-Space ignore and activation-suppression windows | 350ms/500ms windows assume which Space notifications belong to FlowTab's own presentation/migration. Evidence migration plus watchdog. | Establish the observation and exact runtime-service baseline before requesting topology refresh. Resolve only after the Space projection generation advances, then correlate current-Space identity, presentation generation, and exact panel visibility. Independent request-return and projection-notification readbacks close synchronous and missed-event races. The presentation session owns replacement, cancellation, activation suppression, and a one-second diagnostic watchdog. | H; Unit, Behavior, cross-Space UI, runtime-topology Pressure. | blocked: implementation, Unit/Behavior, deterministic Pressure, and Process passed; macOS LocalAuthentication blocked cross-Space UI and real-topology Pressure before test start |
+| SYNC-021 | `ActiveSpaceTransitionObservationOwner`, `SwitcherPanelController+ActiveSpaceTransition.swift`; active-Space ignore and activation-suppression windows | 350ms/500ms windows assume which Space notifications belong to FlowTab's own presentation/migration. Evidence migration plus watchdog. | Establish the observation and exact runtime-service baseline before requesting topology refresh. Resolve only after the Space projection generation advances, then correlate current-Space identity, presentation generation, and exact panel visibility. Independent request-return and projection-notification readbacks close synchronous and missed-event races. The presentation session owns replacement, cancellation, activation suppression, and a one-second diagnostic watchdog. | H; Unit, Behavior, cross-Space UI, runtime-topology Pressure. | completed after freshly authorized signed cross-Space UI/Pressure closure and the independently committed SYNC-023R1 manual-entry repair exposed by that run |
 | SYNC-022 | `TerminateInterruptionProtectionObservationOwner`, `SwitcherPanelController+TerminateInterruptionProtection.swift`, `+Hotkeys.swift`, `+InputHandling.swift`; terminate interruption protection | Five-second and 500ms uptime windows inferred that termination, projection refresh, and related AppKit presentation interruptions had finished. Evidence migration plus watchdog. | Establish an exact appID/PID/request-generation and projection baseline before sending the terminate request. Latch target completion only from matching workspace termination or terminated-process readback plus exact projection removal/replacement. Cancel the completion watchdog at that point, then retain an untimed presentation latch until active-Space, panel-visibility, or consumed interruption evidence is followed by a stable visible/active readback. The presentation session owns replacement and cancellation. | H; Unit, Behavior, termination UI, runtime-topology Pressure. | completed |
 | SYNC-023 | `SwitcherPanelController+Hotkeys.swift`, `AppPreferences.swift`; delayed window-layer entry | The user-configured delay is the product contract. A secondary 350ms timer currently probes projection readiness. Domain duration plus evidence migration. | Retain the persisted auto-entry deadline under a named injectable scheduler. Enter only when both the user deadline and matching projection readiness are observed; remove the secondary readiness timer and react to projection generation events. The panel session owns timer cancellation. | H; Unit, Behavior, switcher UI, interaction Pressure. | completed |
 | SYNC-023R1 | `ManualWindowLayerEntryObservationOwner`, `SwitcherPanelController.beginManualWindowLayerEntryIfNeeded`, and current-app projection notification routing; manual Down-arrow window-layer entry | A complete cached projection could be consumed as proof that a newly requested current-app topology repair had finished. Under cross-Space scheduling, the stale normal-first ordering could enter the window layer before the exact fullscreen-first projection committed. Evidence-race repair. | Establish the exact appID/PID/presentation observation before signaling maintenance. Treat runtime and current-app projection readbacks as the request baseline, then accept only a complete exact current-app projection whose source generation is strictly later than both baselines. Notification and request-return readbacks close event and synchronous-return races. The panel presentation owns observation replacement and cancellation; no duration, poll, retry, or watchdog is retained. | H visible Switcher ordering and repeated runtime projection path; deterministic Unit, controller Behavior, affected signed cross-Space UI, runtime-topology Pressure, all-six-target build, and Process/Tooling. FlowTabCore is not relevant because AppKit presentation and runtime projection service ownership remain in the app feature boundary. | completed |
@@ -27357,3 +27357,83 @@ polling cadence, deadline, or timeout in the scoped paths.
   (`test(sync): correct SYNC-020 cancellation pressure oracle`).
 - Closure commit subject:
   `test(sync): close SYNC-020 signed recovery pressure`.
+
+### SYNC-021 Authorized Resume Closure Record
+
+- Status and authorization: completed. Before this permission-blocked slice
+  changed from `blocked` to `running`, the canonical targeted FlowTabTests
+  command directly requested fresh XCTest/Xcode Helper Accessibility
+  authorization and then passed inside the authorized execution. The signed UI
+  wrapper subsequently reached all four test bodies. Its first three scenarios
+  passed; the fourth produced a functional exact-window ordering failure that
+  became the independently scoped SYNC-023R1 repair.
+- Design and Oracle: `ActiveSpaceTransitionObservationOwner` remains unchanged
+  from implementation commit `17a0e8552fe31a64db60586cdb012a59c348c1a1`.
+  It establishes runtime Space generation, ordered display/current-Space
+  identities, presentation generation, and exact panel visibility before
+  requesting topology maintenance. Resolution comes only from a strictly
+  later Space generation plus the matching Space identity and panel readback.
+  Request-return and exact-service projection-notification readbacks close
+  synchronous and missed-event races. The signed fixture's exact fullscreen
+  and off-Space window identities provide the independent visible Oracle.
+- Retained time and lifecycle: the named one-second
+  `topologyReadbackWatchdogInterval` remains solely a terminal failure bound.
+  Its final exact readback may still resolve; an unmet readback reports the
+  baseline, last evidence, and final Space/panel state. The panel presentation
+  owns observer, watchdog, activation-suppression identity, replacement,
+  session-end cancellation, and controller cleanup. Elapsed time never
+  establishes a Space transition or presentation result.
+- Unit and Behavior: the freshly authorized focused selection passed 12/12 in
+  0.080 seconds under
+  `.build-local/evidence-driven-sync/SYNC-021-authorized-resume/targeted-attempt-001`.
+  It covers observer-before-request ordering, synchronous request-return
+  evidence, initially stable and changed Space identities, stale, duplicate,
+  out-of-order, replaced, and wrong-presentation evidence, cancellation,
+  diagnostic final readback, slow scheduling, and 2,000 replacement cycles.
+  The final current-source canonical `FlowTabTests` run passed 1,103/1,103 in
+  44.494 seconds as recorded by SYNC-023R1. FlowTabCore remains not relevant
+  because AppKit presentation, workspace identity, and runtime projection
+  ownership belong to the app target.
+- UI: the freshly authorized pre-repair matrix proved executable authorization
+  and passed persisted hotkeys, global-hotkey presentation, and in-app
+  explicit/fallback presentation. Its exact cross-Space failure selected
+  `Normal Tab` where the fixture Oracle required `Fullscreen Tab`, yielding
+  SYNC-023R1 rather than a SYNC-021 observer failure. After repair commit
+  `a0f1650826407514359e0d9aa64faedb734ec34d`, the exact signed cross-Space
+  regression passed 1/1 in 79.851 seconds, and the final four-scenario matrix
+  passed 4/4 in 273.729 seconds. The matrix's cross-Space path passed in
+  100.066 seconds with the same exact fullscreen-window Oracle.
+- Pressure: the final canonical 500ms-sampled noisy-CG-sibling topology path
+  passed 1/1 in 41.607 seconds. It round-tripped the four-window
+  fullscreen/off-Space fixture while all 55 identity checks matched, with
+  5,001.759ms stable identity, 25 candidate observations, zero rejected
+  transient identities, and 55 resource samples. CPU average/p95/max were
+  129.05/162.90/180.00 percent; RSS average/p95/max were
+  212.00/289.30/298.28 MB. Compared with the same-machine, same-path
+  SYNC-006R1 baseline, CPU average/p95 changed by -1.64/-0.40 percentage
+  points and RSS p95/max changed by -7.59/-9.83 MB, with no sustained resource
+  regression. Scheduling and topology load changed completion latency while
+  preserving the exact window and Space result.
+- Signing and Process/Tooling: the final fixed-path Apple Development-signed
+  App executable has SHA-256
+  `9ec9b8f40391c9952843ba7a5b05b75f056ba1e5558fd3da4f73f2e37a5411c6`;
+  its private identity manifest has SHA-256
+  `38ceeb14be193fb6a5c753ee1fe8649d552a0d3b4be7a19a3f17cd01507eae8e`.
+  Sandbox-external strict deep verification accepted the App and its
+  designated requirement. The final six-target canonical build passed, every
+  applicable UI/Pressure wrapper stage exited zero, exact App/Runner/fixture
+  and repository xcodebuild process readbacks were empty, and
+  `.build-local/test-assets` remained absent. This closure changes only the
+  migration ledger; `git diff --check`, exact row/record review, startup
+  baseline preservation, and staged-content review are its Process/Tooling
+  gate.
+- Lifecycle cleanup: the 2.9GB SYNC-023R1 evidence root was removed after its
+  durable repair record and commit. The SYNC-021 authorized-resume evidence
+  root is removed after this durable closure commit, followed by exact absence
+  checks.
+- Implementation commit: `17a0e8552fe31a64db60586cdb012a59c348c1a1`
+  (`refactor(sync): migrate SYNC-021 active Space transition`).
+- Dependent repair commit: `a0f1650826407514359e0d9aa64faedb734ec34d`
+  (`fix(sync): repair SYNC-023R1 manual window readiness`).
+- Closure commit subject:
+  `test(sync): close SYNC-021 signed Space pressure`.
