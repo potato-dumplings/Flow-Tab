@@ -351,7 +351,9 @@ extension FlowTabUITests {
         }
         guard let scheduledClose =
                 windowCloseObservation.waitForScheduled(
-                    timeout: 8
+                    timeout:
+                        SpaceFixtureWindowCloseFaultObservationPolicy
+                            .scheduledEvidenceWatchdog
                 )
         else {
             XCTFail(
