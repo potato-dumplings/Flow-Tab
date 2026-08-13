@@ -580,7 +580,7 @@ and Process/Tooling.
 | SYNC-036KU | multi-App App Search; committed result projection | Text is typed before an eight-second raw row-existence wait, so a row alone proves neither committed app scope nor query. Evidence-order migration. | Install the committed Search result owner before typing and require exact app scope/query/result identifier plus row publication. Name the watchdog and cancel with the invocation. | H; stale-baseline/scope/query/row/cancel/watchdog/Pressure tests, signed App Search UI, Process/Tooling. | completed |
 | SYNC-036KV | multi-App App Search confirmation; exact frontmost application | The observer is installed before confirmation and succeeds only from exact workspace/frontmost readback, while the raw ten-second bound is anonymous. Retained watchdog. | Name the App-Search activation watchdog under the application-frontmost owner; preserve initial readback, activation notification, final exact bundle readback, and cancellation. | M; policy/exact/wrong-app/cancel/watchdog tests, signed App Search UI, Process/Tooling. | completed |
 | SYNC-036KW | In-App Control+Tab roundtrip; exact workflow Space/window topology readiness | Raw 12/4-second bounds qualify prelaunch, first-phase, reopened-phase, and fixture reactivation topology. Predicates are exact, while operation-class policy and final diagnostics are scattered. Retained-watchdog consolidation. | Name In-App initial/current/reactivation watchdogs under the workflow-window owners, preserve immediate readback plus workspace/AX events and cancellable fallback, and report exact bundle/window/title/Space evidence. Callers own each synchronous observation. | H; policy/initial/event/wrong-space/cancel/watchdog tests, both signed In-App roundtrips, Process/Tooling. | completed |
-| SYNC-036KX | `assertInAppWindowSwitcherReady`; atomic In-App panel projection | Diagnostics existence, App entry/summary, selected bundle, and noisy preview titles are observed through separate 8-second waits or synchronous reads. Evidence composition migration. | One owner requires foreground diagnostics with exact selected bundle, exact App entry/window count, exact mode, and exact title multiplicity before returning the panel. The helper owns its named cadence/watchdog and cancellation. | H; atomic projection/duplicate-title/stale/cancel/watchdog/Pressure tests, both signed In-App roundtrips, Process/Tooling. | planned |
+| SYNC-036KX | `assertInAppWindowSwitcherReady`; atomic In-App panel projection | Diagnostics existence, App entry/summary, selected bundle, and noisy preview titles are observed through separate 8-second waits or synchronous reads. Evidence composition migration. | One owner starts before the Control+Tab trigger, requires an initially absent panel, and accepts one stable-running FlowTab diagnostics snapshot with exact selected bundle, one exact App entry/window count, exact Window-cycle mode, preview bundle, and exact title multiplicity. Stable foreground or background state preserves the fixture-frontmost suppress-panel-activation topology. The helper owns its shared named cancellable cadence, named watchdog, generation, and cleanup. | H; atomic projection/duplicate-title/stale/cancel/watchdog/Pressure tests, both signed In-App roundtrips, Process/Tooling. | completed |
 | SYNC-036KY | In-App Control+Tab window advances; exact command application publication | Each exact UI selection transition is followed by a raw eight-second two-substring log wait, which can combine records. Retained-watchdog plus evidence refinement. | Capture a pre-command runtime-log baseline and require one exact forward-hotkey/advance application record bound to the current selection transition. Name the watchdog; each phase cancels its baseline/owner. | H; exact-record/order/event/cancel/watchdog tests, signed normal/noisy In-App UIs, Process/Tooling. | planned |
 | SYNC-036KZ | In-App Control+Tab confirmation; exact dismissal and selected-window activation | Dismissal is observed after confirm, then exact activation is observed in a second 12-second wait; both observers miss the trigger boundary and can resolve from different lifecycles. Evidence composition/order migration. | Before confirm, install panel-nonexistence and exact bundle/window-number activation owners, gate both until command delivery returns, and require both evidence objects. Name compatible bounds; the phase invocation owns cancellation. | H; initial-match rejection/event/out-of-order/cancel/watchdog/Pressure tests, signed normal/noisy In-App UIs, Process/Tooling. | planned |
 | SYNC-036LA | noisy In-App roundtrip; filtered CG-only artifact publication | A raw eight-second log wait proves a broad artifact marker from a workflow-wide baseline without exact process identity. Evidence refinement. | Use the pretrigger runtime-log owner and require the exact fixture PID plus a valid filtered-artifact stage/count record. Name the watchdog and cancel with the scenario. | H; exact PID/regex/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | planned |
@@ -28882,6 +28882,122 @@ polling cadence, deadline, or timeout in the scoped paths.
   by exact absence and worktree-baseline checks.
 - Commit subject:
   `test(sync): migrate SYNC-036KW In-App topology readiness`.
+
+### SYNC-036KX Closure Record
+
+- Status and Oracle: completed. In-App Control+Tab panel readiness now accepts
+  only one atomic diagnostics projection whose selected bundle, Window-cycle
+  mode, preview bundle, exact duplicate-preserving title multiplicity, and one
+  matching App entry with the exact window count all describe the expected
+  fixture App. The FlowTab application state must remain the same running state
+  before and after that readback. Both foreground and background are valid so
+  the existing suppress-panel-activation path can keep the fixture App
+  frontmost. Window selection, confirmation, and exact Space activation remain
+  independent KY and KZ contracts.
+- Evidence ordering and lifecycle: each initial presentation and every reopened
+  presentation constructs and starts one projection owner before delivering the
+  Control+Tab trigger. Its initial atomic readback must prove a stable-running
+  FlowTab process and an absent diagnostics element, preventing a matching stale
+  panel from satisfying the new operation. Trigger return opens the acceptance
+  gate and requests an immediate readback; only an unresolved owner activates
+  the deferred schedule. The helper invocation owns one observation generation
+  and uses `defer` cancellation on every return. Resolution, cancellation, and
+  replacement reject late scheduled callbacks and release the schedule.
+- Retained time policy: the compatible eight seconds is named
+  `readinessWatchdog` under
+  `FlowTabUITestInAppSwitcherPanelProjectionPolicy` and serves only as the
+  terminal failure upper bound. XCUI exposes no atomic diagnostics-publication
+  callback, so the owner checks immediately and then uses the shared named,
+  cancellable 100-millisecond XCUI readback cadence only while unresolved.
+  Expiry performs a final readback and reports the expected bundle, window
+  count, title counts, initial-absence and trigger gates, application states,
+  exact App and preview projections, observed title counts, generation, source,
+  cancellation state, and waiter result. Elapsed time cannot make the panel
+  ready.
+- Deterministic and lifecycle Pressure validation: after authorization, the
+  canonical rebuilt and signed Runner passed 8/8 selected checks with zero
+  failures in 1.180 seconds under
+  `.build-local/sync-036kx-deterministic-authorized`; XCTest operation time was
+  2.047 seconds. Coverage includes named-policy compatibility, exact atomic
+  projection, duplicate-title multiplicity, foreground and background running
+  states, wrong bundle/mode/count/state rejection, absent initial baseline,
+  matching stale-baseline rejection, immediate and delayed readbacks, slow
+  scheduling, explicit cancellation, watchdog final evidence, and 100
+  cancelled/replaced callback generations.
+- Affected UI: both current-source canonical signed real-topology paths passed
+  2/2 with zero failures in 119.363 seconds under
+  `.build-local/sync-036kx-signed-ui`; XCTest operation time was 120.134
+  seconds. The noisy four-window/two-fullscreen roundtrip completed in 72.731
+  seconds and the normal two-window/one-fullscreen roundtrip completed in
+  46.632 seconds. Both ran with application AX children suppressed, preserved
+  the fixture as frontmost while FlowTab remained stably running, and satisfied
+  the exact atomic panel projection on initial and reopened presentations.
+  Scheduling changed completion latency without changing the projected or
+  selected window identities.
+- Preliminary failure and recovery evidence: the canonical eight-check attempt
+  under `.build-local/sync-036kx-deterministic` entered all test bodies and
+  passed 7/8; only
+  `testInAppSwitcherPanelProjectionWatchdogReportsFinalEvidence` failed because
+  terminal diagnostics did not yet summarize the final observed title
+  multiplicity. The minimal reproduction command was:
+
+  ```bash
+  ./scripts/testing/run-ui-tests-local.sh \
+    --skip-space-fixtures \
+    --output-root <fresh-root> \
+    -only-testing:FlowTabUITests/FlowTabUITests/testInAppSwitcherPanelProjectionWatchdogReportsFinalEvidence
+  ```
+
+  Adding `observedTitleCounts` made the final Oracle actionable and the complete
+  final set passed. Five later probe attempts failed before every test body with
+  `Timed out while enabling automation mode`; their result bundles and wrapper
+  logs were retained under `sync-036kx-deterministic-final`,
+  `sync-036kx-deterministic-retry`, `sync-036kx-automation-probe`,
+  `sync-036kx-automation-xcode-probe`, and
+  `sync-036kx-automation-auth-probe`. The one-test reproduction command was:
+
+  ```bash
+  ./scripts/testing/run-ui-tests-local.sh \
+    --skip-space-fixtures \
+    --output-root <fresh-root> \
+    -only-testing:FlowTabUITests/FlowTabUITests/testInAppSwitcherPanelProjectionPolicyUsesNamedWatchdog
+  ```
+
+  Directed
+  `testmanagerd` and LocalAuthentication logs identified the pending
+  `Enable UI Automation` policy; after successful local authentication, the
+  post-authorization probe passed 1/1 in 0.508 seconds and both final validation
+  invocations passed. These failures are classified as test-diagnostic and UI
+  automation environment evidence.
+- Validation scope: UI-target deterministic state tests, lifecycle Pressure,
+  and both signed real Space-fixture paths are the applicable layers.
+  FlowTabCore Unit, app Unit/Behavior, and FlowTabTests are not relevant because
+  this slice changes UI-test synchronization and orchestration only. Production
+  behavior, fixture topology, configuration compatibility, window identity
+  semantics, module direction, and path-intent resolution remain unchanged.
+- Signing and Process/Tooling: final deterministic and UI status ledgers report
+  `completed`; every applicable fixture, signing, build, and test stage exited
+  zero, both result bundles are present, and the failure scan is empty.
+  Sandbox-external strict deep verification accepts the fixed App and final
+  rebuilt Runner under Team `96PUA726W9`, with CDHashes
+  `78a55012be48b3e401ae8351413f5c29e4b611f5` and
+  `5855d9aed122bc9528e2acbc90ccb7cf2219b2b6`; executable SHA-256 values are
+  `a67d3ec09f71685ab5b9cf844d190e23b4cb51c8fb9c2690036339d9e409ed35`
+  and `f5d40e16482ecc77ff478f6816b7e8873fd7303a2707c5dd8c9020c9783aeed5`.
+  Swift parsing, project plist lint, scoped raw-bound inventory, failure scan,
+  and `git diff --check` pass. The projection owner/tests and In-App workflow
+  contain 330, 312, and 702 lines with clear responsibilities. The former
+  `assertInAppWindowSwitcherReady` and its separate existence/App/title waits
+  are absent; remaining raw bounds in that workflow belong to KY through LD.
+  Exact App/Runner/fixture and repository-scoped xcodebuild process readbacks
+  are empty.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. Preliminary, authorization-probe,
+  deterministic, and signed UI evidence roots are removed after this durable
+  record and independent commit, followed by exact absence and
+  worktree-baseline checks.
+- Commit subject:
+  `test(sync): migrate SYNC-036KX atomic In-App panel projection`.
 
 ### SYNC-001 Authorized Resume Closure Record
 

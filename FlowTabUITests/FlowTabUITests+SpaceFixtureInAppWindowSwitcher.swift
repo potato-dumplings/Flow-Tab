@@ -83,12 +83,17 @@ extension FlowTabUITests {
             }
         ) { _, app in
             logWorkflowSpaceObservation("\(traceLabel).beforeTrigger", app: targetApp)
-            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.inApp, traceLabel: traceLabel)
-            var diagnosticsSummary = assertInAppWindowSwitcherReady(
-                for: targetApp,
-                in: app,
-                allowsNoisyCGSiblings: allowsNoisyCGSiblings
-            )
+            var diagnosticsSummary =
+                performAndWaitForInAppSwitcherPanelProjection(
+                    for: targetApp,
+                    in: app,
+                    trigger: {
+                        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                            .inApp,
+                            traceLabel: traceLabel
+                        )
+                    }
+                )
             logWorkflowSpaceObservation("\(traceLabel).afterPanelReady", app: targetApp)
             XCTAssertTrue(
                 allowsNoisyCGSiblings
@@ -244,17 +249,6 @@ extension FlowTabUITests {
             "Noisy Control+Tab workflow must include a second fullscreen window."
         )
 
-        XCTAssertTrue(
-            waitForSwitcherPreviewTitles(
-                initialDiagnosticsSummary,
-                toExactlyMatch: targetApp.expectedWindowTitles,
-                timeout: 4
-            ),
-            """
-            Noisy Control+Tab must expose exactly the four user windows, without CG-only fullscreen hosts.
-            \(switcherDebugSummary(app, diagnosticsSummary: initialDiagnosticsSummary))
-            """
-        )
         let initialSelection = try assertNoisyInAppWindowSwitcherCurrentSelection(
             primaryFullscreenTitle,
             expectedSelection: nil,
@@ -306,19 +300,7 @@ extension FlowTabUITests {
                 diagnosticsSummary = relaunchInAppWindowSwitcher(
                     app,
                     for: targetApp,
-                    focusedWindow: currentSelection,
-                    allowsNoisyCGSiblings: true
-                )
-                XCTAssertTrue(
-                    waitForSwitcherPreviewTitles(
-                        diagnosticsSummary,
-                        toExactlyMatch: targetApp.expectedWindowTitles,
-                        timeout: 4
-                    ),
-                    """
-                    Noisy Control+Tab reopened with unexpected window entries before \(phase.trace).
-                    \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                    """
+                    focusedWindow: currentSelection
                 )
                 XCTAssertTrue(
                     waitForExactFrontmostWorkflowCGWindow(
@@ -478,53 +460,6 @@ extension FlowTabUITests {
     ) -> [String] {
         let fullscreenTitles = Set(workflowApp.fullscreenWindowTitles)
         return workflowApp.expectedWindowTitles.filter { !fullscreenTitles.contains($0) }
-    }
-
-    private func assertInAppWindowSwitcherReady(
-        for workflowApp: SpaceFixtureResolvedWorkflow.App,
-        in app: XCUIApplication,
-        allowsNoisyCGSiblings: Bool = false
-    ) -> XCUIElement {
-        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
-
-        if allowsNoisyCGSiblings {
-            XCTAssertTrue(
-                waitForSwitcherAppEntry(
-                    diagnosticsSummary,
-                    bundleIdentifier: workflowApp.identity.bundleIdentifier,
-                    timeout: 8
-                )
-            )
-        } else {
-            XCTAssertTrue(
-                waitForSwitcherAppsSummary(
-                    diagnosticsSummary,
-                    toContain: switcherAppStripSummary(for: workflowApp),
-                    timeout: 8
-                )
-            )
-        }
-        XCTAssertEqual(
-            switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected"),
-            workflowApp.identity.bundleIdentifier
-        )
-        if allowsNoisyCGSiblings {
-            XCTAssertTrue(
-                waitForSwitcherPreviewTitles(
-                    diagnosticsSummary,
-                    toExactlyMatch: workflowApp.expectedWindowTitles,
-                    timeout: 8
-                ),
-                """
-                Control+Tab noisy window state did not expose exactly the expected user windows.
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-        } else {
-            XCTAssertEqual(Set(switcherPreviewTitles(from: diagnosticsSummary)), Set(workflowApp.expectedWindowTitles))
-        }
-        return diagnosticsSummary
     }
 
     private func assertNoisyInAppWindowSwitcherCurrentSelection(
@@ -732,8 +667,7 @@ extension FlowTabUITests {
     private func relaunchInAppWindowSwitcher(
         _ app: XCUIApplication,
         for workflowApp: SpaceFixtureResolvedWorkflow.App,
-        focusedWindow: InAppWindowSelection,
-        allowsNoisyCGSiblings: Bool = false
+        focusedWindow: InAppWindowSelection
     ) -> XCUIElement {
         XCTAssertTrue(app.state == .runningForeground || app.state == .runningBackground)
         let fixtureApplication =
@@ -753,11 +687,15 @@ extension FlowTabUITests {
                 }
             )
         )
-        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.inApp, traceLabel: "control.reopen")
-        return assertInAppWindowSwitcherReady(
+        return performAndWaitForInAppSwitcherPanelProjection(
             for: workflowApp,
             in: app,
-            allowsNoisyCGSiblings: allowsNoisyCGSiblings
+            trigger: {
+                postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                    .inApp,
+                    traceLabel: "control.reopen"
+                )
+            }
         )
     }
 
