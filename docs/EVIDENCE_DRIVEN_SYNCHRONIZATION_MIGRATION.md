@@ -568,7 +568,7 @@ and Process/Tooling.
 | SYNC-036KI | `testHomePageShowsMultipleRealSpaceFixtureWorkflowAppsAndWindowCounts`; atomic multi-App Home projection | Home is tapped first, then each App row and count receives an independent 20-second wait, so success can combine different snapshots. Evidence composition migration. | Install one Home row-projection owner before Home navigation; after the trigger require foreground state and all exact row identities/count values in one snapshot. The named watchdog is failure-only and the invocation owns cancellation. | H; exact atomic projection/initial/stale/slow-scheduling/cancel/watchdog/Pressure tests, signed multi-App Home UI, Process/Tooling. | completed |
 | SYNC-036KJ | `assertHomePageShowsOnlySelectedWorkflowAppTitles`; fullscreen-aware Home App inventory | Each workflow row receives a 20-second existence wait, and the fullscreen-only branch can treat watchdog expiry as success even though the documented Home contract requires stable presentation. Evidence migration. | Before Home navigation, observe one complete workflow-App inventory containing every exact standard and fullscreen-only row/count. Bookend exact-row readback with the global Home count label and total row count so unrelated machine Apps remain compatible while an in-flight inventory cannot satisfy. The owner gates post-trigger evidence and owns cadence cancellation. | H; standard/fullscreen/count-bookend/initial/stale/cancel/watchdog/Pressure tests, signed standard/fullscreen-only Home UIs, Process/Tooling. | completed |
 | SYNC-036KK | `assertHomePageShowsOnlySelectedWorkflowAppTitles`; exact selected-App Home window projection | Selection waits for one title, then independent count, per-title presence, and other-title absence waits can resolve from different snapshots. Evidence composition migration. | Start one exact window-projection owner before tapping each App row; accept an exact initial projection or, after trigger return, require foreground state, stable exact row count, selected-App bundle identity for every row, required selected-App titles present, and every other workflow title absent in one snapshot. The proven SYNC-036KJ inventory supplies each App-row count. Name the compatible selection/projection watchdog and cancel per iteration. | H; atomic visible/excluded/initial/stale/slow-scheduling/cancel/watchdog/Pressure tests, signed Home isolation UIs, Process/Tooling. | completed |
-| SYNC-036KL | Switcher multi-App workflows; exact initial App strip projection | Several paths independently wait for diagnostics and individual App rows (2/8 seconds), omitting exact logical counts and atomic all-App readiness. Evidence composition migration. | Reuse a multi-entry Switcher App-projection owner requiring every exact `bundleID:windowCount` plus each exact row identity in one foreground snapshot. One named watchdog covers all representative paths; each invocation owns cancellation. | H; exact multi-entry/row/count/prefix/stale/cancel/watchdog/Pressure tests, affected signed multi-App Switcher UIs, Process/Tooling. | planned |
+| SYNC-036KL | Switcher multi-App workflows; exact initial App strip projection | Several paths independently wait for diagnostics and individual App rows (2/8 seconds), omitting exact logical counts and atomic all-App readiness. Evidence composition migration. | Reuse one parsed `apps + selected` Switcher readback inside a fixture owner that bookends all target-row reads. Require the selected workflow App's exact configured window count, zero session windows for every unselected workflow App, every exact logical App-row identity, and foreground state in one snapshot; normalize duplicate XCUITest representations by row identity. The explicit global-trigger path installs the owner first; launch-open paths accept exact initial state. One named watchdog covers all representative paths; each invocation owns cancellation. | H; exact multi-entry/selection/row/count/prefix/stale/cancel/watchdog/Pressure tests, affected signed multi-App Switcher UIs, Process/Tooling. | completed |
 | SYNC-036KM | `testSwitcherPanelPreviewCyclesThroughWorkflowAppsWithoutMixingWindowCards`; exact selected-App preview transition | Down is sent before constructing the selected-App preview owner, then a redundant eight-second title wait rechecks evidence in another snapshot. Evidence-order migration. | Start one candidate-bound preview owner before Down, gate acceptance until input returns, and require the exact selected bundle plus its exact title set atomically. Remove the second wait; the per-iteration invocation owns cancellation. | H; pretrigger-match rejection/exact candidate/duplicate/out-of-order/cancel/watchdog/Pressure tests, signed preview-cycle UI, Process/Tooling. | planned |
 | SYNC-036KN | `assertSwitcherPreviewWindowCards`; multi-App real card identity projection | The helper correctly installs an exact card owner before Down, while its default eight-second literal has no named owner. Retained watchdog. | Name the card-identity projection watchdog and retain exact titles, exclusions, and new identifiers as success. The helper cancels its owner and reports the final snapshot. | M; policy/identity/exclusion/cancel/watchdog tests, signed card-anchor UI, Process/Tooling. | planned |
 | SYNC-036KO | standard multi-App open-window mutation; explicit close and gated one-card projection | A 30-second fixture auto-close supplies orchestration slack and a 40-second projection wait infers completion. Evidence migration. | Install the typed close observer before fixture launch, configure zero delay with explicit trigger, prove exact scheduled PID/window topology, start the one-card owner before triggering, and accept only matching applied generation plus exact remaining projection. Owners are cancelled by the scenario. | H; typed close/order/identity/cancel/watchdog and projection Pressure tests, signed standard mutation UI, Process/Tooling. | planned |
@@ -28014,6 +28014,81 @@ polling cadence, deadline, or timeout in the scoped paths.
   worktree-baseline checks.
 - Commit subject:
   `test(sync): migrate SYNC-036KK exact Home windows`.
+
+### SYNC-036KL Closure Record
+
+- Status and Oracle: completed. Five multi-App Switcher paths now share one
+  `FlowTabUITestSpaceFixtureSwitcherAppStripProjectionObservationOwner`.
+  One accepted snapshot must show FlowTab foreground, equal `apps + selected`
+  diagnostics on both sides of the accessibility-row read, the selected exact
+  workflow App with its configured session-window count, every unselected
+  workflow App with zero session windows, and the complete exact workflow
+  App-row identity set. Unrelated machine Apps remain compatible. Exact target
+  entry count and raw-value equality reject duplicate and prefix identities.
+- Evidence ordering and lifecycle: every launch-open path accepts an already
+  exact initial projection. The explicit global-trigger path starts the owner
+  and performs its initial readback before delivering the notification, gates
+  acceptance until delivery returns, and requests an immediate trigger
+  readback. The invocation owns observation generation, scheduled condition
+  readbacks, waiter, idempotent cancellation on every exit, and deinitialization
+  cleanup. Replaced-generation callbacks cannot read or resolve current state.
+- Real-topology correction evidence: the first signed run supplied a stable
+  initial session with `finder:0`, `chrome:0`, `notes:2` and selected Notes.
+  It also showed two XCUITest representations for each exact logical App row.
+  The final Oracle therefore reads `apps` and `selected` from the same
+  diagnostics value, derives exact counts from the selected-session contract,
+  and normalizes accessibility representations by exact row identifier. The
+  initial build also exposed one escaping-closure `self` qualification, which
+  was corrected before deterministic validation.
+- Retained time: Accessibility/XCUI supplies no atomic App-strip publication
+  event. The owner performs an immediate readback and retains the shared named
+  100-millisecond cancellable XCUI condition cadence only while exact evidence
+  is incomplete. One named eight-second watchdog bounds missing evidence and
+  reports acceptance state, source, generation, selected identity, exact App
+  entries, logical row identities, and the final bookended snapshot. Elapsed
+  time cannot establish App-strip readiness or trigger success. Deterministic
+  watchdog coverage uses a named test-only ten-millisecond failure bound.
+- Deterministic validation: the final canonical rebuilt signed Runner passed
+  8/8 selected policy, well-formed expectation, exact selected/unselected
+  counts, row-representation normalization, prefix/duplicate/bookend rejection,
+  matching initial evidence, trigger-return gating, slow scheduling,
+  cancellation, and final-watchdog diagnostics in 1.277 seconds under
+  `.build-local/sync-036kl-deterministic-v3`.
+- Pressure validation: the 200-generation replaced-readback test passed 1/1
+  in 0.219 seconds under `.build-local/sync-036kl-pressure-v2`. Every
+  superseded registration was cancelled, retained callbacks performed no
+  readback, and only generation 200 accepted the final exact snapshot.
+- Affected UI: the final canonical signed invocation passed 5/5 in 152.310
+  seconds under `.build-local/sync-036kl-ui-v2`. App preview cycling passed in
+  24.620 seconds, real card-anchor isolation in 32.134 seconds, fullscreen
+  window-close refresh in 38.608 seconds, standard window-set refresh in
+  37.193 seconds, and the direct multi-App strip path in 19.752 seconds. Each
+  path crossed the same exact initial App-strip Oracle before its existing
+  visible workflow assertions.
+- Validation scope: FlowTabCore Unit, app Unit/Behavior, FlowTabTests,
+  unrelated UI, and production Pressure are not relevant because this slice
+  changes UI-test orchestration and deterministic owner coverage while
+  preserving production behavior, configuration, window identity, module
+  direction, and path intent. Real fixture topology and the five affected
+  visible paths provide the independent application Oracle.
+- Signing and Process/Tooling: the canonical installer, six-target UI build,
+  deterministic run, Pressure run, and five-path UI run completed successfully.
+  Sandbox-external strict deep verification accepts the App and final Runner
+  under Team `96PUA726W9` with CDHashes
+  `78a55012be48b3e401ae8351413f5c29e4b611f5` and
+  `f1bdfedb21827b22a18fb59c5365656453b13eee`. Project plist lint,
+  `git diff --check`, scoped stale-helper search, exact diff review, and exact
+  process readbacks pass; App, Runner, fixture, and repository-scoped
+  xcodebuild queries are empty. The new owner and single-contract test files
+  contain 360 and 481 lines; the existing oversized workflow is reduced from
+  850 to 809 lines without adding a responsibility.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. Initial diagnostic and final
+  deterministic, Pressure, and UI evidence roots are removed after this
+  durable record and independent commit, followed by exact absence and
+  worktree-baseline checks.
+- Commit subject:
+  `test(sync): migrate SYNC-036KL exact Switcher Apps`.
 
 ### SYNC-001 Authorized Resume Closure Record
 

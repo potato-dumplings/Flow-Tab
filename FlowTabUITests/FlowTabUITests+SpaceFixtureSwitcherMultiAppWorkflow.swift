@@ -11,47 +11,11 @@ extension FlowTabUITests {
             workflow,
             flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
         ) { workflow, app in
-            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-
-            for workflowApp in workflow.apps {
-                assertSwitcherAppStripContainsWorkflowApp(
-                    workflowApp,
-                    in: app,
-                    diagnosticsSummary: diagnosticsSummary
-                )
-                if diagnosticsSummary.exists {
-                    XCTAssertTrue(
-                        waitForSwitcherAppEntry(
-                            diagnosticsSummary,
-                            bundleIdentifier: workflowApp.identity.bundleIdentifier,
-                            timeout: 2
-                        ),
-                        """
-                        FlowTab did not include \(workflowApp.appName) in the switcher diagnostics summary.
-
-                        \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                        """
-                    )
-                }
-            }
+            _ = waitForSpaceFixtureSwitcherAppStripProjection(
+                workflow,
+                in: app
+            )
         }
-    }
-
-    private func assertSwitcherAppStripContainsWorkflowApp(
-        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
-        in app: XCUIApplication,
-        diagnosticsSummary: XCUIElement
-    ) {
-        let appTile = element(in: app, identifier: workflowApp.identity.switcherAppAccessibilityIdentifier)
-        XCTAssertTrue(
-            appTile.waitForExistence(timeout: 8),
-            """
-            FlowTab did not expose \(workflowApp.appName) through \
-            \(workflowApp.identity.switcherAppAccessibilityIdentifier).
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
     }
 
     func testSwitcherPanelPreviewCyclesThroughWorkflowAppsWithoutMixingWindowCards() throws {
@@ -67,12 +31,16 @@ extension FlowTabUITests {
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         ) { workflow, app in
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: "multi-app-preview.initial")
-            assertSwitcherAppStripContainsWorkflowApp(
-                workflow.apps[0], in: app,
-                diagnosticsSummary: diagnosticsSummary
-            )
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+            guard waitForSpaceFixtureSwitcherAppStripProjection(
+                workflow,
+                in: app,
+                trigger: {
+                    self.postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                        .global,
+                        traceLabel: "multi-app-preview.initial"
+                    )
+                }
+            ) != nil else { return }
             selectSwitcherWorkflowApp(workflow.apps[0], in: app, diagnosticsSummary: diagnosticsSummary)
 
             var observedAppIDs: [String] = []
@@ -124,13 +92,10 @@ extension FlowTabUITests {
             flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
         ) { workflow, app in
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(
-                element(
-                    in: app,
-                    identifier: workflow.apps[0].identity.switcherAppAccessibilityIdentifier
-                ).waitForExistence(timeout: 8)
-            )
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+            guard waitForSpaceFixtureSwitcherAppStripProjection(
+                workflow,
+                in: app
+            ) != nil else { return }
             selectSwitcherWorkflowApp(workflow.apps[0], in: app, diagnosticsSummary: diagnosticsSummary)
 
             var observedAppIDs: [String] = []
@@ -219,13 +184,10 @@ extension FlowTabUITests {
             }
         ) { workflow, app in
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
-            XCTAssertTrue(
-                element(
-                    in: app,
-                    identifier: targetApp.identity.switcherAppAccessibilityIdentifier
-                ).waitForExistence(timeout: 8)
-            )
+            guard waitForSpaceFixtureSwitcherAppStripProjection(
+                workflow,
+                in: app
+            ) != nil else { return }
 
             let targetProcessIdentifier =
                 try runningWorkflowApplicationProcessIdentifier(targetApp)
@@ -311,13 +273,10 @@ extension FlowTabUITests {
             }
         ) { workflow, app in
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
-            XCTAssertTrue(
-                element(
-                    in: app,
-                    identifier: targetApp.identity.switcherAppAccessibilityIdentifier
-                ).waitForExistence(timeout: 8)
-            )
+            guard waitForSpaceFixtureSwitcherAppStripProjection(
+                workflow,
+                in: app
+            ) != nil else { return }
 
             let targetProcessIdentifier =
                 try runningWorkflowApplicationProcessIdentifier(targetApp)
