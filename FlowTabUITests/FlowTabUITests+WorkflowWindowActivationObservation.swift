@@ -3,6 +3,10 @@ import ApplicationServices
 import Foundation
 import XCTest
 
+enum FlowTabUITestWorkflowWindowActivationObservationPolicy {
+    static let edgeInputsExactWindowWatchdog: TimeInterval = 10
+}
+
 struct FlowTabUITestWorkflowWindowActivationSnapshot: Equatable {
     let frontmostBundleIdentifier: String?
     let topmostCGWindow: WorkflowCGWindowObservation?

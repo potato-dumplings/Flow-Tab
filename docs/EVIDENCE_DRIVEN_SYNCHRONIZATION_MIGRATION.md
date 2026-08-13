@@ -564,7 +564,7 @@ and Process/Tooling.
 | SYNC-036KE | duplicate-title Edge preview; focused public-state identity publication | A raw eight-second regex wait starts from a prelaunch baseline and requires one internal first-assignment branch. A prior exact public binding can legitimately make later readbacks sticky, so scheduling changes the log shape and the test result. Evidence refinement plus retained watchdog. | Start one typed runtime-log owner before fixture launch and bind the exact bundle-derived PID when fixture readiness is available. Accept either one exact focused public-state tie-break or one snapshot joining the same focused PID/AX/CG topology with a `publicExactMatch` binding transition; both prove the intended distinct identity. Name the terminal bound, perform immediate post-bind readback, and let the scenario own baseline/owner cancellation. | H; exact parser/source/PID/initial/event/file-replacement/slow-scheduling/cancel/watchdog/Pressure tests, signed duplicate-title UI across both evidence shapes, Process/Tooling. | completed |
 | SYNC-036KF | minimized Edge preview; minimized AX source-to-window-layer propagation | Two sequential raw eight-second log waits separately observe source topology and output projection and can succeed from unrelated records. Evidence composition migration. | One prelaunch runtime-log owner requires both exact-PID minimized source evidence and its minimized WindowRecord projection after the preview trigger. File events drive readback; a named watchdog reports both missing stages. The scenario owns cancellation. | H; initial/ordered-or-duplicate events/wrong-PID/cancel/watchdog/slow-scheduling tests, signed minimized UI, Process/Tooling. | completed |
 | SYNC-036KG | Edge Window Search scenarios and `performAndWaitForSwitcherSearchWindowIdentifiers`; committed result projection | Both observer-before-typing paths already require exact scope/query/count/identity evidence, while callers supply anonymous eight-second bounds. Retained watchdog. | Name one Edge committed-result watchdog under the Search projection owner and preserve atomic scope/query/result identities as success. Each invocation cancels its owner/cadence. | M; policy/exact query/count/identifier/cancel/watchdog tests, both signed Edge Search UIs, Process/Tooling. | completed |
-| SYNC-036KH | Edge-title Search confirmation; exact CG window activation | The activation owner is installed before confirmation and accepts exact bundle/window-number readback, while a raw ten-second bound lacks scenario policy ownership. Retained watchdog. | Name the Edge exact-window activation watchdog under the workflow-window owner; keep workspace/AX events plus cancellable fallback and exact frontmost readback as the Oracle. | M; policy/exact/wrong-window/cancel/watchdog tests, signed edge-title activation UI, Process/Tooling. | planned |
+| SYNC-036KH | Edge-title Search confirmation; exact CG window activation | The activation owner is installed before confirmation and accepts exact bundle/window-number readback, while a raw ten-second bound lacks scenario policy ownership. Retained watchdog. | Name the Edge exact-window activation watchdog under the workflow-window owner; keep workspace/AX events plus cancellable fallback and exact frontmost readback as the Oracle. | M; policy/exact/wrong-window/cancel/watchdog tests, signed edge-title activation UI, Process/Tooling. | completed |
 | SYNC-036KI | `testHomePageShowsMultipleRealSpaceFixtureWorkflowAppsAndWindowCounts`; atomic multi-App Home projection | Home is tapped first, then each App row and count receives an independent 20-second wait, so success can combine different snapshots. Evidence composition migration. | Install one Home row-projection owner before Home navigation; after the trigger require foreground state and all exact row identities/count values in one snapshot. The named watchdog is failure-only and the invocation owns cancellation. | H; exact atomic projection/initial/stale/slow-scheduling/cancel/watchdog/Pressure tests, signed multi-App Home UI, Process/Tooling. | planned |
 | SYNC-036KJ | `assertHomePageShowsOnlySelectedWorkflowAppTitles`; fullscreen-aware Home App inventory | Each row receives a 20-second existence wait, and absence of a fullscreen-only App is inferred from watchdog expiry. Evidence migration. | Before Home navigation, observe one complete Home App inventory containing every eligible exact row/count and explicitly excluding fullscreen-only rows, with count-label readback on both sides. The owner gates post-trigger evidence and owns cadence cancellation. | H; include/exclude/count/initial/stale/cancel/watchdog/Pressure tests, signed standard/fullscreen-only Home UIs, Process/Tooling. | planned |
 | SYNC-036KK | `assertHomePageShowsOnlySelectedWorkflowAppTitles`; exact selected-App Home window projection | Selection waits for one title, then independent count, per-title presence, and other-title absence waits can resolve from different snapshots. Evidence composition migration. | Start one exact window-projection owner before tapping each App row; after trigger require all selected-App titles visible and every other workflow title absent in one snapshot, while the proven inventory supplies the row count. Name the compatible selection/projection watchdog and cancel per iteration. | H; atomic visible/excluded/initial/stale/slow-scheduling/cancel/watchdog/Pressure tests, signed Home isolation UIs, Process/Tooling. | planned |
@@ -27748,6 +27748,59 @@ polling cadence, deadline, or timeout in the scoped paths.
   exact absence and worktree-baseline checks.
 - Commit subject:
   `test(sync): migrate SYNC-036KG Edge Search watchdog`.
+
+### SYNC-036KH Closure Record
+
+- Status and Oracle: completed. The Edge-title Search confirmation now obtains
+  its terminal bound from
+  `FlowTabUITestWorkflowWindowActivationObservationPolicy.edgeInputsExactWindowWatchdog`.
+  Success still requires one readback in which the exact target bundle is
+  frontmost and its topmost CG window has the selected result's exact
+  `CGWindowID`. Title evidence remains diagnostic because exact window identity
+  is authoritative.
+- Evidence ordering and lifecycle: the workflow-window activation owner starts
+  before the Search confirmation command. Its initial readback records the
+  baseline while `triggerCompleted` rejects matching evidence; command return
+  opens the acceptance gate and `waitForResolution` performs an immediate
+  readback. The invocation owns generation, workspace notification, target-PID
+  AX focused/main-window observer, fallback schedule, watchdog, and idempotent
+  cancellation on every exit.
+- Retained time: ten seconds remains only as the named failure upper bound for
+  absent exact activation evidence. Workspace and AX events drive readback;
+  the shared named 100-millisecond cancellable fallback covers coalesced or
+  unavailable platform publication. Watchdog diagnostics report the gate,
+  expected bundle/window/title, final frontmost bundle, topmost CG window,
+  active title, source, and generation. Elapsed time cannot establish success.
+- Deterministic validation: the canonical rebuilt signed Runner passed the
+  selected policy, exact initial state, observer-before-readback and trigger
+  gate, wrong-bundle/window rejection, slow-readback, and final-watchdog
+  diagnostic coverage 6/6 in 0.927 seconds.
+- Pressure validation: the 100-generation cancelled/replaced event lifecycle
+  test passed 1/1 in 0.303 seconds. Stale handlers could not resolve a newer
+  activation owner, while the current generation accepted the exact identity.
+- Affected UI: after the canonical installer refreshed the fixed signed App,
+  the real non-ASCII punctuation/long-title Search confirmation and exact
+  window activation path passed 1/1 in 16.886 seconds.
+- Validation scope: FlowTabCore Unit, app Unit/Behavior, FlowTabTests,
+  unrelated UI, and production Pressure are not relevant because production
+  activation, Search behavior, configuration, window identity, module
+  direction, path intent, and recurring work are unchanged. This slice names
+  one UI-test activation watchdog, asserts its policy, and migrates its one
+  representative Edge caller.
+- Signing and Process/Tooling: the canonical six-target UI test build and
+  fixed-App install completed successfully. Sandbox-external strict deep
+  verification accepts the App and Runner under Team `96PUA726W9` with
+  CDHashes `78a55012be48b3e401ae8351413f5c29e4b611f5` and
+  `1af51abfb88ac64fd59ba227e422b07179162830`. Exact App/Runner/fixture and
+  repository-scoped xcodebuild process readbacks are empty. Swift parsing,
+  `git diff --check`, exact diff review, and staged-content review form the
+  remaining local Process/Tooling gate.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. The reproducible UI result bundle
+  is removed after this durable record and independent commit, followed by
+  exact absence and worktree-baseline checks.
+- Commit subject:
+  `test(sync): migrate SYNC-036KH Edge activation watchdog`.
 
 ### SYNC-001 Authorized Resume Closure Record
 

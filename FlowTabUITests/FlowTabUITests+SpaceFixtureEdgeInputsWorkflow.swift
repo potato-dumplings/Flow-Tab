@@ -283,7 +283,9 @@ extension FlowTabUITests {
                     windowNumber: targetWindowNumber,
                     title: edgeTitle,
                     app: targetApp,
-                    timeout: 10,
+                    timeout:
+                        FlowTabUITestWorkflowWindowActivationObservationPolicy
+                        .edgeInputsExactWindowWatchdog,
                     trigger: {
                         confirmEdgeSwitcherSearchSelection(
                             in: app,

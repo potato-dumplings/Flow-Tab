@@ -7,6 +7,14 @@ private enum FlowTabUITestWorkflowWindowActivationTestPolicy {
 }
 
 extension FlowTabUITests {
+    func testWorkflowWindowActivationPolicyUsesNamedEdgeWatchdog() {
+        let watchdog =
+            FlowTabUITestWorkflowWindowActivationObservationPolicy
+            .edgeInputsExactWindowWatchdog
+        XCTAssertEqual(watchdog, 10)
+        XCTAssertTrue(watchdog.isFinite && watchdog > 0)
+    }
+
     func testWorkflowWindowActivationObserverAcceptsExactInitialState() {
         var registrationOrder: [String] = []
         let owner =
