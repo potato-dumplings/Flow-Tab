@@ -976,28 +976,13 @@ extension FlowTabUITests {
         }
 
         for workflowApp in workflow.apps {
-            let homeRows = app.buttons.matching(identifier: workflowApp.identity.homeAppAccessibilityIdentifier)
-            guard selectHomeWorkflowApp(workflowApp, in: app, timeout: 8) else {
-                XCTFail(
-                    "FlowTab surfaced \(workflowApp.appName) on the home page, but its selection was not confirmed"
-                )
+            guard selectSpaceFixtureHomeAppAndWaitForExactWindowProjection(
+                workflowApp,
+                in: workflow,
+                app: app
+            ) != nil else {
                 return
             }
-            assertValue(of: homeRows.firstMatch, equals: "\(workflowApp.windowCount)w", timeout: 20)
-
-            for title in workflowApp.expectedHomeWindowTitles {
-                assertHomeWindowTitle(
-                    title,
-                    in: app,
-                    timeout: 12,
-                    message: "Missing window title for \(workflowApp.appName): \(title)"
-                )
-            }
-            assertHomeWindowTitlesAbsent(
-                workflow.otherExpectedHomeWindowTitles(excluding: workflowApp.appID),
-                in: app,
-                timeout: 12
-            )
         }
     }
 
