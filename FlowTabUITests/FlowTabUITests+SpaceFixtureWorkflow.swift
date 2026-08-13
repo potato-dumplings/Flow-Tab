@@ -99,8 +99,17 @@ extension FlowTabUITests {
             targetDescription: "quit-shortcut-post-fixture-launch"
         )
 
-        let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
-        XCTAssertTrue(fixtureAppTile.waitForExistence(timeout: 12))
+        guard assertCurrentSwitcherAppProjection(
+            in: app,
+            exactEntry: "\(identity.bundleIdentifier):1",
+            timeout:
+                FlowTabUITestSwitcherAppProjectionPolicy
+                    .quitShortcutInitialProjectionWatchdog
+        ) else { return }
+        let fixtureAppTile = element(
+            in: app,
+            identifier: identity.switcherAppAccessibilityIdentifier
+        )
         selectSwitcherAppDirectly(
             in: app,
             appID: identity.bundleIdentifier,

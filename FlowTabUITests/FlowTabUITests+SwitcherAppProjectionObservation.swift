@@ -6,6 +6,7 @@ enum FlowTabUITestSwitcherAppProjectionPolicy {
     static let runtimeOrderWatchdog: TimeInterval = 5
     static let standardFixtureProjectionWatchdog: TimeInterval = 8
     static let quitShortcutRemovalWatchdog: TimeInterval = 8
+    static let quitShortcutInitialProjectionWatchdog: TimeInterval = 12
 }
 
 struct FlowTabUITestSwitcherAppProjectionEntry: Equatable {

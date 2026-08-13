@@ -75,6 +75,23 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherAppProjectionQuitShortcutInitialPolicyPreservesCompatibleBound() {
+        XCTAssertEqual(
+            FlowTabUITestSwitcherAppProjectionPolicy
+                .quitShortcutInitialProjectionWatchdog,
+            12
+        )
+        XCTAssertTrue(
+            FlowTabUITestSwitcherAppProjectionPolicy
+                .quitShortcutInitialProjectionWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSwitcherAppProjectionPolicy
+                .quitShortcutInitialProjectionWatchdog,
+            0
+        )
+    }
+
     func testSwitcherAppProjectionParsesBundleAndWindowCount() {
         let entry = FlowTabUITestSwitcherAppProjectionEntry(
             rawValue: "com.example.browser:2"
