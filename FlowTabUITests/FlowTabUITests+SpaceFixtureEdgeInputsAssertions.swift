@@ -5,28 +5,39 @@ import XCTest
 extension FlowTabUITests {
     func selectEdgeWorkflowAppInSwitcherAppLayer(
         _ targetApp: SpaceFixtureResolvedWorkflow.App,
-        app: XCUIApplication,
-        diagnosticsSummary: XCUIElement,
-        timeout: TimeInterval
+        app: XCUIApplication
     ) -> Bool {
         do {
-            try FlowTabUITestSwitcherCommandPayload.write(targetApp.identity.bundleIdentifier)
-        } catch {
-            XCTFail("Failed to write edge workflow switcher select-app payload: \(error)")
-            return false
-        }
-        return performAndWaitForSwitcherDiagnostics(
-            diagnosticsSummary,
-            key: "selected",
-            equals: targetApp.identity.bundleIdentifier,
-            timeout: timeout
-        ) {
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
-                .selectApp,
-                traceLabel:
-                    "edgeInputs.selectApp.\(targetApp.appID)",
-                timeout: timeout
+            return try performAndWaitForSwitcherAppSelection(
+                in: app,
+                bundleIdentifier:
+                    targetApp.identity.bundleIdentifier,
+                appProjectionExpectation:
+                    .exactEntry(
+                        targetApp.identity.bundleIdentifier
+                            + ":2"
+                    ),
+                timeout:
+                    FlowTabUITestSwitcherAppSelectionPolicy
+                        .edgeInputsApplicationWatchdog,
+                trigger: {
+                    try FlowTabUITestSwitcherCommandPayload.write(
+                        targetApp.identity.bundleIdentifier
+                    )
+                    postFlowTabUITestSwitcherCommand(
+                        .selectApp,
+                        traceLabel:
+                            "edgeInputs.selectApp."
+                            + targetApp.appID
+                    )
+                }
             )
+        } catch {
+            XCTFail(
+                "Failed to publish the edge workflow "
+                    + "switcher select-app payload: \(error)"
+            )
+            return false
         }
     }
 

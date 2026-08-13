@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 
 enum FlowTabUITestSwitcherAppSelectionPolicy {
+    static let edgeInputsApplicationWatchdog: TimeInterval = 10
     static let openWindowMutationApplicationWatchdog: TimeInterval = 8
     static let selectedWindowMutationApplicationWatchdog: TimeInterval = 8
 }
@@ -178,7 +179,10 @@ extension FlowTabUITests {
                 }
             )
         owner.start()
-        defer { owner.cancel() }
+        defer {
+            owner.cancel()
+            logBaseline.cancel()
+        }
 
         try trigger()
 

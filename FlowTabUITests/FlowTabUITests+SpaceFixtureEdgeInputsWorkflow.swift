@@ -58,7 +58,6 @@ extension FlowTabUITests {
             focusedPublicState.bindTarget(
                 processIdentifier: targetPID
             )
-            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
             guard assertCurrentSwitcherAppProjection(
                 in: app,
                 exactEntry: "\(targetApp.identity.bundleIdentifier):2",
@@ -67,9 +66,7 @@ extension FlowTabUITests {
             XCTAssertTrue(
                 selectEdgeWorkflowAppInSwitcherAppLayer(
                     targetApp,
-                    app: app,
-                    diagnosticsSummary: diagnosticsSummary,
-                    timeout: 10
+                    app: app
                 ),
                 "Switcher did not select the duplicate-window workflow app before preview assertions."
             )
@@ -119,7 +116,6 @@ extension FlowTabUITests {
                 "--flowtab-ui-listen-switcher-trigger"
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         ) { _, app in
-            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
             guard assertCurrentSwitcherAppProjection(
                 in: app,
                 exactEntry: "\(targetApp.identity.bundleIdentifier):2",
@@ -128,9 +124,7 @@ extension FlowTabUITests {
             XCTAssertTrue(
                 selectEdgeWorkflowAppInSwitcherAppLayer(
                     targetApp,
-                    app: app,
-                    diagnosticsSummary: diagnosticsSummary,
-                    timeout: 10
+                    app: app
                 ),
                 "Switcher did not select the duplicate-window workflow app before minimized-state assertions."
             )
