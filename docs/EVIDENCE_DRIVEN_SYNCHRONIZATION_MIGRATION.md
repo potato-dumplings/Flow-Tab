@@ -124,7 +124,7 @@ and Process/Tooling.
 | SYNC-018 | `OptionTabHotkeyMonitor`, `AppDelegate.setupHotkeyMonitors`, `SwitcherHotkeyInputOwner`, `SwitcherPanelController+Hotkeys.swift`, `+SelectionLifecycle.swift`; tab throttle and post-finish ignore | 16ms and 20ms windows discard input assumed to be duplicate/replayed, so scheduling can change the selected result. Evidence migration. | Give each monitor a stable source UUID and monotonic sequence; register the exact route source and callback before explicitly starting Carbon observation. Accept each route/source/sequence identity once, reject duplicate, regressed, or replaced-source delivery, and preserve every distinct immediate event. Establish modifier/main-key observation before selection commit/end and close replay suppression only from an exact released-state readback. The controller owns input generations; AppDelegate owns monitor start/stop; the release owner owns observer/fallback cancellation. | H; Unit, Behavior, switcher UI, interaction Pressure. | completed; the expanded full Priority run's assigned SYNC-032/SYNC-033 order-isolation failure is recorded below |
 | SYNC-019 | `InitialPanelVisibilityObservationOwner`, `SwitcherPanelController+InitialVisibilityRecovery.swift`; initial panel visibility | A grace duration decides whether occlusion is stale and later triggers failure. Evidence migration plus watchdog. | Install panel occlusion, become-key, and expose observers during controller initialization. Start the session observation before the first order-front action, and accept only an exact visible `PanelVisibilitySnapshot` from the initial readback, matching presentation action, window event, or recovery readback. An unsatisfied 350ms readback only escalates recovery and keeps the exact observation active; SYNC-019R1 owns the final cross-owner lifecycle repair. | H; Unit, Behavior, switcher UI, runtime-topology Pressure. | completed through implementation commit `a0b746b` and the SYNC-019R1 repair; deterministic Unit/Behavior, full FlowTabTests, focused signed UI, and noisy runtime-topology Pressure passed |
 | SYNC-019R1 | `InitialPanelVisibilityObservationOwner`, `SwitcherPanelController+InitialVisibilityRecovery`, `SwitcherPanelController+VisibilityRecovery`, and initial-presentation TestingSupport readback; slow initial panel exposure | The SYNC-019 350ms terminal watchdog removed the exact visibility observation and routed its unsatisfied final readback through modifier-state interruption handling. A real topology presentation scheduled at 372.550ms therefore cancelled after the modifier had been released, even though later AppKit visibility evidence could still arrive. Evidence-lifecycle repair plus domain recovery timing. | Retain 350ms only as the named initial-presentation recovery-escalation policy. Check exact visibility on delivery; a visible readback completes normally, while an unsatisfied readback starts the existing hard-reorder recovery without cancelling the session and leaves the original exact visibility observer active. Initial or later panel evidence remains the sole presentation-success Oracle. Exact recovery evidence cancels the initial observer; exact initial evidence cancels recovery. The recovery owner's one-second watchdog terminates and diagnoses only that bounded recovery action, while presentation/session end, selection, cancellation, replacement, and controller release own the persistent observation and every scheduler token. | H production switcher presentation and shared UI readiness readback; deterministic initial/event/escalation/synchronous-delivery/late-evidence/cross-owner-cancel/modifier-release-result/cancellation plus 2,000 replacement and 200 presentation lifecycle Pressure, focused and full FlowTabTests, affected signed switcher UI and noisy cross-Space runtime-topology Pressure, signing/process evidence, and Process/Tooling. FlowTabCore is not relevant because the contract remains inside AppKit presentation and app TestingSupport boundaries. | completed: exact-evidence lifecycle repair, full 1,095-test app suite, focused signed UI, 50ms-sampled real-topology Pressure, signing, and process cleanup passed |
-| SYNC-020 | `PanelVisibilityRecoveryObservationOwner`, `SwitcherPanelController+VisibilityRecovery.swift`; visibility recovery attempts and hard reorder | Fixed `[0, 50ms, 150ms, 300ms]` attempt waits and a fixed 10ms order-out/order-front gap assumed AppKit had committed window ordering. Evidence migration plus conditional observation. | Use the controller-lifetime occlusion/key/expose observers established by SYNC-019, an immediate exact readback, and an ordered state machine that must observe `panelPresented == false` before order-front and exact `userVisible == true` before success. The local AppKit SDK has no public order-on/off notification, so the presentation session owns one named cancellable 10ms condition-readback cadence, a four-attempt action policy, matching recovery/presentation generations, and a 1-second diagnostic watchdog. | H; Unit, Behavior, switcher UI, runtime-topology Pressure. | blocked: implementation and all-target Process build passed; the shared macOS XCTest service blocked Unit/Behavior/UI execution before test start, and runtime-topology launch identity remained unobserved |
+| SYNC-020 | `PanelVisibilityRecoveryObservationOwner`, `SwitcherPanelController+VisibilityRecovery.swift`; visibility recovery attempts and hard reorder | Fixed `[0, 50ms, 150ms, 300ms]` attempt waits and a fixed 10ms order-out/order-front gap assumed AppKit had committed window ordering. Evidence migration plus conditional observation. | Use the controller-lifetime occlusion/key/expose observers established by SYNC-019, an immediate exact readback, and an ordered state machine that must observe `panelPresented == false` before order-front and exact `userVisible == true` before success. The local AppKit SDK has no public order-on/off notification, so the presentation session owns one named cancellable 10ms condition-readback cadence, a four-attempt action policy, matching recovery/presentation generations, and a 1-second diagnostic watchdog. | H; Unit, Behavior, switcher UI, runtime-topology Pressure. | completed: authorized Unit/Behavior 10/10, focused signed UI 1/1, real-topology Pressure 1/1 with 54/54 identity checks, strict signing, exact cleanup, and Process/Tooling evidence passed |
 | SYNC-021 | `ActiveSpaceTransitionObservationOwner`, `SwitcherPanelController+ActiveSpaceTransition.swift`; active-Space ignore and activation-suppression windows | 350ms/500ms windows assume which Space notifications belong to FlowTab's own presentation/migration. Evidence migration plus watchdog. | Establish the observation and exact runtime-service baseline before requesting topology refresh. Resolve only after the Space projection generation advances, then correlate current-Space identity, presentation generation, and exact panel visibility. Independent request-return and projection-notification readbacks close synchronous and missed-event races. The presentation session owns replacement, cancellation, activation suppression, and a one-second diagnostic watchdog. | H; Unit, Behavior, cross-Space UI, runtime-topology Pressure. | blocked: implementation, Unit/Behavior, deterministic Pressure, and Process passed; macOS LocalAuthentication blocked cross-Space UI and real-topology Pressure before test start |
 | SYNC-022 | `TerminateInterruptionProtectionObservationOwner`, `SwitcherPanelController+TerminateInterruptionProtection.swift`, `+Hotkeys.swift`, `+InputHandling.swift`; terminate interruption protection | Five-second and 500ms uptime windows inferred that termination, projection refresh, and related AppKit presentation interruptions had finished. Evidence migration plus watchdog. | Establish an exact appID/PID/request-generation and projection baseline before sending the terminate request. Latch target completion only from matching workspace termination or terminated-process readback plus exact projection removal/replacement. Cancel the completion watchdog at that point, then retain an untimed presentation latch until active-Space, panel-visibility, or consumed interruption evidence is followed by a stable visible/active readback. The presentation session owns replacement and cancellation. | H; Unit, Behavior, termination UI, runtime-topology Pressure. | completed |
 | SYNC-023 | `SwitcherPanelController+Hotkeys.swift`, `AppPreferences.swift`; delayed window-layer entry | The user-configured delay is the product contract. A secondary 350ms timer currently probes projection readiness. Domain duration plus evidence migration. | Retain the persisted auto-entry deadline under a named injectable scheduler. Enter only when both the user deadline and matching projection readiness are observed; remove the secondary readiness timer and react to projection generation events. The panel session owns timer cancellation. | H; Unit, Behavior, switcher UI, interaction Pressure. | completed |
@@ -27194,3 +27194,78 @@ polling cadence, deadline, or timeout in the scoped paths.
   (`refactor(sync): migrate SYNC-019 initial panel visibility`).
 - Repair commit subject:
   `fix(sync): repair SYNC-019R1 slow panel visibility`.
+
+### SYNC-020 Authorized Resume Closure Record
+
+- Status and authorization: completed. Before this permission-blocked slice
+  changed from `blocked` to `running`, its exact canonical FlowTabTests command
+  directly re-authorized XCTest/Xcode Helper Accessibility execution. The
+  canonical installer then rebuilt the final-source signed App, and the private
+  identity manifest used by the real-topology run has SHA-256
+  `cd9d3f52bc02ed15b1a345a51ea34923944d08a3384c96c78039a072c7d3c477`.
+- Design and Oracle: `PanelVisibilityRecoveryObservationOwner` performs an
+  immediate exact `PanelVisibilitySnapshot` readback, observes
+  `panelPresented == false` after order-out before issuing order-front, and
+  accepts only an exact current `userVisible == true` readback as success.
+  Controller-lifetime occlusion, become-key, and expose observations are
+  installed before recovery actions. Recovery and presentation generations
+  reject duplicate, stale, reordered, replaced, and wrong-session evidence.
+- Retained time and lifecycle: AppKit supplies no public window order-on/off
+  event. The presentation session therefore owns the named injectable 10ms
+  `interruptionConditionReadbackInterval`, which checks immediately and then
+  conditionally reads back ordering evidence. The four-attempt maximum bounds
+  evidence-producing actions. The named one-second
+  `interruptionPresentationRecoveryWatchdogInterval` is a terminal diagnostic
+  bound whose final readback may still succeed; an unsatisfied bound reports
+  both the last and final evidence. Replacement, session end, selection
+  cancellation, success, watchdog termination, and controller release cancel
+  the owner, readback token, and watchdog token.
+- Unit and Behavior: the freshly authorized canonical targeted run passed
+  10/10 in 0.287 seconds. Its independent Oracles cover initially satisfied
+  state, order-out evidence before order-front, slow scheduling with the same
+  result, cancellation and replacement, final-readback watchdog diagnostics,
+  controller policy/state/diagnostic integration, watchdog cancellation, and
+  200 rapid presentation lifecycles with cancelled callbacks replayed. The
+  xcresult reports `status=succeeded`, `testsCount=10`, and an empty issue
+  summary. The complete canonical FlowTabTests target also passed 1,095/1,095
+  at this final source state in the immediately preceding shared validation.
+  FlowTabCore is not relevant because this AppKit ordering and presentation
+  lifecycle contract belongs to the app target.
+- UI: the canonical signed
+  `testSwitcherInitialPresentationStaleOcclusionDoesNotHardRecover` path passed
+  1/1 in 3.207 seconds. Exact runtime evidence covered the 260ms stale
+  occlusion, evidence-driven soft recovery, visible completion, and absence of
+  an unnecessary hard reorder. Its xcresult reports `status=succeeded`,
+  `testsCount=1`, and an empty issue summary.
+- Pressure: the canonical 500ms-sampled noisy cross-Space real-topology path
+  passed 1/1 in 41.109 seconds. Normal, incognito, and two fullscreen workflow
+  sibling identities round-tripped with suppressed App AX windows and noisy CG
+  siblings. All 54 independent PID/signature identity checks matched across a
+  5,182.764ms stable window, with 25 candidate observations and zero rejected
+  transient identities. CPU average/P95/max were 135.59/165.20/180.00 percent;
+  RSS average/P95/max were 239.24/315.41/323.00 MiB. Its xcresult reports
+  `status=succeeded`, `testsCount=1`, and an empty issue summary. Scheduling,
+  animation, AX/CG, and I/O pressure changed latency while preserving the exact
+  topology result.
+- Signing and Process/Tooling: sandbox-external strict deep verification accepts
+  the installed App and final Runner under Team `96PUA726W9` and Apple
+  Development authority `gobestsoft@qq.com (RF9WCUVKH8)`. Their CDHashes are
+  `29ff75307dc44b47cf5f071f1325abbbea0b13d4` and
+  `3b7f503bcb68b9755f31c7322aa9f4dfe04f04d0`. Every wrapper stage exited zero;
+  final logs contain no test/build failure, assertion failure, watchdog expiry,
+  actionable permission denial, or sandbox denial. Project-file
+  `plutil -lint`, `git diff --check`, the scoped legacy 50/150/300ms timing
+  search, and exact process readbacks passed.
+- Lifecycle cleanup: wrapper-owned application and OS-process cleanup both
+  reached exact absence with their observation owners cancelled. Independent
+  post-run fixed-App/Runner/fixture and repository-scoped xcodebuild readbacks
+  are empty, `.build-local/test-assets` remains absent, and startup baseline
+  files remain outside the slice. The 1,770,612 KB SYNC-020 evidence root is
+  removed after this durable record, followed by an exact absence check.
+- Implementation commit: `206afdffa78e3bc1e193033fe03e1f06b69be0e3`
+  (`refactor(sync): migrate SYNC-020 panel visibility recovery`).
+- Validation-correction commit:
+  `b7a1b2263598dfbd5f18797501dfdc0f4e0eb549`
+  (`test(sync): correct SYNC-020 cancellation pressure oracle`).
+- Closure commit subject:
+  `test(sync): close SYNC-020 signed recovery pressure`.
