@@ -276,7 +276,9 @@ extension FlowTabUITests {
         terminateSpaceFixtureApplicationAndWait(
             fixtureApp,
             identity: identity,
-            timeout: 8
+            timeout:
+                FlowTabUITestApplicationTerminationPolicy
+                    .runtimeLifecycleFixtureWatchdog
         )
         waitForRuntimeLogFiles(
             matching:
