@@ -3,6 +3,8 @@ import XCTest
 
 enum FlowTabUITestSwitcherWindowTitleObservationPolicy {
     static let openWindowMutationInitialProjectionWatchdog: TimeInterval = 8
+    static let selectedWindowMutationInitialWindowProjectionWatchdog:
+        TimeInterval = 8
     static let openWindowMutationProjectionWatchdog: TimeInterval = 25
 }
 

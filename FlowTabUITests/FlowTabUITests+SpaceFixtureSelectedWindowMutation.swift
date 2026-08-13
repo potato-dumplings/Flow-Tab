@@ -147,6 +147,18 @@ extension FlowTabUITests {
             titlePrefix: "Selected Mutation",
             windowCount: 2
         )
+        var acceptsInitialWindowProjection = false
+        let initialWindowCards =
+            makeSwitcherWindowTitleObservation(
+                in: app,
+                expectedTitles: allTitles,
+                acceptsResolution: {
+                    acceptsInitialWindowProjection
+                }
+            )
+        initialWindowCards.start()
+        defer { initialWindowCards.cancel() }
+
         app.activate()
         let diagnosticsSummary = element(
             in: app,
@@ -164,11 +176,23 @@ extension FlowTabUITests {
                 app.typeKey(.downArrow, modifierFlags: [])
             }
         ) else { return }
-        _ = waitForSwitcherWindowCards(
-            in: app,
-            expectedTitles: allTitles,
-            timeout: 8
+        acceptsInitialWindowProjection = true
+        initialWindowCards.requestReadback(
+            source: .triggerReadback
         )
+        guard
+            initialWindowCards.waitForResolution(
+                timeout:
+                    FlowTabUITestSwitcherWindowTitleObservationPolicy
+                        .selectedWindowMutationInitialWindowProjectionWatchdog
+            ) != nil
+        else {
+            XCTFail(
+                "Initial Selected Mutation window projection watchdog expired. "
+                    + initialWindowCards.diagnosticSummary
+            )
+            return
+        }
 
         windowCloseObservation.requestClose(from: scheduledClose)
         guard let appliedClose =

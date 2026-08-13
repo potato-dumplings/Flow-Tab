@@ -26,6 +26,24 @@ extension FlowTabUITests {
         )
     }
 
+    func testSwitcherWindowTitleSelectedMutationInitialProjectionWatchdogPolicyCompatibility() {
+        XCTAssertEqual(
+            FlowTabUITestSwitcherWindowTitleObservationPolicy
+                .selectedWindowMutationInitialWindowProjectionWatchdog,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestSwitcherWindowTitleObservationPolicy
+                .selectedWindowMutationInitialWindowProjectionWatchdog
+                .isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSwitcherWindowTitleObservationPolicy
+                .selectedWindowMutationInitialWindowProjectionWatchdog,
+            0
+        )
+    }
+
     func testSwitcherWindowTitleObserverRejectsMatchingPreTriggerEvidenceUnderPressure() {
         let expectation =
             FlowTabUITestSwitcherWindowTitleExpectation(
