@@ -2264,14 +2264,8 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeProjectionServiceSeedsVerifiedFocusRecordWhenFocusedAXWindowIsNotInRegistry() async throws {
         let defaults = UserDefaults.standard
-        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
         defer {
-            if let previousExpiration {
-                defaults.set(previousExpiration, forKey: AppPreferenceKeys.diagnosticSessionExpiration)
-            } else {
-                defaults.removeObject(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
-            }
             if let previousLevel {
                 defaults.set(previousLevel, forKey: AppPreferenceKeys.runtimeLogLevel)
             } else {
@@ -2279,7 +2273,6 @@ extension FlowTabPriorityCoverageTests {
             }
             RuntimeDiagnostics.shared.clear()
         }
-        RuntimeDiagnosticSessionStore.start(userDefaults: defaults)
         defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         RuntimeDiagnostics.shared.clear()
         let logSnapshot = await RuntimeDiagnostics.shared.makeReadSnapshot()

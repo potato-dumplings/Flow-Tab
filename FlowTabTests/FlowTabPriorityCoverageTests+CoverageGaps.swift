@@ -41,14 +41,8 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeLogIntegrationFiltersDeltasAndClearsEntries() async {
         let defaults = UserDefaults.standard
-        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
         defer {
-            restoreUserDefaultsValue(
-                previousExpiration,
-                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
-                userDefaults: defaults
-            )
             restoreUserDefaultsValue(
                 previousLevel,
                 forKey: AppPreferenceKeys.runtimeLogLevel,
@@ -57,7 +51,6 @@ extension FlowTabPriorityCoverageTests {
             RuntimeDiagnostics.shared.clear()
         }
 
-        RuntimeDiagnosticSessionStore.stop(userDefaults: defaults)
         defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         RuntimeDiagnostics.shared.clear()
         _ = await RuntimeDiagnostics.shared.makeReadSnapshot()

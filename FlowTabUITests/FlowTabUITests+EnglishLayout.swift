@@ -49,7 +49,7 @@ extension FlowTabUITests {
         }
 
         openLogsTab(in: app)
-        XCTAssertTrue(app.staticTexts["Start a 15-minute diagnostic session"].exists)
+        XCTAssertTrue(app.staticTexts["Log level"].exists)
 
         openSettingsTab(in: app)
         guard assertSettingsAppVisibilityManagerProjectionAfterNavigation(

@@ -76,8 +76,6 @@
 		A44200043D4A000100B0D737 /* FlowTabUITests+SwitcherWindowCardObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44200033D4A000100B0D737 /* FlowTabUITests+SwitcherWindowCardObservationTests.swift */; };
 		A44300023D4B000100B0D737 /* FlowTabUITests+LogsProjectionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44300013D4B000100B0D737 /* FlowTabUITests+LogsProjectionObservation.swift */; };
 		A44300043D4B000100B0D737 /* FlowTabUITests+LogsProjectionObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44300033D4B000100B0D737 /* FlowTabUITests+LogsProjectionObservationTests.swift */; };
-		A44300063D4B000100B0D737 /* FlowTabUITests+LogsDiagnosticSessionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44300053D4B000100B0D737 /* FlowTabUITests+LogsDiagnosticSessionObservation.swift */; };
-		A44300083D4B000100B0D737 /* FlowTabUITests+LogsDiagnosticSessionObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44300073D4B000100B0D737 /* FlowTabUITests+LogsDiagnosticSessionObservationTests.swift */; };
 		A44300123D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44300113D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservation.swift */; };
 		A44300143D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44300133D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservationTests.swift */; };
 		A44300163D4B000100B0D737 /* FlowTabUITests+LogsRuntimeDeliveryObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44300153D4B000100B0D737 /* FlowTabUITests+LogsRuntimeDeliveryObservation.swift */; };
@@ -350,8 +348,6 @@
 		E6D100063D14000100B0D737 /* RuntimeFocusRecoveryPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D100053D14000100B0D737 /* RuntimeFocusRecoveryPolicy.swift */; };
 		E6D1000E3D14000100B0D737 /* RuntimeFocusRecoveryDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D1000D3D14000100B0D737 /* RuntimeFocusRecoveryDiagnostics.swift */; };
 		E7D100043D15000100B0D737 /* RuntimeLogChangeObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D100033D15000100B0D737 /* RuntimeLogChangeObservation.swift */; };
-		E8D100023D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D100013D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift */; };
-		E8D100043D16000100B0D737 /* RuntimeDiagnosticSessionDeadlineCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D100033D16000100B0D737 /* RuntimeDiagnosticSessionDeadlineCoordinator.swift */; };
 		E9D100023D17000100B0D737 /* RuntimePermissionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D100013D17000100B0D737 /* RuntimePermissionObservation.swift */; };
 		E9D100043D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D100033D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift */; };
 		E9D100063D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D100053D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift */; };
@@ -749,8 +745,6 @@
 		E6D100053D14000100B0D737 /* RuntimeFocusRecoveryPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeFocusRecoveryPolicy.swift; sourceTree = "<group>"; };
 		E6D1000D3D14000100B0D737 /* RuntimeFocusRecoveryDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeFocusRecoveryDiagnostics.swift; sourceTree = "<group>"; };
 		E7D100033D15000100B0D737 /* RuntimeLogChangeObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogChangeObservation.swift; sourceTree = "<group>"; };
-		E8D100013D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimeDiagnosticSessionDeadline.swift"; sourceTree = "<group>"; };
-		E8D100033D16000100B0D737 /* RuntimeDiagnosticSessionDeadlineCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeDiagnosticSessionDeadlineCoordinator.swift; sourceTree = "<group>"; };
 		E9D100013D17000100B0D737 /* RuntimePermissionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimePermissionObservation.swift; sourceTree = "<group>"; };
 		E9D100033D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimePermissionObservationCoordinator.swift; sourceTree = "<group>"; };
 		E9D100053D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimePermissionObservation.swift"; sourceTree = "<group>"; };
@@ -1110,8 +1104,6 @@
 		A44200033D4A000100B0D737 /* FlowTabUITests+SwitcherWindowCardObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherWindowCardObservationTests.swift"; sourceTree = "<group>"; };
 		A44300013D4B000100B0D737 /* FlowTabUITests+LogsProjectionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+LogsProjectionObservation.swift"; sourceTree = "<group>"; };
 		A44300033D4B000100B0D737 /* FlowTabUITests+LogsProjectionObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+LogsProjectionObservationTests.swift"; sourceTree = "<group>"; };
-		A44300053D4B000100B0D737 /* FlowTabUITests+LogsDiagnosticSessionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+LogsDiagnosticSessionObservation.swift"; sourceTree = "<group>"; };
-		A44300073D4B000100B0D737 /* FlowTabUITests+LogsDiagnosticSessionObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+LogsDiagnosticSessionObservationTests.swift"; sourceTree = "<group>"; };
 		A44300113D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+LogsClearProjectionObservation.swift"; sourceTree = "<group>"; };
 		A44300133D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+LogsClearProjectionObservationTests.swift"; sourceTree = "<group>"; };
 		A44300153D4B000100B0D737 /* FlowTabUITests+LogsRuntimeDeliveryObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+LogsRuntimeDeliveryObservation.swift"; sourceTree = "<group>"; };
@@ -1522,7 +1514,6 @@
 				E6D1000B3D14000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusRecoveryIntegration.swift */,
 				A5A100013DC0000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusVerificationPriority.swift */,
 				E7D100013D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift */,
-				E8D100013D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift */,
 				E9D100053D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift */,
 				EAD100033D18000100B0D737 /* FlowTabTests+HomePermissionObservation.swift */,
 				EBD100033D19000100B0D737 /* FlowTabTests+HomeInitialProjectionObservation.swift */,
@@ -1658,8 +1649,6 @@
 				A44200033D4A000100B0D737 /* FlowTabUITests+SwitcherWindowCardObservationTests.swift */,
 				A44300013D4B000100B0D737 /* FlowTabUITests+LogsProjectionObservation.swift */,
 				A44300033D4B000100B0D737 /* FlowTabUITests+LogsProjectionObservationTests.swift */,
-				A44300053D4B000100B0D737 /* FlowTabUITests+LogsDiagnosticSessionObservation.swift */,
-				A44300073D4B000100B0D737 /* FlowTabUITests+LogsDiagnosticSessionObservationTests.swift */,
 				A44300113D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservation.swift */,
 				A44300133D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservationTests.swift */,
 				A44300153D4B000100B0D737 /* FlowTabUITests+LogsRuntimeDeliveryObservation.swift */,
@@ -2075,7 +2064,6 @@
 			isa = PBXGroup;
 			children = (
 				C100001E2F75000100B0D737 /* AppLogsView.swift */,
-				E8D100033D16000100B0D737 /* RuntimeDiagnosticSessionDeadlineCoordinator.swift */,
 				E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */,
 			);
 			path = Logs;
@@ -2414,7 +2402,6 @@
 				E1F100012B00000100B0D737 /* RuntimeLogging.swift in Sources */,
 				E1F100042B00000100B0D737 /* RuntimeLogPrivacy.swift in Sources */,
 				E1F100052B00000100B0D737 /* RuntimeLogStoragePrivacy.swift in Sources */,
-				E8D100043D16000100B0D737 /* RuntimeDiagnosticSessionDeadlineCoordinator.swift in Sources */,
 				E9D100023D17000100B0D737 /* RuntimePermissionObservation.swift in Sources */,
 				E9D100043D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift in Sources */,
 				E1F100022B00000100B0D737 /* RuntimeLogsSection.swift in Sources */,
@@ -2679,7 +2666,6 @@
 				E6D1000C3D14000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusRecoveryIntegration.swift in Sources */,
 				A5A100023DC0000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusVerificationPriority.swift in Sources */,
 				E7D100023D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift in Sources */,
-				E8D100023D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift in Sources */,
 				E9D100063D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift in Sources */,
 				EED100043D1C000100B0D737 /* FlowTabTests+TemporaryRegularActivationRestoration.swift in Sources */,
 				EAD100043D18000100B0D737 /* FlowTabTests+HomePermissionObservation.swift in Sources */,
@@ -2849,8 +2835,6 @@
 				A44200043D4A000100B0D737 /* FlowTabUITests+SwitcherWindowCardObservationTests.swift in Sources */,
 				A44300023D4B000100B0D737 /* FlowTabUITests+LogsProjectionObservation.swift in Sources */,
 				A44300043D4B000100B0D737 /* FlowTabUITests+LogsProjectionObservationTests.swift in Sources */,
-				A44300063D4B000100B0D737 /* FlowTabUITests+LogsDiagnosticSessionObservation.swift in Sources */,
-				A44300083D4B000100B0D737 /* FlowTabUITests+LogsDiagnosticSessionObservationTests.swift in Sources */,
 				A44300123D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservation.swift in Sources */,
 				A44300143D4B000100B0D737 /* FlowTabUITests+LogsClearProjectionObservationTests.swift in Sources */,
 				A44300163D4B000100B0D737 /* FlowTabUITests+LogsRuntimeDeliveryObservation.swift in Sources */,

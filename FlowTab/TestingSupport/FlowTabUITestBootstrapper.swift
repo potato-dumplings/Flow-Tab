@@ -4,6 +4,8 @@ import Foundation
 
 @MainActor
 enum FlowTabUITestBootstrapper {
+    static let seededLogCategory = "UITestSeed"
+
     private static var hotkeyReloadDiagnosticsObserver: NSObjectProtocol?
     private static var switcherTriggerObservers: [SwitcherTriggerNotificationObserver] = []
     private static var switcherCommandObservers: [SwitcherCommandNotificationObserver] = []
@@ -95,13 +97,14 @@ enum FlowTabUITestBootstrapper {
             FlowTabUITestMockRuntimeEffects.reset()
         }
 
-        if let runtimeLogLevelRaw = FlowTabTestLaunchOptions.runtimeLogLevelOverrideRawValue {
+        let runtimeLogLevelRaw =
+            FlowTabTestLaunchOptions.runtimeLogLevelOverrideRawValue
+            ?? (FlowTabTestLaunchOptions.enablesVerboseRuntimeLogs
+                ? RuntimeLogLevel.debug.rawValue
+                : nil)
+        if let runtimeLogLevelRaw {
             let resolved = RuntimeLogPreferencesStore.resolve(rawValue: runtimeLogLevelRaw)
             userDefaults.set(resolved.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
-        }
-
-        if FlowTabTestLaunchOptions.enablesVerboseRuntimeLogs {
-            RuntimeDiagnosticSessionStore.start(userDefaults: userDefaults)
         }
 
         installHotkeyReloadDiagnosticsIfNeeded()
@@ -115,7 +118,7 @@ enum FlowTabUITestBootstrapper {
                     let level = seededLevels[(index - 1) % seededLevels.count]
                     RuntimeDiagnostics.shared.log(
                         level: level,
-                        category: "UITest",
+                        category: seededLogCategory,
                         message: "seeded-\(level.rawValue.lowercased())-log-\(index)"
                     )
                 }

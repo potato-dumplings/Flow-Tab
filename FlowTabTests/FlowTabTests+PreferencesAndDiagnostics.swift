@@ -373,6 +373,19 @@ extension FlowTabTests {
         )
     }
 
+    func testAppPreferenceMaintenanceRemovesRetiredDiagnosticValues() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
+
+        userDefaults.set(true, forKey: "enableVerboseDiagnostics")
+        userDefaults.set(1_800_000_000.0, forKey: "diagnosticSessionExpiration")
+
+        AppPreferenceMaintenance.removeRetiredValues(userDefaults: userDefaults)
+
+        XCTAssertNil(userDefaults.object(forKey: "enableVerboseDiagnostics"))
+        XCTAssertNil(userDefaults.object(forKey: "diagnosticSessionExpiration"))
+    }
+
     func testThemePreferencesResolveFallsBackToFollowSystem() {
         XCTAssertEqual(ThemePreferencesStore.resolve(rawValue: ThemeMode.light.rawValue), .light)
         XCTAssertEqual(ThemePreferencesStore.resolve(rawValue: "invalid"), .followSystem)
@@ -1057,16 +1070,35 @@ extension FlowTabTests {
         XCTAssertTrue(scopedLines[1].contains("[\(marker)5]"))
     }
 
-    func testRuntimeLogSuppressesDebugAndInfoOutsideDiagnosticSession() async {
+    func testRuntimeLogRecordingPolicyUsesSelectedMinimumLevel() {
+        let expectations: [(
+            minimumLevel: RuntimeLogLevel,
+            recordedLevels: [RuntimeLogLevel]
+        )] = [
+            (.debug, [.debug, .info, .warning, .error]),
+            (.info, [.info, .warning, .error]),
+            (.warning, [.warning, .error]),
+            (.error, [.error])
+        ]
+
+        for expectation in expectations {
+            for level in RuntimeLogLevel.allCases {
+                XCTAssertEqual(
+                    RuntimeLogRecordingPolicy.shouldRecord(
+                        level: level,
+                        minimumLevel: expectation.minimumLevel
+                    ),
+                    expectation.recordedLevels.contains(level),
+                    "level=\(level.rawValue) minimum=\(expectation.minimumLevel.rawValue)"
+                )
+            }
+        }
+    }
+
+    func testRuntimeLogRecordsEveryLevelWhenMinimumIsDebug() async {
         let defaults = UserDefaults.standard
-        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
         defer {
-            restoreUserDefaultsValue(
-                previousExpiration,
-                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
-                userDefaults: defaults
-            )
             restoreUserDefaultsValue(
                 previousLevel,
                 forKey: AppPreferenceKeys.runtimeLogLevel,
@@ -1074,32 +1106,28 @@ extension FlowTabTests {
             )
         }
 
-        RuntimeDiagnosticSessionStore.stop(userDefaults: defaults)
         defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         await resetRuntimeLogsForTest()
 
-        RuntimeLog.debug(.inputTrace, "debug")
-        RuntimeLog.info(.inputTrace, "info")
-        RuntimeLog.warning(.inputTrace, "warning")
+        let category = "UnitTestAllLevels\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
+        RuntimeLog.debug(category, "debug")
+        RuntimeLog.info(category, "info")
+        RuntimeLog.warning(category, "warning")
+        RuntimeLog.error(category, "error")
 
         let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 50, minimumLevel: .debug)
-        let scopedLines = lines.filter { $0.contains("[InputTrace]") }
+        let scopedLines = lines.filter { $0.contains("[\(category)]") }
 
-        XCTAssertFalse(scopedLines.contains(where: { $0.contains("[DEBUG]") }))
-        XCTAssertFalse(scopedLines.contains(where: { $0.contains("[INFO]") }))
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[DEBUG]") }))
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[INFO]") }))
         XCTAssertTrue(scopedLines.contains(where: { $0.contains("[WARN]") }))
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[ERROR]") }))
     }
 
-    func testRuntimeLogTypedCategoryKeepsWarningsAndErrorsOutsideDiagnosticSession() async {
+    func testRuntimeLogFiltersEntriesBelowSelectedMinimumLevel() async {
         let defaults = UserDefaults.standard
-        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
         defer {
-            restoreUserDefaultsValue(
-                previousExpiration,
-                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
-                userDefaults: defaults
-            )
             restoreUserDefaultsValue(
                 previousLevel,
                 forKey: AppPreferenceKeys.runtimeLogLevel,
@@ -1107,8 +1135,7 @@ extension FlowTabTests {
             )
         }
 
-        RuntimeDiagnosticSessionStore.stop(userDefaults: defaults)
-        defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
+        defaults.set(RuntimeLogLevel.warning.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         await resetRuntimeLogsForTest()
 
         RuntimeLog.debug(.activation, "debug")
@@ -1125,16 +1152,10 @@ extension FlowTabTests {
         XCTAssertTrue(scopedLines.contains(where: { $0.contains("[ERROR]") }))
     }
 
-    func testRuntimeLogDiagnosticSessionAllowsDebugAndInfoWhenMinimumLevelAllows() async {
+    func testRuntimeLogPermissionWarningRecordsWhenMinimumLevelAllows() async {
         let defaults = UserDefaults.standard
-        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
         defer {
-            restoreUserDefaultsValue(
-                previousExpiration,
-                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
-                userDefaults: defaults
-            )
             restoreUserDefaultsValue(
                 previousLevel,
                 forKey: AppPreferenceKeys.runtimeLogLevel,
@@ -1142,40 +1163,7 @@ extension FlowTabTests {
             )
         }
 
-        RuntimeDiagnosticSessionStore.start(userDefaults: defaults)
-        defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
-        await resetRuntimeLogsForTest()
-
-        let category = "UnitTestSession\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
-        RuntimeLog.debug(category, "debug")
-        RuntimeLog.info(category, "info")
-
-        let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 50, minimumLevel: .debug)
-        let scopedLines = lines.filter { $0.contains("[\(category)]") }
-
-        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[DEBUG]") }))
-        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[INFO]") }))
-    }
-
-    func testRuntimeLogPermissionWarningRecordsOutsideDiagnosticSession() async {
-        let defaults = UserDefaults.standard
-        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
-        let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
-        defer {
-            restoreUserDefaultsValue(
-                previousExpiration,
-                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
-                userDefaults: defaults
-            )
-            restoreUserDefaultsValue(
-                previousLevel,
-                forKey: AppPreferenceKeys.runtimeLogLevel,
-                userDefaults: defaults
-            )
-        }
-
-        RuntimeDiagnosticSessionStore.stop(userDefaults: defaults)
-        defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
+        defaults.set(RuntimeLogLevel.warning.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         await resetRuntimeLogsForTest()
 
         RuntimeLog.warning(.permission, "permission-missing")

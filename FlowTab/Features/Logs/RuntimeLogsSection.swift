@@ -136,46 +136,12 @@ final class RuntimeLogLinesViewModel: ObservableObject {
 }
 
 struct RuntimeLogsSection: View {
-    @Binding var diagnosticSessionExpiration: Double
     @Binding var runtimeLogLevelRaw: String
     let hotkeyShortcutText: String
     let appLanguage: AppLanguage
     let targetAppearance: NSAppearance
 
     @StateObject private var logsViewModel = RuntimeLogLinesViewModel()
-    @StateObject private var diagnosticSessionDeadlineCoordinator =
-        RuntimeDiagnosticSessionDeadlineCoordinator()
-
-    private var isDiagnosticSessionActive: Bool {
-        diagnosticSessionExpiration
-            > diagnosticSessionDeadlineCoordinator.observedNow
-                .timeIntervalSince1970
-    }
-
-    private var diagnosticSessionToggle: Binding<Bool> {
-        Binding(
-            get: { isDiagnosticSessionActive },
-            set: { shouldEnable in
-                let now =
-                    diagnosticSessionDeadlineCoordinator.readNow()
-                if shouldEnable {
-                    diagnosticSessionExpiration =
-                        RuntimeDiagnosticSessionStore.start(
-                            now: now
-                        ).timeIntervalSince1970
-                    observeDiagnosticSessionDeadline()
-                } else {
-                    stopDiagnosticSession()
-                }
-            }
-        )
-    }
-
-    private var diagnosticSessionRemainingMinutes: Int {
-        diagnosticSessionDeadlineCoordinator.displayedMinuteCount(
-            expirationTimestamp: diagnosticSessionExpiration
-        )
-    }
 
     private var selectedLogLevel: RuntimeLogLevel {
         RuntimeLogPreferencesStore.resolve(rawValue: runtimeLogLevelRaw)
@@ -188,44 +154,30 @@ struct RuntimeLogsSection: View {
         }
     }
 
-    private func observeDiagnosticSessionDeadline() {
-        guard diagnosticSessionExpiration > 0 else {
-            diagnosticSessionDeadlineCoordinator.stop()
-            return
-        }
-        let expirationBinding = $diagnosticSessionExpiration
-        diagnosticSessionDeadlineCoordinator.start(
-            expirationTimestamp: diagnosticSessionExpiration
-        ) { [expirationBinding] in
-            RuntimeDiagnosticSessionStore.stop()
-            expirationBinding.wrappedValue = 0
-        }
-    }
-
-    private func stopDiagnosticSession() {
-        diagnosticSessionDeadlineCoordinator.stop()
-        RuntimeDiagnosticSessionStore.stop()
-        diagnosticSessionExpiration = 0
-    }
-
     private func openLogsDirectory() {
         let logsURL = URL(fileURLWithPath: RuntimeDiagnostics.logsDirectoryPath, isDirectory: true)
         _ = NSWorkspace.shared.open(logsURL)
     }
 
     private func accessibilityIdentifier(forLogLine line: String, index: Int) -> String {
-        if line.contains("[DEBUG] [UITest]") {
-            return "flowtab.logs.line.seeded.debug"
+#if FLOWTAB_TESTING
+        let seededCategoryToken = "[\(FlowTabUITestBootstrapper.seededLogCategory)]"
+        if FlowTabTestLaunchOptions.isRunningUITests,
+           line.contains(seededCategoryToken) {
+            if line.contains("[DEBUG]") {
+                return "flowtab.logs.line.seeded.debug"
+            }
+            if line.contains("[INFO]") {
+                return "flowtab.logs.line.seeded.info"
+            }
+            if line.contains("[WARN]") {
+                return "flowtab.logs.line.seeded.warn"
+            }
+            if line.contains("[ERROR]") {
+                return "flowtab.logs.line.seeded.error"
+            }
         }
-        if line.contains("[INFO] [UITest]") {
-            return "flowtab.logs.line.seeded.info"
-        }
-        if line.contains("[WARN] [UITest]") {
-            return "flowtab.logs.line.seeded.warn"
-        }
-        if line.contains("[ERROR] [UITest]") {
-            return "flowtab.logs.line.seeded.error"
-        }
+#endif
         return "flowtab.logs.line.row.\(index)"
     }
 
@@ -252,33 +204,6 @@ struct RuntimeLogsSection: View {
             subtitle: AppStrings.text(.logsSectionSubtitle, language: appLanguage)
         ) {
             VStack(alignment: .leading, spacing: 10) {
-                Toggle(isOn: diagnosticSessionToggle) {
-                    Text(AppStrings.text(.logsEnableVerbose, language: appLanguage))
-                        .font(FlowTypography.swiftUI(.formLabel))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                    .toggleStyle(.switch)
-                    .accessibilityIdentifier("flowtab.logs.diagnostic-session")
-
-                if isDiagnosticSessionActive {
-                    Text(
-                        AppStrings.text(
-                            .logsDiagnosticSessionStatus,
-                            replacements: ["minutes": "\(diagnosticSessionRemainingMinutes)"],
-                            language: appLanguage
-                        )
-                    )
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("flowtab.logs.diagnostic-session-status")
-                }
-
-                Text(AppStrings.text(.logsPrivacyNotice, language: appLanguage))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("flowtab.logs.privacy-notice")
-
                 HStack(spacing: 10) {
                     Text(AppStrings.text(.logsLevel, language: appLanguage))
                         .font(FlowTypography.swiftUI(.formLabel))
@@ -290,6 +215,12 @@ struct RuntimeLogsSection: View {
                     )
                     .frame(width: 120)
                 }
+
+                Text(AppStrings.text(.logsPrivacyNotice, language: appLanguage))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("flowtab.logs.privacy-notice")
 
                 Text(
                     AppStrings.text(
@@ -370,19 +301,8 @@ struct RuntimeLogsSection: View {
             }
         }
         .onAppear {
-            let now =
-                diagnosticSessionDeadlineCoordinator.readNow()
-            if !RuntimeDiagnosticSessionStore.isActive(now: now) {
-                diagnosticSessionExpiration = 0
-                diagnosticSessionDeadlineCoordinator.stop()
-            } else {
-                observeDiagnosticSessionDeadline()
-            }
             synchronizeLogLevelIfNeeded()
             logsViewModel.start(minimumLevel: selectedLogLevel)
-        }
-        .onChange(of: diagnosticSessionExpiration) { _ in
-            observeDiagnosticSessionDeadline()
         }
         .onChange(of: runtimeLogLevelRaw) { newValue in
             let resolved = RuntimeLogPreferencesStore.resolve(rawValue: newValue)
@@ -394,7 +314,6 @@ struct RuntimeLogsSection: View {
         }
         .onDisappear {
             logsViewModel.stop()
-            diagnosticSessionDeadlineCoordinator.stop()
         }
     }
 }

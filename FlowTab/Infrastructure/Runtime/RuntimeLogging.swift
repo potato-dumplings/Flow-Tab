@@ -30,6 +30,15 @@ enum RuntimeLogLevel: String, CaseIterable, Comparable, Identifiable {
     }
 }
 
+enum RuntimeLogRecordingPolicy {
+    static func shouldRecord(
+        level: RuntimeLogLevel,
+        minimumLevel: RuntimeLogLevel
+    ) -> Bool {
+        level >= minimumLevel
+    }
+}
+
 enum RuntimeLogPreferencesStore {
     static let defaultLevel: RuntimeLogLevel = .error
 
@@ -72,34 +81,6 @@ enum RuntimeLogCategory: String, CaseIterable, Identifiable {
     case uiTest = "UITest"
 
     var id: String { rawValue }
-
-    var isVerboseOnlyBelowWarning: Bool {
-        switch self {
-        case .activation,
-             .autoEnter,
-             .ax,
-             .axMatch,
-             .axObserver,
-             .hotKey,
-             .inputTrace,
-             .manual,
-             .preview,
-             .projection,
-             .recency,
-             .runtimeFacts,
-             .search,
-             .searchInput,
-             .searchModel,
-             .searchTrace,
-             .session,
-             .switcherLayout:
-            return true
-        case .app,
-             .permission,
-             .uiTest:
-            return false
-        }
-    }
 
     static func resolve(_ category: String) -> RuntimeLogCategory? {
         allCases.first { $0.rawValue == category }
@@ -697,20 +678,15 @@ final class RuntimeLogFileStore {
 }
 
 enum RuntimeLog {
-    private static var isDiagnosticSessionActive: Bool {
-        RuntimeDiagnosticSessionStore.readIsActive()
-    }
-
     private static var minimumLevel: RuntimeLogLevel {
         RuntimeLogPreferencesStore.loadMinimumLevel()
     }
 
-    private static func shouldRecord(level: RuntimeLogLevel, category: String) -> Bool {
-        guard level >= minimumLevel else { return false }
-        if level < .warning {
-            return isDiagnosticSessionActive
-        }
-        return true
+    private static func shouldRecord(level: RuntimeLogLevel) -> Bool {
+        RuntimeLogRecordingPolicy.shouldRecord(
+            level: level,
+            minimumLevel: minimumLevel
+        )
     }
 
     private static func emit(
@@ -718,7 +694,7 @@ enum RuntimeLog {
         category: String,
         message: @autoclosure () -> String
     ) {
-        guard shouldRecord(level: level, category: category) else { return }
+        guard shouldRecord(level: level) else { return }
         RuntimeDiagnostics.shared.log(level: level, category: category, message: message())
     }
 
@@ -738,12 +714,12 @@ enum RuntimeLog {
         emit(level: .debug, category: category, message: message())
     }
 
-    static func isDebugEnabled(for category: String) -> Bool {
-        shouldRecord(level: .debug, category: category)
+    static func isDebugEnabled(for _: String) -> Bool {
+        shouldRecord(level: .debug)
     }
 
-    static func isDebugEnabled(for category: RuntimeLogCategory) -> Bool {
-        shouldRecord(level: .debug, category: category.rawValue)
+    static func isDebugEnabled(for _: RuntimeLogCategory) -> Bool {
+        shouldRecord(level: .debug)
     }
 
     static func info(_ category: String, _ message: @autoclosure () -> String) {

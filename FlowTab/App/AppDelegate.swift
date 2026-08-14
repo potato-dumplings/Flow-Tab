@@ -33,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
+        AppPreferenceMaintenance.removeRetiredValues(userDefaults: resolvedUserDefaults)
 #if FLOWTAB_TESTING
         FlowTabUITestBootstrapper.prepareIfNeeded(userDefaults: resolvedUserDefaults)
 #endif

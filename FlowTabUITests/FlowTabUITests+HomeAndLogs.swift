@@ -436,6 +436,7 @@ extension FlowTabUITests {
         let app = makeApp(
             additionalArguments: [
                 "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
                 "--flowtab-ui-seed-logs",
                 "4",
                 "--flowtab-ui-runtime-log-level",
@@ -474,10 +475,6 @@ extension FlowTabUITests {
                 )
             }
         )
-        let diagnosticSessionToggle = element(
-            in: app,
-            identifier: Identifier.logsDiagnosticSession
-        )
         XCTAssertEqual(
             persistedFingerprints.count,
             expectedSeededLogs.count
@@ -485,6 +482,11 @@ extension FlowTabUITests {
         for fingerprint in persistedFingerprints {
             XCTAssertFalse(fingerprint.isEmpty)
         }
+        XCTAssertFalse(
+            app.descendants(matching: .any)[
+                "flowtab.logs.diagnostic-session"
+            ].exists
+        )
         let diskContentsBeforeClear = runtimeLogContents()
         XCTAssertTrue(persistedFingerprints.allSatisfy { diskContentsBeforeClear.contains($0) })
 
@@ -509,23 +511,6 @@ extension FlowTabUITests {
                 controlIdentifier: Identifier.logsLevel,
                 optionIdentifier: "WARN"
             )
-        }
-
-        assertLogsDiagnosticSessionTransition(
-            in: app,
-            toggle: diagnosticSessionToggle,
-            targetDescription: "diagnostic-session-activation",
-            from: false, to: true
-        ) {
-            setToggle(diagnosticSessionToggle, to: true)
-        }
-        assertLogsDiagnosticSessionTransition(
-            in: app,
-            toggle: diagnosticSessionToggle,
-            targetDescription: "diagnostic-session-deactivation",
-            from: true, to: false
-        ) {
-            setToggle(diagnosticSessionToggle, to: false)
         }
 
         assertLogsClearTransition(

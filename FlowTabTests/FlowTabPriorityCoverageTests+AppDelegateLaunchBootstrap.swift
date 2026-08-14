@@ -28,6 +28,10 @@ extension FlowTabPriorityCoverageTests {
             standardDefaults.object(
                 forKey: AppPreferenceKeys.searchDefaultScope
             )
+        let previousRuntimeLogLevel =
+            standardDefaults.object(
+                forKey: AppPreferenceKeys.runtimeLogLevel
+            )
         let expectedSeededLogCount = 3
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let takeoverController = SpyCommandTabTakeoverController()
@@ -88,6 +92,11 @@ extension FlowTabPriorityCoverageTests {
             restoreUserDefaultsValue(
                 previousSearchDefaultScope,
                 forKey: AppPreferenceKeys.searchDefaultScope,
+                userDefaults: standardDefaults
+            )
+            restoreUserDefaultsValue(
+                previousRuntimeLogLevel,
+                forKey: AppPreferenceKeys.runtimeLogLevel,
                 userDefaults: standardDefaults
             )
             RuntimeDiagnostics.shared.clear()
@@ -152,6 +161,10 @@ extension FlowTabPriorityCoverageTests {
             SwitcherSearchScope.app.rawValue,
             forKey:
                 AppPreferenceKeys.searchDefaultScope
+        )
+        standardDefaults.set(
+            RuntimeLogLevel.warning.rawValue,
+            forKey: AppPreferenceKeys.runtimeLogLevel
         )
         AccessibilityPermissionChecker
             .isTrustedOverrideForTesting = { true }
@@ -422,14 +435,18 @@ extension FlowTabPriorityCoverageTests {
             }
         )
         let seededLines = lines.filter {
-            $0.contains("[UITest]")
-                && $0.contains(
-                    "message.fieldCount=0"
-                )
+            $0.contains("[\(FlowTabUITestBootstrapper.seededLogCategory)]")
         }
         XCTAssertEqual(
             seededLines.count,
-            expectedSeededLogCount
+            expectedSeededLogCount,
+            "unmetCondition=exactSeededLogCategory finalLines=\(lines)"
+        )
+        XCTAssertTrue(
+            seededLines.allSatisfy {
+                $0.contains("message.fieldCount=0")
+            },
+            "unmetCondition=redactedSeededLogMetadata seededLines=\(seededLines)"
         )
     }
 }

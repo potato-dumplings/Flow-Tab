@@ -560,6 +560,7 @@ extension FlowTabUITests {
         let app = makeApp(
             additionalArguments: [
                 "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
                 "--flowtab-ui-seed-logs",
                 "4",
                 "--flowtab-ui-runtime-log-level",

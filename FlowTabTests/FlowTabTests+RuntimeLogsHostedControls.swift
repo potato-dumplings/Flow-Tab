@@ -7,14 +7,9 @@ extension FlowTabTests {
     @MainActor
     func testRuntimeLogsDropdownUpdatesRuntimeLogLevelBinding() throws {
         let appearance = try XCTUnwrap(NSAppearance(named: .aqua))
-        var diagnosticSessionExpiration = 0.0
         var runtimeLogLevelRaw = RuntimeLogLevel.info.rawValue
         let hostedView = NSHostingView(
             rootView: RuntimeLogsSection(
-                diagnosticSessionExpiration: Binding(
-                    get: { diagnosticSessionExpiration },
-                    set: { diagnosticSessionExpiration = $0 }
-                ),
                 runtimeLogLevelRaw: Binding(
                     get: { runtimeLogLevelRaw },
                     set: { runtimeLogLevelRaw = $0 }

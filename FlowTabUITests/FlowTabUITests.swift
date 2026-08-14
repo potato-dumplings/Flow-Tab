@@ -53,8 +53,6 @@ final class FlowTabUITests: XCTestCase {
         static let logsLevel = "flowtab.logs.level"
         static let logsLines = "flowtab.logs.lines"
         static let logsEmptyHint = "flowtab.logs.empty-hint"
-        static let logsDiagnosticSession = "flowtab.logs.diagnostic-session"
-        static let logsDiagnosticSessionStatus = "flowtab.logs.diagnostic-session-status"
         static let logsPrivacyNotice = "flowtab.logs.privacy-notice"
         static let logsSeededDebugLine = "flowtab.logs.line.seeded.debug"
         static let logsSeededInfoLine = "flowtab.logs.line.seeded.info"

@@ -986,7 +986,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(lines.contains(where: { $0.contains("[UnitTest]") }))
         XCTAssertFalse(
             lines.contains {
-                $0.contains("[UITest]") && $0.contains("message.fieldCount=0")
+                $0.contains("[\(FlowTabUITestBootstrapper.seededLogCategory)]")
+                    && $0.contains("message.fieldCount=0")
             }
         )
     }

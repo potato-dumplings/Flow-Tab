@@ -18,8 +18,6 @@ enum AppPreferenceKeys {
     static let hideMinimizedAppsFromAppLayer = "hideMinimizedAppsFromAppLayer"
     static let searchEnabled = "searchEnabled"
     static let searchDefaultScope = "searchDefaultScope"
-    static let enableVerboseDiagnostics = "enableVerboseDiagnostics"
-    static let diagnosticSessionExpiration = "diagnosticSessionExpiration"
     static let runtimeLogLevel = "runtimeLogLevel"
     static let themeMode = "themeMode"
     static let appLanguage = "appLanguage"
@@ -41,12 +39,21 @@ enum AppPreferenceKeys {
         hideMinimizedAppsFromAppLayer,
         searchEnabled,
         searchDefaultScope,
-        enableVerboseDiagnostics,
-        diagnosticSessionExpiration,
         runtimeLogLevel,
         themeMode,
         appLanguage
     ]
+}
+
+enum AppPreferenceMaintenance {
+    private static let retiredKeys = [
+        "enableVerboseDiagnostics",
+        "diagnosticSessionExpiration"
+    ]
+
+    static func removeRetiredValues(userDefaults: UserDefaults = .standard) {
+        retiredKeys.forEach { userDefaults.removeObject(forKey: $0) }
+    }
 }
 
 enum AppLanguage: String, CaseIterable, Equatable, Sendable, Identifiable {
