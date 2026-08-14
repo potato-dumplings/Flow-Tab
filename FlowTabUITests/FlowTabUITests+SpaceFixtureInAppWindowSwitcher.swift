@@ -46,6 +46,7 @@ extension FlowTabUITests {
         var filteredArtifactObservationOwner:
             FlowTabUITestInAppFilteredArtifactObservationOwner?
         defer { filteredArtifactObservationOwner?.cancel() }
+        var targetProcessIdentifier: pid_t?
 
         try runRealSpaceFixtureWorkflow(
             workflow,
@@ -58,15 +59,16 @@ extension FlowTabUITests {
             beforeFlowTabLaunch: { _ in
                 self.logWorkflowSpaceObservation("\(traceLabel).beforeFlowTabLaunch", app: targetApp)
                 if allowsNoisyCGSiblings {
-                    let targetProcessIdentifier = try self
+                    let runningProcessIdentifier = try self
                         .runningWorkflowApplicationProcessIdentifier(
                             targetApp
                         )
+                    targetProcessIdentifier = runningProcessIdentifier
                     let owner =
                         FlowTabUITestInAppFilteredArtifactObservationOwner(
                             expectedAppName: targetApp.appName,
                             expectedProcessIdentifier:
-                                targetProcessIdentifier,
+                                runningProcessIdentifier,
                             baseline: runtimeLogSnapshot
                         )
                     owner.start()
@@ -175,7 +177,11 @@ extension FlowTabUITests {
                     diagnosticsSummary: diagnosticsSummary,
                     primaryFullscreenTitle: fullscreenTitle,
                     traceLabel: traceLabel,
-                    runtimeLogSnapshot: runtimeLogSnapshot
+                    runtimeLogSnapshot: runtimeLogSnapshot,
+                    targetProcessIdentifier: try XCTUnwrap(
+                        targetProcessIdentifier,
+                        "Noisy Control+Tab fixture PID must be captured before FlowTab launch."
+                    )
                 )
                 return
             }
@@ -266,7 +272,8 @@ extension FlowTabUITests {
         primaryFullscreenTitle: String,
         traceLabel: String,
         runtimeLogSnapshot:
-            FlowTabUITestRuntimeLogObservationBaseline
+            FlowTabUITestRuntimeLogObservationBaseline,
+        targetProcessIdentifier: pid_t
     ) throws {
         let standardTitles = standardWindowTitles(in: targetApp)
         let normalOneTitle = try XCTUnwrap(
@@ -357,18 +364,18 @@ extension FlowTabUITests {
                 )
             }
 
-            let selection = try selectNoisyInAppWindow(
+            let selection = try selectNoisyInAppWindowWithLayerEvidence(
                 currentSelection: currentSelection,
                 title: phase.targetTitle,
                 expectedPrefix: phase.expectedPrefix,
                 in: app,
                 diagnosticsSummary: diagnosticsSummary,
-                traceLabel: "\(traceLabel).\(phase.trace)"
-            )
-            assertNoisyInAppWindowLayerSource(
-                selection,
+                traceLabel: "\(traceLabel).\(phase.trace)",
+                targetApp: targetApp,
+                targetProcessIdentifier:
+                    targetProcessIdentifier,
                 phaseTrace: phase.trace,
-                since: runtimeLogSnapshot
+                runtimeLogSnapshot: runtimeLogSnapshot
             )
             let activationLogSnapshot = makeRuntimeLogFileSnapshot()
             guard
@@ -399,19 +406,55 @@ extension FlowTabUITests {
         }
     }
 
-    private func assertNoisyInAppWindowLayerSource(
-        _ selection: InAppWindowSelection,
+    private func selectNoisyInAppWindowWithLayerEvidence(
+        currentSelection: InAppWindowSelection,
+        title: String,
+        expectedPrefix: [String],
+        in app: XCUIApplication,
+        diagnosticsSummary: XCUIElement,
+        traceLabel: String,
+        targetApp: SpaceFixtureResolvedWorkflow.App,
+        targetProcessIdentifier: pid_t,
         phaseTrace: String,
-        since snapshot:
+        runtimeLogSnapshot:
             FlowTabUITestRuntimeLogObservationBaseline
-    ) {
-        let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
-        waitForRuntimeLogFiles(
-            matching: #"window-entries app=Chrome Fixture .*id=cg:[0-9]+:\#(selection.windowNumber):title=\#(escapedTitle)[^\n]*source=stickyBinding:spaceEvidence=(observed|inferredFromTopology)"#,
-            since: snapshot,
-            timeout: 8,
-            description: "sticky current-app window-layer source for selected Noisy Control+Tab \(phaseTrace) window"
+    ) throws -> InAppWindowSelection {
+        let owner = FlowTabUITestInAppWindowLayerObservationOwner(
+            expectedAppName: targetApp.appName,
+            expectedProcessIdentifier:
+                targetProcessIdentifier,
+            expectedTitle: title,
+            baseline: runtimeLogSnapshot
         )
+        owner.start()
+        defer { owner.cancel() }
+
+        let selection = try selectNoisyInAppWindow(
+            currentSelection: currentSelection,
+            title: title,
+            expectedPrefix: expectedPrefix,
+            in: app,
+            diagnosticsSummary: diagnosticsSummary,
+            traceLabel: traceLabel
+        )
+        let evidence = try XCTUnwrap(
+            owner.waitForResolution(
+                timeout:
+                    FlowTabUITestInAppWindowLayerObservationPolicy
+                    .watchdog
+            ),
+            "Noisy Control+Tab exact sticky Window-layer watchdog expired for \(phaseTrace). \(owner.diagnosticSummary)"
+        )
+        XCTAssertEqual(
+            evidence.value.windowID,
+            selection.windowID
+        )
+        XCTAssertEqual(
+            evidence.value.windowNumber,
+            selection.windowNumber
+        )
+        XCTAssertEqual(evidence.value.title, selection.title)
+        return selection
     }
 
     private func assertNoisyInAppWindowRequestSource(
