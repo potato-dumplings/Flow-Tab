@@ -84,6 +84,12 @@ final class FlowTabUITestWorkflowWindowActivationObservationOwner {
         conditionOwner.waitForResolution(timeout: timeout)
     }
 
+    func requestReadback(
+        source: FlowTabUITestConditionObservationSource
+    ) {
+        conditionOwner.requestReadback(source: source)
+    }
+
     var latestEvidence: FlowTabUITestConditionEvidence<
         FlowTabUITestWorkflowWindowActivationSnapshot
     >? {

@@ -582,7 +582,7 @@ and Process/Tooling.
 | SYNC-036KW | In-App Control+Tab roundtrip; exact workflow Space/window topology readiness | Raw 12/4-second bounds qualify prelaunch, first-phase, reopened-phase, and fixture reactivation topology. Predicates are exact, while operation-class policy and final diagnostics are scattered. Retained-watchdog consolidation. | Name In-App initial/current/reactivation watchdogs under the workflow-window owners, preserve immediate readback plus workspace/AX events and cancellable fallback, and report exact bundle/window/title/Space evidence. Callers own each synchronous observation. | H; policy/initial/event/wrong-space/cancel/watchdog tests, both signed In-App roundtrips, Process/Tooling. | completed |
 | SYNC-036KX | `assertInAppWindowSwitcherReady`; atomic In-App panel projection | Diagnostics existence, App entry/summary, selected bundle, and noisy preview titles are observed through separate 8-second waits or synchronous reads. Evidence composition migration. | One owner starts before the Control+Tab trigger, requires an initially absent panel, and accepts one stable-running FlowTab diagnostics snapshot with exact selected bundle, one exact App entry/window count, exact Window-cycle mode, preview bundle, and exact title multiplicity. Stable foreground or background state preserves the fixture-frontmost suppress-panel-activation topology. The helper owns its shared named cancellable cadence, named watchdog, generation, and cleanup. | H; atomic projection/duplicate-title/stale/cancel/watchdog/Pressure tests, both signed In-App roundtrips, Process/Tooling. | completed |
 | SYNC-036KY | In-App Control+Tab window advances; exact command application publication | Each exact UI selection transition is followed by a raw eight-second two-substring log wait, which can combine records. Retained-watchdog plus evidence refinement. | Capture a pre-command runtime-log baseline and require one exact forward-hotkey/advance application record bound to the current selection transition. Name the watchdog; each phase cancels its baseline/owner. | H; exact-record/order/event/cancel/watchdog tests, signed normal/noisy In-App UIs, Process/Tooling. | completed |
-| SYNC-036KZ | In-App Control+Tab confirmation; exact dismissal and selected-window activation | Dismissal is observed after confirm, then exact activation is observed in a second 12-second wait; both observers miss the trigger boundary and can resolve from different lifecycles. Evidence composition/order migration. | Before confirm, install panel-nonexistence and exact bundle/window-number activation owners, gate both until command delivery returns, and require both evidence objects. Name compatible bounds; the phase invocation owns cancellation. | H; initial-match rejection/event/out-of-order/cancel/watchdog/Pressure tests, signed normal/noisy In-App UIs, Process/Tooling. | planned |
+| SYNC-036KZ | In-App Control+Tab confirmation; exact dismissal and selected-window activation | Dismissal is observed after confirm, then exact activation is observed in a second 12-second wait; both observers miss the trigger boundary and can resolve from different lifecycles. Evidence composition/order migration. | Before confirm, install panel-nonexistence and exact bundle/window-number activation owners, gate both until command delivery returns, and require both evidence objects. Name compatible bounds; the phase invocation owns cancellation. | H; initial-match rejection/event/out-of-order/cancel/watchdog/Pressure tests, signed normal/noisy In-App UIs, Process/Tooling. | completed |
 | SYNC-036LA | noisy In-App roundtrip; filtered CG-only artifact publication | A raw eight-second log wait proves a broad artifact marker from a workflow-wide baseline without exact process identity. Evidence refinement. | Use the pretrigger runtime-log owner and require the exact fixture PID plus a valid filtered-artifact stage/count record. Name the watchdog and cancel with the scenario. | H; exact PID/regex/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | planned |
 | SYNC-036LB | noisy In-App roundtrip; exact sticky Window-layer source | A raw eight-second regex accepts title/window-number source evidence while bundle/PID ownership is implicit. Evidence refinement. | Require one post-baseline record with exact fixture PID, selected CG window number/title, sticky source, and Space evidence. Name the watchdog; the scenario owns the shared baseline lifecycle. | H; exact identity/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | planned |
 | SYNC-036LC | noisy In-App roundtrip; exact sticky window request | A raw eight-second regex accepts app ID/window number/title but any PID. Evidence refinement. | Bind the request record to exact app ID, fixture PID, selected CG number/title, and sticky source after confirm. Name the watchdog and cancel the per-confirm owner. | H; exact PID/window/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | planned |
@@ -29089,6 +29089,79 @@ polling cadence, deadline, or timeout in the scoped paths.
   absence and worktree-baseline checks.
 - Commit subject:
   `refactor(sync): migrate SYNC-036KY In-App command application`.
+
+### SYNC-036KZ Closure Record
+
+- Status and Oracle: completed. Every affected In-App confirmation now succeeds
+  only when one invocation observes both the exact diagnostics panel become
+  nonexistent and the independently selected bundle/window-number become the
+  exact frontmost CG window. Normal standard/fullscreen confirmation and all
+  four noisy cross-Space phases use the same composite owner and retain exact
+  window identity semantics.
+- Evidence ordering and stale-state rejection: the composite owner installs the
+  exact-window activation inputs and panel observer before delivering `.confirm`,
+  performs initial readbacks, and requires an initially visible panel plus an
+  initial exact-window mismatch. The trigger gate opens only after synchronous
+  command delivery returns, followed by immediate readbacks for both conditions.
+  Initial exact activation, an already-dismissed panel, wrong bundle or window,
+  reordered or duplicate events, and callbacks from cancelled generations cannot
+  resolve the invocation. Both observers start together, and the invocation owns
+  cancellation through `defer` on every return.
+- Retained time policy: the compatible four- and twelve-second bounds are named
+  `panelDismissalWatchdog` and `exactWindowActivationWatchdog` under
+  `FlowTabUITestInAppConfirmationObservationPolicy`. They are terminal failure
+  upper bounds only. Panel readback begins immediately and uses the shared named
+  100-millisecond unresolved XCUI cadence; exact activation uses workspace
+  activation, AX focused/main-window events, the shared named cadence, and
+  immediate readback. Expiry performs final readbacks and reports the initial
+  panel/activation baseline, trigger state, both generations and sources, exact
+  bundle/window expectations, and both last-observed values. Elapsed time cannot
+  establish dismissal or activation.
+- Deterministic UI and lifecycle Pressure: the canonical signed Runner passed
+  8/8 selected checks with zero failures in 1.376 seconds under
+  `.build-local/sync-036kz-ui-observation-a1`. Coverage proves compatible named
+  policy, both stale-baseline rejections, both event orders, wrong bundle/window
+  and duplicate rejection, trigger readback, cancellation, watchdog evidence,
+  and 100 generations of stale-callback/event-order Pressure. Its status ledger
+  is completed and xcresult reports `succeeded` with eight tests and no issue
+  summaries.
+- Affected signed UI: both current-source canonical real-topology paths passed
+  2/2 with zero failures in 164.620 seconds under
+  `.build-local/sync-036kz-ui-roundtrip-a1`. The noisy four-window/two-fullscreen
+  roundtrip completed in 104.200 seconds and the normal two-window/one-fullscreen
+  roundtrip completed in 60.419 seconds. Every confirmation required the exact
+  composite evidence despite different event ordering and scheduling latency.
+  Its status ledger is completed and xcresult reports `succeeded` with two tests
+  and no issue summaries.
+- Validation scope: deterministic UI state/lifecycle tests, lifecycle Pressure,
+  and both signed real Space-fixture paths are the applicable layers. FlowTabCore
+  Unit, app Unit/Behavior, and FlowTabTests are not relevant because this slice
+  changes UI-test synchronization and orchestration only. Production behavior,
+  fixture topology, configuration compatibility, window identity semantics,
+  module direction, and path-intent resolution remain unchanged.
+- Signing and Process/Tooling: both final status ledgers report `completed`;
+  every applicable fixture, signing, build, and test stage exited zero, both
+  result bundles are present, and final failure scans are empty. Sandbox-external
+  strict deep verification accepts the fixed App and final Runner under Team
+  `96PUA726W9`, signed with certificate fingerprint
+  `1BF0E48A99836282230C3A10EAF6ADC83A4AED82`. Their CDHashes are
+  `bdd8ee9fac3a22357ab6fbe99a7139c6992ddffc` and
+  `b4c582cc5a2807edcb7a601c5323c700dd1414ed`; executable SHA-256 values are
+  `2ae312f09a74c2cf4c49556bfe03903a10b056217c6736df17b8eca7aa679922`
+  and `7e910e3b524301e1891598ed6fd477cac2a94c0342a4555072abe67dbf856aa6`.
+  Swift parsing, project plist lint, scoped raw-wait inventory, and
+  `git diff --check` pass. The composite owner/tests, affected workflow, and
+  shared activation owner contain 334, 486, 679, and 386 lines with clear
+  responsibilities. Raw confirmation delivery/nonexistence/twelve-second waits
+  are absent from the workflow; its remaining time contracts belong to later
+  ledger slices. Exact App/Runner/fixture and repository-scoped xcodebuild
+  process readbacks are empty.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. Exact SYNC-036KZ evidence roots are
+  removed after this durable record and independent commit, followed by exact
+  absence and worktree-baseline checks.
+- Commit subject:
+  `test(sync): migrate SYNC-036KZ atomic In-App confirmation`.
 
 ### SYNC-001 Authorized Resume Closure Record
 

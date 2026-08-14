@@ -148,16 +148,19 @@ extension FlowTabUITests {
                 requiresControlTab: true
             )
 
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "\(traceLabel).confirmStandard")
-            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: standardSelection.windowNumber,
+            guard
+                confirmInAppSelectionAndWaitForEvidence(
+                    windowNumber:
+                        standardSelection.windowNumber,
                     title: standardTitle,
                     app: targetApp,
-                    timeout: 12
-                )
-            )
+                    diagnosticsSummary: diagnosticsSummary,
+                    traceLabel:
+                        "\(traceLabel).confirmStandard"
+                ) != nil
+            else {
+                return
+            }
             logWorkflowSpaceObservation("\(traceLabel).afterStandardConfirm", app: targetApp)
 
             diagnosticsSummary = relaunchInAppWindowSwitcher(
@@ -200,16 +203,19 @@ extension FlowTabUITests {
                 requiresControlTab: true
             )
 
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "\(traceLabel).confirmFullscreen")
-            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: fullscreenSelection.windowNumber,
+            guard
+                confirmInAppSelectionAndWaitForEvidence(
+                    windowNumber:
+                        fullscreenSelection.windowNumber,
                     title: targetFullscreenTitle,
                     app: targetApp,
-                    timeout: 12
-                )
-            )
+                    diagnosticsSummary: diagnosticsSummary,
+                    traceLabel:
+                        "\(traceLabel).confirmFullscreen"
+                ) != nil
+            else {
+                return
+            }
             logWorkflowSpaceObservation("\(traceLabel).afterFullscreenConfirm", app: targetApp)
         }
     }
@@ -329,20 +335,18 @@ extension FlowTabUITests {
                 since: runtimeLogSnapshot
             )
             let activationLogSnapshot = makeRuntimeLogFileSnapshot()
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
-                .confirm,
-                traceLabel: "\(traceLabel).confirm.\(phase.trace)"
-            )
-            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
+            guard
+                confirmInAppSelectionAndWaitForEvidence(
                     windowNumber: selection.windowNumber,
                     title: phase.targetTitle,
                     app: targetApp,
-                    timeout: 12
-                ),
-                "Noisy Control+Tab must activate the exact \(phase.targetTitle) CG window selected in \(phase.trace)."
-            )
+                    diagnosticsSummary: diagnosticsSummary,
+                    traceLabel:
+                        "\(traceLabel).confirm.\(phase.trace)"
+                ) != nil
+            else {
+                return
+            }
             assertNoisyInAppWindowRequestSource(
                 selection,
                 appID: targetApp.identity.bundleIdentifier,
