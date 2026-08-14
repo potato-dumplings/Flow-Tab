@@ -634,7 +634,7 @@ struct HomeLandingView: View {
         let summaries = projectionRead.summaries
         homeSummaryProjectionFreshness = projectionRead.freshness
         appSummaries = summaries
-        loadingWindowCountAppIDs = accessibilityTrusted && !evidence.isReady
+        loadingWindowCountAppIDs = accessibilityTrusted && !evidence.isReadyForPresentation
             ? Set(summaries.map(\.appID))
             : []
         let validAppIDs = Set(summaries.map(\.appID))
@@ -649,11 +649,14 @@ struct HomeLandingView: View {
         setupWindowMonitorIfCountsReady()
         persistCache()
 
-        if evidence.isReady {
+        if evidence.isReadyForPresentation {
             startAppSummaryProjectionObservation(
                 reason: "initial_projection_\(evidence.source.rawValue)"
             )
-        } else if accessibilityTrusted, let selectedAppID = currentSelectedAppID {
+        }
+        if !evidence.isReady,
+           accessibilityTrusted,
+           let selectedAppID = currentSelectedAppID {
             requestSelectedAppRefresh(
                 appID: selectedAppID,
                 force: true,
@@ -662,7 +665,7 @@ struct HomeLandingView: View {
         }
         RuntimeLog.debug(
             .projection,
-            "homeInitialProjectionRead result=\(evidence.isReady ? "ready" : "observing") source=\(evidence.source.rawValue) transition=\(evidence.transition.rawValue) freshnessComplete=\(projectionRead.freshness?.isCompleteForScope == true ? 1 : 0) apps=\(summaries.count) selected=\(currentSelectedAppID ?? "nil") loadingCounts=\(loadingWindowCountAppIDs.count) accessibilityTrusted=\(accessibilityTrusted) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
+            "homeInitialProjectionRead result=\(evidence.isReadyForPresentation ? "ready" : "observing") source=\(evidence.source.rawValue) transition=\(evidence.transition.rawValue) freshnessComplete=\(projectionRead.freshness?.isCompleteForScope == true ? 1 : 0) apps=\(summaries.count) selected=\(currentSelectedAppID ?? "nil") loadingCounts=\(loadingWindowCountAppIDs.count) accessibilityTrusted=\(accessibilityTrusted) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
         )
     }
 

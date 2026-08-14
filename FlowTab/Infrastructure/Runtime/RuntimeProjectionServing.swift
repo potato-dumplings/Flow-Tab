@@ -10,12 +10,48 @@ extension Notification.Name {
     static let runtimeCommittedSearchIndexDidUpdate = Notification.Name(
         "FlowTab.runtimeCommittedSearchIndexDidUpdate"
     )
+    static let runtimeAppSwitcherProjectionMaintenanceDidFinish = Notification.Name(
+        "FlowTab.runtimeAppSwitcherProjectionMaintenanceDidFinish"
+    )
 }
 
 enum RuntimeProjectionNotificationUserInfoKey {
     static let appID = "appID"
+    static let runtimeProjectionMaintenanceReason =
+        "runtimeProjectionMaintenanceReason"
     static let currentAppWindowProjectionUpdateEvidence =
         "currentAppWindowProjectionUpdateEvidence"
+}
+
+struct RuntimeAppSwitcherProjectionMaintenanceCompletion: Equatable {
+    let reason: RuntimeProjectionMaintenanceReason
+
+    init(reason: RuntimeProjectionMaintenanceReason) {
+        self.reason = reason
+    }
+
+    init?(notification: Notification) {
+        guard notification.name
+                == .runtimeAppSwitcherProjectionMaintenanceDidFinish,
+              let rawReason = notification.userInfo?[
+                RuntimeProjectionNotificationUserInfoKey
+                    .runtimeProjectionMaintenanceReason
+              ] as? String,
+              let reason = RuntimeProjectionMaintenanceReason(
+                rawValue: rawReason
+              )
+        else {
+            return nil
+        }
+        self.reason = reason
+    }
+
+    var notificationUserInfo: [AnyHashable: Any] {
+        [
+            RuntimeProjectionNotificationUserInfoKey
+                .runtimeProjectionMaintenanceReason: reason.rawValue
+        ]
+    }
 }
 
 struct RuntimeCurrentAppWindowProjectionUpdateEvidence: Equatable {
@@ -67,6 +103,21 @@ enum RuntimeProjectionNotificationPublisher {
                 userInfo: userInfo
             )
         }
+    }
+}
+
+extension RuntimeProjectionService {
+    func publishAppSwitcherProjectionMaintenanceCompletion(
+        reason: RuntimeProjectionMaintenanceReason
+    ) {
+        let completion = RuntimeAppSwitcherProjectionMaintenanceCompletion(
+            reason: reason
+        )
+        RuntimeProjectionNotificationPublisher.post(
+            name: .runtimeAppSwitcherProjectionMaintenanceDidFinish,
+            object: self,
+            userInfo: completion.notificationUserInfo
+        )
     }
 }
 

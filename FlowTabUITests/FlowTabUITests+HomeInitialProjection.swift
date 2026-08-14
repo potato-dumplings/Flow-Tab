@@ -478,4 +478,98 @@ extension FlowTabUITests {
             appliedBrowserY
         )
     }
+
+    func testHomeDegradedInitialProjectionStopsLoadingAfterMaintenanceCompletion() {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-mock-runtime-variant",
+                "degraded-home",
+                "-showPermissionReminder",
+                "NO",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(
+            waitForFlowTabUITestApplicationToBecomeReady(
+                app,
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .foregroundActivation
+            ),
+            "Home degraded-projection foreground watchdog expired. "
+                + "finalState=\(String(describing: app.state))"
+        )
+
+        let homeTabButtons = app.buttons.matching(
+            identifier: Identifier.homeTabButton
+        )
+        let homeContent = element(
+            in: app,
+            identifier: Identifier.homeTabContent
+        )
+        let navigationSatisfied =
+            tapFirstHittableAndWaitForExistence(
+                in: homeTabButtons,
+                content: homeContent,
+                contentDescription: Identifier.homeTabContent,
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .tabNavigation
+            )
+        XCTAssertTrue(
+            navigationSatisfied,
+            "Home degraded-projection navigation watchdog expired. "
+                + "finalCandidateCount=\(homeTabButtons.count) "
+                + "finalContentExists=\(homeContent.exists)"
+        )
+        guard navigationSatisfied else { return }
+
+        let expectedRows = [
+            FlowTabUITestHomeAppRowProjectionExpectation.Row(
+                identifier: Identifier.homeAppMockMail,
+                value: "0w"
+            ),
+            FlowTabUITestHomeAppRowProjectionExpectation.Row(
+                identifier: Identifier.homeAppMockBrowser,
+                value: "0w"
+            )
+        ]
+        let rowObservation = makeHomeAppRowProjectionObservation(
+            in: app,
+            rows: expectedRows,
+            requiredApplicationState: .runningForeground
+        )
+        rowObservation.start()
+        defer { rowObservation.cancel() }
+
+        guard let projection = rowObservation.waitForResolution(
+            timeout:
+                FlowTabUITestHomeAppliedRowProjectionPolicy
+                    .watchdog
+        )?.value else {
+            XCTFail(
+                "Home degraded projection kept loading after maintenance completion. "
+                    + rowObservation.diagnosticSummary
+            )
+            return
+        }
+        XCTAssertEqual(
+            projection.row(
+                identifier: Identifier.homeAppMockMail
+            )?.value,
+            "0w"
+        )
+        XCTAssertEqual(
+            projection.row(
+                identifier: Identifier.homeAppMockBrowser
+            )?.value,
+            "0w"
+        )
+    }
 }

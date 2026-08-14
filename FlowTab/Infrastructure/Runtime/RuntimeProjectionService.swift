@@ -88,6 +88,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason) {
         maintenanceOwner.enqueue { [self] in
+            defer {
+                publishAppSwitcherProjectionMaintenanceCompletion(reason: reason)
+            }
             let now = Date.timeIntervalSinceReferenceDate
             let appDirectoryProviderEvidenceCount = commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             var mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(

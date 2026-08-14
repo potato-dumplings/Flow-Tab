@@ -168,9 +168,16 @@ enum FlowTabUITestBootstrapper {
     private static func installMockRuntimeProjectionServiceIfNeeded() {
         guard FlowTabTestLaunchOptions.usesMockRuntimeProjection else { return }
         guard AppDelegate.testHooks.runtimeProjectionService == nil else { return }
+        let axWindowRepairAvailability: (@Sendable () -> Bool)?
+        if FlowTabTestLaunchOptions.keepsMockHomeProjectionDegraded {
+            axWindowRepairAvailability = { false }
+        } else {
+            axWindowRepairAvailability = nil
+        }
         let service = RuntimeProjectionService(
             label: "FlowTab.UITest.MockRuntimeProjectionService",
-            appDirectoryProvider: RuntimeUITestProjectionAppDirectoryProvider()
+            appDirectoryProvider: RuntimeUITestProjectionAppDirectoryProvider(),
+            axWindowRepairAvailability: axWindowRepairAvailability
         )
         AppDelegate.testHooks.runtimeProjectionService = service
         service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)

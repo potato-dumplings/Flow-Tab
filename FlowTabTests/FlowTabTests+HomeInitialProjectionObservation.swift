@@ -78,6 +78,37 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testUITestBootstrapperKeepsRequestedHomeProjectionDegraded() {
+        let previousHooks = AppDelegate.testHooks
+        defer {
+            AppDelegate.testHooks = previousHooks
+        }
+        AppDelegate.testHooks.runtimeProjectionService = nil
+
+        withLaunchArgumentsForTesting([
+            "FlowTab",
+            "--flowtab-ui-mock-runtime",
+            "--flowtab-ui-mock-runtime-variant",
+            "degraded-home",
+            "--flowtab-ui-ax-trusted",
+            "true"
+        ]) {
+            FlowTabUITestBootstrapper.prepareIfNeeded()
+        }
+
+        let projection = AppDelegate.testHooks
+            .runtimeProjectionService?
+            .readHomeSummaryProjection()
+        XCTAssertFalse(
+            projection?.freshness.isCompleteForScope == true
+        )
+        XCTAssertEqual(
+            projection?.summaries.prefix(2).map(\.windowCount),
+            [0, 0]
+        )
+    }
+
+    @MainActor
     func testHomeVisibilityOwnsInitialProjectionObservationLifecycle() async {
         let notificationCenter = NotificationCenter()
         let runtimeProjectionService = RecordingRuntimeProjectionService()
@@ -269,6 +300,80 @@ extension FlowTabTests {
         )
     }
 
+    @MainActor
+    func testHomeVisibilityHandsOffDegradedProjectionAfterMaintenanceCompletion() {
+        let notificationCenter = NotificationCenter()
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            homeSummaryProjection:
+                makeHomeVisibilityDegradedSummaryProjection()
+        )
+        let initialProjectionOwner =
+            HomeInitialProjectionObservationOwner(
+                runtimeProjectionService: runtimeProjectionService,
+                notificationCenter: notificationCenter
+            )
+        let appSummaryProjectionOwner =
+            HomeAppSummaryProjectionObservationOwner(
+                runtimeProjectionService: runtimeProjectionService,
+                notificationCenter: notificationCenter
+            )
+        let permissionOwner = HomePermissionObservationOwner(
+            accessibilityTrusted: true,
+            screenCaptureTrusted: true,
+            readAccessibilityPermission: { true },
+            readScreenCapturePermission: { true }
+        )
+        let hostedView = NSHostingView(
+            rootView: HomeLandingView(
+                isActive: true,
+                appLanguage: .english,
+                runtimeProjectionService: runtimeProjectionService,
+                permissionObservationOwner: permissionOwner,
+                initialProjectionObservationOwner:
+                    initialProjectionOwner,
+                appSummaryProjectionObservationOwner:
+                    appSummaryProjectionOwner,
+                openSettings: {}
+            )
+        )
+        hostedView.frame = NSRect(
+            x: 0,
+            y: 0,
+            width: 1_040,
+            height: 720
+        )
+        hostedView.layoutSubtreeIfNeeded()
+
+        XCTAssertTrue(initialProjectionOwner.isObserving)
+        XCTAssertFalse(appSummaryProjectionOwner.isObserving)
+        let completion =
+            RuntimeAppSwitcherProjectionMaintenanceCompletion(
+                reason: .homeProjectionMissing
+            )
+        notificationCenter.post(
+            name: .runtimeAppSwitcherProjectionMaintenanceDidFinish,
+            object: runtimeProjectionService,
+            userInfo: completion.notificationUserInfo
+        )
+        hostedView.layoutSubtreeIfNeeded()
+
+        XCTAssertFalse(initialProjectionOwner.isObserving)
+        XCTAssertTrue(appSummaryProjectionOwner.isObserving)
+        let readCountBeforeCommit =
+            runtimeProjectionService.homeSummaryProjectionReadCount()
+        runtimeProjectionService.setHomeSummaryProjection(
+            makeHomeVisibilitySummaryProjection(generation: 3)
+        )
+        notificationCenter.post(
+            name: .runtimeAppSwitcherProjectionDidUpdate,
+            object: runtimeProjectionService
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.homeSummaryProjectionReadCount(),
+            readCountBeforeCommit + 1
+        )
+    }
+
     private func makeHomeVisibilitySummaryProjection()
         -> RuntimeHomeSummaryProjection
     {
@@ -299,6 +404,36 @@ extension FlowTabTests {
                 dirtyCGWindowIDs: [],
                 pendingRepairScopes: [],
                 isCompleteForScope: true
+            )
+        )
+    }
+
+    private func makeHomeVisibilityDegradedSummaryProjection()
+        -> RuntimeHomeSummaryProjection
+    {
+        RuntimeHomeSummaryProjection(
+            summaries: [
+                RuntimeHomeAppSummary(
+                    appID: "com.example.home-visible",
+                    displayName: "Home Visible",
+                    groupID: "home-visible",
+                    lastActiveAt: 100,
+                    windowCount: 0,
+                    pid: 18_414,
+                    bundleIdentifier: "com.example.home-visible"
+                )
+            ],
+            freshness: RuntimeProjectionFreshness(
+                generatedAt: 2,
+                sourceGeneration:
+                    RuntimeReadModelGeneration(projection: 2),
+                dirtyAppIDs: ["com.example.home-visible"],
+                dirtyPIDs: [18_414],
+                dirtyCGWindowIDs: [],
+                pendingRepairScopes: [
+                    "appWindows:com.example.home-visible"
+                ],
+                isCompleteForScope: false
             )
         )
     }

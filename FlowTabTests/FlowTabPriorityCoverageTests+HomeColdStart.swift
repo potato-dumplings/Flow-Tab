@@ -152,6 +152,84 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testHomeInitialProjectionObservationHandsOffDegradedProjectionAfterMaintenanceCompletion() {
+        let notificationCenter = NotificationCenter()
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            homeSummaryProjection: makeHomeInitialSummaryProjection(
+                generation: 2,
+                isCompleteForScope: false
+            )
+        )
+        let owner = HomeInitialProjectionObservationOwner(
+            runtimeProjectionService: runtimeProjectionService,
+            notificationCenter: notificationCenter
+        )
+        var evidence: [HomeInitialProjectionObservationEvidence] = []
+
+        owner.start(reason: "test_degraded_maintenance_completion") {
+            evidence.append($0)
+        }
+        let completion =
+            RuntimeAppSwitcherProjectionMaintenanceCompletion(
+                reason: .homeProjectionMissing
+            )
+        notificationCenter.post(
+            name: .runtimeAppSwitcherProjectionMaintenanceDidFinish,
+            object: runtimeProjectionService,
+            userInfo: completion.notificationUserInfo
+        )
+
+        XCTAssertFalse(owner.isObserving)
+        XCTAssertEqual(
+            evidence.map(\.source),
+            [
+                .initialReadback,
+                .maintenanceRequestReadback,
+                .maintenanceCompletion
+            ]
+        )
+        XCTAssertFalse(evidence.last?.isReady == true)
+        XCTAssertTrue(evidence.last?.isReadyForPresentation == true)
+    }
+
+    @MainActor
+    func testRuntimeProjectionServicePublishesHomeMaintenanceCompletion() async {
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.HomeMaintenanceCompletion",
+            repairProvider: RuntimeProjectionRepairProvider(
+                reconciliationCoordinator:
+                    RuntimeReconciliationCoordinator()
+            ),
+            axWindowRepairAvailability: { false }
+        )
+        let publication = expectation(
+            forNotification:
+                .runtimeAppSwitcherProjectionMaintenanceDidFinish,
+            object: service
+        ) { notification in
+            XCTAssertTrue(Thread.isMainThread)
+            XCTAssertEqual(
+                RuntimeAppSwitcherProjectionMaintenanceCompletion(
+                    notification: notification
+                )?.reason,
+                .homeProjectionMissing
+            )
+            return true
+        }
+
+        service.requestAppSwitcherProjectionMaintenance(
+            reason: .homeProjectionMissing
+        )
+
+        await fulfillment(
+            of: [publication],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .runtimeProjectionMainThreadDelivery
+        )
+    }
+
+    @MainActor
     func testHomeInitialProjectionApplicationForwarderPublishesExactEvidenceAndCancels() throws {
         let notificationCenter = NotificationCenter()
         let runtimeProjectionService =

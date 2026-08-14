@@ -360,6 +360,10 @@ enum FlowTabTestLaunchOptions {
         uiTestValue(after: "--flowtab-ui-mock-runtime-variant")
     }
 
+    static var keepsMockHomeProjectionDegraded: Bool {
+        mockRuntimeVariant == "degraded-home"
+    }
+
     static var initialPanelOcclusionStaleMilliseconds: Int? {
         guard let rawValue = uiTestValue(after: "--flowtab-ui-initial-panel-occlusion-stale-ms") else {
             return nil

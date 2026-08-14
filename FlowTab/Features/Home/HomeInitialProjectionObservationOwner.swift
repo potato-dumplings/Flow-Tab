@@ -12,6 +12,7 @@ extension Notification.Name {
 enum HomeInitialProjectionObservationSource: String, Equatable {
     case initialReadback
     case maintenanceRequestReadback
+    case maintenanceCompletion
     case appSwitcherProjectionNotification
 }
 
@@ -24,11 +25,19 @@ struct HomeInitialProjectionObservationEvidence: Equatable {
 
     var shouldApply: Bool {
         transition.shouldApply
+            || source == .maintenanceCompletion
+                && projectionRead.isProjectionBacked
     }
 
     var isReady: Bool {
         projectionRead.isProjectionBacked
             && projectionRead.freshness?.isCompleteForScope == true
+    }
+
+    var isReadyForPresentation: Bool {
+        isReady
+            || source == .maintenanceCompletion
+                && projectionRead.isProjectionBacked
     }
 }
 
@@ -83,7 +92,7 @@ final class HomeInitialProjectionObservationOwner: ObservableObject {
     private let notificationObject: AnyObject
     private var nextGeneration: UInt64 = 1
     private var observation: Observation?
-    private var observerToken: NSObjectProtocol?
+    private var observerTokens: [NSObjectProtocol] = []
 
     init(
         runtimeProjectionService: any RuntimeProjectionServing,
@@ -153,13 +162,13 @@ final class HomeInitialProjectionObservationOwner: ObservableObject {
     }
 
     deinit {
-        if let observerToken {
+        for observerToken in observerTokens {
             notificationCenter.removeObserver(observerToken)
         }
     }
 
     private func installObserver(generation: UInt64) {
-        observerToken = notificationCenter.addObserver(
+        observerTokens.append(notificationCenter.addObserver(
             forName: .runtimeAppSwitcherProjectionDidUpdate,
             object: notificationObject,
             queue: .main
@@ -170,7 +179,24 @@ final class HomeInitialProjectionObservationOwner: ObservableObject {
                     generation: generation
                 )
             }
-        }
+        })
+        observerTokens.append(notificationCenter.addObserver(
+            forName: .runtimeAppSwitcherProjectionMaintenanceDidFinish,
+            object: notificationObject,
+            queue: .main
+        ) { [weak self] notification in
+            guard RuntimeAppSwitcherProjectionMaintenanceCompletion(
+                notification: notification
+            )?.reason == .homeProjectionMissing else {
+                return
+            }
+            MainActor.assumeIsolated {
+                _ = self?.readback(
+                    source: .maintenanceCompletion,
+                    generation: generation
+                )
+            }
+        })
     }
 
     @discardableResult
@@ -209,11 +235,13 @@ final class HomeInitialProjectionObservationOwner: ObservableObject {
         guard observation?.generation == generation else {
             return evidence
         }
-        if evidence.shouldApply, evidence.isReady {
+        if evidence.shouldApply, evidence.isReadyForPresentation {
             finish(
                 generation: generation,
                 source: source,
-                reason: "completeProjectionObserved"
+                reason: evidence.isReady
+                    ? "completeProjectionObserved"
+                    : "maintenanceCompletedWithDegradedProjection"
             )
         }
         publishApplication(
@@ -252,7 +280,7 @@ final class HomeInitialProjectionObservationOwner: ObservableObject {
         _ evidence: HomeInitialProjectionObservationEvidence,
         requestReason: String
     ) {
-        guard evidence.shouldApply,
+        guard evidence.transition.shouldApply,
               evidence.projectionRead.isProjectionBacked
         else {
             return
@@ -273,10 +301,10 @@ final class HomeInitialProjectionObservationOwner: ObservableObject {
     private func takeObservation() -> Observation? {
         guard let active = observation else { return nil }
         observation = nil
-        if let observerToken {
+        for observerToken in observerTokens {
             notificationCenter.removeObserver(observerToken)
-            self.observerToken = nil
         }
+        observerTokens.removeAll()
         return active
     }
 }
