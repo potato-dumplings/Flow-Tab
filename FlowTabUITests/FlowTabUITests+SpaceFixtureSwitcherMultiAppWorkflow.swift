@@ -3,6 +3,30 @@ import CoreGraphics
 import Foundation
 import XCTest
 
+private enum FlowTabUITestMultiAppFullscreenWindowSearchPolicy {
+    static let diagnosticsPublicationWatchdog: TimeInterval = 8
+
+    static func waitForDiagnosticsPublication(
+        initialReadback: () -> Bool,
+        waitForPublication: (TimeInterval) -> Bool
+    ) -> Bool {
+        if initialReadback() {
+            return true
+        }
+        return waitForPublication(diagnosticsPublicationWatchdog)
+    }
+
+    static func diagnosticsPublicationFailure(
+        identifier: String,
+        finalExists: Bool
+    ) -> String {
+        "Fullscreen multi-app Window Search diagnostics "
+            + "publication watchdog expired; unmetCondition="
+            + "exactDiagnosticsSummaryExists identifier="
+            + "\(identifier) finalExists=\(finalExists ? 1 : 0)"
+    }
+}
+
 extension FlowTabUITests {
     func testSwitcherPanelShowsAllWorkflowAppsInMultiAppFixtureStrip() throws {
         let workflow = try configuredSwitcherSpaceFixtureWorkflow()
@@ -285,6 +309,66 @@ extension FlowTabUITests {
         }
     }
 
+    func testMultiAppFullscreenWindowSearchPolicyPreservesCompatibleDiagnosticsWatchdog() {
+        XCTAssertEqual(
+            FlowTabUITestMultiAppFullscreenWindowSearchPolicy
+                .diagnosticsPublicationWatchdog,
+            8
+        )
+    }
+
+    func testMultiAppFullscreenWindowSearchAcceptsInitiallyPublishedDiagnostics() {
+        var waitInvocations = 0
+
+        XCTAssertTrue(
+            FlowTabUITestMultiAppFullscreenWindowSearchPolicy
+                .waitForDiagnosticsPublication(
+                    initialReadback: { true },
+                    waitForPublication: { _ in
+                        waitInvocations += 1
+                        return false
+                    }
+                )
+        )
+        XCTAssertEqual(waitInvocations, 0)
+    }
+
+    func testMultiAppFullscreenWindowSearchAcceptsWaitedDiagnosticsEvidence() {
+        var observedWatchdogs: [TimeInterval] = []
+
+        XCTAssertTrue(
+            FlowTabUITestMultiAppFullscreenWindowSearchPolicy
+                .waitForDiagnosticsPublication(
+                    initialReadback: { false },
+                    waitForPublication: { watchdog in
+                        observedWatchdogs.append(watchdog)
+                        return true
+                    }
+                )
+        )
+        XCTAssertEqual(
+            observedWatchdogs,
+            [
+                FlowTabUITestMultiAppFullscreenWindowSearchPolicy
+                    .diagnosticsPublicationWatchdog
+            ]
+        )
+    }
+
+    func testMultiAppFullscreenWindowSearchWatchdogReportsFinalDiagnosticsEvidence() {
+        XCTAssertEqual(
+            FlowTabUITestMultiAppFullscreenWindowSearchPolicy
+                .diagnosticsPublicationFailure(
+                    identifier: Identifier.switcherSummary,
+                    finalExists: false
+                ),
+            "Fullscreen multi-app Window Search diagnostics "
+                + "publication watchdog expired; unmetCondition="
+                + "exactDiagnosticsSummaryExists identifier="
+                + "flowtab.testing.switcher.summary finalExists=0"
+        )
+    }
+
     func testSwitcherPanelWindowSearchActivatesFullscreenWorkflowWindowAcrossSpaces() throws {
         let workflow = try configuredSwitcherSpaceFixtureWorkflow()
         let targetApp = try XCTUnwrap(
@@ -314,7 +398,29 @@ extension FlowTabUITests {
                     observedBy: readiness
                 )
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+            let diagnosticsPublished =
+                FlowTabUITestMultiAppFullscreenWindowSearchPolicy
+                    .waitForDiagnosticsPublication(
+                        initialReadback: {
+                            diagnosticsSummary.exists
+                        },
+                        waitForPublication: { watchdog in
+                            diagnosticsSummary.waitForExistence(
+                                timeout: watchdog
+                            )
+                        }
+                    )
+            guard diagnosticsPublished else {
+                XCTFail(
+                    FlowTabUITestMultiAppFullscreenWindowSearchPolicy
+                        .diagnosticsPublicationFailure(
+                            identifier:
+                                diagnosticsSummary.identifier,
+                            finalExists: diagnosticsSummary.exists
+                        )
+                )
+                return
+            }
             XCTAssertNotEqual(
                 NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
                 targetApp.identity.bundleIdentifier,

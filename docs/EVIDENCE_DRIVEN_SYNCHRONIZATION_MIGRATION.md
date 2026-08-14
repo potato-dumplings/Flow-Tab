@@ -587,6 +587,7 @@ and Process/Tooling.
 | SYNC-036LB | noisy In-App roundtrip; exact sticky Window-layer source | A raw eight-second regex accepts title/window-number source evidence while bundle/PID ownership is implicit. Evidence refinement. | Require one post-baseline record with exact fixture PID, selected CG window number/title, sticky source, and Space evidence. Name the watchdog; the scenario owns the shared baseline lifecycle. | H; exact identity/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | completed |
 | SYNC-036LC | noisy In-App roundtrip; exact sticky window request | A raw eight-second regex accepts app ID/window number/title but any PID. Evidence refinement. | Bind the request record to exact app ID, fixture PID, selected CG number/title, and sticky source after confirm. Name the watchdog and cancel the per-confirm owner. | H; exact PID/window/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | completed |
 | SYNC-036LD | noisy In-App roundtrip; exact verified-focus readback publication | A raw eight-second regex observes the selected CG number but omits app/PID context and named ownership. Evidence refinement. | Require a post-confirm verified-focus transition for the exact selected record and fixture process, with exact activation readback as an independent Oracle. Name the watchdog and cancel the runtime-log owner. | H; exact identity/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | completed |
+| SYNC-036LE | `testSwitcherPanelWindowSearchActivatesFullscreenWorkflowWindowAcrossSpaces`; fullscreen multi-app Search diagnostics publication | A raw eight-second `waitForExistence` begins after exact Search-input keyboard readiness. Exact diagnostics-summary existence already defines success, while the initial check, terminal bound, and final failure evidence are implicit or anonymous. Retained watchdog classification. | Name the compatible diagnostics-publication watchdog at the fullscreen multi-app Window Search owner. Perform an explicit immediate exact-identifier existence readback before entering XCTest's wait and accept only `exists`; the synchronous platform wait owns cancellation. Expiry reports the unmet publication condition, exact identifier, and final existence. Search-input readiness, committed result publication, exact activation, and panel dismissal remain independent Oracles. | M real-topology UI-test publication caller; initial/delayed/named-policy/failure-diagnostic regression, affected signed fullscreen multi-app Window Search UI, exact process cleanup, Process/Tooling. | completed |
 | SYNC-037 | `scripts/perf/tab-switch-stress.sh`, `search-committed-index-pressure.sh`, `runtime-topology-pressure.sh`, `lib/runtime-topology-target.sh` | Sampling duration/cadence and identity stability windows are pressure/safety protocols; process termination loops use unnamed 100ms cadence and attempt bounds. Domain duration/conditional observation/watchdog. | Retain measurement durations and sample cadence as named protocol inputs. Name process polling cadence/watchdogs, check state immediately, terminate from PID/start-identity/readback, and report the final `ps`/identity/status evidence. Traps own cancellation and cleanup. | M tooling/hot path; Pressure and Process/Tooling. | completed through SYNC-037A tab-switch, SYNC-037B Search pressure, SYNC-037C runtime-topology runner-tree cleanup, SYNC-037D independent application cleanup, SYNC-037D1 exact application-process cleanup, SYNC-037E target-exit completion, and SYNC-037F target-launch readiness |
 | SYNC-037A | `tab-switch-stress.sh`, `lib/process-exit-observation.sh`, and `test-process-exit-observation.sh`; tab-switch stress child termination and trap cleanup | After TERM, twenty unnamed 100ms attempts infer when the child is safe to reap or whether KILL escalation is required. A scheduling slowdown changes the observed opportunity count and diagnostics omit the expected process identity. | Capture the launched child PID and start identity, check `ps` state immediately, and accept only exact absence or zombie state before the owning shell performs `wait PID`. Retain a named 100ms conditional observation cadence while the child remains active. A named two-second monotonic watchdog only controls KILL escalation and reports the unmet exit condition, expected start identity, final PID/PPID/state/start/command record, and readback status. The synchronous trap owner supplies cancellation and reaping. Sampling duration, switch cadence, and sample cadence remain explicit pressure protocol inputs. | M perf process owner; deterministic initial/delayed/slow-scheduling/final-readback/watchdog/readback-error/identity/cancel tests, real child readiness/TERM/reap integration, normal and interrupted tab-switch Pressure, Process/Tooling. | completed |
 | SYNC-037B | `search-committed-index-pressure.sh`, `lib/process-exit-observation.sh`, and `test-process-exit-observation.sh`; Search pressure test-process-tree termination and trap cleanup | After TERM and after optional KILL, two independent twenty-attempt 100ms loops watch only the root shell PID. Attempt count and scheduler availability determine escalation and completion, while surviving descendants and PID reuse lack exact evidence. | Capture and deduplicate every observed PID plus `lstart` identity before signalling. Perform an immediate exact readback before each TERM/KILL, then observe the complete captured identity set immediately and at a named 100ms cadence. Exact absence, zombie state, or a changed identity proves the captured record inactive; readback, identity-capture, and monotonic-clock failures remain unmet evidence. A named 2,000ms TERM grace only controls exact-record KILL escalation, and a separate 2,000ms watchdog bounds KILL confirmation; each reports `processTreeExited` and final PID/PPID/state/start/command evidence. The synchronous trap owns capture, signalling, observation, cancellation, `wait PID`, atomic status persistence, and cleanup. Caller-selected sampling duration and cadence remain explicit pressure protocol inputs. | M perf process-tree owner/shared helper; deterministic initial/dedup/exact-signal/slow-scheduling/cancel/final-readback/watchdog/readback-error tests, real child integration, completed and interrupted Search Pressure, Process/Tooling. | completed |
@@ -29471,6 +29472,63 @@ polling cadence, deadline, or timeout in the scoped paths.
   followed by exact absence and worktree-baseline checks.
 - Commit subject:
   `test(sync): migrate SYNC-036LD verified-focus evidence`.
+
+### SYNC-036LE Closure Record
+
+- Status and Oracle: completed. The fullscreen multi-app Window Search path
+  retains XCTest's exact `flowtab.testing.switcher.summary` existence predicate
+  as the sole diagnostics-publication success condition. The owner performs an
+  explicit immediate `exists` readback before entering `waitForExistence`, and
+  elapsed time never establishes publication. Exact Search-input keyboard
+  readiness, committed result publication, target-bundle/window activation, and
+  panel dismissal remain separate Oracles.
+- Retained time and lifecycle: the compatible eight-second upper bound is named
+  `FlowTabUITestMultiAppFullscreenWindowSearchPolicy.diagnosticsPublicationWatchdog`
+  and is solely a terminal failure bound. XCTest's synchronous platform wait
+  owns its internal observation lifecycle and cancellation through return. On
+  expiry, the owner reports the unmet exact-publication condition, accessibility
+  identifier, and final `exists` readback before ending the scenario.
+- Deterministic UI: the canonical signed Runner passed the four selected policy,
+  initial-state, delayed-evidence, and diagnostic checks with zero failures in
+  0.583 seconds under
+  `.build-local/sync-036le-ui-policy-a1`. Coverage proves immediate completion
+  without entering the wait, one wait with the compatible named watchdog after
+  an unsatisfied initial readback, and the terminal diagnostic's unmet
+  condition, exact identifier, and final observation. The status ledger is
+  `completed`; xcresult reports `succeeded` with four tests and an empty issue
+  summary.
+- Affected signed UI: the current-source canonical fullscreen multi-app fixture
+  path passed 1/1 with zero failures in 20.695 seconds under
+  `.build-local/sync-036le-ui-fullscreen-a1`. After exact Search-input keyboard
+  readiness, the explicit initial readback found the diagnostics summary by its
+  exact identifier and completed without entering the bounded wait. Search
+  committed `Notes Focus`, exact fixture activation succeeded across Spaces,
+  and the panel dismissed. The status ledger is `completed`; every fixture,
+  signing, build, and test stage exited zero, and xcresult reports `succeeded`
+  with one test and an empty issue summary.
+- Validation scope: deterministic UI, affected signed real-topology UI, and
+  Process/Tooling are applicable and pass. FlowTabCore Unit, App Unit/Behavior,
+  and Pressure are not relevant because this slice classifies and names an
+  existing UI-test publication watchdog without changing production behavior,
+  fixture topology, application orchestration, or a hot-path lifecycle.
+- Signing and Process/Tooling: sandbox-external strict deep verification accepts
+  the unchanged fixed App and final Runner under Team `96PUA726W9`, signed by
+  Apple Development authority `gobestsoft@qq.com (RF9WCUVKH8)`. Their CDHashes
+  are `bed32577af2bdbc6081a17a290338204838960a6` and
+  `24b4759198e88593972ed7dd02e92faf5b8a6c29`; executable SHA-256 values are
+  `a3df7115a935e0e5b52ef7518a6a46a571f2017e3b68d69dcbdc8fe578d85d4e`
+  and `be82e2be1b71024d769ca8c5ff4c70d8d44d55939ad6fd80e3d367ef24aac8d0`.
+  Swift parsing, scoped zero-literal XCTest-timeout inventory, final failure
+  scans, and `git diff --check` pass. The affected workflow contains 787 lines
+  within its existing single real-topology fixture responsibility. Exact
+  App/Runner/fixture and repository-scoped xcodebuild process readbacks are
+  empty.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. Exact SYNC-036LE build and result
+  roots are removed after this durable record and independent commit, followed
+  by exact absence and worktree-baseline checks.
+- Commit subject:
+  `test(sync): migrate SYNC-036LE diagnostics watchdog`.
 
 ### SYNC-001 Authorized Resume Closure Record
 
