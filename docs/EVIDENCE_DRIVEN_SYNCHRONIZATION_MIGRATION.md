@@ -586,7 +586,7 @@ and Process/Tooling.
 | SYNC-036LA | noisy In-App roundtrip; filtered CG-only artifact publication | A raw eight-second log wait proves a broad artifact marker from a workflow-wide baseline without exact process identity. Evidence refinement. | Use the pretrigger runtime-log owner and require the exact fixture PID plus a valid filtered-artifact stage/count record. Name the watchdog and cancel with the scenario. | H; exact PID/regex/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | completed |
 | SYNC-036LB | noisy In-App roundtrip; exact sticky Window-layer source | A raw eight-second regex accepts title/window-number source evidence while bundle/PID ownership is implicit. Evidence refinement. | Require one post-baseline record with exact fixture PID, selected CG window number/title, sticky source, and Space evidence. Name the watchdog; the scenario owns the shared baseline lifecycle. | H; exact identity/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | completed |
 | SYNC-036LC | noisy In-App roundtrip; exact sticky window request | A raw eight-second regex accepts app ID/window number/title but any PID. Evidence refinement. | Bind the request record to exact app ID, fixture PID, selected CG number/title, and sticky source after confirm. Name the watchdog and cancel the per-confirm owner. | H; exact PID/window/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | completed |
-| SYNC-036LD | noisy In-App roundtrip; exact verified-focus readback publication | A raw eight-second regex observes the selected CG number but omits app/PID context and named ownership. Evidence refinement. | Require a post-confirm verified-focus transition for the exact selected record and fixture process, with exact activation readback as an independent Oracle. Name the watchdog and cancel the runtime-log owner. | H; exact identity/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | planned |
+| SYNC-036LD | noisy In-App roundtrip; exact verified-focus readback publication | A raw eight-second regex observes the selected CG number but omits app/PID context and named ownership. Evidence refinement. | Require a post-confirm verified-focus transition for the exact selected record and fixture process, with exact activation readback as an independent Oracle. Name the watchdog and cancel the runtime-log owner. | H; exact identity/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | completed |
 | SYNC-037 | `scripts/perf/tab-switch-stress.sh`, `search-committed-index-pressure.sh`, `runtime-topology-pressure.sh`, `lib/runtime-topology-target.sh` | Sampling duration/cadence and identity stability windows are pressure/safety protocols; process termination loops use unnamed 100ms cadence and attempt bounds. Domain duration/conditional observation/watchdog. | Retain measurement durations and sample cadence as named protocol inputs. Name process polling cadence/watchdogs, check state immediately, terminate from PID/start-identity/readback, and report the final `ps`/identity/status evidence. Traps own cancellation and cleanup. | M tooling/hot path; Pressure and Process/Tooling. | completed through SYNC-037A tab-switch, SYNC-037B Search pressure, SYNC-037C runtime-topology runner-tree cleanup, SYNC-037D independent application cleanup, SYNC-037D1 exact application-process cleanup, SYNC-037E target-exit completion, and SYNC-037F target-launch readiness |
 | SYNC-037A | `tab-switch-stress.sh`, `lib/process-exit-observation.sh`, and `test-process-exit-observation.sh`; tab-switch stress child termination and trap cleanup | After TERM, twenty unnamed 100ms attempts infer when the child is safe to reap or whether KILL escalation is required. A scheduling slowdown changes the observed opportunity count and diagnostics omit the expected process identity. | Capture the launched child PID and start identity, check `ps` state immediately, and accept only exact absence or zombie state before the owning shell performs `wait PID`. Retain a named 100ms conditional observation cadence while the child remains active. A named two-second monotonic watchdog only controls KILL escalation and reports the unmet exit condition, expected start identity, final PID/PPID/state/start/command record, and readback status. The synchronous trap owner supplies cancellation and reaping. Sampling duration, switch cadence, and sample cadence remain explicit pressure protocol inputs. | M perf process owner; deterministic initial/delayed/slow-scheduling/final-readback/watchdog/readback-error/identity/cancel tests, real child readiness/TERM/reap integration, normal and interrupted tab-switch Pressure, Process/Tooling. | completed |
 | SYNC-037B | `search-committed-index-pressure.sh`, `lib/process-exit-observation.sh`, and `test-process-exit-observation.sh`; Search pressure test-process-tree termination and trap cleanup | After TERM and after optional KILL, two independent twenty-attempt 100ms loops watch only the root shell PID. Attempt count and scheduler availability determine escalation and completion, while surviving descendants and PID reuse lack exact evidence. | Capture and deduplicate every observed PID plus `lstart` identity before signalling. Perform an immediate exact readback before each TERM/KILL, then observe the complete captured identity set immediately and at a named 100ms cadence. Exact absence, zombie state, or a changed identity proves the captured record inactive; readback, identity-capture, and monotonic-clock failures remain unmet evidence. A named 2,000ms TERM grace only controls exact-record KILL escalation, and a separate 2,000ms watchdog bounds KILL confirmation; each reports `processTreeExited` and final PID/PPID/state/start/command evidence. The synchronous trap owns capture, signalling, observation, cancellation, `wait PID`, atomic status persistence, and cleanup. Caller-selected sampling duration and cadence remain explicit pressure protocol inputs. | M perf process-tree owner/shared helper; deterministic initial/dedup/exact-signal/slow-scheduling/cancel/final-readback/watchdog/readback-error tests, real child integration, completed and interrupted Search Pressure, Process/Tooling. | completed |
@@ -29391,6 +29391,86 @@ polling cadence, deadline, or timeout in the scoped paths.
   absence and worktree-baseline checks.
 - Commit subject:
   `test(sync): migrate SYNC-036LC exact window request`.
+
+### SYNC-036LD Closure Record
+
+- Status and Oracle: completed. Each noisy confirmation now requires one atomic
+  production AXMatch `binding-confidence-change` record whose stable WindowRecord
+  identity and separate CG field agree on the selected window number, whose
+  stable window ID and concrete AX ID agree on the positive fixture PID, whose
+  confidence transition is `sticky->exact`, whose source transition is
+  `stickyBinding->verifiedFocusReadback`, and whose fallback flag is zero. The
+  same confirmation independently requires KZ's exact bundle/window activation
+  readback and panel dismissal; the two evidence objects must agree on the
+  selected CG window.
+- Evidence ordering and lifecycle: after each exact selection, the phase creates
+  a fresh runtime-log baseline and starts both exact request and verified-focus
+  owners before `.confirm`. Immediately before command delivery, the shared
+  confirmation helper asks the verified-focus owner to perform a synchronous
+  trigger-boundary readback while evidence remains gated; a matching baseline
+  record is a named rejection. File events may publish evidence during command
+  delivery. After delivery returns, `markTriggerCompleted()` opens the gate and
+  performs a trigger readback, closing notification coalescing and delivery
+  races without accepting an initially satisfied state. A phase-local `do`
+  scope owns baseline and both owner cancellations through `defer`; resolution,
+  expiry, explicit cancellation, and deinit cancel recurring work.
+- Retained time policy: the compatible eight-second upper bound is named
+  `FlowTabUITestInAppVerifiedFocusReadbackObservationPolicy.watchdog` and is
+  solely a terminal failure bound. The baseline supplies vnode events plus the
+  shared named cancellable 200-millisecond readback cadence for coalesced,
+  rotated, or unavailable file events. Success comes only from the exact atomic
+  transition after the trigger boundary. Expiry performs a final readback and
+  reports expected PID/window identity, trigger state, baseline issue, bounded
+  parsed records, event generations, character count, log tail, and wait result.
+- Deterministic UI and lifecycle Pressure: the canonical signed Runner passed
+  8/8 selected checks with zero failures in 0.887 seconds under
+  `.build-local/sync-036ld-ui-observation-a1`. Coverage proves the compatible
+  named watchdog, atomic record/category parsing, stable-ID/CG/AX PID agreement,
+  exact forward confidence/source transitions, fallback rejection, matching
+  pretrigger-baseline rejection, exact post-trigger event identity, delayed
+  notification closure through trigger readback, cancellation, watchdog last-
+  evidence diagnostics, and 100 generations of stale-callback lifecycle
+  Pressure. Its status ledger is `completed`; xcresult reports `succeeded` with
+  eight tests and an empty issue summary.
+- Affected signed UI: the current-source canonical noisy four-window,
+  two-fullscreen real-topology roundtrip passed 1/1 with zero failures in
+  105.728 seconds under `.build-local/sync-036ld-ui-noisy-a1`. Exact fixture PID
+  `60877` published verified-focus transitions for normal window `105446`,
+  primary fullscreen window `105514`, incognito window `105449`, and second
+  fullscreen window `105479`. Every record repeated the same PID in stable and
+  AX identities, matched the separate CG field, advanced sticky confidence to
+  exact through verified-focus readback, and reported fallback zero. The status
+  ledger is `completed`; xcresult reports `succeeded` with one test and an empty
+  issue summary.
+- Validation scope: deterministic UI, lifecycle Pressure, signed noisy real-
+  topology UI, and Process/Tooling are applicable and pass. FlowTabCore Unit and
+  App Unit/Behavior are not relevant because this slice consumes the existing
+  production AXMatch and activation contracts and changes UI-test
+  synchronization and orchestration only. Production behavior, log format,
+  fixture topology, configuration compatibility, window identity semantics,
+  module direction, and path-intent resolution remain unchanged.
+- Signing and Process/Tooling: the canonical installer succeeded and both test
+  status ledgers report `completed`; every applicable fixture, signing, build,
+  and test stage exited zero, both result bundles are present, and final failure
+  scans are empty. Sandbox-external strict deep verification accepts the fixed
+  App and final Runner under Team `96PUA726W9`, signed with certificate
+  fingerprint `1BF0E48A99836282230C3A10EAF6ADC83A4AED82`. Their CDHashes are
+  `bed32577af2bdbc6081a17a290338204838960a6` and
+  `3cc28752163933659cc50781e61842b9671b5735`; executable SHA-256 values are
+  `a3df7115a935e0e5b52ef7518a6a46a571f2017e3b68d69dcbdc8fe578d85d4e`
+  and `bab5029fbc3e95d554ecb4aebad28ca8213b8bc0860046dbd3671da527fe626d`.
+  Swift parsing, project plist lint, scoped raw-wait inventory, and
+  `git diff --check` pass. The owner, tests, shared confirmation helper, and
+  affected workflow contain 391, 366, 345, and 782 lines with clear
+  responsibilities. The broad verified-focus regex helper and the final raw
+  eight-second wait in this workflow are absent. Exact App/Runner/fixture and
+  repository-scoped xcodebuild process readbacks are empty.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. Exact SYNC-036LD installer, build,
+  and result roots are removed after this durable record and independent commit,
+  followed by exact absence and worktree-baseline checks.
+- Commit subject:
+  `test(sync): migrate SYNC-036LD verified-focus evidence`.
 
 ### SYNC-001 Authorized Resume Closure Record
 

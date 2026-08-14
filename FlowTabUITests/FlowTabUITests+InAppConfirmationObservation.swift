@@ -26,6 +26,13 @@ struct FlowTabUITestInAppConfirmationEvidence {
     >
 }
 
+protocol FlowTabUITestInAppConfirmationTriggerLifecycle:
+    AnyObject
+{
+    func markTriggerStarted()
+    func markTriggerCompleted()
+}
+
 private final class FlowTabUITestInAppConfirmationState {
     let expectedBundleIdentifier: String
     let expectedWindowNumber: CGWindowID
@@ -255,7 +262,9 @@ extension FlowTabUITests {
         title: String,
         app workflowApp: SpaceFixtureResolvedWorkflow.App,
         diagnosticsSummary: XCUIElement,
-        traceLabel: String
+        traceLabel: String,
+        additionalTriggerLifecycle:
+            FlowTabUITestInAppConfirmationTriggerLifecycle? = nil
     ) -> FlowTabUITestInAppConfirmationEvidence? {
         let bundleIdentifier =
             workflowApp.identity.bundleIdentifier
@@ -292,11 +301,13 @@ extension FlowTabUITests {
             return nil
         }
 
+        additionalTriggerLifecycle?.markTriggerStarted()
         postFlowTabUITestSwitcherCommandAndWaitForDelivery(
             .confirm,
             traceLabel: traceLabel
         )
         owner.markTriggerCompleted()
+        additionalTriggerLifecycle?.markTriggerCompleted()
 
         guard
             let evidence = owner.waitForResolution(

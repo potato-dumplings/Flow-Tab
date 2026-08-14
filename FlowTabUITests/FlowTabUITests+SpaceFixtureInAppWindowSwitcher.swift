@@ -394,17 +394,37 @@ extension FlowTabUITests {
                     )
                 requestOwner.start()
                 defer { requestOwner.cancel() }
+                let verifiedFocusOwner =
+                    FlowTabUITestInAppVerifiedFocusReadbackObservationOwner(
+                        expectedProcessIdentifier:
+                            targetProcessIdentifier,
+                        expectedWindowID: selection.windowID,
+                        expectedWindowNumber:
+                            selection.windowNumber,
+                        baseline: activationLogSnapshot
+                    )
+                verifiedFocusOwner.start()
+                defer { verifiedFocusOwner.cancel() }
 
                 guard
-                    confirmInAppSelectionAndWaitForEvidence(
-                        windowNumber: selection.windowNumber,
-                        title: phase.targetTitle,
-                        app: targetApp,
-                        diagnosticsSummary: diagnosticsSummary,
-                        traceLabel:
-                            "\(traceLabel).confirm.\(phase.trace)"
-                    ) != nil
+                    let confirmationEvidence =
+                        confirmInAppSelectionAndWaitForEvidence(
+                            windowNumber: selection.windowNumber,
+                            title: phase.targetTitle,
+                            app: targetApp,
+                            diagnosticsSummary: diagnosticsSummary,
+                            traceLabel:
+                                "\(traceLabel).confirm.\(phase.trace)",
+                            additionalTriggerLifecycle:
+                                verifiedFocusOwner
+                        )
                 else {
+                    return
+                }
+                guard verifiedFocusOwner.baselineIssue == nil else {
+                    XCTFail(
+                        "Noisy Control+Tab verified-focus baseline rejected for \(phase.trace). \(verifiedFocusOwner.diagnosticSummary)"
+                    )
                     return
                 }
                 let requestEvidence = try XCTUnwrap(
@@ -423,10 +443,29 @@ extension FlowTabUITests {
                     requestEvidence.value.processIdentifier,
                     targetProcessIdentifier
                 )
-                assertNoisyInAppVerifiedFocusReadback(
-                    selection,
-                    phaseTrace: phase.trace,
-                    since: activationLogSnapshot
+                let verifiedFocusEvidence = try XCTUnwrap(
+                    verifiedFocusOwner.waitForResolution(
+                        timeout:
+                            FlowTabUITestInAppVerifiedFocusReadbackObservationPolicy
+                            .watchdog
+                    ),
+                    "Noisy Control+Tab exact verified-focus readback watchdog expired for \(phase.trace). \(verifiedFocusOwner.diagnosticSummary)"
+                )
+                XCTAssertEqual(
+                    verifiedFocusEvidence.value.windowID,
+                    selection.windowID
+                )
+                XCTAssertEqual(
+                    verifiedFocusEvidence.value.processIdentifier,
+                    targetProcessIdentifier
+                )
+                XCTAssertTrue(
+                    confirmationEvidence.activation.value.matches(
+                        bundleIdentifier:
+                            targetApp.identity.bundleIdentifier,
+                        windowNumber: selection.windowNumber
+                    ),
+                    "Noisy Control+Tab exact activation readback must agree with verified-focus evidence for \(phase.trace)."
                 )
             }
             currentSelection = selection
@@ -483,20 +522,6 @@ extension FlowTabUITests {
         )
         XCTAssertEqual(evidence.value.title, selection.title)
         return selection
-    }
-
-    private func assertNoisyInAppVerifiedFocusReadback(
-        _ selection: InAppWindowSelection,
-        phaseTrace: String,
-        since snapshot:
-            FlowTabUITestRuntimeLogObservationBaseline
-    ) {
-        waitForRuntimeLogFiles(
-            matching: "binding-confidence-change windowID=cg:[0-9]+:\(selection.windowNumber) cg=\(selection.windowNumber) .* source=.*->verifiedFocusReadback",
-            since: snapshot,
-            timeout: 8,
-            description: "verified-focus exact WindowRecord relearn after Noisy Control+Tab \(phaseTrace) confirm"
-        )
     }
 
     private func inAppSwitcherLaunchArguments(
