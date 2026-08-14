@@ -377,30 +377,58 @@ extension FlowTabUITests {
                 phaseTrace: phase.trace,
                 runtimeLogSnapshot: runtimeLogSnapshot
             )
-            let activationLogSnapshot = makeRuntimeLogFileSnapshot()
-            guard
-                confirmInAppSelectionAndWaitForEvidence(
-                    windowNumber: selection.windowNumber,
-                    title: phase.targetTitle,
-                    app: targetApp,
-                    diagnosticsSummary: diagnosticsSummary,
-                    traceLabel:
-                        "\(traceLabel).confirm.\(phase.trace)"
-                ) != nil
-            else {
-                return
+            do {
+                let activationLogSnapshot = makeRuntimeLogFileSnapshot()
+                defer { activationLogSnapshot.cancel() }
+                let requestOwner =
+                    FlowTabUITestInAppWindowRequestObservationOwner(
+                        expectedAppID:
+                            targetApp.identity.bundleIdentifier,
+                        expectedProcessIdentifier:
+                            targetProcessIdentifier,
+                        expectedWindowID: selection.windowID,
+                        expectedWindowNumber:
+                            selection.windowNumber,
+                        expectedTitle: selection.title,
+                        baseline: activationLogSnapshot
+                    )
+                requestOwner.start()
+                defer { requestOwner.cancel() }
+
+                guard
+                    confirmInAppSelectionAndWaitForEvidence(
+                        windowNumber: selection.windowNumber,
+                        title: phase.targetTitle,
+                        app: targetApp,
+                        diagnosticsSummary: diagnosticsSummary,
+                        traceLabel:
+                            "\(traceLabel).confirm.\(phase.trace)"
+                    ) != nil
+                else {
+                    return
+                }
+                let requestEvidence = try XCTUnwrap(
+                    requestOwner.waitForResolution(
+                        timeout:
+                            FlowTabUITestInAppWindowRequestObservationPolicy
+                            .watchdog
+                    ),
+                    "Noisy Control+Tab exact sticky window-request watchdog expired for \(phase.trace). \(requestOwner.diagnosticSummary)"
+                )
+                XCTAssertEqual(
+                    requestEvidence.value.windowID,
+                    selection.windowID
+                )
+                XCTAssertEqual(
+                    requestEvidence.value.processIdentifier,
+                    targetProcessIdentifier
+                )
+                assertNoisyInAppVerifiedFocusReadback(
+                    selection,
+                    phaseTrace: phase.trace,
+                    since: activationLogSnapshot
+                )
             }
-            assertNoisyInAppWindowRequestSource(
-                selection,
-                appID: targetApp.identity.bundleIdentifier,
-                phaseTrace: phase.trace,
-                since: activationLogSnapshot
-            )
-            assertNoisyInAppVerifiedFocusReadback(
-                selection,
-                phaseTrace: phase.trace,
-                since: activationLogSnapshot
-            )
             currentSelection = selection
             logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
         }
@@ -455,23 +483,6 @@ extension FlowTabUITests {
         )
         XCTAssertEqual(evidence.value.title, selection.title)
         return selection
-    }
-
-    private func assertNoisyInAppWindowRequestSource(
-        _ selection: InAppWindowSelection,
-        appID: String,
-        phaseTrace: String,
-        since snapshot:
-            FlowTabUITestRuntimeLogObservationBaseline
-    ) {
-        let escapedAppID = NSRegularExpression.escapedPattern(for: appID)
-        let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
-        waitForRuntimeLogFiles(
-            matching: #"window-request appID=\#(escapedAppID) pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) title=\#(escapedTitle)[^\n]* sticky=true source=stickyBinding"#,
-            since: snapshot,
-            timeout: 8,
-            description: "sticky current-app window request source for selected Noisy Control+Tab \(phaseTrace) window"
-        )
     }
 
     private func assertNoisyInAppVerifiedFocusReadback(

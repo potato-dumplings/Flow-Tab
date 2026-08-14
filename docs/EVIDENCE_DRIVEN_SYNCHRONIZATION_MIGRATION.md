@@ -585,7 +585,7 @@ and Process/Tooling.
 | SYNC-036KZ | In-App Control+Tab confirmation; exact dismissal and selected-window activation | Dismissal is observed after confirm, then exact activation is observed in a second 12-second wait; both observers miss the trigger boundary and can resolve from different lifecycles. Evidence composition/order migration. | Before confirm, install panel-nonexistence and exact bundle/window-number activation owners, gate both until command delivery returns, and require both evidence objects. Name compatible bounds; the phase invocation owns cancellation. | H; initial-match rejection/event/out-of-order/cancel/watchdog/Pressure tests, signed normal/noisy In-App UIs, Process/Tooling. | completed |
 | SYNC-036LA | noisy In-App roundtrip; filtered CG-only artifact publication | A raw eight-second log wait proves a broad artifact marker from a workflow-wide baseline without exact process identity. Evidence refinement. | Use the pretrigger runtime-log owner and require the exact fixture PID plus a valid filtered-artifact stage/count record. Name the watchdog and cancel with the scenario. | H; exact PID/regex/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | completed |
 | SYNC-036LB | noisy In-App roundtrip; exact sticky Window-layer source | A raw eight-second regex accepts title/window-number source evidence while bundle/PID ownership is implicit. Evidence refinement. | Require one post-baseline record with exact fixture PID, selected CG window number/title, sticky source, and Space evidence. Name the watchdog; the scenario owns the shared baseline lifecycle. | H; exact identity/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | completed |
-| SYNC-036LC | noisy In-App roundtrip; exact sticky window request | A raw eight-second regex accepts app ID/window number/title but any PID. Evidence refinement. | Bind the request record to exact app ID, fixture PID, selected CG number/title, and sticky source after confirm. Name the watchdog and cancel the per-confirm owner. | H; exact PID/window/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | planned |
+| SYNC-036LC | noisy In-App roundtrip; exact sticky window request | A raw eight-second regex accepts app ID/window number/title but any PID. Evidence refinement. | Bind the request record to exact app ID, fixture PID, selected CG number/title, and sticky source after confirm. Name the watchdog and cancel the per-confirm owner. | H; exact PID/window/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | completed |
 | SYNC-036LD | noisy In-App roundtrip; exact verified-focus readback publication | A raw eight-second regex observes the selected CG number but omits app/PID context and named ownership. Evidence refinement. | Require a post-confirm verified-focus transition for the exact selected record and fixture process, with exact activation readback as an independent Oracle. Name the watchdog and cancel the runtime-log owner. | H; exact identity/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | planned |
 | SYNC-037 | `scripts/perf/tab-switch-stress.sh`, `search-committed-index-pressure.sh`, `runtime-topology-pressure.sh`, `lib/runtime-topology-target.sh` | Sampling duration/cadence and identity stability windows are pressure/safety protocols; process termination loops use unnamed 100ms cadence and attempt bounds. Domain duration/conditional observation/watchdog. | Retain measurement durations and sample cadence as named protocol inputs. Name process polling cadence/watchdogs, check state immediately, terminate from PID/start-identity/readback, and report the final `ps`/identity/status evidence. Traps own cancellation and cleanup. | M tooling/hot path; Pressure and Process/Tooling. | completed through SYNC-037A tab-switch, SYNC-037B Search pressure, SYNC-037C runtime-topology runner-tree cleanup, SYNC-037D independent application cleanup, SYNC-037D1 exact application-process cleanup, SYNC-037E target-exit completion, and SYNC-037F target-launch readiness |
 | SYNC-037A | `tab-switch-stress.sh`, `lib/process-exit-observation.sh`, and `test-process-exit-observation.sh`; tab-switch stress child termination and trap cleanup | After TERM, twenty unnamed 100ms attempts infer when the child is safe to reap or whether KILL escalation is required. A scheduling slowdown changes the observed opportunity count and diagnostics omit the expected process identity. | Capture the launched child PID and start identity, check `ps` state immediately, and accept only exact absence or zombie state before the owning shell performs `wait PID`. Retain a named 100ms conditional observation cadence while the child remains active. A named two-second monotonic watchdog only controls KILL escalation and reports the unmet exit condition, expected start identity, final PID/PPID/state/start/command record, and readback status. The synchronous trap owner supplies cancellation and reaping. Sampling duration, switch cadence, and sample cadence remain explicit pressure protocol inputs. | M perf process owner; deterministic initial/delayed/slow-scheduling/final-readback/watchdog/readback-error/identity/cancel tests, real child readiness/TERM/reap integration, normal and interrupted tab-switch Pressure, Process/Tooling. | completed |
@@ -29318,6 +29318,79 @@ polling cadence, deadline, or timeout in the scoped paths.
   absence and worktree-baseline checks.
 - Commit subject:
   `test(sync): migrate SYNC-036LB exact Window-layer evidence`.
+
+### SYNC-036LC Closure Record
+
+- Status and Oracle: completed. Each noisy confirmation now requires one atomic
+  production Activation `window-request` record whose exact app ID and positive
+  fixture PID agree with `windowID=cg:<pid>:<cg>`, whose separate CG field equals
+  the selected window number, whose title equals the selected title, and whose
+  request fields say `sticky=true` and `source=stickyBinding`. The existing
+  composite confirmation remains an independent Oracle for exact panel
+  dismissal and selected-window activation.
+- Evidence ordering and lifecycle: after each exact selection, the phase creates
+  a fresh runtime-log baseline and starts its exact appID/PID/windowID/CG/title
+  request owner before delivering `.confirm`. Registration precedes immediate
+  baseline-relative readback. Durable evidence published after the baseline can
+  therefore resolve from initial readback or a later file event without a lost-
+  event window. A phase-local `do` scope owns both baseline and owner cancellation
+  through `defer`, including confirmation failure and thrown assertions;
+  resolution, expiry, explicit cancellation, and deinit cancel recurring work.
+- Retained time policy: the compatible eight-second upper bound is named
+  `FlowTabUITestInAppWindowRequestObservationPolicy.watchdog` and is solely a
+  terminal failure bound. The baseline supplies vnode events plus the shared
+  named cancellable 200-millisecond readback cadence for coalesced, rotated, or
+  unavailable file events. Success comes only from the exact request record.
+  Expiry performs a final readback and reports every expected identity field,
+  bounded parsed records, event generations, character count, log tail, and
+  wait result.
+- Deterministic UI and lifecycle Pressure: the canonical signed Runner passed
+  7/7 selected checks with zero failures in 0.762 seconds under
+  `.build-local/sync-036lc-ui-observation-a1`. Coverage proves compatible named
+  policy, atomic record parsing, header/window PID and CG agreement, rejection
+  of invalid category/sticky/source records, initial readback, every exact field
+  on event, cancellation, watchdog last-evidence diagnostics, and 100
+  generations of stale-callback lifecycle Pressure. Its status ledger is
+  `completed`; xcresult reports `succeeded` with seven tests and no issue
+  summaries.
+- Affected signed UI: the current-source canonical noisy four-window,
+  two-fullscreen real-topology roundtrip passed 1/1 with zero failures in
+  100.665 seconds under `.build-local/sync-036lc-ui-noisy-a1`. Exact fixture PID
+  `59863` produced requests for normal window `104976`, primary fullscreen
+  window `105040`, incognito window `104979`, and second fullscreen window
+  `105005`; every line repeated the same PID in its full window ID, matched the
+  separate CG field and exact title, and carried the sticky source. The status
+  ledger is `completed`; xcresult reports `succeeded` with one test and no issue
+  summaries.
+- Validation scope: deterministic UI, lifecycle Pressure, signed noisy real-
+  topology UI, and Process/Tooling are applicable and pass. FlowTabCore Unit and
+  App Unit/Behavior are not relevant because this slice consumes the existing
+  production Activation contract and changes UI-test synchronization and
+  orchestration only. Production behavior, log format, fixture topology,
+  configuration compatibility, window identity semantics, module direction,
+  and path-intent resolution remain unchanged.
+- Signing and Process/Tooling: both status ledgers report `completed`; every
+  applicable fixture, signing, build, and test stage exited zero, both result
+  bundles are present, and final failure scans are empty. Sandbox-external
+  strict deep verification accepts the unchanged fixed App and final Runner
+  under Team `96PUA726W9`, signed with certificate fingerprint
+  `1BF0E48A99836282230C3A10EAF6ADC83A4AED82`. Their CDHashes are
+  `78da20ee78f344c3049849bd55358bf52bc568ea` and
+  `d48a88a819f550795159a475dc3f6b6ca4575ac2`; executable SHA-256 values are
+  `d843bc41f54a5eecce9aca142cb71d9c520515708b8f83779507c5cdcaedefdc`
+  and `de63e2a31f2e86d5529dcf65ff9e608e945ea7a77256084fba27289457053776`.
+  Swift parsing, project plist lint, scoped raw-wait inventory, and
+  `git diff --check` pass. The owner, tests, and affected workflow contain 296,
+  318, and 757 lines with clear responsibilities. The broad request regex helper
+  is absent; the only remaining raw eight-second wait belongs to SYNC-036LD.
+  Exact App/Runner/fixture and repository-scoped xcodebuild process readbacks
+  are empty.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. Exact SYNC-036LC evidence roots are
+  removed after this durable record and independent commit, followed by exact
+  absence and worktree-baseline checks.
+- Commit subject:
+  `test(sync): migrate SYNC-036LC exact window request`.
 
 ### SYNC-001 Authorized Resume Closure Record
 
