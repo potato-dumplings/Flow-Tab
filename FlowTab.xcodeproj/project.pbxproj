@@ -117,6 +117,8 @@
 		A4A300043DA1000100B0D737 /* FlowTabUITests+InAppForwardCommandApplicationObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4A300033DA1000100B0D737 /* FlowTabUITests+InAppForwardCommandApplicationObservationTests.swift */; };
 		A4A400023DA2000100B0D737 /* FlowTabUITests+InAppConfirmationObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4A400013DA2000100B0D737 /* FlowTabUITests+InAppConfirmationObservation.swift */; };
 		A4A400043DA2000100B0D737 /* FlowTabUITests+InAppConfirmationObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4A400033DA2000100B0D737 /* FlowTabUITests+InAppConfirmationObservationTests.swift */; };
+		A4A500023DA3000100B0D737 /* FlowTabUITests+InAppFilteredArtifactObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4A500013DA3000100B0D737 /* FlowTabUITests+InAppFilteredArtifactObservation.swift */; };
+		A4A500043DA3000100B0D737 /* FlowTabUITests+InAppFilteredArtifactObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4A500033DA3000100B0D737 /* FlowTabUITests+InAppFilteredArtifactObservationTests.swift */; };
 		A46700023D6F000100B0D737 /* FlowTabUITests+SwitcherPreviewExitObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46700013D6F000100B0D737 /* FlowTabUITests+SwitcherPreviewExitObservation.swift */; };
 		A46800023D70000100B0D737 /* FlowTabUITests+HomeInitialProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46800013D70000100B0D737 /* FlowTabUITests+HomeInitialProjection.swift */; };
 		A46900023D71000100B0D737 /* FlowTabUITestHomeInitialProjectionApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46900013D71000100B0D737 /* FlowTabUITestHomeInitialProjectionApplication.swift */; };
@@ -459,6 +461,7 @@
 		C1F000023A20000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherInteractionRegressions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F000013A20000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherInteractionRegressions.swift */; };
 		C1A700023A10000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherTerminationProtection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A700013A10000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherTerminationProtection.swift */; };
 		B100110B2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSnapshotAndPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010B2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSnapshotAndPreview.swift */; };
+		B10F00023DA3000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeWindowFilteredArtifactLogRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10F00013DA3000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeWindowFilteredArtifactLogRecord.swift */; };
 		B100110C2F76000100B0D737 /* FlowTabPriorityCoverageTests+CacheAndIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010C2F76000100B0D737 /* FlowTabPriorityCoverageTests+CacheAndIcons.swift */; };
 		B100110D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift */; };
 		B100110E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift */; };
@@ -608,6 +611,7 @@
 		F8A9B0C735AE000100B0D737 /* RuntimeWindowPresentationFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A9B0C635AE000100B0D737 /* RuntimeWindowPresentationFilter.swift */; };
 		F8A9B0CB35AE000100B0D737 /* RuntimeWindowPresentationFilter+TitleDeduplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A9B0CA35AE000100B0D737 /* RuntimeWindowPresentationFilter+TitleDeduplication.swift */; };
 		F8A9B0CD35AE000100B0D737 /* RuntimeCurrentAppWindowPreservationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A9B0CC35AE000100B0D737 /* RuntimeCurrentAppWindowPreservationPolicy.swift */; };
+		F8A9B0CF35AE000100B0D737 /* RuntimeWindowFilteredArtifactLogRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A9B0CE35AE000100B0D737 /* RuntimeWindowFilteredArtifactLogRecord.swift */; };
 		F8A9B0C935AE000100B0D737 /* RuntimeWindowListDeduplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A9B0C835AE000100B0D737 /* RuntimeWindowListDeduplicator.swift */; };
 		F9C0D1E235AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9C0D1E135AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift */; };
 		F50001012F90000100B0D737 /* FlowTabSpaceFixtureApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000022F90000100B0D737 /* FlowTabSpaceFixtureApp.swift */; };
@@ -856,6 +860,7 @@
 		C1F000013A20000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherInteractionRegressions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+SwitcherInteractionRegressions.swift"; sourceTree = "<group>"; };
 		C1A700013A10000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherTerminationProtection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+SwitcherTerminationProtection.swift"; sourceTree = "<group>"; };
 		B100010B2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSnapshotAndPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeSnapshotAndPreview.swift"; sourceTree = "<group>"; };
+		B10F00013DA3000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeWindowFilteredArtifactLogRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeWindowFilteredArtifactLogRecord.swift"; sourceTree = "<group>"; };
 		B100010C2F76000100B0D737 /* FlowTabPriorityCoverageTests+CacheAndIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+CacheAndIcons.swift"; sourceTree = "<group>"; };
 		B100010D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+Support.swift"; sourceTree = "<group>"; };
 		B100010E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+TestDoubles.swift"; sourceTree = "<group>"; };
@@ -1020,6 +1025,7 @@
 		F8A9B0C635AE000100B0D737 /* RuntimeWindowPresentationFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowPresentationFilter.swift; sourceTree = "<group>"; };
 		F8A9B0CA35AE000100B0D737 /* RuntimeWindowPresentationFilter+TitleDeduplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeWindowPresentationFilter+TitleDeduplication.swift"; sourceTree = "<group>"; };
 		F8A9B0CC35AE000100B0D737 /* RuntimeCurrentAppWindowPreservationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeCurrentAppWindowPreservationPolicy.swift; sourceTree = "<group>"; };
+		F8A9B0CE35AE000100B0D737 /* RuntimeWindowFilteredArtifactLogRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowFilteredArtifactLogRecord.swift; sourceTree = "<group>"; };
 		F8A9B0C835AE000100B0D737 /* RuntimeWindowListDeduplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowListDeduplicator.swift; sourceTree = "<group>"; };
 		F9C0D1E135AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeChromeWindowFocusBridge.swift; sourceTree = "<group>"; };
 		F50000012F90000100B0D737 /* FlowTabSpaceFixture.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FlowTabSpaceFixture.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1135,6 +1141,8 @@
 		A4A300033DA1000100B0D737 /* FlowTabUITests+InAppForwardCommandApplicationObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+InAppForwardCommandApplicationObservationTests.swift"; sourceTree = "<group>"; };
 		A4A400013DA2000100B0D737 /* FlowTabUITests+InAppConfirmationObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+InAppConfirmationObservation.swift"; sourceTree = "<group>"; };
 		A4A400033DA2000100B0D737 /* FlowTabUITests+InAppConfirmationObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+InAppConfirmationObservationTests.swift"; sourceTree = "<group>"; };
+		A4A500013DA3000100B0D737 /* FlowTabUITests+InAppFilteredArtifactObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+InAppFilteredArtifactObservation.swift"; sourceTree = "<group>"; };
+		A4A500033DA3000100B0D737 /* FlowTabUITests+InAppFilteredArtifactObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+InAppFilteredArtifactObservationTests.swift"; sourceTree = "<group>"; };
 		A46700013D6F000100B0D737 /* FlowTabUITests+SwitcherPreviewExitObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherPreviewExitObservation.swift"; sourceTree = "<group>"; };
 		A46800013D70000100B0D737 /* FlowTabUITests+HomeInitialProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeInitialProjection.swift"; sourceTree = "<group>"; };
 		A46900013D71000100B0D737 /* FlowTabUITestHomeInitialProjectionApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestHomeInitialProjectionApplication.swift; sourceTree = "<group>"; };
@@ -1461,6 +1469,7 @@
 				C1F000013A20000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherInteractionRegressions.swift */,
 				C1A700013A10000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherTerminationProtection.swift */,
 				B100010B2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSnapshotAndPreview.swift */,
+				B10F00013DA3000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeWindowFilteredArtifactLogRecord.swift */,
 				B100010C2F76000100B0D737 /* FlowTabPriorityCoverageTests+CacheAndIcons.swift */,
 				B10001112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift */,
 				B10001122F76000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerEntry.swift */,
@@ -1672,6 +1681,8 @@
 				A4A300033DA1000100B0D737 /* FlowTabUITests+InAppForwardCommandApplicationObservationTests.swift */,
 				A4A400013DA2000100B0D737 /* FlowTabUITests+InAppConfirmationObservation.swift */,
 				A4A400033DA2000100B0D737 /* FlowTabUITests+InAppConfirmationObservationTests.swift */,
+				A4A500013DA3000100B0D737 /* FlowTabUITests+InAppFilteredArtifactObservation.swift */,
+				A4A500033DA3000100B0D737 /* FlowTabUITests+InAppFilteredArtifactObservationTests.swift */,
 				A46700013D6F000100B0D737 /* FlowTabUITests+SwitcherPreviewExitObservation.swift */,
 				A44D00013D55000100B0D737 /* FlowTabUITests+SwitcherSearchResultObservation.swift */,
 				A44D00033D55000100B0D737 /* FlowTabUITests+SwitcherSearchResultObservationTests.swift */,
@@ -1939,6 +1950,7 @@
 				F8A9B0C635AE000100B0D737 /* RuntimeWindowPresentationFilter.swift */,
 				F8A9B0CA35AE000100B0D737 /* RuntimeWindowPresentationFilter+TitleDeduplication.swift */,
 				F8A9B0CC35AE000100B0D737 /* RuntimeCurrentAppWindowPreservationPolicy.swift */,
+				F8A9B0CE35AE000100B0D737 /* RuntimeWindowFilteredArtifactLogRecord.swift */,
 				F8A9B0C835AE000100B0D737 /* RuntimeWindowListDeduplicator.swift */,
 				F6E7C01335C000100B0D737 /* RuntimeAXWindowRecovery.swift */,
 				F6E7C01535C000100B0D737 /* RuntimeAppDirectory.swift */,
@@ -2443,6 +2455,7 @@
 				F8A9B0C735AE000100B0D737 /* RuntimeWindowPresentationFilter.swift in Sources */,
 				F8A9B0CB35AE000100B0D737 /* RuntimeWindowPresentationFilter+TitleDeduplication.swift in Sources */,
 				F8A9B0CD35AE000100B0D737 /* RuntimeCurrentAppWindowPreservationPolicy.swift in Sources */,
+				F8A9B0CF35AE000100B0D737 /* RuntimeWindowFilteredArtifactLogRecord.swift in Sources */,
 				F8A9B0C935AE000100B0D737 /* RuntimeWindowListDeduplicator.swift in Sources */,
 				A1B2C4402F73000100B0D737 /* RuntimeWindowPreviewProvider.swift in Sources */,
 				D2A0001235B9000100B0D737 /* WindowPreviewProviderResolver.swift in Sources */,
@@ -2605,6 +2618,7 @@
 				C1F000023A20000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherInteractionRegressions.swift in Sources */,
 				C1A700023A10000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherTerminationProtection.swift in Sources */,
 				B100110B2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSnapshotAndPreview.swift in Sources */,
+				B10F00023DA3000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeWindowFilteredArtifactLogRecord.swift in Sources */,
 				B100110C2F76000100B0D737 /* FlowTabPriorityCoverageTests+CacheAndIcons.swift in Sources */,
 				B10011112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift in Sources */,
 				B10011122F76000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerEntry.swift in Sources */,
@@ -2850,6 +2864,8 @@
 				A4A300043DA1000100B0D737 /* FlowTabUITests+InAppForwardCommandApplicationObservationTests.swift in Sources */,
 				A4A400023DA2000100B0D737 /* FlowTabUITests+InAppConfirmationObservation.swift in Sources */,
 				A4A400043DA2000100B0D737 /* FlowTabUITests+InAppConfirmationObservationTests.swift in Sources */,
+				A4A500023DA3000100B0D737 /* FlowTabUITests+InAppFilteredArtifactObservation.swift in Sources */,
+				A4A500043DA3000100B0D737 /* FlowTabUITests+InAppFilteredArtifactObservationTests.swift in Sources */,
 				A46700023D6F000100B0D737 /* FlowTabUITests+SwitcherPreviewExitObservation.swift in Sources */,
 				A44D00023D55000100B0D737 /* FlowTabUITests+SwitcherSearchResultObservation.swift in Sources */,
 				A44D00043D55000100B0D737 /* FlowTabUITests+SwitcherSearchResultObservationTests.swift in Sources */,

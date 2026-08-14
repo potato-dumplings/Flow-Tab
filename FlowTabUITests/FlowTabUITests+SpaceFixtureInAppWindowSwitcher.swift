@@ -42,6 +42,10 @@ extension FlowTabUITests {
         let fullscreenTitle = try XCTUnwrap(fullscreenWindowTitle(in: targetApp))
         let standardTitle = try XCTUnwrap(firstStandardWindowTitle(in: targetApp))
         let runtimeLogSnapshot = makeRuntimeLogFileSnapshot()
+        defer { runtimeLogSnapshot.cancel() }
+        var filteredArtifactObservationOwner:
+            FlowTabUITestInAppFilteredArtifactObservationOwner?
+        defer { filteredArtifactObservationOwner?.cancel() }
 
         try runRealSpaceFixtureWorkflow(
             workflow,
@@ -54,6 +58,19 @@ extension FlowTabUITests {
             beforeFlowTabLaunch: { _ in
                 self.logWorkflowSpaceObservation("\(traceLabel).beforeFlowTabLaunch", app: targetApp)
                 if allowsNoisyCGSiblings {
+                    let targetProcessIdentifier = try self
+                        .runningWorkflowApplicationProcessIdentifier(
+                            targetApp
+                        )
+                    let owner =
+                        FlowTabUITestInAppFilteredArtifactObservationOwner(
+                            expectedAppName: targetApp.appName,
+                            expectedProcessIdentifier:
+                                targetProcessIdentifier,
+                            baseline: runtimeLogSnapshot
+                        )
+                    owner.start()
+                    filteredArtifactObservationOwner = owner
                     XCTAssertTrue(
                         self.waitForWorkflowSpaceContainingCGWindow(
                             title: fullscreenTitle,
@@ -93,8 +110,30 @@ extension FlowTabUITests {
                             traceLabel: traceLabel
                         )
                     }
-                )
+            )
             logWorkflowSpaceObservation("\(traceLabel).afterPanelReady", app: targetApp)
+            if allowsNoisyCGSiblings {
+                let owner = try XCTUnwrap(
+                    filteredArtifactObservationOwner,
+                    "Noisy Control+Tab filtered-artifact observation must start before the In-App trigger."
+                )
+                let evidence = try XCTUnwrap(
+                    owner.waitForResolution(
+                        timeout:
+                            FlowTabUITestInAppFilteredArtifactObservationPolicy
+                            .watchdog
+                    ),
+                    "Noisy Control+Tab exact filtered-artifact watchdog expired. \(owner.diagnosticSummary)"
+                )
+                XCTAssertEqual(
+                    evidence.value.appName,
+                    targetApp.appName
+                )
+                XCTAssertGreaterThan(
+                    evidence.value.droppedCount,
+                    0
+                )
+            }
             XCTAssertTrue(
                 allowsNoisyCGSiblings
                     ? waitForWorkflowSpaceContainingCGWindow(
@@ -326,9 +365,6 @@ extension FlowTabUITests {
                 diagnosticsSummary: diagnosticsSummary,
                 traceLabel: "\(traceLabel).\(phase.trace)"
             )
-            assertNoisyInAppFilteredCGOnlyArtifactSource(
-                since: runtimeLogSnapshot
-            )
             assertNoisyInAppWindowLayerSource(
                 selection,
                 phaseTrace: phase.trace,
@@ -361,18 +397,6 @@ extension FlowTabUITests {
             currentSelection = selection
             logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
         }
-    }
-
-    private func assertNoisyInAppFilteredCGOnlyArtifactSource(
-        since snapshot:
-            FlowTabUITestRuntimeLogObservationBaseline
-    ) {
-        waitForRuntimeLogFiles(
-            matching: #"Chrome Fixture (filtered-fullscreen-((sibling|host)-artifacts stage=(pre-dedupe|presentation|window-record-projection|read-model-current-app-normalization)|duplicate-surfaces stage=(presentation-final|window-record-projection|read-model-current-app-normalization))|filtered-cg-only-covered-by-activation stage=read-model-current-app-normalization) dropped=[1-9][0-9]*"#,
-            since: snapshot,
-            timeout: 8,
-            description: "Noisy Control+Tab filtered CG-only/fullscreen artifact or duplicate surface source"
-        )
     }
 
     private func assertNoisyInAppWindowLayerSource(

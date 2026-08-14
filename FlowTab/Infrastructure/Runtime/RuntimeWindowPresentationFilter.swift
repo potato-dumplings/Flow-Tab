@@ -31,7 +31,7 @@ enum RuntimeWindowPresentationFilter {
         }
         guard !activationSurfaces.isEmpty else { return entries }
 
-        var droppedCount = 0
+        var droppedEntries: [RuntimeWindowListEntry] = []
         let filteredEntries = entries.filter { entry in
             let isArtifact = entryLooksLikeFullscreenHostArtifact(
                 entry,
@@ -40,17 +40,17 @@ enum RuntimeWindowPresentationFilter {
                 appName: appName
             )
             if isArtifact {
-                droppedCount += 1
+                droppedEntries.append(entry)
             }
             return !isArtifact
         }
 
-        if droppedCount > 0 {
-            RuntimeLog.debug(
-                .axMatch,
-                "\(appName) filtered-fullscreen-host-artifacts stage=\(stage) dropped=\(droppedCount)"
-            )
-        }
+        RuntimeWindowFilteredArtifactLogRecord.publish(
+            appName: appName,
+            kind: .fullscreenHostArtifacts,
+            stage: stage,
+            droppedEntries: droppedEntries
+        )
         return filteredEntries
     }
 
@@ -86,7 +86,7 @@ enum RuntimeWindowPresentationFilter {
         )
         guard !strongTitles.isEmpty else { return entries }
 
-        var droppedCount = 0
+        var droppedEntries: [RuntimeWindowListEntry] = []
         let filteredEntries = entries.filter { entry in
             let isArtifact = entryLooksLikeFullscreenSiblingArtifact(
                 entry,
@@ -95,17 +95,17 @@ enum RuntimeWindowPresentationFilter {
                 strongTitles: strongTitles
             )
             if isArtifact {
-                droppedCount += 1
+                droppedEntries.append(entry)
             }
             return !isArtifact
         }
 
-        if droppedCount > 0 {
-            RuntimeLog.debug(
-                .axMatch,
-                "\(appName) filtered-fullscreen-sibling-artifacts stage=\(stage) dropped=\(droppedCount)"
-            )
-        }
+        RuntimeWindowFilteredArtifactLogRecord.publish(
+            appName: appName,
+            kind: .fullscreenSiblingArtifacts,
+            stage: stage,
+            droppedEntries: droppedEntries
+        )
         return filteredEntries
     }
 
@@ -166,7 +166,7 @@ enum RuntimeWindowPresentationFilter {
         }
         guard !contentSurfaces.isEmpty else { return entries }
 
-        var droppedCount = 0
+        var droppedEntries: [RuntimeWindowListEntry] = []
         let filteredEntries = entries.filter { entry in
             let isDuplicateHost = entryLooksLikeDuplicateFullscreenGeometryHost(
                 entry,
@@ -175,17 +175,17 @@ enum RuntimeWindowPresentationFilter {
                 appName: appName
             )
             if isDuplicateHost {
-                droppedCount += 1
+                droppedEntries.append(entry)
             }
             return !isDuplicateHost
         }
 
-        if droppedCount > 0 {
-            RuntimeLog.debug(
-                .axMatch,
-                "\(appName) filtered-fullscreen-duplicate-surfaces stage=\(stage) dropped=\(droppedCount)"
-            )
-        }
+        RuntimeWindowFilteredArtifactLogRecord.publish(
+            appName: appName,
+            kind: .fullscreenDuplicateSurfaces,
+            stage: stage,
+            droppedEntries: droppedEntries
+        )
         return filteredEntries
     }
 
