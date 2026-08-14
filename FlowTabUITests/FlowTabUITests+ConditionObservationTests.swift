@@ -375,6 +375,12 @@ extension FlowTabUITests {
                 "frontmost=com.example.target"
             )
         )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "waitResult=timedOut"
+            ),
+            owner.diagnosticSummary
+        )
     }
 
     func testHittableElementObserverUsesInitialExactCandidateEvidence() {

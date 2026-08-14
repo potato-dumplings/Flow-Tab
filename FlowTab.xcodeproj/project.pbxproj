@@ -113,6 +113,8 @@
 		A46600043D6E000100B0D737 /* FlowTabUITests+SwitcherWorkflowSelectionObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46600033D6E000100B0D737 /* FlowTabUITests+SwitcherWorkflowSelectionObservationTests.swift */; };
 		A4A200023DA0000100B0D737 /* FlowTabUITests+InAppSwitcherPanelProjectionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4A200013DA0000100B0D737 /* FlowTabUITests+InAppSwitcherPanelProjectionObservation.swift */; };
 		A4A200043DA0000100B0D737 /* FlowTabUITests+InAppSwitcherPanelProjectionObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4A200033DA0000100B0D737 /* FlowTabUITests+InAppSwitcherPanelProjectionObservationTests.swift */; };
+		A4A300023DA1000100B0D737 /* FlowTabUITests+InAppForwardCommandApplicationObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4A300013DA1000100B0D737 /* FlowTabUITests+InAppForwardCommandApplicationObservation.swift */; };
+		A4A300043DA1000100B0D737 /* FlowTabUITests+InAppForwardCommandApplicationObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4A300033DA1000100B0D737 /* FlowTabUITests+InAppForwardCommandApplicationObservationTests.swift */; };
 		A46700023D6F000100B0D737 /* FlowTabUITests+SwitcherPreviewExitObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46700013D6F000100B0D737 /* FlowTabUITests+SwitcherPreviewExitObservation.swift */; };
 		A46800023D70000100B0D737 /* FlowTabUITests+HomeInitialProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46800013D70000100B0D737 /* FlowTabUITests+HomeInitialProjection.swift */; };
 		A46900023D71000100B0D737 /* FlowTabUITestHomeInitialProjectionApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46900013D71000100B0D737 /* FlowTabUITestHomeInitialProjectionApplication.swift */; };
@@ -1127,6 +1129,8 @@
 		A46600033D6E000100B0D737 /* FlowTabUITests+SwitcherWorkflowSelectionObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherWorkflowSelectionObservationTests.swift"; sourceTree = "<group>"; };
 		A4A200013DA0000100B0D737 /* FlowTabUITests+InAppSwitcherPanelProjectionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+InAppSwitcherPanelProjectionObservation.swift"; sourceTree = "<group>"; };
 		A4A200033DA0000100B0D737 /* FlowTabUITests+InAppSwitcherPanelProjectionObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+InAppSwitcherPanelProjectionObservationTests.swift"; sourceTree = "<group>"; };
+		A4A300013DA1000100B0D737 /* FlowTabUITests+InAppForwardCommandApplicationObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+InAppForwardCommandApplicationObservation.swift"; sourceTree = "<group>"; };
+		A4A300033DA1000100B0D737 /* FlowTabUITests+InAppForwardCommandApplicationObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+InAppForwardCommandApplicationObservationTests.swift"; sourceTree = "<group>"; };
 		A46700013D6F000100B0D737 /* FlowTabUITests+SwitcherPreviewExitObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherPreviewExitObservation.swift"; sourceTree = "<group>"; };
 		A46800013D70000100B0D737 /* FlowTabUITests+HomeInitialProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeInitialProjection.swift"; sourceTree = "<group>"; };
 		A46900013D71000100B0D737 /* FlowTabUITestHomeInitialProjectionApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestHomeInitialProjectionApplication.swift; sourceTree = "<group>"; };
@@ -1660,6 +1664,8 @@
 				A46600033D6E000100B0D737 /* FlowTabUITests+SwitcherWorkflowSelectionObservationTests.swift */,
 				A4A200013DA0000100B0D737 /* FlowTabUITests+InAppSwitcherPanelProjectionObservation.swift */,
 				A4A200033DA0000100B0D737 /* FlowTabUITests+InAppSwitcherPanelProjectionObservationTests.swift */,
+				A4A300013DA1000100B0D737 /* FlowTabUITests+InAppForwardCommandApplicationObservation.swift */,
+				A4A300033DA1000100B0D737 /* FlowTabUITests+InAppForwardCommandApplicationObservationTests.swift */,
 				A46700013D6F000100B0D737 /* FlowTabUITests+SwitcherPreviewExitObservation.swift */,
 				A44D00013D55000100B0D737 /* FlowTabUITests+SwitcherSearchResultObservation.swift */,
 				A44D00033D55000100B0D737 /* FlowTabUITests+SwitcherSearchResultObservationTests.swift */,
@@ -2834,6 +2840,8 @@
 				A46600043D6E000100B0D737 /* FlowTabUITests+SwitcherWorkflowSelectionObservationTests.swift in Sources */,
 				A4A200023DA0000100B0D737 /* FlowTabUITests+InAppSwitcherPanelProjectionObservation.swift in Sources */,
 				A4A200043DA0000100B0D737 /* FlowTabUITests+InAppSwitcherPanelProjectionObservationTests.swift in Sources */,
+				A4A300023DA1000100B0D737 /* FlowTabUITests+InAppForwardCommandApplicationObservation.swift in Sources */,
+				A4A300043DA1000100B0D737 /* FlowTabUITests+InAppForwardCommandApplicationObservationTests.swift in Sources */,
 				A46700023D6F000100B0D737 /* FlowTabUITests+SwitcherPreviewExitObservation.swift in Sources */,
 				A44D00023D55000100B0D737 /* FlowTabUITests+SwitcherSearchResultObservation.swift in Sources */,
 				A44D00043D55000100B0D737 /* FlowTabUITests+SwitcherSearchResultObservationTests.swift in Sources */,

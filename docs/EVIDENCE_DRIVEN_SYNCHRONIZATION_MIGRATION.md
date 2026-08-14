@@ -581,7 +581,7 @@ and Process/Tooling.
 | SYNC-036KV | multi-App App Search confirmation; exact frontmost application | The observer is installed before confirmation and succeeds only from exact workspace/frontmost readback, while the raw ten-second bound is anonymous. Retained watchdog. | Name the App-Search activation watchdog under the application-frontmost owner; preserve initial readback, activation notification, final exact bundle readback, and cancellation. | M; policy/exact/wrong-app/cancel/watchdog tests, signed App Search UI, Process/Tooling. | completed |
 | SYNC-036KW | In-App Control+Tab roundtrip; exact workflow Space/window topology readiness | Raw 12/4-second bounds qualify prelaunch, first-phase, reopened-phase, and fixture reactivation topology. Predicates are exact, while operation-class policy and final diagnostics are scattered. Retained-watchdog consolidation. | Name In-App initial/current/reactivation watchdogs under the workflow-window owners, preserve immediate readback plus workspace/AX events and cancellable fallback, and report exact bundle/window/title/Space evidence. Callers own each synchronous observation. | H; policy/initial/event/wrong-space/cancel/watchdog tests, both signed In-App roundtrips, Process/Tooling. | completed |
 | SYNC-036KX | `assertInAppWindowSwitcherReady`; atomic In-App panel projection | Diagnostics existence, App entry/summary, selected bundle, and noisy preview titles are observed through separate 8-second waits or synchronous reads. Evidence composition migration. | One owner starts before the Control+Tab trigger, requires an initially absent panel, and accepts one stable-running FlowTab diagnostics snapshot with exact selected bundle, one exact App entry/window count, exact Window-cycle mode, preview bundle, and exact title multiplicity. Stable foreground or background state preserves the fixture-frontmost suppress-panel-activation topology. The helper owns its shared named cancellable cadence, named watchdog, generation, and cleanup. | H; atomic projection/duplicate-title/stale/cancel/watchdog/Pressure tests, both signed In-App roundtrips, Process/Tooling. | completed |
-| SYNC-036KY | In-App Control+Tab window advances; exact command application publication | Each exact UI selection transition is followed by a raw eight-second two-substring log wait, which can combine records. Retained-watchdog plus evidence refinement. | Capture a pre-command runtime-log baseline and require one exact forward-hotkey/advance application record bound to the current selection transition. Name the watchdog; each phase cancels its baseline/owner. | H; exact-record/order/event/cancel/watchdog tests, signed normal/noisy In-App UIs, Process/Tooling. | planned |
+| SYNC-036KY | In-App Control+Tab window advances; exact command application publication | Each exact UI selection transition is followed by a raw eight-second two-substring log wait, which can combine records. Retained-watchdog plus evidence refinement. | Capture a pre-command runtime-log baseline and require one exact forward-hotkey/advance application record bound to the current selection transition. Name the watchdog; each phase cancels its baseline/owner. | H; exact-record/order/event/cancel/watchdog tests, signed normal/noisy In-App UIs, Process/Tooling. | completed |
 | SYNC-036KZ | In-App Control+Tab confirmation; exact dismissal and selected-window activation | Dismissal is observed after confirm, then exact activation is observed in a second 12-second wait; both observers miss the trigger boundary and can resolve from different lifecycles. Evidence composition/order migration. | Before confirm, install panel-nonexistence and exact bundle/window-number activation owners, gate both until command delivery returns, and require both evidence objects. Name compatible bounds; the phase invocation owns cancellation. | H; initial-match rejection/event/out-of-order/cancel/watchdog/Pressure tests, signed normal/noisy In-App UIs, Process/Tooling. | planned |
 | SYNC-036LA | noisy In-App roundtrip; filtered CG-only artifact publication | A raw eight-second log wait proves a broad artifact marker from a workflow-wide baseline without exact process identity. Evidence refinement. | Use the pretrigger runtime-log owner and require the exact fixture PID plus a valid filtered-artifact stage/count record. Name the watchdog and cancel with the scenario. | H; exact PID/regex/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | planned |
 | SYNC-036LB | noisy In-App roundtrip; exact sticky Window-layer source | A raw eight-second regex accepts title/window-number source evidence while bundle/PID ownership is implicit. Evidence refinement. | Require one post-baseline record with exact fixture PID, selected CG window number/title, sticky source, and Space evidence. Name the watchdog; the scenario owns the shared baseline lifecycle. | H; exact identity/event/cancel/watchdog tests, signed noisy In-App UI, Process/Tooling. | planned |
@@ -28998,6 +28998,97 @@ polling cadence, deadline, or timeout in the scoped paths.
   worktree-baseline checks.
 - Commit subject:
   `test(sync): migrate SYNC-036KX atomic In-App panel projection`.
+
+### SYNC-036KY Closure Record
+
+- Status and Oracle: completed. Every In-App forward input that changes the
+  selected window now publishes one atomic `inAppHotkeyAdvance result=applied`
+  record. The record binds the accepted input source UUID, sequence, input and
+  source-registration generations, presentation generation, direction, key,
+  exact previous window ID, and exact selected window ID. Each affected UI
+  transition succeeds only when one post-baseline forward/tabForward record
+  starts at its exact previous window ID and its selected window ID equals the
+  independently observed diagnostics transition result.
+- Evidence ordering and lifecycle: each forward attempt captures a runtime-log
+  baseline, installs its file-event observation, performs an immediate readback,
+  and records the initial exact-record count before command delivery. The trigger
+  gate opens before posting the command and immediately requests another
+  readback after the synchronous post returns. Initial records, records for
+  another previous window, reordered or partial records, duplicate late events,
+  and callbacks from cancelled generations cannot resolve the owner. The helper
+  invocation owns the baseline, event cancellation, observation generation, and
+  cleanup through `defer` on every return.
+- Retained time policy: the compatible eight seconds is named `watchdog` under
+  `FlowTabUITestInAppForwardCommandApplicationObservationPolicy` and serves only
+  as the terminal failure upper bound. Runtime-log file changes supply the
+  observable event source, while initial and trigger readbacks close the event
+  registration races. Expiry performs a final readback and reports expected
+  direction/key/previous identity, initial record count, trigger state,
+  observation generation/source, all recent exact records, runtime-log tail,
+  and stable semantic waiter result. Elapsed time cannot establish command
+  application.
+- App Unit/Behavior: the canonical FlowTabTests wrapper passed 2/2 selected
+  tests with zero failures in 0.002 seconds under
+  `.build-local/sync-036ky-flowtabtests-a1`; its status ledger is completed and
+  xcresult reports `succeeded` with two tests. Coverage proves the exact forward
+  publication and rejects another route, release phase, unchanged identity, and
+  missing previous identity. FlowTabCore is outside this AppKit switcher-input
+  ownership boundary.
+- Deterministic UI and lifecycle Pressure: the final canonical signed Runner
+  passed 10/10 selected checks with zero failures in 1.356 seconds under
+  `.build-local/sync-036ky-ui-observation-a3`. Coverage includes named-policy
+  compatibility, exact one-record parsing and field order, initial-record and
+  wrong-previous rejection, event delivery, trigger readback, duplicate and
+  out-of-order input, cancellation, watchdog final evidence, shared observer
+  replacement pressure, and scheduled-readback lifecycle pressure. The status
+  ledger is completed and xcresult reports `succeeded` with ten tests.
+- Affected signed UI: both current-source canonical real-topology paths passed
+  2/2 with zero failures in 106.808 seconds under
+  `.build-local/sync-036ky-ui-roundtrip-a1`. The noisy four-window/two-fullscreen
+  roundtrip completed in 72.784 seconds and the normal two-window/one-fullscreen
+  roundtrip completed in 34.024 seconds. Across seven noisy and two normal
+  forward transitions, every attempt required the exact atomic application
+  record and matching diagnostics window identity. The normal runtime log
+  independently contains `cg:52797:103002 -> cg:52797:103001` and
+  `cg:52797:103001 -> cg:52797:103002` atomic records. Scheduling and topology
+  load changed completion latency while preserving all nine transition results.
+- Diagnostic failure and repair evidence: the first six-check canonical run
+  under `.build-local/sync-036ky-ui-observation-a1` passed five checks; the
+  watchdog assertion exposed that this SDK renders `XCTWaiter.Result` as an
+  unstable raw-value description. The isolated reproduction under
+  `.build-local/sync-036ky-ui-observation-a2` retained the final backward/
+  tabBackward record and `watchdogReadback` source while reporting
+  `XCTWaiterResult(rawValue: 2)`. The shared condition owner now maps waiter
+  results to stable semantic names, including `timedOut`; the expanded ten-check
+  final run passed. Both preliminary status ledgers and result bundles are
+  retained until this durable record and commit.
+- Validation scope: App Unit/Behavior, deterministic UI state/lifecycle tests,
+  shared-owner Pressure, and both signed real Space-fixture paths are the
+  applicable layers. Configuration compatibility, window identity semantics,
+  module direction, fixture topology, and path-intent resolution remain
+  unchanged.
+- Signing and Process/Tooling: final status ledgers report `completed`; every
+  applicable fixture, signing, build, and test stage exited zero, all final
+  result bundles are present, and final failure scans contain no test failure.
+  Sandbox-external strict deep verification accepts the fixed App and final
+  Runner under Team `96PUA726W9`, signed with certificate fingerprint
+  `1BF0E48A99836282230C3A10EAF6ADC83A4AED82`. Their CDHashes are
+  `bdd8ee9fac3a22357ab6fbe99a7139c6992ddffc` and
+  `a318c0dc4bc71639cbf809493f9c073b9b4d6c0d`; executable SHA-256 values are
+  `2ae312f09a74c2cf4c49556bfe03903a10b056217c6736df17b8eca7aa679922`
+  and `05903cb2297cd8bccd84ff19998ee1d2c54f006f17433f7db5fa88d9949a0e3c`.
+  Swift parsing, project plist lint, scoped raw-wait inventory, and
+  `git diff --check` pass. The new owner/tests and affected workflow contain
+  396, 283, and 675 lines with clear responsibilities. The former two-substring
+  post-advance waits are absent; remaining raw waits in that workflow belong to
+  KZ through LD. Exact App/Runner/fixture and repository-scoped xcodebuild
+  process readbacks are empty.
+- Lifecycle cleanup: `.build-local/test-assets` remains absent and startup
+  baseline files remain outside this slice. Exact SYNC-036KY evidence roots are
+  removed after this durable record and independent commit, followed by exact
+  absence and worktree-baseline checks.
+- Commit subject:
+  `refactor(sync): migrate SYNC-036KY In-App command application`.
 
 ### SYNC-001 Authorized Resume Closure Record
 

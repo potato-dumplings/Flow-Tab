@@ -146,7 +146,19 @@ extension SwitcherPanelController {
             logInputTrace(
                 "inAppHotkeyPressed dir=\(directionText) panelVisible=1 modifierPressed=1 action=advance nowMs=\(formatMilliseconds(nowMs))"
             )
+            let previousWindowID =
+                model.session?.selectedWindow?.id
             advance(isBackward ? .tabBackward : .tabForward)
+            if let evidence =
+                InAppHotkeyAdvanceApplicationEvidence(
+                    receipt: receipt,
+                    previousWindowID: previousWindowID,
+                    selectedWindowID:
+                        model.session?.selectedWindow?.id
+                )
+            {
+                logInputTrace(evidence.logMessage)
+            }
             return
         }
         logInputTrace(

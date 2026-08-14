@@ -37,6 +37,68 @@ struct SwitcherHotkeyInputReceipt: Equatable, Sendable {
     let presentationSessionGeneration: Int
 }
 
+struct InAppHotkeyAdvanceApplicationEvidence:
+    Equatable,
+    Sendable
+{
+    let direction: String
+    let key: String
+    let sourceID: HotkeyInputSourceID
+    let sequence: UInt64
+    let inputGeneration: UInt64
+    let sourceRegistrationGeneration: UInt64
+    let presentationSessionGeneration: Int
+    let previousWindowID: String
+    let selectedWindowID: String
+
+    init?(
+        receipt: SwitcherHotkeyInputReceipt,
+        previousWindowID: String?,
+        selectedWindowID: String?
+    ) {
+        guard
+            receipt.route == .inAppWindowSwitcher,
+            receipt.event.phase == .pressed,
+            let previousWindowID,
+            let selectedWindowID,
+            previousWindowID != selectedWindowID
+        else {
+            return nil
+        }
+
+        direction = receipt.event.isBackward
+            ? "backward"
+            : "forward"
+        key = receipt.event.isBackward
+            ? "tabBackward"
+            : "tabForward"
+        sourceID = receipt.event.identity.sourceID
+        sequence = receipt.event.identity.sequence
+        inputGeneration = receipt.inputGeneration
+        sourceRegistrationGeneration =
+            receipt.sourceRegistrationGeneration
+        presentationSessionGeneration =
+            receipt.presentationSessionGeneration
+        self.previousWindowID = previousWindowID
+        self.selectedWindowID = selectedWindowID
+    }
+
+    var logMessage: String {
+        "inAppHotkeyAdvance result=applied "
+            + "dir=\(direction) key=\(key) "
+            + "route=inAppWindowSwitcher "
+            + "source=\(sourceID.rawValue.uuidString) "
+            + "sequence=\(sequence) "
+            + "inputGeneration=\(inputGeneration) "
+            + "sourceRegistrationGeneration="
+            + "\(sourceRegistrationGeneration) "
+            + "sessionGeneration="
+            + "\(presentationSessionGeneration) "
+            + "previousWindowID=\(previousWindowID) "
+            + "selectedWindowID=\(selectedWindowID)"
+    }
+}
+
 enum SwitcherHotkeyInputRejection: Equatable, Sendable {
     case sourceNotRegistered
     case unexpectedSource(

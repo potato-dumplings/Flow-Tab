@@ -192,7 +192,7 @@ final class FlowTabUITestConditionObservationOwner<Value> {
             return "unobserved"
         }
         let waitResult = lastWaitResult.map {
-            " waitResult=\(String(describing: $0))"
+            " waitResult=\($0.flowTabDiagnosticName)"
         } ?? ""
         return "generation=\(latestEvidence.generation) "
             + "source=\(latestEvidence.source.rawValue) "
@@ -277,6 +277,25 @@ final class FlowTabUITestConditionObservationOwner<Value> {
     private func stopObservationInputs() {
         eventCancellation?.cancel()
         eventCancellation = nil
+    }
+}
+
+private extension XCTWaiter.Result {
+    var flowTabDiagnosticName: String {
+        switch self {
+        case .completed:
+            "completed"
+        case .timedOut:
+            "timedOut"
+        case .incorrectOrder:
+            "incorrectOrder"
+        case .invertedFulfillment:
+            "invertedFulfillment"
+        case .interrupted:
+            "interrupted"
+        @unknown default:
+            "unknown(rawValue=\(rawValue))"
+        }
     }
 }
 

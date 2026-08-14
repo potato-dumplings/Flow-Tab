@@ -141,17 +141,11 @@ extension FlowTabUITests {
                 return
             }
 
-            let firstLogSnapshot = makeRuntimeLogFileSnapshot()
             let standardSelection = try selectInAppWindow(
                 title: standardTitle,
                 in: app,
                 diagnosticsSummary: diagnosticsSummary,
                 requiresControlTab: true
-            )
-            waitForRuntimeLogFiles(
-                containing: ["inAppHotkeyPressed dir=forward panelVisible=1", "advance key=tabForward"],
-                since: firstLogSnapshot,
-                timeout: 8
             )
 
             postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "\(traceLabel).confirmStandard")
@@ -199,17 +193,11 @@ extension FlowTabUITests {
                     """
                 )
                 : fullscreenTitle
-            let secondLogSnapshot = makeRuntimeLogFileSnapshot()
             let fullscreenSelection = try selectInAppWindow(
                 title: targetFullscreenTitle,
                 in: app,
                 diagnosticsSummary: diagnosticsSummary,
                 requiresControlTab: true
-            )
-            waitForRuntimeLogFiles(
-                containing: ["inAppHotkeyPressed dir=forward panelVisible=1", "advance key=tabForward"],
-                since: secondLogSnapshot,
-                timeout: 8
             )
 
             postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "\(traceLabel).confirmFullscreen")
@@ -324,7 +312,6 @@ extension FlowTabUITests {
                 )
             }
 
-            let logSnapshot = makeRuntimeLogFileSnapshot()
             let selection = try selectNoisyInAppWindow(
                 currentSelection: currentSelection,
                 title: phase.targetTitle,
@@ -341,12 +328,6 @@ extension FlowTabUITests {
                 phaseTrace: phase.trace,
                 since: runtimeLogSnapshot
             )
-            waitForRuntimeLogFiles(
-                containing: ["inAppHotkeyPressed dir=forward panelVisible=1", "advance key=tabForward"],
-                since: logSnapshot,
-                timeout: 8
-            )
-
             let activationLogSnapshot = makeRuntimeLogFileSnapshot()
             postFlowTabUITestSwitcherCommandAndWaitForDelivery(
                 .confirm,
@@ -531,19 +512,15 @@ extension FlowTabUITests {
 
         for attempt in 0..<attempts {
             let result =
-                try performAndWaitForSwitcherWindowSelectionTransition(
+                try performAndWaitForInAppForwardSelectionTransition(
+                    fromWindowID:
+                        latestSelection.windowID,
                     fromWindowNumber:
                         latestSelection.windowNumber,
                     in: app,
                     diagnosticsSummary: diagnosticsSummary,
                     traceLabel:
-                        "\(traceLabel).selectAttempt.\(attempt + 1)",
-                    trigger: {
-                        postFlowTabUITestSwitcherCommandAndWaitForDelivery(
-                            .inAppForward,
-                            traceLabel: "control.select"
-                        )
-                    }
+                        "\(traceLabel).selectAttempt.\(attempt + 1)"
                 )
             latestSelection = InAppWindowSelection(
                 title: result.title,
@@ -612,19 +589,15 @@ extension FlowTabUITests {
 
         for attempt in 0..<attempts {
             let result =
-                try performAndWaitForSwitcherWindowSelectionTransition(
+                try performAndWaitForInAppForwardSelectionTransition(
+                    fromWindowID:
+                        latestSelection.windowID,
                     fromWindowNumber:
                         latestSelection.windowNumber,
                     in: app,
                     diagnosticsSummary: diagnosticsSummary,
                     traceLabel:
-                        "control.selectAttempt.\(attempt + 1)",
-                    trigger: {
-                        postFlowTabUITestSwitcherCommandAndWaitForDelivery(
-                            .inAppForward,
-                            traceLabel: "control.select"
-                        )
-                    }
+                        "control.selectAttempt.\(attempt + 1)"
                 )
             latestSelection = InAppWindowSelection(
                 title: result.title,

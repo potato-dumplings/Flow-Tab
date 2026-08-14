@@ -256,4 +256,112 @@ extension FlowTabTests {
         XCTAssertEqual(owner.inputGeneration, 2_000)
         XCTAssertEqual(owner.latestPhase(for: .globalAppSwitcher), .released)
     }
+
+    func testInAppHotkeyAdvanceApplicationEvidencePublishesExactTransition() {
+        let sourceID = HotkeyInputSourceID(
+            rawValue: UUID(
+                uuidString:
+                    "7A9D58C2-46B3-43EF-935B-6E6C050E4D53"
+            )!
+        )
+        let receipt = SwitcherHotkeyInputReceipt(
+            route: .inAppWindowSwitcher,
+            event: HotkeyInputEvent(
+                identity: HotkeyInputEventIdentity(
+                    sourceID: sourceID,
+                    sequence: 17
+                ),
+                phase: .pressed,
+                isBackward: false
+            ),
+            inputGeneration: 23,
+            sourceRegistrationGeneration: 5,
+            presentationSessionGeneration: 11
+        )
+
+        let evidence = InAppHotkeyAdvanceApplicationEvidence(
+            receipt: receipt,
+            previousWindowID: "cg:420:7001",
+            selectedWindowID: "cg:420:7002"
+        )
+
+        XCTAssertEqual(evidence?.direction, "forward")
+        XCTAssertEqual(evidence?.key, "tabForward")
+        XCTAssertEqual(
+            evidence?.logMessage,
+            "inAppHotkeyAdvance result=applied "
+                + "dir=forward key=tabForward "
+                + "route=inAppWindowSwitcher "
+                + "source=7A9D58C2-46B3-43EF-935B-6E6C050E4D53 "
+                + "sequence=17 inputGeneration=23 "
+                + "sourceRegistrationGeneration=5 "
+                + "sessionGeneration=11 "
+                + "previousWindowID=cg:420:7001 "
+                + "selectedWindowID=cg:420:7002"
+        )
+    }
+
+    func testInAppHotkeyAdvanceApplicationEvidenceRequiresAcceptedChangedWindow() {
+        let sourceID = HotkeyInputSourceID()
+        func receipt(
+            route: SwitcherHotkeyInputRoute,
+            phase: HotkeyInputEvent.Phase
+        ) -> SwitcherHotkeyInputReceipt {
+            SwitcherHotkeyInputReceipt(
+                route: route,
+                event: HotkeyInputEvent(
+                    identity: HotkeyInputEventIdentity(
+                        sourceID: sourceID,
+                        sequence: 1
+                    ),
+                    phase: phase,
+                    isBackward: false
+                ),
+                inputGeneration: 1,
+                sourceRegistrationGeneration: 1,
+                presentationSessionGeneration: 1
+            )
+        }
+
+        XCTAssertNil(
+            InAppHotkeyAdvanceApplicationEvidence(
+                receipt: receipt(
+                    route: .globalAppSwitcher,
+                    phase: .pressed
+                ),
+                previousWindowID: "cg:420:7001",
+                selectedWindowID: "cg:420:7002"
+            )
+        )
+        XCTAssertNil(
+            InAppHotkeyAdvanceApplicationEvidence(
+                receipt: receipt(
+                    route: .inAppWindowSwitcher,
+                    phase: .released
+                ),
+                previousWindowID: "cg:420:7001",
+                selectedWindowID: "cg:420:7002"
+            )
+        )
+        XCTAssertNil(
+            InAppHotkeyAdvanceApplicationEvidence(
+                receipt: receipt(
+                    route: .inAppWindowSwitcher,
+                    phase: .pressed
+                ),
+                previousWindowID: "cg:420:7001",
+                selectedWindowID: "cg:420:7001"
+            )
+        )
+        XCTAssertNil(
+            InAppHotkeyAdvanceApplicationEvidence(
+                receipt: receipt(
+                    route: .inAppWindowSwitcher,
+                    phase: .pressed
+                ),
+                previousWindowID: nil,
+                selectedWindowID: "cg:420:7002"
+            )
+        )
+    }
 }
