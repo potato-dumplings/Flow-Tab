@@ -128,33 +128,40 @@ final class FlowPresentationState: ObservableObject {
     private let userDefaults: UserDefaults
     private let notificationCenter: NotificationCenter
     private let systemThemeProvider: FlowPresentationSystemThemeProviding
+    private let preferredLanguageIdentifiers: [String]
     private var themeObservation: FlowPresentationThemeObservation?
 
     convenience init(
         userDefaults: UserDefaults = .standard,
-        notificationCenter: NotificationCenter = .default
+        notificationCenter: NotificationCenter = .default,
+        preferredLanguageIdentifiers: [String] = Locale.preferredLanguages
     ) {
         self.init(
             userDefaults: userDefaults,
             notificationCenter: notificationCenter,
-            systemThemeProvider: FlowPresentationSystemThemeProvider.shared
+            systemThemeProvider: FlowPresentationSystemThemeProvider.shared,
+            preferredLanguageIdentifiers: preferredLanguageIdentifiers
         )
     }
 
     init(
         userDefaults: UserDefaults,
         notificationCenter: NotificationCenter,
-        systemThemeProvider: FlowPresentationSystemThemeProviding
+        systemThemeProvider: FlowPresentationSystemThemeProviding,
+        preferredLanguageIdentifiers: [String] = Locale.preferredLanguages
     ) {
         self.userDefaults = userDefaults
         self.notificationCenter = notificationCenter
         self.systemThemeProvider = systemThemeProvider
+        self.preferredLanguageIdentifiers = preferredLanguageIdentifiers
 
         let resolution = FlowPresentationResolver.resolve(
             themeRaw: userDefaults.string(forKey: AppPreferenceKeys.themeMode)
                 ?? ThemePreferencesStore.defaultMode.rawValue,
-            languageRaw: userDefaults.string(forKey: AppPreferenceKeys.appLanguage)
-                ?? AppLanguagePreferencesStore.defaultLanguage.rawValue,
+            languageRaw: AppLanguagePreferencesStore.load(
+                userDefaults: userDefaults,
+                preferredLanguageIdentifiers: preferredLanguageIdentifiers
+            ).rawValue,
             systemColorScheme: systemThemeProvider.currentColorScheme
         )
         context = resolution.context
@@ -195,8 +202,10 @@ final class FlowPresentationState: ObservableObject {
         let resolution = FlowPresentationResolver.resolve(
             themeRaw: userDefaults.string(forKey: AppPreferenceKeys.themeMode)
                 ?? ThemePreferencesStore.defaultMode.rawValue,
-            languageRaw: userDefaults.string(forKey: AppPreferenceKeys.appLanguage)
-                ?? AppLanguagePreferencesStore.defaultLanguage.rawValue,
+            languageRaw: AppLanguagePreferencesStore.load(
+                userDefaults: userDefaults,
+                preferredLanguageIdentifiers: preferredLanguageIdentifiers
+            ).rawValue,
             systemColorScheme: systemThemeProvider.currentColorScheme
         )
         apply(resolution, postLanguageNotification: postLanguageNotification)

@@ -22,7 +22,7 @@ extension FlowTabTests {
         XCTAssertEqual(resolved, .simplifiedChinese)
         XCTAssertEqual(
             userDefaults.string(forKey: AppPreferenceKeys.appLanguage),
-            AppLanguagePreferencesStore.defaultLanguage.rawValue
+            AppLanguagePreferencesStore.invalidValueFallbackLanguage.rawValue
         )
     }
 
@@ -594,6 +594,7 @@ extension FlowTabTests {
     @MainActor
     func testUITestBootstrapResetRefreshesSharedPresentationState() {
         let previousContext = FlowPresentationState.shared.context
+        let expectedLanguage = AppLanguagePreferencesStore.firstLaunchLanguage()
         let standardDefaults = UserDefaults.standard
         let previousValues = AppPreferenceKeys.allKeys.reduce(into: [String: Any]()) { values, key in
             values[key] = standardDefaults.object(forKey: key)
@@ -629,14 +630,14 @@ extension FlowTabTests {
         }
 
         XCTAssertEqual(FlowPresentationState.shared.context.themeMode, .followSystem)
-        XCTAssertEqual(FlowPresentationState.shared.context.appLanguage, .simplifiedChinese)
+        XCTAssertEqual(FlowPresentationState.shared.context.appLanguage, expectedLanguage)
         XCTAssertEqual(
             standardDefaults.string(forKey: AppPreferenceKeys.themeMode),
             ThemeMode.followSystem.rawValue
         )
         XCTAssertEqual(
             standardDefaults.string(forKey: AppPreferenceKeys.appLanguage),
-            AppLanguage.simplifiedChinese.rawValue
+            expectedLanguage.rawValue
         )
     }
 

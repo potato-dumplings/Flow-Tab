@@ -142,6 +142,18 @@ private struct FlowTabUITestSettingsEnglishAppearanceProjectionAllElements {
 }
 
 extension FlowTabUITests {
+    func assertSettingsEnglishAppearanceProjectionAfterNavigation(
+        in app: XCUIApplication,
+        targetDescription: String,
+        trigger: () -> Void
+    ) -> FlowTabUITestSettingsEnglishAppearanceElements? {
+        assertSettingsEnglishAppearanceProjection(
+            in: app,
+            targetDescription: targetDescription,
+            trigger: trigger
+        )
+    }
+
     func assertSettingsEnglishAppearanceProjectionAfterSelectingEnglish(
         in app: XCUIApplication,
         targetDescription: String

@@ -439,6 +439,7 @@
 		B10011012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */; };
 		B10011022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift */; };
 		B10011032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift */; };
+		FA14000231A1000100C0D001 /* FlowTabTests+AppLanguageDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA14000131A1000100C0D001 /* FlowTabTests+AppLanguageDefaults.swift */; };
 		9D6F70B3709646D09744E552 /* FlowTabTests+SystemThemeReadback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 125C23FC5F5849C4B80EC194 /* FlowTabTests+SystemThemeReadback.swift */; };
 		90C598A2EC4741759017CFF8 /* SettingsPresentationObservationTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F579AC8FD7949238E13861B /* SettingsPresentationObservationTestSupport.swift */; };
 		6B4BA1AB206C4BB8BF51CA3B /* FlowTabTests+SettingsPresentationBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3F19D9083814333B7EA324F /* FlowTabTests+SettingsPresentationBridge.swift */; };
@@ -504,6 +505,7 @@
 		B10012012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */; };
 		C8A100023A24000100B0D737 /* FlowTabUITests+HomePermissionBoundary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A100013A24000100B0D737 /* FlowTabUITests+HomePermissionBoundary.swift */; };
 		B10012022F76000100B0D737 /* FlowTabUITests+Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */; };
+		FA14000431A1000100C0D001 /* FlowTabUITests+AppLanguageDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA14000331A1000100C0D001 /* FlowTabUITests+AppLanguageDefaults.swift */; };
 		E12000033600000100B0D737 /* FlowTabUITests+EnglishLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = E12000023600000100B0D737 /* FlowTabUITests+EnglishLayout.swift */; };
 		B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */; };
 		A47A00023D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A47A00013D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift */; };
@@ -838,6 +840,7 @@
 		B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+CoreConfiguration.swift"; sourceTree = "<group>"; };
 		B10001022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimeInteraction.swift"; sourceTree = "<group>"; };
 		B10001032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+PreferencesAndDiagnostics.swift"; sourceTree = "<group>"; };
+		FA14000131A1000100C0D001 /* FlowTabTests+AppLanguageDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+AppLanguageDefaults.swift"; sourceTree = "<group>"; };
 		125C23FC5F5849C4B80EC194 /* FlowTabTests+SystemThemeReadback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SystemThemeReadback.swift"; sourceTree = "<group>"; };
 		6F579AC8FD7949238E13861B /* SettingsPresentationObservationTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPresentationObservationTestSupport.swift; sourceTree = "<group>"; };
 		D3F19D9083814333B7EA324F /* FlowTabTests+SettingsPresentationBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SettingsPresentationBridge.swift"; sourceTree = "<group>"; };
@@ -923,6 +926,7 @@
 		A4C800033DAE000100B0D737 /* FlowTabUITests+SpaceFixtureCurrentAppProjectionAcceptanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureCurrentAppProjectionAcceptanceTests.swift"; sourceTree = "<group>"; };
 		C8A100013A24000100B0D737 /* FlowTabUITests+HomePermissionBoundary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomePermissionBoundary.swift"; sourceTree = "<group>"; };
 		B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+Settings.swift"; sourceTree = "<group>"; };
+		FA14000331A1000100C0D001 /* FlowTabUITests+AppLanguageDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+AppLanguageDefaults.swift"; sourceTree = "<group>"; };
 		E12000023600000100B0D737 /* FlowTabUITests+EnglishLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+EnglishLayout.swift"; sourceTree = "<group>"; };
 		B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherAndSearch.swift"; sourceTree = "<group>"; };
 		A47A00013D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SearchSelectionWrap.swift"; sourceTree = "<group>"; };
@@ -1412,6 +1416,7 @@
 				B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */,
 				B10001022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift */,
 				B10001032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift */,
+				FA14000131A1000100C0D001 /* FlowTabTests+AppLanguageDefaults.swift */,
 				125C23FC5F5849C4B80EC194 /* FlowTabTests+SystemThemeReadback.swift */,
 				6F579AC8FD7949238E13861B /* SettingsPresentationObservationTestSupport.swift */,
 				D3F19D9083814333B7EA324F /* FlowTabTests+SettingsPresentationBridge.swift */,
@@ -1600,6 +1605,7 @@
 				C8A100013A24000100B0D737 /* FlowTabUITests+HomePermissionBoundary.swift */,
 				A48B00093D97000100B0D737 /* FlowTabUITests+SettingsInAppHotkey.swift */,
 				B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */,
+				FA14000331A1000100C0D001 /* FlowTabUITests+AppLanguageDefaults.swift */,
 				E9D100073D17000100B0D737 /* FlowTabUITests+PermissionObservation.swift */,
 				E12000023600000100B0D737 /* FlowTabUITests+EnglishLayout.swift */,
 				A48A00093D93000100B0D737 /* FlowTabUITests+SettingsAppVisibilityInventoryProjectionObservation.swift */,
@@ -2578,6 +2584,7 @@
 				B10011012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift in Sources */,
 				B10011022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift in Sources */,
 				B10011032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift in Sources */,
+				FA14000231A1000100C0D001 /* FlowTabTests+AppLanguageDefaults.swift in Sources */,
 				9D6F70B3709646D09744E552 /* FlowTabTests+SystemThemeReadback.swift in Sources */,
 				90C598A2EC4741759017CFF8 /* SettingsPresentationObservationTestSupport.swift in Sources */,
 				6B4BA1AB206C4BB8BF51CA3B /* FlowTabTests+SettingsPresentationBridge.swift in Sources */,
@@ -2789,6 +2796,7 @@
 				C8A100023A24000100B0D737 /* FlowTabUITests+HomePermissionBoundary.swift in Sources */,
 				A48B000A3D97000100B0D737 /* FlowTabUITests+SettingsInAppHotkey.swift in Sources */,
 				B10012022F76000100B0D737 /* FlowTabUITests+Settings.swift in Sources */,
+				FA14000431A1000100C0D001 /* FlowTabUITests+AppLanguageDefaults.swift in Sources */,
 				E9D100083D17000100B0D737 /* FlowTabUITests+PermissionObservation.swift in Sources */,
 				E12000033600000100B0D737 /* FlowTabUITests+EnglishLayout.swift in Sources */,
 				A48A000A3D93000100B0D737 /* FlowTabUITests+SettingsAppVisibilityInventoryProjectionObservation.swift in Sources */,

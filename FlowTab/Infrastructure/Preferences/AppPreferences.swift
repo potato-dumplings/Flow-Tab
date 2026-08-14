@@ -66,15 +66,34 @@ enum AppLanguage: String, CaseIterable, Equatable, Sendable, Identifiable {
 }
 
 enum AppLanguagePreferencesStore {
-    static let defaultLanguage: AppLanguage = .simplifiedChinese
+    static let invalidValueFallbackLanguage: AppLanguage = .simplifiedChinese
 
-    static func resolve(rawValue: String) -> AppLanguage {
-        AppLanguage(rawValue: rawValue) ?? defaultLanguage
+    static func firstLaunchLanguage(
+        preferredLanguageIdentifiers: [String] = Locale.preferredLanguages
+    ) -> AppLanguage {
+        guard let primaryIdentifier = preferredLanguageIdentifiers.first else {
+            return .english
+        }
+        let languageCode = Locale(identifier: primaryIdentifier)
+            .language.languageCode?.identifier
+        return languageCode?.lowercased() == "zh" ? .simplifiedChinese : .english
     }
 
-    static func load(userDefaults: UserDefaults = .standard) -> AppLanguage {
-        let rawValue = userDefaults.string(forKey: AppPreferenceKeys.appLanguage)
-            ?? defaultLanguage.rawValue
+    static func resolve(rawValue: String) -> AppLanguage {
+        AppLanguage(rawValue: rawValue) ?? invalidValueFallbackLanguage
+    }
+
+    static func load(
+        userDefaults: UserDefaults = .standard,
+        preferredLanguageIdentifiers: [String] = Locale.preferredLanguages
+    ) -> AppLanguage {
+        guard let rawValue = userDefaults.string(forKey: AppPreferenceKeys.appLanguage) else {
+            let language = firstLaunchLanguage(
+                preferredLanguageIdentifiers: preferredLanguageIdentifiers
+            )
+            userDefaults.set(language.rawValue, forKey: AppPreferenceKeys.appLanguage)
+            return language
+        }
         let resolved = resolve(rawValue: rawValue)
         if rawValue != resolved.rawValue {
             userDefaults.set(resolved.rawValue, forKey: AppPreferenceKeys.appLanguage)
