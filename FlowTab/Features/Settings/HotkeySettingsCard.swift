@@ -256,21 +256,19 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
     }
 
     func update(with state: HotkeySettingsCardState) {
-        guard currentState != state else { return }
+        let selectionProjection = selectionProjection(for: state)
+        guard
+            currentState != state
+                || selectionProjection.contains(where: { $0.control.selectionID != $0.rawValue })
+        else {
+            return
+        }
         currentState = state
 
         isApplyingState = true
-        selectItem(in: mainPrimaryModifierSelect, rawValue: state.hotkeyConfiguration.primaryModifier.rawValue)
-        selectItem(in: mainKeySelect, rawValue: state.hotkeyConfiguration.mainKey.rawValue)
-        selectItem(in: quitKeySelect, rawValue: state.hotkeyConfiguration.quitKey.rawValue)
-        selectItem(
-            in: inAppPrimaryModifierSelect,
-            rawValue: state.inAppWindowHotkeyConfiguration.primaryModifier.rawValue
-        )
-        selectItem(
-            in: inAppMainKeySelect,
-            rawValue: state.inAppWindowHotkeyConfiguration.mainKey.rawValue
-        )
+        for selection in selectionProjection {
+            selectItem(in: selection.control, rawValue: selection.rawValue)
+        }
         isApplyingState = false
 
         mainSummaryLabel.stringValue = state.mainSummaryText
@@ -402,6 +400,21 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
 
     private func selectItem(in selectControl: FlowSettingsSelectControl, rawValue: String) {
         AppKitSettingsCardBaseView.selectItem(in: selectControl, rawValue: rawValue)
+    }
+
+    private func selectionProjection(
+        for state: HotkeySettingsCardState
+    ) -> [(control: FlowSettingsSelectControl, rawValue: String)] {
+        [
+            (mainPrimaryModifierSelect, state.hotkeyConfiguration.primaryModifier.rawValue),
+            (mainKeySelect, state.hotkeyConfiguration.mainKey.rawValue),
+            (quitKeySelect, state.hotkeyConfiguration.quitKey.rawValue),
+            (
+                inAppPrimaryModifierSelect,
+                state.inAppWindowHotkeyConfiguration.primaryModifier.rawValue
+            ),
+            (inAppMainKeySelect, state.inAppWindowHotkeyConfiguration.mainKey.rawValue)
+        ]
     }
 
     private func handleMainPrimaryModifierChanged(_ rawValue: String) {

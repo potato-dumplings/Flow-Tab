@@ -1,3 +1,4 @@
+import AppKit
 import Carbon
 import XCTest
 @testable import FlowTab
@@ -188,6 +189,86 @@ extension FlowTabTests {
         )
     }
 
+    func testHotkeyRegistrationRequestLoadNormalizesStoredInAppQuitConflict() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
+
+        userDefaults.set(
+            SwitcherPrimaryModifier.option.rawValue,
+            forKey: AppPreferenceKeys.hotkeyPrimaryModifier
+        )
+        userDefaults.set(SwitcherHotkeyKey.tab.rawValue, forKey: AppPreferenceKeys.hotkeyMainKey)
+        userDefaults.set(SwitcherHotkeyKey.q.rawValue, forKey: AppPreferenceKeys.hotkeyQuitKey)
+        userDefaults.set(
+            SwitcherPrimaryModifier.option.rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier
+        )
+        userDefaults.set(
+            SwitcherHotkeyKey.q.rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey
+        )
+
+        let request = HotkeyRegistrationRequest.load(userDefaults: userDefaults)
+
+        XCTAssertEqual(request.mainConfiguration.primaryModifier, .option)
+        XCTAssertEqual(request.mainConfiguration.mainKey, .tab)
+        XCTAssertEqual(request.mainConfiguration.quitKey, .q)
+        XCTAssertEqual(request.inAppWindowConfiguration.primaryModifier, .control)
+        XCTAssertEqual(request.inAppWindowConfiguration.mainKey, .q)
+        XCTAssertEqual(
+            userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier),
+            SwitcherPrimaryModifier.control.rawValue
+        )
+        XCTAssertEqual(
+            userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey),
+            SwitcherHotkeyKey.q.rawValue
+        )
+    }
+
+    @MainActor
+    func testHotkeySettingsCardProjectsFallbackWhenInAppShortcutMatchesQuitShortcut() throws {
+        let request = HotkeyRegistrationRequest.normalized(
+            mainPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
+            mainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
+            quitKeyRaw: SwitcherHotkeyKey.q.rawValue,
+            inAppPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
+            inAppMainKeyRaw: SwitcherHotkeyKey.q.rawValue
+        )
+        let view = HotkeySettingsCardAppKitView()
+        view.update(
+            with: HotkeySettingsCardState(
+                hotkeyPrimaryModifierRaw: request.mainConfiguration.primaryModifier.rawValue,
+                hotkeyMainKeyRaw: request.mainConfiguration.mainKey.rawValue,
+                hotkeyQuitKeyRaw: request.mainConfiguration.quitKey.rawValue,
+                inAppWindowHotkeyPrimaryModifierRaw:
+                    request.inAppWindowConfiguration.primaryModifier.rawValue,
+                inAppWindowHotkeyMainKeyRaw: request.inAppWindowConfiguration.mainKey.rawValue,
+                commandTabTakeoverRegistrationState: .inactive,
+                accessibilityTrusted: true,
+                appLanguageRaw: AppLanguage.simplifiedChinese.rawValue
+            )
+        )
+
+        let inAppModifierSelect: FlowSettingsSelectControl = try XCTUnwrap(
+            hotkeyDescendant(
+                in: view,
+                identifier: "flowtab.settings.hotkey.in-app-modifier"
+            )
+        )
+        let inAppKeySelect: FlowSettingsSelectControl = try XCTUnwrap(
+            hotkeyDescendant(
+                in: view,
+                identifier: "flowtab.settings.hotkey.in-app-key"
+            )
+        )
+
+        XCTAssertEqual(
+            inAppModifierSelect.selectionID,
+            SwitcherPrimaryModifier.control.rawValue
+        )
+        XCTAssertEqual(inAppKeySelect.selectionID, SwitcherHotkeyKey.q.rawValue)
+    }
+
     func testHotkeyRegistrationRequestCoversSupportedSettingsMatrixAxes() {
         for modifier in SwitcherPrimaryModifier.allCases {
             for mainKey in SwitcherHotkeyKey.allCases {
@@ -293,5 +374,21 @@ extension FlowTabTests {
                 }
             }
         }
+    }
+
+    private func hotkeyDescendant<T: NSView>(
+        in view: NSView,
+        identifier: String,
+        as type: T.Type = T.self
+    ) -> T? {
+        if view.identifier?.rawValue == identifier || view.accessibilityIdentifier() == identifier {
+            return view as? T
+        }
+        for subview in view.subviews {
+            if let match: T = hotkeyDescendant(in: subview, identifier: identifier, as: type) {
+                return match
+            }
+        }
+        return nil
     }
 }

@@ -55,6 +55,8 @@ final class FlowSettingsSelectControl: NSView, FlowSettingsAppearanceRefreshable
         invalidateIntrinsicContentSize()
     }
 
+    var selectionID: String? { selectedID }
+
     func applySettingsAppearance(_ appearance: NSAppearance) {
         targetAppearance = appearance
         self.appearance = appearance

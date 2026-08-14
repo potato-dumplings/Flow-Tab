@@ -298,6 +298,82 @@ extension FlowTabTests {
         XCTAssertFalse(control.accessibilityPerformPress())
     }
 
+    @MainActor
+    func testHotkeySettingsCardReprojectsNormalizedSelectionsWhenStateIsUnchanged() throws {
+        let state = HotkeySettingsCardState(
+            hotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
+            hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
+            hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
+            inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
+            inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
+            commandTabTakeoverRegistrationState: .inactive,
+            accessibilityTrusted: true,
+            appLanguageRaw: AppLanguage.simplifiedChinese.rawValue
+        )
+        let view = HotkeySettingsCardAppKitView()
+        view.update(with: state)
+
+        let quitSelect: FlowSettingsSelectControl = try XCTUnwrap(
+            descendant(in: view, identifier: "flowtab.settings.hotkey.quit-key")
+        )
+        let inAppModifierSelect: FlowSettingsSelectControl = try XCTUnwrap(
+            descendant(in: view, identifier: "flowtab.settings.hotkey.in-app-modifier")
+        )
+        let quitDropdown: FlowDropdownControl = try XCTUnwrap(
+            descendant(in: quitSelect, as: FlowDropdownControl.self)
+        )
+        let inAppModifierDropdown: FlowDropdownControl = try XCTUnwrap(
+            descendant(in: inAppModifierSelect, as: FlowDropdownControl.self)
+        )
+
+        quitDropdown.selectOptionForTesting(SwitcherHotkeyKey.tab.rawValue)
+        inAppModifierDropdown.selectOptionForTesting(SwitcherPrimaryModifier.option.rawValue)
+        view.update(with: state)
+
+        XCTAssertEqual(quitDropdown.selectedIdentifierForTesting, SwitcherHotkeyKey.q.rawValue)
+        XCTAssertEqual(
+            inAppModifierDropdown.selectedIdentifierForTesting,
+            SwitcherPrimaryModifier.control.rawValue
+        )
+    }
+
+    @MainActor
+    func testSettingsPageImmediatelyProjectsNormalizedHotkeyValues() throws {
+        let view = AppKitSettingsPageView()
+        view.update(with: makeSettingsPageState(themeModeRaw: ThemeMode.followSystem.rawValue))
+
+        let quitSelect: FlowSettingsSelectControl = try XCTUnwrap(
+            descendant(in: view, identifier: "flowtab.settings.hotkey.quit-key")
+        )
+        let inAppModifierSelect: FlowSettingsSelectControl = try XCTUnwrap(
+            descendant(in: view, identifier: "flowtab.settings.hotkey.in-app-modifier")
+        )
+        let quitDropdown: FlowDropdownControl = try XCTUnwrap(
+            descendant(in: quitSelect, as: FlowDropdownControl.self)
+        )
+        let inAppModifierDropdown: FlowDropdownControl = try XCTUnwrap(
+            descendant(in: inAppModifierSelect, as: FlowDropdownControl.self)
+        )
+
+        quitDropdown.selectOptionForTesting(SwitcherHotkeyKey.tab.rawValue)
+        inAppModifierDropdown.selectOptionForTesting(SwitcherPrimaryModifier.option.rawValue)
+        view.updateHotkeyContent(
+            with: AppKitSettingsHotkeyRawValues(
+                hotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
+                hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
+                hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
+                inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
+                inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue
+            )
+        )
+
+        XCTAssertEqual(quitDropdown.selectedIdentifierForTesting, SwitcherHotkeyKey.q.rawValue)
+        XCTAssertEqual(
+            inAppModifierDropdown.selectedIdentifierForTesting,
+            SwitcherPrimaryModifier.control.rawValue
+        )
+    }
+
     func testFlowDropdownSharedControlDoesNotReadPresentationOrLocalizationState() throws {
         let repoRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

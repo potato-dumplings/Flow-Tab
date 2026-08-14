@@ -789,10 +789,10 @@ extension FlowTabTests {
             quitKey: .q
         )
 
-        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
+        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
             primaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
             mainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
-            mainHotkeyConfiguration: mainConfiguration
+            switcherConfiguration: mainConfiguration
         )
         XCTAssertEqual(resolved.primaryModifier, .option)
         XCTAssertEqual(resolved.mainKey, .tab)
@@ -805,13 +805,29 @@ extension FlowTabTests {
             quitKey: .q
         )
 
-        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
+        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
             primaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
             mainKeyRaw: SwitcherHotkeyKey.space.rawValue,
-            mainHotkeyConfiguration: mainConfiguration
+            switcherConfiguration: mainConfiguration
         )
         XCTAssertEqual(resolved.primaryModifier, .option)
         XCTAssertEqual(resolved.mainKey, .space)
+    }
+
+    func testInAppWindowHotkeyResolveAvoidingQuitConflictFallsBackToNonConflictingModifier() {
+        let mainConfiguration = SwitcherHotkeyConfiguration(
+            primaryModifier: .option,
+            mainKey: .tab,
+            quitKey: .q
+        )
+
+        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
+            primaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
+            mainKeyRaw: SwitcherHotkeyKey.q.rawValue,
+            switcherConfiguration: mainConfiguration
+        )
+        XCTAssertEqual(resolved.primaryModifier, .control)
+        XCTAssertEqual(resolved.mainKey, .q)
     }
 
     func testSwitcherBehaviorAndVisibilityPreferenceDefaults() {

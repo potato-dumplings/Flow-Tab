@@ -466,10 +466,10 @@ struct AppSettingsView: View {
     }
 
     private func enforceInAppWindowHotkeyConsistency() {
-        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
+        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
             primaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw,
             mainKeyRaw: inAppWindowHotkeyMainKeyRaw,
-            mainHotkeyConfiguration: hotkeyConfiguration
+            switcherConfiguration: hotkeyConfiguration
         )
         if inAppWindowHotkeyPrimaryModifierRaw != resolved.primaryModifier.rawValue {
             inAppWindowHotkeyPrimaryModifierRaw = resolved.primaryModifier.rawValue

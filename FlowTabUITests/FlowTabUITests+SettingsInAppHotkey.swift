@@ -1,6 +1,78 @@
 import XCTest
 
 extension FlowTabUITests {
+    func testSettingsHotkeyConflictsImmediatelyProjectFallbackSelections() throws {
+        let app = makeApp(
+            additionalArguments: hotkeyEffectArguments(resetDefaults: true)
+        )
+        defer { app.terminate() }
+        launchFlowTabUITestApplication(app)
+        openSettingsTab(in: app)
+
+        selectOption(
+            in: app,
+            controlIdentifier: Identifier.settingsHotkeyQuitKey,
+            optionIdentifier: "tab"
+        )
+
+        assertValue(
+            of: element(
+                in: app,
+                identifier: Identifier.settingsHotkeyQuitKey
+            ),
+            equals: "q"
+        )
+
+        selectOption(
+            in: app,
+            controlIdentifier: Identifier.settingsHotkeyInAppModifier,
+            optionIdentifier: "option"
+        )
+
+        assertValue(
+            of: element(
+                in: app,
+                identifier: Identifier.settingsHotkeyInAppModifier
+            ),
+            equals: "control"
+        )
+    }
+
+    func testSettingsInAppHotkeyMatchingQuitShortcutImmediatelyProjectsFallbackModifier() throws {
+        let app = makeApp(
+            additionalArguments: hotkeyEffectArguments(resetDefaults: true)
+        )
+        defer { app.terminate() }
+        launchFlowTabUITestApplication(app)
+        openSettingsTab(in: app)
+
+        selectOption(
+            in: app,
+            controlIdentifier: Identifier.settingsHotkeyInAppKey,
+            optionIdentifier: "q"
+        )
+        selectOption(
+            in: app,
+            controlIdentifier: Identifier.settingsHotkeyInAppModifier,
+            optionIdentifier: "option"
+        )
+
+        assertValue(
+            of: element(
+                in: app,
+                identifier: Identifier.settingsHotkeyInAppModifier
+            ),
+            equals: "control"
+        )
+        assertValue(
+            of: element(
+                in: app,
+                identifier: Identifier.settingsHotkeyInAppKey
+            ),
+            equals: "q"
+        )
+    }
+
     func testSettingsInAppHotkeyExplicitAndFallbackMatrixStartsFocusedWindowSession() throws {
         let cases: [(
             rawSelections: [(control: String, option: String)],

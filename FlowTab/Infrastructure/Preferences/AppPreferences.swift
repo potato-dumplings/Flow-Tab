@@ -139,10 +139,10 @@ struct HotkeyRegistrationRequest: Equatable, Sendable {
         inAppWindowConfiguration: SwitcherHotkeyConfiguration
     ) {
         let resolvedInAppWindowConfiguration =
-            InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
+            InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
                 primaryModifierRaw: inAppWindowConfiguration.primaryModifier.rawValue,
                 mainKeyRaw: inAppWindowConfiguration.mainKey.rawValue,
-                mainHotkeyConfiguration: mainConfiguration
+                switcherConfiguration: mainConfiguration
             )
         self.requestID = requestID
         self.mainConfiguration = mainConfiguration
@@ -218,10 +218,10 @@ struct HotkeyRegistrationRequest: Equatable, Sendable {
             quitKeyRaw: quitKeyRaw
         )
         let resolvedInAppWindowConfiguration =
-            InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
+            InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
                 primaryModifierRaw: inAppPrimaryModifierRaw,
                 mainKeyRaw: inAppMainKeyRaw,
-                mainHotkeyConfiguration: mainConfiguration
+                switcherConfiguration: mainConfiguration
             )
         let inAppWindowConfiguration = SwitcherHotkeyConfiguration(
             primaryModifier: resolvedInAppWindowConfiguration.primaryModifier,
@@ -572,24 +572,39 @@ enum InAppWindowHotkeyPreferencesStore {
         return (primaryModifier, mainKey)
     }
 
-    static func resolveAvoidingMainHotkeyConflict(
+    static func resolveAvoidingSwitcherHotkeyConflicts(
         primaryModifierRaw: String,
         mainKeyRaw: String,
-        mainHotkeyConfiguration: SwitcherHotkeyConfiguration
+        switcherConfiguration: SwitcherHotkeyConfiguration
     ) -> (primaryModifier: SwitcherPrimaryModifier, mainKey: SwitcherHotkeyKey) {
         let resolved = resolve(primaryModifierRaw: primaryModifierRaw, mainKeyRaw: mainKeyRaw)
-        guard
-            resolved.primaryModifier == mainHotkeyConfiguration.primaryModifier,
-            resolved.mainKey == mainHotkeyConfiguration.mainKey
-        else {
+        guard conflictsWithSwitcherShortcut(
+            primaryModifier: resolved.primaryModifier,
+            mainKey: resolved.mainKey,
+            switcherConfiguration: switcherConfiguration
+        ) else {
             return resolved
         }
 
-        let candidateModifiers = [defaultPrimaryModifier] + SwitcherPrimaryModifier.allCases
+        let candidateModifiers = [defaultPrimaryModifier]
+            + SwitcherPrimaryModifier.allCases.filter { $0 != defaultPrimaryModifier }
         let fallbackPrimaryModifier = candidateModifiers.first {
-            $0 != mainHotkeyConfiguration.primaryModifier
+            !conflictsWithSwitcherShortcut(
+                primaryModifier: $0,
+                mainKey: resolved.mainKey,
+                switcherConfiguration: switcherConfiguration
+            )
         } ?? defaultPrimaryModifier
 
         return (fallbackPrimaryModifier, resolved.mainKey)
+    }
+
+    private static func conflictsWithSwitcherShortcut(
+        primaryModifier: SwitcherPrimaryModifier,
+        mainKey: SwitcherHotkeyKey,
+        switcherConfiguration: SwitcherHotkeyConfiguration
+    ) -> Bool {
+        primaryModifier == switcherConfiguration.primaryModifier
+            && (mainKey == switcherConfiguration.mainKey || mainKey == switcherConfiguration.quitKey)
     }
 }

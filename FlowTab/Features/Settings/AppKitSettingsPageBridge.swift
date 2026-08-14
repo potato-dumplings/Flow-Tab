@@ -65,6 +65,9 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
                 inAppWindowHotkeyMainKeyRaw: inAppWindowHotkeyMainKeyRaw.wrappedValue
             )
         }
+        let updateHotkeyContent = { [weak pageView] in
+            pageView?.updateHotkeyContent(with: currentHotkeyValues())
+        }
 
         pageView.onShowShortcutHintChanged = { showShortcutHint.wrappedValue = $0 }
         pageView.onShowInCommandTabChanged = { showInCommandTab.wrappedValue = $0 }
@@ -85,22 +88,27 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
         pageView.onHotkeyPrimaryModifierChanged = {
             hotkeyPrimaryModifierRaw.wrappedValue = $0
             onMainHotkeyChanged(currentHotkeyValues())
+            updateHotkeyContent()
         }
         pageView.onHotkeyMainKeyChanged = {
             hotkeyMainKeyRaw.wrappedValue = $0
             onMainHotkeyChanged(currentHotkeyValues())
+            updateHotkeyContent()
         }
         pageView.onHotkeyQuitKeyChanged = {
             hotkeyQuitKeyRaw.wrappedValue = $0
             onQuitHotkeyChanged(currentHotkeyValues())
+            updateHotkeyContent()
         }
         pageView.onInAppWindowPrimaryModifierChanged = {
             inAppWindowHotkeyPrimaryModifierRaw.wrappedValue = $0
             onInAppWindowHotkeyChanged(currentHotkeyValues())
+            updateHotkeyContent()
         }
         pageView.onInAppWindowMainKeyChanged = {
             inAppWindowHotkeyMainKeyRaw.wrappedValue = $0
             onInAppWindowHotkeyChanged(currentHotkeyValues())
+            updateHotkeyContent()
         }
         pageView.onShowPermissionReminderChanged = { showPermissionReminder.wrappedValue = $0 }
         pageView.onAllowLaunchAtLoginChanged = {

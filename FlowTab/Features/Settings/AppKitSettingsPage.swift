@@ -413,18 +413,7 @@ final class AppKitSettingsPageView: NSView {
         appVisibilityCard.updateTitleAccessory(
             appVisibilityState.statusText
         )
-        hotkeyContent.update(
-            with: HotkeySettingsCardState(
-                hotkeyPrimaryModifierRaw: state.hotkeyPrimaryModifierRaw,
-                hotkeyMainKeyRaw: state.hotkeyMainKeyRaw,
-                hotkeyQuitKeyRaw: state.hotkeyQuitKeyRaw,
-                inAppWindowHotkeyPrimaryModifierRaw: state.inAppWindowHotkeyPrimaryModifierRaw,
-                inAppWindowHotkeyMainKeyRaw: state.inAppWindowHotkeyMainKeyRaw,
-                commandTabTakeoverRegistrationState: state.commandTabTakeoverRegistrationState,
-                accessibilityTrusted: state.accessibilityTrusted,
-                appLanguageRaw: state.appLanguageRaw
-            )
-        )
+        hotkeyContent.update(with: hotkeyCardState(from: state))
         permissionContent.update(
             with: PermissionSettingsCardState(
                 showPermissionReminder: state.showPermissionReminder,
@@ -443,9 +432,37 @@ final class AppKitSettingsPageView: NSView {
         invalidateIntrinsicContentSize()
     }
 
+    func updateHotkeyContent(with values: AppKitSettingsHotkeyRawValues) {
+        guard let currentState else { return }
+        hotkeyContent.update(
+            with: hotkeyCardState(from: currentState, overridingRawValuesWith: values)
+        )
+    }
+
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         applySettingsAppearance(targetSettingsAppearance)
+    }
+
+    private func hotkeyCardState(
+        from state: AppKitSettingsPageState,
+        overridingRawValuesWith values: AppKitSettingsHotkeyRawValues? = nil
+    ) -> HotkeySettingsCardState {
+        HotkeySettingsCardState(
+            hotkeyPrimaryModifierRaw: values?.hotkeyPrimaryModifierRaw
+                ?? state.hotkeyPrimaryModifierRaw,
+            hotkeyMainKeyRaw: values?.hotkeyMainKeyRaw
+                ?? state.hotkeyMainKeyRaw,
+            hotkeyQuitKeyRaw: values?.hotkeyQuitKeyRaw
+                ?? state.hotkeyQuitKeyRaw,
+            inAppWindowHotkeyPrimaryModifierRaw: values?.inAppWindowHotkeyPrimaryModifierRaw
+                ?? state.inAppWindowHotkeyPrimaryModifierRaw,
+            inAppWindowHotkeyMainKeyRaw: values?.inAppWindowHotkeyMainKeyRaw
+                ?? state.inAppWindowHotkeyMainKeyRaw,
+            commandTabTakeoverRegistrationState: state.commandTabTakeoverRegistrationState,
+            accessibilityTrusted: state.accessibilityTrusted,
+            appLanguageRaw: state.appLanguageRaw
+        )
     }
 
     func applySettingsAppearance(_ appearance: NSAppearance) {
