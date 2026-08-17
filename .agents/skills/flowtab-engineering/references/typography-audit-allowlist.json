@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "scope": {
+    "resource_boundary": "repository_root",
+    "relative_path_intent": "FlowTab"
+  },
+  "entries": [
+    {
+      "file": "FlowTab/App/ContentView.swift",
+      "kind": "swiftui-system-size",
+      "expected_count": 2,
+      "classification": "legacy",
+      "target": "FlowTypography.swiftUI(.display/.body)"
+    },
+    {
+      "file": "FlowTab/App/HomeRootView.swift",
+      "kind": "swiftui-system-size",
+      "expected_count": 3,
+      "classification": "legacy",
+      "target": "named sidebar typography/visual roles and FlowTypography.swiftUI(.cardTitle)"
+    },
+    {
+      "file": "FlowTab/Features/Home/HomeLandingView.swift",
+      "kind": "appkit-system-font",
+      "expected_count": 1,
+      "classification": "legacy",
+      "target": "FlowTypography.appKit(.pageTitle)"
+    },
+    {
+      "file": "FlowTab/Features/Home/HomeLandingView.swift",
+      "kind": "swiftui-system-size",
+      "expected_count": 3,
+      "classification": "legacy",
+      "target": "FlowTypography.swiftUI(.controlText/.controlTextEmphasized/.bodyEmphasized)"
+    },
+    {
+      "file": "FlowTab/Features/Home/HomeLayerRowView.swift",
+      "kind": "swiftui-system-size",
+      "expected_count": 4,
+      "classification": "legacy",
+      "target": "FlowTypography.swiftUI list-label, micro, and metadata tokens"
+    },
+    {
+      "file": "FlowTab/Features/Home/HomeOverviewComponents.swift",
+      "kind": "appkit-system-font",
+      "expected_count": 4,
+      "classification": "legacy",
+      "target": "FlowTypography.appKit tokens and a named Home stat-value role"
+    },
+    {
+      "file": "FlowTab/Features/Home/HomeOverviewComponents.swift",
+      "kind": "swiftui-system-size",
+      "expected_count": 1,
+      "classification": "legacy",
+      "target": "FlowTypography.swiftUI(.bodyStrong)"
+    },
+    {
+      "file": "FlowTab/Features/Home/HomeWindowRowButton.swift",
+      "kind": "appkit-system-font",
+      "expected_count": 3,
+      "classification": "legacy",
+      "target": "FlowTypography.appKit row-label and body tokens"
+    },
+    {
+      "file": "FlowTab/Features/Logs/AppLogsView.swift",
+      "kind": "swiftui-system-size",
+      "expected_count": 2,
+      "classification": "legacy",
+      "target": "FlowTypography.swiftUI(.pageTitle/.pageSubtitle)"
+    },
+    {
+      "file": "FlowTab/Features/Logs/RuntimeLogsSection.swift",
+      "kind": "swiftui-system-size",
+      "expected_count": 4,
+      "classification": "legacy",
+      "target": "FlowTypography.swiftUI(.body/.metadataMonospaced)"
+    },
+    {
+      "file": "FlowTab/Features/Settings/AppVisibilityManagerView.swift",
+      "kind": "appkit-system-font",
+      "expected_count": 1,
+      "classification": "legacy",
+      "target": "FlowTypography.appKit(.controlText) or a named App Visibility role"
+    },
+    {
+      "file": "FlowTab/Features/Settings/AppVisibilityManagerView.swift",
+      "kind": "swiftui-system-size",
+      "expected_count": 18,
+      "classification": "legacy",
+      "target": "FlowTypography.swiftUI tokens or named App Visibility roles"
+    },
+    {
+      "file": "FlowTab/Features/SharedUI/HomeChrome.swift",
+      "kind": "appkit-system-font",
+      "expected_count": 1,
+      "classification": "legacy",
+      "target": "FlowTypography.appKit(.cardSubtitle)"
+    },
+    {
+      "file": "FlowTab/Features/SharedUI/HomeChrome.swift",
+      "kind": "swiftui-system-size",
+      "expected_count": 3,
+      "classification": "legacy",
+      "target": "FlowTypography.swiftUI(.cardTitle/.cardSubtitle/.bodyStrong)"
+    },
+    {
+      "file": "FlowTab/Features/Switcher/SwitcherPanelOverlayView.swift",
+      "kind": "swiftui-system-size",
+      "expected_count": 1,
+      "classification": "legacy",
+      "target": "FlowSwitcherVisual.overlayMarkerSwiftUIFont"
+    },
+    {
+      "file": "FlowTab/Features/Switcher/SwitcherPanelPreviewViews.swift",
+      "kind": "swiftui-system-size",
+      "expected_count": 5,
+      "classification": "legacy",
+      "target": "FlowTypography tokens and named Switcher visual/icon roles"
+    },
+    {
+      "file": "FlowTab/Features/Switcher/SwitcherPanelSearchBridge.swift",
+      "kind": "appkit-system-font",
+      "expected_count": 1,
+      "classification": "legacy",
+      "target": "FlowSwitcherTypography.searchInputAppKit"
+    },
+    {
+      "file": "FlowTab/Features/Switcher/SwitcherPanelSearchViews.swift",
+      "kind": "appkit-system-font",
+      "expected_count": 1,
+      "classification": "legacy",
+      "target": "FlowSwitcherTypography.highlightedTitleAppKit"
+    },
+    {
+      "file": "FlowTab/Features/Switcher/SwitcherPanelSearchViews.swift",
+      "kind": "swiftui-system-size",
+      "expected_count": 15,
+      "classification": "legacy",
+      "target": "FlowSwitcherTypography, FlowSwitcherVisual, and FlowTypography roles"
+    },
+    {
+      "file": "FlowTab/Infrastructure/Appearance/FlowTypography.swift",
+      "kind": "appkit-descriptor-font",
+      "expected_count": 1,
+      "classification": "canonical-source",
+      "target": "FlowTypography rounded AppKit implementation"
+    },
+    {
+      "file": "FlowTab/Infrastructure/Appearance/FlowTypography.swift",
+      "kind": "appkit-monospaced-system-font",
+      "expected_count": 1,
+      "classification": "canonical-source",
+      "target": "FlowTypography AppKit implementation"
+    },
+    {
+      "file": "FlowTab/Infrastructure/Appearance/FlowTypography.swift",
+      "kind": "appkit-system-font",
+      "expected_count": 2,
+      "classification": "canonical-source",
+      "target": "FlowTypography AppKit implementation"
+    },
+    {
+      "file": "FlowTab/Infrastructure/Appearance/FlowTypography.swift",
+      "kind": "swiftui-system-size",
+      "expected_count": 1,
+      "classification": "canonical-source",
+      "target": "FlowTypography SwiftUI implementation"
+    },
+    {
+      "file": "FlowTab/Infrastructure/Runtime/TerminalWindowPreviewProvider.swift",
+      "kind": "appkit-descriptor-font",
+      "expected_count": 1,
+      "classification": "legacy",
+      "target": "TerminalPreviewTypography.terminalFont(for:)"
+    },
+    {
+      "file": "FlowTab/Infrastructure/Runtime/TerminalWindowPreviewProvider.swift",
+      "kind": "appkit-monospaced-system-font",
+      "expected_count": 2,
+      "classification": "legacy",
+      "target": "TerminalPreviewTypography.terminalFont(for:)"
+    },
+    {
+      "file": "FlowTab/Infrastructure/Runtime/TerminalWindowPreviewProvider.swift",
+      "kind": "appkit-named-font",
+      "expected_count": 1,
+      "classification": "legacy",
+      "target": "TerminalPreviewTypography.terminalFont(for:)"
+    },
+    {
+      "file": "FlowTab/TestingSupport/FlowTabUITestBootstrapper.swift",
+      "kind": "appkit-system-font",
+      "expected_count": 1,
+      "classification": "testing-diagnostic",
+      "target": "named testing diagnostic typography"
+    }
+  ]
+}

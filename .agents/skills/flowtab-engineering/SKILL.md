@@ -1,6 +1,6 @@
 ---
 name: flowtab-engineering
-description: "Use for FlowTab repository engineering work including implementation, code review, bug triage, architecture, transient full-validation test-asset handling, test strategy, performance analysis, and validated change delivery. Apply FlowTab module boundaries, evidence-first debugging, risk-calibrated validation layers, canonical test tooling, and task-specific handoff requirements."
+description: "Use for FlowTab repository engineering work including implementation, code review, bug triage, architecture, UI appearance and typography, transient full-validation test-asset handling, test strategy, performance analysis, and validated change delivery. Apply FlowTab module boundaries, evidence-first debugging, risk-calibrated validation layers, canonical test tooling, and task-specific handoff requirements."
 ---
 
 # FlowTab Engineering
@@ -46,6 +46,9 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 12. Apply repository maintenance guardrails.
     Keep new source files near 400 lines, preserve a single responsibility through 800 lines, split oversized files instead of expanding them, and place detailed project documentation under `docs/`.
 
+13. Apply the shared appearance and typography contract.
+    Route production fonts through `FlowTypography` tokens or audited named exceptions. Read `references/appearance-typography.md` before changing fonts, text measurement, visual-font metrics, shared component styling or typography audit inputs, then run the canonical typography audit.
+
 ## Reference Routing
 
 - Feature work: read `references/feature-workflow.md`.
@@ -61,6 +64,7 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 - Architecture and file placement: read `references/module-boundaries.md`.
 - Timing, waiting, retry, polling, deadline, or test-synchronization decisions: read `references/evidence-driven-synchronization.md`.
 - Concurrency, lifetime, permissions, logging, or dependency ownership: read `references/engineering-specialty-rules.md`.
+- UI appearance, typography, text measurement, visual-font metrics, or shared component styling: read `references/appearance-typography.md`; for legacy migration, also read `../../../docs/APPEARANCE_TYPOGRAPHY_MIGRATION.md` and `references/typography-audit-allowlist.json`.
 - Engineering closure or transferable handoff: read `references/handoff-contract.md`.
 
 ## Working Method
@@ -95,6 +99,8 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 - `references/module-boundaries.md`
 - `references/evidence-driven-synchronization.md`
 - `references/engineering-specialty-rules.md`
+- `references/appearance-typography.md`
+- `references/typography-audit-allowlist.json`
 - `references/handoff-contract.md`
 - `scripts/test_asset_model.py`
 - `scripts/test_asset_boundary.py`
@@ -103,4 +109,5 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 - `scripts/test_asset_views.py`
 - `scripts/test_asset_workspace.py`
 - `scripts/test_asset_selftest.py`
+- `scripts/typography_audit.py`
 - `scripts/validate-skill.py`

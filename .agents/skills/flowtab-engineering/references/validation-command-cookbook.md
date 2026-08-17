@@ -5,6 +5,7 @@ Use this reference when choosing concrete local commands for FlowTab validation.
 ## Contents
 
 - [General Rules](#general-rules)
+- [Typography Audit](#typography-audit)
 - [Test Asset Tooling](#test-asset-tooling)
 - [Build](#build)
 - [FlowTabCore Unit Tests](#flowtabcore-unit-tests)
@@ -34,6 +35,23 @@ Use this reference when choosing concrete local commands for FlowTab validation.
 - For a blocked slice with named follow-up remediation, retain only the compact diagnostics that the recovery action consumes, such as `status.json`, pressure summaries, the relevant log excerpt, and the private command manifest. Name that retained bundle and its cleanup owner in the handoff.
 - Delete the complete slice root when no explicit downstream dependency remains. Historical artifact paths in a tracked ledger are provenance path intents for the original local run; terminal cleanup may make those ignored local paths unavailable.
 - Verify and report the preceding slice's cleanup before allocating the next slice root.
+
+## Typography Audit
+
+Run this command after changing production fonts, text measurement, visual-font metrics, the
+typography detector or its allowlist:
+
+```bash
+python3 .agents/skills/flowtab-engineering/scripts/typography_audit.py \
+  --repository-root .
+```
+
+The audit resolves the tracked `FlowTab` path intent against the supplied repository root and
+compares every detected constructor with
+[`typography-audit-allowlist.json`](typography-audit-allowlist.json). Use `--scan` only to
+diagnose findings or maintain the allowlist. Treat an unexpected constructor, a missing tracked
+constructor or a changed legacy count as a failed Process/Tooling check until the source and
+allowlist diffs support the same ownership decision.
 
 ## Test Asset Tooling
 
