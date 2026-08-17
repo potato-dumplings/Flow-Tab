@@ -32,6 +32,7 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 
 8. Use canonical validation paths.
    Follow `references/validation-command-cookbook.md`, the FlowTabTests wrapper contract, UI prerequisites, and pressure workflow. Keep build roots and evidence under the repository-local ignored tree.
+   Bound raw evidence by the owning validation slice. In a long-running audit or migration, record the slice's durable result, commit or hand off its terminal state, and remove reproducible build products, result bundles, fixture products, caches, and temporary homes before the next slice starts. Retain a compact blocker bundle only when named remediation work explicitly depends on it.
 
 9. Use evidence-driven synchronization.
    Drive production and test progress from callbacks, notifications, readbacks, generations, explicit state transitions, and independent Oracles. Reject fixed-delay temporal coupling, raw settling sleeps, fixed RunLoop waits, and magic timeouts as sequencing, readiness, success, or correctness signals. Allow condition polling only when no event source exposes the required transition; keep the observable condition or readback as the sole success signal. Use centralized cancellable watchdogs only as terminal failure bounds, and model domain time through injectable clocks or schedulers. Follow `references/evidence-driven-synchronization.md`.

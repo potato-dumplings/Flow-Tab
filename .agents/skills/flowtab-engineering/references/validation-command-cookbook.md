@@ -16,15 +16,24 @@ Use this reference when choosing concrete local commands for FlowTab validation.
 
 ## General Rules
 
-- Keep repository-local build products, caches, active raw evidence, and private manifests under `./.build-local/` while their owning validation or task is active. Give every generated root an explicit terminal cleanup boundary. The repository's `.gitignore` excludes this tree so the same relative layout can move with any checkout.
+- Keep repository-local build products, caches, active raw evidence, and private manifests under `./.build-local/` while their owning validation slice is active. Give every generated root an explicit terminal cleanup boundary. A long-running Campaign does not extend a completed slice's raw-evidence lifetime. The repository's `.gitignore` excludes this tree so the same relative layout can move with any checkout.
 - Persist project-local locations as `{resource_boundary: repository_root, relative_path_intent: <relative-path>}`. Resolve each intent against the current repository root at the resource-owning boundary immediately before use.
 - Targeted and routine validation operate on tracked definitions while `.build-local/test-assets` remains absent. One selected full-validation entry owns it through `scripts/test_asset_workspace.py`; the runner removes it at terminal exit.
 - Use distinct before-change and after-change build-root intents when comparing bugfix signals: SwiftPM `--scratch-path`, repository wrappers `--build-root`, and direct `xcodebuild` `-derivedDataPath`.
 - Use `-only-testing:` filters for targeted validation first, then broaden when the touched code is shared.
-- For an audit run, allocate a fresh attempt-specific output path and leave its leaf absent. Pass it to the repository wrapper, which atomically creates the directory and rejects reuse so prior evidence remains intact.
+- For an audit run, allocate a fresh attempt-specific output path and leave its leaf absent. Pass it to the repository wrapper, which atomically creates the directory and rejects reuse so evidence remains intact until its owning slice records the attempt outcome.
 - Resolve `--build-root`, `--scratch-path`, and `-derivedDataPath` below the current project's ignored `./.build-local/` tree.
 - Normal non-audit calls can omit audit-output options and continue using the existing fixed local paths.
 - Report the command, outcome, and validation layer. For audit work, Git-tracked reports use a redacted command ID/hash while non-secret argv, secret references, and resolved local paths remain in the ignored private evidence manifest. Report sandbox, permission, code-identity, or missing-fixture blockers explicitly.
+
+### Long-Running Campaign Evidence Lifecycle
+
+- Give each migration or audit slice one owning evidence root. The active slice may retain fresh attempts needed for diagnosis, before/after comparison, required-layer validation, and closure.
+- Capture each terminal slice's durable evidence in its tracked ledger or handoff: command ID or reproducible command, outcome, independent Oracle, required metrics, blocker facts, and the minimum recovery input.
+- After the slice reaches its recorded terminal state and its commit or transferable handoff exists, remove reproducible heavy artifacts from that slice root before starting the next slice. This includes `DerivedData`, `.xcresult` bundles, built fixture applications, source-package and module caches, temporary homes, and superseded build roots.
+- For a blocked slice with named follow-up remediation, retain only the compact diagnostics that the recovery action consumes, such as `status.json`, pressure summaries, the relevant log excerpt, and the private command manifest. Name that retained bundle and its cleanup owner in the handoff.
+- Delete the complete slice root when no explicit downstream dependency remains. Historical artifact paths in a tracked ledger are provenance path intents for the original local run; terminal cleanup may make those ignored local paths unavailable.
+- Verify and report the preceding slice's cleanup before allocating the next slice root.
 
 ## Test Asset Tooling
 
