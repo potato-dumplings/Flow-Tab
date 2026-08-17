@@ -2,6 +2,7 @@ import AppKit
 
 final class FlowSettingsSelectControl: NSView, FlowSettingsAppearanceRefreshable {
     var onSelectionChanged: ((String) -> Void)?
+    var onInteraction: (() -> Void)?
 
     var isEnabled = true {
         didSet {
@@ -101,6 +102,9 @@ final class FlowSettingsSelectControl: NSView, FlowSettingsAppearanceRefreshable
         dropdownControl.translatesAutoresizingMaskIntoConstraints = false
         dropdownControl.onSelectionChanged = { [weak self] id in
             self?.commitSelection(id)
+        }
+        dropdownControl.onInteraction = { [weak self] in
+            self?.onInteraction?()
         }
         addSubview(dropdownControl)
 

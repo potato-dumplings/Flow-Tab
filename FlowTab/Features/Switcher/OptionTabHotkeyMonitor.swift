@@ -238,18 +238,34 @@ enum SwitcherHotkeyPreferencesStore {
         mainKeyRaw: String,
         quitKeyRaw: String
     ) -> SwitcherHotkeyConfiguration {
-        let primaryModifier = SwitcherPrimaryModifier(rawValue: primaryModifierRaw) ?? defaultPrimaryModifier
-        let mainKey = SwitcherHotkeyKey(rawValue: mainKeyRaw) ?? defaultMainKey
-        var quitKey = SwitcherHotkeyKey(rawValue: quitKeyRaw) ?? defaultQuitKey
+        let candidate = resolveCandidate(
+            primaryModifierRaw: primaryModifierRaw,
+            mainKeyRaw: mainKeyRaw,
+            quitKeyRaw: quitKeyRaw
+        )
+        var quitKey = candidate.quitKey
 
-        if quitKey == mainKey {
-            quitKey = defaultQuitFallback(excluding: mainKey)
+        if quitKey == candidate.mainKey {
+            quitKey = defaultQuitFallback(excluding: candidate.mainKey)
         }
 
         return SwitcherHotkeyConfiguration(
-            primaryModifier: primaryModifier,
-            mainKey: mainKey,
+            primaryModifier: candidate.primaryModifier,
+            mainKey: candidate.mainKey,
             quitKey: quitKey
+        )
+    }
+
+    static func resolveCandidate(
+        primaryModifierRaw: String,
+        mainKeyRaw: String,
+        quitKeyRaw: String
+    ) -> SwitcherHotkeyConfiguration {
+        SwitcherHotkeyConfiguration(
+            primaryModifier: SwitcherPrimaryModifier(rawValue: primaryModifierRaw)
+                ?? defaultPrimaryModifier,
+            mainKey: SwitcherHotkeyKey(rawValue: mainKeyRaw) ?? defaultMainKey,
+            quitKey: SwitcherHotkeyKey(rawValue: quitKeyRaw) ?? defaultQuitKey
         )
     }
 

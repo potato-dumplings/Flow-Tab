@@ -65,6 +65,7 @@ enum AppStringKey: String {
     case homePermissionMissing
     case hotkeyCommandTabTakeoverActive
     case hotkeyCommandTabTakeoverInactive
+    case hotkeyConflict
     case hotkeyMainSummary
     case hotkeyInAppSummary
     case hotkeySummaryReverseLabel
@@ -221,6 +222,7 @@ enum AppStrings {
             .homePermissionMissing: "未授权",
             .hotkeyCommandTabTakeoverActive: "已接管系统 Command + Tab / Command + Shift + Tab，退出 FlowTab 后会自动恢复。",
             .hotkeyCommandTabTakeoverInactive: "检测到 Command + Tab 组合：FlowTab 会自动尝试接管系统 Command + Tab / Command + Shift + Tab。",
+            .hotkeyConflict: "已被使用",
             .hotkeyMainSummary: "当前：{main}（{reverseLabel}：{reverse}），{quitLabel}：{quit}",
             .hotkeyInAppSummary: "{inAppLabel}：{main}（{reverseLabel}：{reverse}）",
             .hotkeySummaryReverseLabel: "反向",
@@ -372,6 +374,7 @@ enum AppStrings {
             .homePermissionMissing: "Missing",
             .hotkeyCommandTabTakeoverActive: "System Command + Tab / Command + Shift + Tab is now taken over and will be restored after FlowTab exits.",
             .hotkeyCommandTabTakeoverInactive: "Command + Tab combination detected: FlowTab will try to take over system Command + Tab / Command + Shift + Tab.",
+            .hotkeyConflict: "Already in use",
             .hotkeyMainSummary: "Current: {main} ({reverseLabel}: {reverse}), {quitLabel}: {quit}",
             .hotkeyInAppSummary: "{inAppLabel}: {main} ({reverseLabel}: {reverse})",
             .hotkeySummaryReverseLabel: "Reverse",

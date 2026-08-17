@@ -369,7 +369,9 @@
 		EFD100043D1D000100B0D737 /* FlowTabTests+SearchScheduling.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFD100033D1D000100B0D737 /* FlowTabTests+SearchScheduling.swift */; };
 		F0D100023D1E000100B0D737 /* HotkeyRegistrationEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0D100013D1E000100B0D737 /* HotkeyRegistrationEvidence.swift */; };
 		F0D100043D1E000100B0D737 /* HotkeyRegistrationObservationOwner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0D100033D1E000100B0D737 /* HotkeyRegistrationObservationOwner.swift */; };
+		A6F100023E11000100B0D737 /* HotkeySettingsChangeTransaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F100013E11000100B0D737 /* HotkeySettingsChangeTransaction.swift */; };
 		F0D100063D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0D100053D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift */; };
+		A6F100043E11000100B0D737 /* FlowTabTests+HotkeyConflictSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F100033E11000100B0D737 /* FlowTabTests+HotkeyConflictSettings.swift */; };
 		F1D100023D1F000100B0D737 /* ModifierReleaseObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D100013D1F000100B0D737 /* ModifierReleaseObservation.swift */; };
 		F1D100043D1F000100B0D737 /* SwitcherPanelController+ModifierReleaseObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D100033D1F000100B0D737 /* SwitcherPanelController+ModifierReleaseObservation.swift */; };
 		F1D100063D1F000100B0D737 /* FlowTabTests+ModifierReleaseObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D100053D1F000100B0D737 /* FlowTabTests+ModifierReleaseObservation.swift */; };
@@ -766,7 +768,9 @@
 		EFD100033D1D000100B0D737 /* FlowTabTests+SearchScheduling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SearchScheduling.swift"; sourceTree = "<group>"; };
 		F0D100013D1E000100B0D737 /* HotkeyRegistrationEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyRegistrationEvidence.swift; sourceTree = "<group>"; };
 		F0D100033D1E000100B0D737 /* HotkeyRegistrationObservationOwner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyRegistrationObservationOwner.swift; sourceTree = "<group>"; };
+		A6F100013E11000100B0D737 /* HotkeySettingsChangeTransaction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeySettingsChangeTransaction.swift; sourceTree = "<group>"; };
 		F0D100053D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HotkeyRegistrationObservation.swift"; sourceTree = "<group>"; };
+		A6F100033E11000100B0D737 /* FlowTabTests+HotkeyConflictSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HotkeyConflictSettings.swift"; sourceTree = "<group>"; };
 		F1D100013D1F000100B0D737 /* ModifierReleaseObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierReleaseObservation.swift; sourceTree = "<group>"; };
 		F1D100033D1F000100B0D737 /* SwitcherPanelController+ModifierReleaseObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+ModifierReleaseObservation.swift"; sourceTree = "<group>"; };
 		F1D100053D1F000100B0D737 /* FlowTabTests+ModifierReleaseObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+ModifierReleaseObservation.swift"; sourceTree = "<group>"; };
@@ -1416,6 +1420,7 @@
 				33D753077275423A9D5E1BE4 /* SettingsPresentationLayoutTestSupport.swift */,
 				6DAFC825927F48AEA80B2C04 /* FlowTabTests+SettingsPermissionReadback.swift */,
 				F0D100053D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift */,
+				A6F100033E11000100B0D737 /* FlowTabTests+HotkeyConflictSettings.swift */,
 				F1D100053D1F000100B0D737 /* FlowTabTests+ModifierReleaseObservation.swift */,
 				F2D100033D20000100B0D737 /* FlowTabTests+HotkeyInputEvidence.swift */,
 				F3D100033D21000100B0D737 /* FlowTabTests+InitialPanelVisibilityObservation.swift */,
@@ -2075,6 +2080,7 @@
 				FDD100013D2A000100B0D737 /* SettingsAppVisibilityNavigationAnimationPolicy.swift */,
 				C100001F2F75000100B0D737 /* AppSettingsView.swift */,
 				F0D100033D1E000100B0D737 /* HotkeyRegistrationObservationOwner.swift */,
+				A6F100013E11000100B0D737 /* HotkeySettingsChangeTransaction.swift */,
 				C10000192F75000100B0D737 /* AppKitSettingsPage.swift */,
 				E1F200152B00000100B0D737 /* AppKitSettingsPageBridge.swift */,
 				C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */,
@@ -2348,6 +2354,7 @@
 				FDD100023D2A000100B0D737 /* SettingsAppVisibilityNavigationAnimationPolicy.swift in Sources */,
 				C100000F2F75000100B0D737 /* AppSettingsView.swift in Sources */,
 				F0D100043D1E000100B0D737 /* HotkeyRegistrationObservationOwner.swift in Sources */,
+				A6F100023E11000100B0D737 /* HotkeySettingsChangeTransaction.swift in Sources */,
 				C100000E2F75000100B0D737 /* AppLogsView.swift in Sources */,
 				C100000D2F75000100B0D737 /* PermissionSettingsCard.swift in Sources */,
 				C100000C2F75000100B0D737 /* SearchSettingsCard.swift in Sources */,
@@ -2579,6 +2586,7 @@
 				5AD1251B99A44A598D40E35E /* SettingsPresentationLayoutTestSupport.swift in Sources */,
 				F3B14FE50DBF457F9E28BF04 /* FlowTabTests+SettingsPermissionReadback.swift in Sources */,
 				F0D100063D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift in Sources */,
+				A6F100043E11000100B0D737 /* FlowTabTests+HotkeyConflictSettings.swift in Sources */,
 				F1D100063D1F000100B0D737 /* FlowTabTests+ModifierReleaseObservation.swift in Sources */,
 				F2D100043D20000100B0D737 /* FlowTabTests+HotkeyInputEvidence.swift in Sources */,
 				F3D100043D21000100B0D737 /* FlowTabTests+InitialPanelVisibilityObservation.swift in Sources */,

@@ -531,7 +531,7 @@ extension FlowTabUITests {
         }
     }
 
-    func testSettingsQuitHotkeyExplicitAndFallbackMatrixTerminatesSelectedApp() throws {
+    func testSettingsQuitHotkeyExplicitMatrixTerminatesSelectedApp() throws {
         let cases: [(
             rawSelections: [(control: String, option: String)],
             expectedValues: [(control: String, value: String)],
@@ -559,8 +559,8 @@ extension FlowTabUITests {
             (
                 [
                     (Identifier.settingsHotkeyMainModifier, "option"),
+                    (Identifier.settingsHotkeyQuitKey, "w"),
                     (Identifier.settingsHotkeyMainKey, "q"),
-                    (Identifier.settingsHotkeyQuitKey, "q"),
                     (Identifier.settingsHotkeyInAppModifier, "control"),
                     (Identifier.settingsHotkeyInAppKey, "b")
                 ],

@@ -2,6 +2,7 @@ import AppKit
 
 final class FlowDropdownControl: NSView {
     var onSelectionChanged: ((String) -> Void)?
+    var onInteraction: (() -> Void)?
 
     var isEnabled = true {
         didSet {
@@ -140,12 +141,14 @@ final class FlowDropdownControl: NSView {
 
     override func mouseDown(with event: NSEvent) {
         guard isEnabled else { return }
+        onInteraction?()
         window?.makeFirstResponder(self)
         toggleMenu()
     }
 
     override func accessibilityPerformPress() -> Bool {
         guard isEnabled else { return false }
+        onInteraction?()
         window?.makeFirstResponder(self)
         toggleMenu()
         return true
@@ -158,6 +161,7 @@ final class FlowDropdownControl: NSView {
         }
         switch event.keyCode {
         case 36, 49, 125:
+            onInteraction?()
             showMenu()
         case 53:
             closeMenu()

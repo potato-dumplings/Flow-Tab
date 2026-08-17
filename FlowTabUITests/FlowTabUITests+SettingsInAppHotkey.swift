@@ -1,13 +1,26 @@
 import XCTest
 
 extension FlowTabUITests {
-    func testSettingsHotkeyConflictsImmediatelyProjectFallbackSelections() throws {
+    func testSettingsHotkeyConflictsShowWarningAndKeepCurrentSelections() throws {
         let app = makeApp(
             additionalArguments: hotkeyEffectArguments(resetDefaults: true)
         )
         defer { app.terminate() }
         launchFlowTabUITestApplication(app)
         openSettingsTab(in: app)
+
+        selectOption(
+            in: app,
+            controlIdentifier: Identifier.settingsHotkeyQuitKey,
+            optionIdentifier: "z"
+        )
+        assertValue(
+            of: element(
+                in: app,
+                identifier: Identifier.settingsHotkeyQuitKey
+            ),
+            equals: "z"
+        )
 
         selectOption(
             in: app,
@@ -20,25 +33,52 @@ extension FlowTabUITests {
                 in: app,
                 identifier: Identifier.settingsHotkeyQuitKey
             ),
-            equals: "q"
+            equals: "z"
+        )
+        assertHotkeyConflictVisible(
+            in: app,
+            controlIdentifier: Identifier.settingsHotkeyQuitKey
         )
 
+        selectOption(
+            in: app,
+            controlIdentifier: Identifier.settingsHotkeyMainKey,
+            optionIdentifier: "space"
+        )
+        assertValue(
+            of: element(
+                in: app,
+                identifier: Identifier.settingsHotkeyMainKey
+            ),
+            equals: "space"
+        )
+        selectOption(
+            in: app,
+            controlIdentifier: Identifier.settingsHotkeyInAppKey,
+            optionIdentifier: "b"
+        )
         selectOption(
             in: app,
             controlIdentifier: Identifier.settingsHotkeyInAppModifier,
             optionIdentifier: "option"
         )
+        selectOption(
+            in: app,
+            controlIdentifier: Identifier.settingsHotkeyMainKey,
+            optionIdentifier: "b"
+        )
 
         assertValue(
-            of: element(
-                in: app,
-                identifier: Identifier.settingsHotkeyInAppModifier
-            ),
-            equals: "control"
+            of: element(in: app, identifier: Identifier.settingsHotkeyMainKey),
+            equals: "space"
+        )
+        assertHotkeyConflictVisible(
+            in: app,
+            controlIdentifier: Identifier.settingsHotkeyMainKey
         )
     }
 
-    func testSettingsInAppHotkeyMatchingQuitShortcutImmediatelyProjectsFallbackModifier() throws {
+    func testSettingsInAppHotkeyConflictWithQuitShowsWarningAndKeepsCurrentSelection() throws {
         let app = makeApp(
             additionalArguments: hotkeyEffectArguments(resetDefaults: true)
         )
@@ -54,6 +94,18 @@ extension FlowTabUITests {
         selectOption(
             in: app,
             controlIdentifier: Identifier.settingsHotkeyInAppModifier,
+            optionIdentifier: "command"
+        )
+        assertValue(
+            of: element(
+                in: app,
+                identifier: Identifier.settingsHotkeyInAppModifier
+            ),
+            equals: "command"
+        )
+        selectOption(
+            in: app,
+            controlIdentifier: Identifier.settingsHotkeyInAppModifier,
             optionIdentifier: "option"
         )
 
@@ -62,7 +114,7 @@ extension FlowTabUITests {
                 in: app,
                 identifier: Identifier.settingsHotkeyInAppModifier
             ),
-            equals: "control"
+            equals: "command"
         )
         assertValue(
             of: element(
@@ -71,9 +123,55 @@ extension FlowTabUITests {
             ),
             equals: "q"
         )
+        assertHotkeyConflictVisible(
+            in: app,
+            controlIdentifier: Identifier.settingsHotkeyInAppModifier
+        )
     }
 
-    func testSettingsInAppHotkeyExplicitAndFallbackMatrixStartsFocusedWindowSession() throws {
+    func testSettingsHotkeyConflictFeedbackDismissesAfterOtherClick() throws {
+        let app = makeApp(
+            additionalArguments: hotkeyEffectArguments(resetDefaults: true)
+        )
+        defer { app.terminate() }
+        launchFlowTabUITestApplication(app)
+        openSettingsTab(in: app)
+
+        selectOption(
+            in: app,
+            controlIdentifier: Identifier.settingsHotkeyQuitKey,
+            optionIdentifier: "z"
+        )
+        selectOption(
+            in: app,
+            controlIdentifier: Identifier.settingsHotkeyQuitKey,
+            optionIdentifier: "tab"
+        )
+
+        let conflictStatus = element(
+            in: app,
+            identifier: Identifier.settingsHotkeyConflictStatus(
+                for: Identifier.settingsHotkeyQuitKey
+            )
+        )
+        XCTAssertTrue(conflictStatus.waitForExistence(timeout: 5))
+        let shortcutHintToggle = element(
+            in: app,
+            identifier: Identifier.settingsAppearanceShowShortcutHint
+        )
+        assertElementDoesNotExistAfterTrigger(
+            conflictStatus,
+            timeout: 5,
+            description: "Hotkey conflict feedback click-away dismissal",
+            trigger: { tapElement(shortcutHintToggle) }
+        )
+        assertValue(
+            of: element(in: app, identifier: Identifier.settingsHotkeyQuitKey),
+            equals: "z"
+        )
+    }
+
+    func testSettingsInAppHotkeyExplicitMatrixStartsFocusedWindowSession() throws {
         let cases: [(
             rawSelections: [(control: String, option: String)],
             expectedValues: [(control: String, value: String)],
@@ -105,7 +203,7 @@ extension FlowTabUITests {
                     (Identifier.settingsHotkeyMainModifier, "option"),
                     (Identifier.settingsHotkeyMainKey, "b"),
                     (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
+                    (Identifier.settingsHotkeyInAppModifier, "control"),
                     (Identifier.settingsHotkeyInAppKey, "b")
                 ],
                 [
@@ -194,5 +292,30 @@ extension FlowTabUITests {
             )
             inputBaseline.cancel()
         }
+    }
+
+    private func assertHotkeyConflictVisible(
+        in app: XCUIApplication,
+        controlIdentifier: String
+    ) {
+        let conflictText = "已被使用"
+        let conflictIdentifier = Identifier.settingsHotkeyConflictStatus(
+            for: controlIdentifier
+        )
+        let conflictStatus = app.descendants(matching: .any)
+            .matching(
+                NSPredicate(
+                    format: "identifier == %@ AND (label CONTAINS %@ OR value CONTAINS %@)",
+                    conflictIdentifier,
+                    conflictText,
+                    conflictText
+                )
+            )
+            .firstMatch
+
+        XCTAssertTrue(
+            conflictStatus.waitForExistence(timeout: 5),
+            "Expected field-level hotkey conflict feedback to be visible"
+        )
     }
 }

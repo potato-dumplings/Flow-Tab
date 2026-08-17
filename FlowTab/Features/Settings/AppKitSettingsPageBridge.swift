@@ -22,14 +22,14 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
     @Binding var inAppWindowHotkeyPrimaryModifierRaw: String
     @Binding var inAppWindowHotkeyMainKeyRaw: String
     let commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
+    let hotkeyConflict: HotkeySettingsConflictPresentation?
     let accessibilityTrusted: Bool
     let screenCaptureTrusted: Bool
     let onWindowLayerAutoEnterDelayTextChanged: (String) -> Void
     let onWindowLayerAutoEnterDelayTextCommitted: () -> Void
     let onWindowLayerAutoEnterDelayEditingChanged: (Bool) -> Void
-    let onMainHotkeyChanged: (AppKitSettingsHotkeyRawValues) -> Void
-    let onQuitHotkeyChanged: (AppKitSettingsHotkeyRawValues) -> Void
-    let onInAppWindowHotkeyChanged: (AppKitSettingsHotkeyRawValues) -> Void
+    let onHotkeyChanged: (HotkeySettingsChangeCandidate) -> Void
+    let onDismissHotkeyConflict: () -> Void
     let onLaunchAtLoginChanged: (Bool) -> Void
     let onManageAppVisibility: () -> Void
     let onAccessibilityAction: () -> Void
@@ -85,29 +85,50 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
         pageView.onSearchEnabledChanged = { searchEnabled.wrappedValue = $0 }
         pageView.onSearchDefaultScopeChanged = { searchDefaultScopeRaw.wrappedValue = $0 }
         pageView.onManageAppVisibility = onManageAppVisibility
+        pageView.onDismissHotkeyConflict = onDismissHotkeyConflict
         pageView.onHotkeyPrimaryModifierChanged = {
-            hotkeyPrimaryModifierRaw.wrappedValue = $0
-            onMainHotkeyChanged(currentHotkeyValues())
+            onHotkeyChanged(
+                HotkeySettingsChangeCandidate(
+                    field: .mainModifier,
+                    values: currentHotkeyValues().replacing(.mainModifier, with: $0)
+                )
+            )
             updateHotkeyContent()
         }
         pageView.onHotkeyMainKeyChanged = {
-            hotkeyMainKeyRaw.wrappedValue = $0
-            onMainHotkeyChanged(currentHotkeyValues())
+            onHotkeyChanged(
+                HotkeySettingsChangeCandidate(
+                    field: .mainKey,
+                    values: currentHotkeyValues().replacing(.mainKey, with: $0)
+                )
+            )
             updateHotkeyContent()
         }
         pageView.onHotkeyQuitKeyChanged = {
-            hotkeyQuitKeyRaw.wrappedValue = $0
-            onQuitHotkeyChanged(currentHotkeyValues())
+            onHotkeyChanged(
+                HotkeySettingsChangeCandidate(
+                    field: .quitKey,
+                    values: currentHotkeyValues().replacing(.quitKey, with: $0)
+                )
+            )
             updateHotkeyContent()
         }
         pageView.onInAppWindowPrimaryModifierChanged = {
-            inAppWindowHotkeyPrimaryModifierRaw.wrappedValue = $0
-            onInAppWindowHotkeyChanged(currentHotkeyValues())
+            onHotkeyChanged(
+                HotkeySettingsChangeCandidate(
+                    field: .inAppModifier,
+                    values: currentHotkeyValues().replacing(.inAppModifier, with: $0)
+                )
+            )
             updateHotkeyContent()
         }
         pageView.onInAppWindowMainKeyChanged = {
-            inAppWindowHotkeyMainKeyRaw.wrappedValue = $0
-            onInAppWindowHotkeyChanged(currentHotkeyValues())
+            onHotkeyChanged(
+                HotkeySettingsChangeCandidate(
+                    field: .inAppKey,
+                    values: currentHotkeyValues().replacing(.inAppKey, with: $0)
+                )
+            )
             updateHotkeyContent()
         }
         pageView.onShowPermissionReminderChanged = { showPermissionReminder.wrappedValue = $0 }
@@ -139,9 +160,28 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
                 commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
                 accessibilityTrusted: accessibilityTrusted,
                 screenCaptureTrusted: screenCaptureTrusted,
-                targetNSAppearanceName: presentationContext.targetNSAppearanceName
+                targetNSAppearanceName: presentationContext.targetNSAppearanceName,
+                hotkeyConflict: hotkeyConflict
             ),
             isActive: isActive
+        )
+    }
+}
+
+private extension AppKitSettingsHotkeyRawValues {
+    func replacing(
+        _ field: HotkeySettingsField,
+        with rawValue: String
+    ) -> AppKitSettingsHotkeyRawValues {
+        AppKitSettingsHotkeyRawValues(
+            hotkeyPrimaryModifierRaw: field == .mainModifier
+                ? rawValue : hotkeyPrimaryModifierRaw,
+            hotkeyMainKeyRaw: field == .mainKey ? rawValue : hotkeyMainKeyRaw,
+            hotkeyQuitKeyRaw: field == .quitKey ? rawValue : hotkeyQuitKeyRaw,
+            inAppWindowHotkeyPrimaryModifierRaw: field == .inAppModifier
+                ? rawValue : inAppWindowHotkeyPrimaryModifierRaw,
+            inAppWindowHotkeyMainKeyRaw: field == .inAppKey
+                ? rawValue : inAppWindowHotkeyMainKeyRaw
         )
     }
 }

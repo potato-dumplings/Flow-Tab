@@ -59,6 +59,7 @@ struct AppSettingsView: View {
     @State private var isWindowLayerAutoEnterDelayEditing = false
     @State private var isApplyingLaunchAtLoginPreference = false
     @State private var lastNotifiedHotkeySignature = ""
+    @State private var hotkeyConflict: HotkeySettingsConflictPresentation?
     @State private var hiddenAppCount = AppVisibilityPreferencesStore.loadHiddenAppIDs().count
     @State private var showsAppVisibilityManager = false
 
@@ -180,6 +181,7 @@ struct AppSettingsView: View {
                 inAppWindowHotkeyPrimaryModifierRaw: $inAppWindowHotkeyPrimaryModifierRaw,
                 inAppWindowHotkeyMainKeyRaw: $inAppWindowHotkeyMainKeyRaw,
                 commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
+                hotkeyConflict: hotkeyConflict,
                 accessibilityTrusted: accessibilityTrusted,
                 screenCaptureTrusted: screenCaptureTrusted,
                 onWindowLayerAutoEnterDelayTextChanged: applyWindowLayerAutoEnterDelayText,
@@ -187,11 +189,11 @@ struct AppSettingsView: View {
                 onWindowLayerAutoEnterDelayEditingChanged: {
                     isWindowLayerAutoEnterDelayEditing = $0
                 },
-                onMainHotkeyChanged: handleMainHotkeyChanged,
-                onQuitHotkeyChanged: handleQuitHotkeyChanged,
-                onInAppWindowHotkeyChanged: handleInAppWindowHotkeyChanged,
+                onHotkeyChanged: handleHotkeyChanged,
+                onDismissHotkeyConflict: dismissHotkeyConflict,
                 onLaunchAtLoginChanged: handleLaunchAtLoginChanged,
                 onManageAppVisibility: {
+                    dismissHotkeyConflict()
                     refreshHiddenAppCount()
                     withAnimation(appVisibilityNavigationAnimation) {
                         showsAppVisibilityManager = true
@@ -271,6 +273,11 @@ struct AppSettingsView: View {
             refreshScreenCaptureStatus()
         }
         .onReceive(NotificationCenter.default.publisher(
+            for: NSApplication.didResignActiveNotification
+        )) { _ in
+            dismissHotkeyConflict()
+        }
+        .onReceive(NotificationCenter.default.publisher(
             for: UserDefaults.didChangeNotification
         )) { _ in
             handleStoredHotkeyDefaultsDidChange()
@@ -282,6 +289,7 @@ struct AppSettingsView: View {
             refreshHiddenAppCount()
         }
         .onDisappear {
+            dismissHotkeyConflict()
             cancelPermissionObservation()
             hotkeyRegistrationObservationOwner.stop()
         }
@@ -292,6 +300,7 @@ struct AppSettingsView: View {
     @MainActor
     private func handleVisibilityChanged(_ active: Bool) {
         guard active else {
+            dismissHotkeyConflict()
             cancelPermissionObservation()
             hotkeyRegistrationObservationOwner.stop()
             return
@@ -480,24 +489,29 @@ struct AppSettingsView: View {
     }
 
     @MainActor
-    private func handleMainHotkeyChanged(_ values: AppKitSettingsHotkeyRawValues) {
-        let request = normalizedHotkeyRegistrationRequest(from: values)
-        applyNormalizedHotkeyValues(from: request)
-        notifyHotkeyConfigChanged(using: request)
+    private func handleHotkeyChanged(_ candidate: HotkeySettingsChangeCandidate) {
+        let result = HotkeySettingsChangeTransaction.apply(candidate.values) { request in
+            applyNormalizedHotkeyValues(from: request)
+            notifyHotkeyConfigChanged(using: request)
+        }
+        switch result {
+        case .applied:
+            dismissHotkeyConflict()
+        case let .conflict(conflict):
+            hotkeyConflict = HotkeySettingsConflictPresentation(
+                field: candidate.field,
+                conflict: conflict
+            )
+            RuntimeLog.warning(
+                .hotKey,
+                "settings conflict=\(conflict.rawValue) field=\(candidate.field.rawValue) action=rejected"
+            )
+        }
     }
 
     @MainActor
-    private func handleQuitHotkeyChanged(_ values: AppKitSettingsHotkeyRawValues) {
-        let request = normalizedHotkeyRegistrationRequest(from: values)
-        applyNormalizedHotkeyValues(from: request)
-        notifyHotkeyConfigChanged(using: request)
-    }
-
-    @MainActor
-    private func handleInAppWindowHotkeyChanged(_ values: AppKitSettingsHotkeyRawValues) {
-        let request = normalizedHotkeyRegistrationRequest(from: values)
-        applyNormalizedHotkeyValues(from: request)
-        notifyHotkeyConfigChanged(using: request)
+    private func dismissHotkeyConflict() {
+        hotkeyConflict = nil
     }
 
     @MainActor
@@ -516,18 +530,6 @@ struct AppSettingsView: View {
     @MainActor
     private func handleStoredHotkeyDefaultsDidChange() {
         notifyHotkeyConfigChangedIfNeeded(using: HotkeyRegistrationRequest.load())
-    }
-
-    private func normalizedHotkeyRegistrationRequest(
-        from values: AppKitSettingsHotkeyRawValues
-    ) -> HotkeyRegistrationRequest {
-        HotkeyRegistrationRequest.normalized(
-            mainPrimaryModifierRaw: values.hotkeyPrimaryModifierRaw,
-            mainKeyRaw: values.hotkeyMainKeyRaw,
-            quitKeyRaw: values.hotkeyQuitKeyRaw,
-            inAppPrimaryModifierRaw: values.inAppWindowHotkeyPrimaryModifierRaw,
-            inAppMainKeyRaw: values.inAppWindowHotkeyMainKeyRaw
-        )
     }
 
     private func applyNormalizedHotkeyValues(from request: HotkeyRegistrationRequest) {

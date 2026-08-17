@@ -124,6 +124,7 @@ struct HotkeySettingsCardState: Equatable {
     let commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
     let accessibilityTrusted: Bool
     let appLanguageRaw: String
+    var hotkeyConflict: HotkeySettingsConflictPresentation? = nil
 
     var language: AppLanguage {
         AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
@@ -192,6 +193,7 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
     var onHotkeyQuitKeyChanged: ((String) -> Void)?
     var onInAppWindowPrimaryModifierChanged: ((String) -> Void)?
     var onInAppWindowMainKeyChanged: ((String) -> Void)?
+    var onInteraction: (() -> Void)?
 
     private let stackView = NSStackView()
     private let mainPrimaryModifierSelect = FlowSettingsSelectControl(frame: .zero)
@@ -207,23 +209,28 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
     private let inAppTakeoverStatusLabel = HotkeySettingsCardAppKitView.makeStatusLabel()
     private lazy var mainPrimaryModifierRow = AppKitSettingsCardBaseView.makeControlRow(
         title: "",
-        control: mainPrimaryModifierSelect
+        control: mainPrimaryModifierSelect,
+        validationIdentifier: HotkeySettingsField.mainModifier.conflictTestingIdentifier
     )
     private lazy var mainKeyRow = AppKitSettingsCardBaseView.makeControlRow(
         title: "",
-        control: mainKeySelect
+        control: mainKeySelect,
+        validationIdentifier: HotkeySettingsField.mainKey.conflictTestingIdentifier
     )
     private lazy var quitKeyRow = AppKitSettingsCardBaseView.makeControlRow(
         title: "",
-        control: quitKeySelect
+        control: quitKeySelect,
+        validationIdentifier: HotkeySettingsField.quitKey.conflictTestingIdentifier
     )
     private lazy var inAppPrimaryModifierRow = AppKitSettingsCardBaseView.makeControlRow(
         title: "",
-        control: inAppPrimaryModifierSelect
+        control: inAppPrimaryModifierSelect,
+        validationIdentifier: HotkeySettingsField.inAppModifier.conflictTestingIdentifier
     )
     private lazy var inAppMainKeyRow = AppKitSettingsCardBaseView.makeControlRow(
         title: "",
-        control: inAppMainKeySelect
+        control: inAppMainKeySelect,
+        validationIdentifier: HotkeySettingsField.inAppKey.conflictTestingIdentifier
     )
     private var isApplyingState = false
     private var currentState: HotkeySettingsCardState?
@@ -273,6 +280,7 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
 
         mainSummaryLabel.stringValue = state.mainSummaryText
         updateMainTakeoverStatus(with: state)
+        updateConflictStatus(with: state)
 
         inAppRowsContainer.alphaValue = state.accessibilityTrusted ? 1 : 0.55
         inAppPrimaryModifierSelect.isEnabled = state.accessibilityTrusted
@@ -343,11 +351,21 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
                 self?.handleInAppMainKeyChanged(rawValue)
             }
         )
-        mainPrimaryModifierSelect.setFlowTabTestingIdentifier("flowtab.settings.hotkey.main-modifier")
-        mainKeySelect.setFlowTabTestingIdentifier("flowtab.settings.hotkey.main-key")
-        quitKeySelect.setFlowTabTestingIdentifier("flowtab.settings.hotkey.quit-key")
-        inAppPrimaryModifierSelect.setFlowTabTestingIdentifier("flowtab.settings.hotkey.in-app-modifier")
-        inAppMainKeySelect.setFlowTabTestingIdentifier("flowtab.settings.hotkey.in-app-key")
+        mainPrimaryModifierSelect.setFlowTabTestingIdentifier(
+            HotkeySettingsField.mainModifier.controlTestingIdentifier
+        )
+        mainKeySelect.setFlowTabTestingIdentifier(
+            HotkeySettingsField.mainKey.controlTestingIdentifier
+        )
+        quitKeySelect.setFlowTabTestingIdentifier(
+            HotkeySettingsField.quitKey.controlTestingIdentifier
+        )
+        inAppPrimaryModifierSelect.setFlowTabTestingIdentifier(
+            HotkeySettingsField.inAppModifier.controlTestingIdentifier
+        )
+        inAppMainKeySelect.setFlowTabTestingIdentifier(
+            HotkeySettingsField.inAppKey.controlTestingIdentifier
+        )
         mainSummaryLabel.setFlowTabTestingIdentifier("flowtab.settings.hotkey.main-summary")
         inAppSummaryLabel.setFlowTabTestingIdentifier("flowtab.settings.hotkey.in-app-summary")
         mainTakeoverStatusLabel.setFlowTabTestingIdentifier("flowtab.settings.hotkey.main-takeover-status")
@@ -391,6 +409,9 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         onSelectionChanged: @escaping (String) -> Void
     ) {
         selectControl.onSelectionChanged = onSelectionChanged
+        selectControl.onInteraction = { [weak self] in
+            self?.onInteraction?()
+        }
         AppKitSettingsCardBaseView.configure(
             selectControl: selectControl,
             options: options,
@@ -449,6 +470,30 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
             registrationState: state.commandTabTakeoverRegistrationState,
             language: state.language
         )
+    }
+
+    private func updateConflictStatus(with state: HotkeySettingsCardState) {
+        let message = AppStrings.text(.hotkeyConflict, language: state.language)
+        for field in HotkeySettingsField.allCases {
+            row(for: field).updateValidationMessage(
+                state.hotkeyConflict?.field == field ? message : nil
+            )
+        }
+    }
+
+    private func row(for field: HotkeySettingsField) -> AppKitSettingsControlRow {
+        switch field {
+        case .mainModifier:
+            return mainPrimaryModifierRow
+        case .mainKey:
+            return mainKeyRow
+        case .quitKey:
+            return quitKeyRow
+        case .inAppModifier:
+            return inAppPrimaryModifierRow
+        case .inAppKey:
+            return inAppMainKeyRow
+        }
     }
 
     private func updateInAppTakeoverStatus(with state: HotkeySettingsCardState) {
@@ -520,7 +565,12 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         guard availableWidth > 0 else { return false }
 
         var didUpdate = false
-        for label in [mainSummaryLabel, mainTakeoverStatusLabel, inAppSummaryLabel, inAppTakeoverStatusLabel] {
+        for label in [
+            mainSummaryLabel,
+            mainTakeoverStatusLabel,
+            inAppSummaryLabel,
+            inAppTakeoverStatusLabel
+        ] {
             let preferredWidth = floor(availableWidth)
             guard abs(label.preferredMaxLayoutWidth - preferredWidth) > 0.5 else { continue }
             label.preferredMaxLayoutWidth = preferredWidth
@@ -528,5 +578,26 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
             didUpdate = true
         }
         return didUpdate
+    }
+}
+
+private extension HotkeySettingsField {
+    var controlTestingIdentifier: String {
+        switch self {
+        case .mainModifier:
+            return "flowtab.settings.hotkey.main-modifier"
+        case .mainKey:
+            return "flowtab.settings.hotkey.main-key"
+        case .quitKey:
+            return "flowtab.settings.hotkey.quit-key"
+        case .inAppModifier:
+            return "flowtab.settings.hotkey.in-app-modifier"
+        case .inAppKey:
+            return "flowtab.settings.hotkey.in-app-key"
+        }
+    }
+
+    var conflictTestingIdentifier: String {
+        "\(controlTestingIdentifier).conflict-status"
     }
 }

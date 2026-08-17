@@ -102,6 +102,11 @@ final class FlowTabUITests: XCTestCase {
         static let settingsHotkeyInAppModifier = "flowtab.settings.hotkey.in-app-modifier"
         static let settingsHotkeyInAppKey = "flowtab.settings.hotkey.in-app-key"
         static let settingsHotkeyMainTakeoverStatus = "flowtab.settings.hotkey.main-takeover-status"
+        static func settingsHotkeyConflictStatus(
+            for controlIdentifier: String
+        ) -> String {
+            "\(controlIdentifier).conflict-status"
+        }
         static let statusItem = "flowtab.status-item"
         static let statusItemQuit = "flowtab.status-item.quit"
         static let switcherSummary = "flowtab.testing.switcher.summary"
