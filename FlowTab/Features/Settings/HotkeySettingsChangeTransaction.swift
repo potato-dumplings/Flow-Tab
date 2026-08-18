@@ -1,15 +1,19 @@
 enum HotkeySettingsConflict: String, Equatable, Sendable {
+    case mainAndReverseModifier = "main_and_reverse_modifier"
+    case mainFamilyDuplicateKey = "main_family_duplicate_key"
     case mainAndQuit = "main_and_quit"
     case mainAndInApp = "main_and_in_app"
     case quitAndInApp = "quit_and_in_app"
+    case inAppAndReverseModifier = "in_app_and_reverse_modifier"
 }
 
 enum HotkeySettingsField: String, CaseIterable, Equatable, Hashable, Sendable {
-    case mainModifier = "main_modifier"
+    case mainModifiers = "main_modifiers"
+    case mainReverseModifiers = "main_reverse_modifiers"
     case mainKey = "main_key"
     case quitKey = "quit_key"
-    case inAppModifier = "in_app_modifier"
-    case inAppKey = "in_app_key"
+    case inAppShortcut = "in_app_shortcut"
+    case inAppReverseModifiers = "in_app_reverse_modifiers"
 }
 
 struct HotkeySettingsChangeCandidate: Equatable {
@@ -33,30 +37,47 @@ enum HotkeySettingsChangeTransaction {
         commit: (HotkeyRegistrationRequest) -> Void
     ) -> HotkeySettingsChangeResult {
         let mainConfiguration = SwitcherHotkeyPreferencesStore.resolveCandidate(
-            primaryModifierRaw: values.hotkeyPrimaryModifierRaw,
-            mainKeyRaw: values.hotkeyMainKeyRaw,
-            quitKeyRaw: values.hotkeyQuitKeyRaw
+            baseKeysRaw: values.hotkeyPrimaryModifierRaw,
+            reverseKeysRaw: values.hotkeyReverseModifiersRaw,
+            mainKeysRaw: values.hotkeyMainKeyRaw,
+            quitKeysRaw: values.hotkeyQuitKeyRaw
         )
-        let resolvedInAppConfiguration = InAppWindowHotkeyPreferencesStore.resolve(
-            primaryModifierRaw: values.inAppWindowHotkeyPrimaryModifierRaw,
-            mainKeyRaw: values.inAppWindowHotkeyMainKeyRaw
+        let resolvedInAppConfiguration = InAppWindowHotkeyPreferencesStore.resolveCandidate(
+            shortcutKeysRaw: values.inAppWindowHotkeyShortcutKeysRaw,
+            reverseKeysRaw: values.inAppWindowHotkeyReverseKeysRaw
         )
-        let inAppConfiguration = SwitcherHotkeyConfiguration(
-            primaryModifier: resolvedInAppConfiguration.primaryModifier,
-            mainKey: resolvedInAppConfiguration.mainKey,
-            quitKey: .q
-        )
+        let inAppConfiguration = resolvedInAppConfiguration.configuration
 
-        if mainConfiguration.mainKey == mainConfiguration.quitKey {
+        if !mainConfiguration.baseKeys.isDisjoint(
+            with: mainConfiguration.reverseKeys
+        )
+        {
+            return .conflict(.mainAndReverseModifier)
+        }
+        if !mainConfiguration.mainKeys.isDisjoint(
+            with: mainConfiguration.quitKeys
+        )
+        {
             return .conflict(.mainAndQuit)
         }
-        if mainConfiguration.primaryModifier == inAppConfiguration.primaryModifier {
-            if mainConfiguration.mainKey == inAppConfiguration.mainKey {
-                return .conflict(.mainAndInApp)
-            }
-            if mainConfiguration.quitKey == inAppConfiguration.mainKey {
-                return .conflict(.quitAndInApp)
-            }
+        if mainConfiguration.mainFamilyHasDuplicateKeys {
+            return .conflict(.mainFamilyDuplicateKey)
+        }
+        if !inAppConfiguration.baseKeys.isDisjoint(
+            with: inAppConfiguration.reverseKeys
+        )
+        {
+            return .conflict(.inAppAndReverseModifier)
+        }
+
+        let mainSwitchingShortcuts = mainConfiguration.switchingShortcuts
+        let inAppSwitchingShortcuts = inAppConfiguration.switchingShortcuts
+
+        if !mainSwitchingShortcuts.isDisjoint(with: inAppSwitchingShortcuts) {
+            return .conflict(.mainAndInApp)
+        }
+        if inAppSwitchingShortcuts.contains(mainConfiguration.quitShortcut) {
+            return .conflict(.quitAndInApp)
         }
 
         let request = HotkeyRegistrationRequest(

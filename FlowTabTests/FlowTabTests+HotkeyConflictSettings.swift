@@ -80,11 +80,15 @@ extension FlowTabTests {
             return XCTFail("Expected non-conflicting hotkey candidate to be applied")
         }
         XCTAssertEqual(committedRequest, request)
-        XCTAssertEqual(request.mainConfiguration.primaryModifier, .command)
-        XCTAssertEqual(request.mainConfiguration.mainKey, .space)
-        XCTAssertEqual(request.mainConfiguration.quitKey, .z)
-        XCTAssertEqual(request.inAppWindowConfiguration.primaryModifier, .control)
-        XCTAssertEqual(request.inAppWindowConfiguration.mainKey, .b)
+        XCTAssertEqual(request.mainConfiguration.baseKeys, [.command])
+        XCTAssertEqual(request.mainConfiguration.reverseKeys, [.shift])
+        XCTAssertEqual(request.mainConfiguration.mainKeys, [.space])
+        XCTAssertEqual(request.mainConfiguration.quitKeys, [.z])
+        XCTAssertEqual(
+            request.inAppWindowConfiguration.baseKeys,
+            [.control, .b]
+        )
+        XCTAssertEqual(request.inAppWindowConfiguration.reverseKeys, [.shift])
     }
 
     @MainActor
@@ -110,12 +114,15 @@ extension FlowTabTests {
             searchDefaultScopeRaw: state.binding(\.searchDefaultScopeRaw),
             hiddenAppCount: 0,
             hotkeyPrimaryModifierRaw: state.binding(\.hotkeyPrimaryModifierRaw),
+            hotkeyReverseModifiersRaw: state.binding(\.hotkeyReverseModifiersRaw),
             hotkeyMainKeyRaw: state.binding(\.hotkeyMainKeyRaw),
             hotkeyQuitKeyRaw: state.binding(\.hotkeyQuitKeyRaw),
-            inAppWindowHotkeyPrimaryModifierRaw: state.binding(
-                \.inAppWindowHotkeyPrimaryModifierRaw
+            inAppWindowHotkeyShortcutKeysRaw: state.binding(
+                \.inAppWindowHotkeyShortcutKeysRaw
             ),
-            inAppWindowHotkeyMainKeyRaw: state.binding(\.inAppWindowHotkeyMainKeyRaw),
+            inAppWindowHotkeyReverseKeysRaw: state.binding(
+                \.inAppWindowHotkeyReverseKeysRaw
+            ),
             commandTabTakeoverRegistrationState: .inactive,
             hotkeyConflict: nil,
             accessibilityTrusted: true,
@@ -136,41 +143,67 @@ extension FlowTabTests {
         hostedView.frame = NSRect(x: 0, y: 0, width: 1_200, height: 820)
         hostedView.layoutSubtreeIfNeeded()
 
-        let quitSelect: FlowSettingsSelectControl = try XCTUnwrap(
+        let mainModifiersRecorder: FlowSettingsShortcutRecorderControl = try XCTUnwrap(
             hotkeyConflictDescendant(
                 in: hostedView,
-                identifier: "flowtab.settings.hotkey.quit-key"
+                identifier: "flowtab.settings.hotkey.main-modifiers"
             )
         )
-        let quitDropdown: FlowDropdownControl = try XCTUnwrap(
-            hotkeyConflictDescendant(in: quitSelect, as: FlowDropdownControl.self)
+        let conflictingPress = try XCTUnwrap(
+            NSEvent.keyEvent(
+                with: .flagsChanged,
+                location: .zero,
+                modifierFlags: [.option, .shift],
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                characters: "",
+                charactersIgnoringModifiers: "",
+                isARepeat: false,
+                keyCode: SwitcherHotkeyKey.shift.keyCode
+            )
+        )
+        let conflictingRelease = try XCTUnwrap(
+            NSEvent.keyEvent(
+                with: .flagsChanged,
+                location: .zero,
+                modifierFlags: [],
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                characters: "",
+                charactersIgnoringModifiers: "",
+                isARepeat: false,
+                keyCode: SwitcherHotkeyKey.shift.keyCode
+            )
         )
 
-        quitDropdown.selectOptionForTesting(SwitcherHotkeyKey.tab.rawValue)
+        XCTAssertTrue(mainModifiersRecorder.accessibilityPerformPress())
+        mainModifiersRecorder.flagsChanged(with: conflictingPress)
+        mainModifiersRecorder.flagsChanged(with: conflictingRelease)
 
-        XCTAssertEqual(rejectedCandidate?.field, .quitKey)
+        XCTAssertEqual(rejectedCandidate?.field, .mainModifiers)
         XCTAssertEqual(
-            rejectedCandidate?.values.hotkeyQuitKeyRaw,
-            SwitcherHotkeyKey.tab.rawValue
+            rejectedCandidate?.values.hotkeyPrimaryModifierRaw,
+            "option+shift"
         )
-        XCTAssertEqual(state.hotkeyQuitKeyRaw, SwitcherHotkeyKey.z.rawValue)
-        XCTAssertEqual(quitDropdown.selectedIdentifierForTesting, SwitcherHotkeyKey.z.rawValue)
+        XCTAssertEqual(state.hotkeyPrimaryModifierRaw, "option")
+        XCTAssertEqual(mainModifiersRecorder.recordedKeys, [.option])
     }
 
     @MainActor
     func testHotkeySettingsCardShowsCenteredConflictWhileProjectingCurrentSelection() throws {
         var state = HotkeySettingsCardState(
-            hotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
+            hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.option.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.z.rawValue,
-            inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
-            inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.space.rawValue,
+            inAppWindowHotkeyShortcutKeysRaw: "control+space",
             commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: true,
             appLanguageRaw: AppLanguage.simplifiedChinese.rawValue,
             hotkeyConflict: HotkeySettingsConflictPresentation(
-                field: .quitKey,
-                conflict: .mainAndQuit
+                field: .mainModifiers,
+                conflict: .mainAndReverseModifier
             )
         )
         let view = HotkeySettingsCardAppKitView()
@@ -182,56 +215,58 @@ extension FlowTabTests {
         let conflictLabel: NSTextField = try XCTUnwrap(
             hotkeyConflictDescendant(
                 in: view,
-                identifier: "flowtab.settings.hotkey.quit-key.conflict-status"
+                identifier: "flowtab.settings.hotkey.main-modifiers.conflict-status"
             )
         )
-        let mainKeyConflictLabel: NSTextField = try XCTUnwrap(
+        let reverseConflictLabel: NSTextField = try XCTUnwrap(
             hotkeyConflictDescendant(
                 in: view,
-                identifier: "flowtab.settings.hotkey.main-key.conflict-status"
+                identifier: "flowtab.settings.hotkey.main-reverse-modifiers.conflict-status"
             )
         )
-        let quitSelect: FlowSettingsSelectControl = try XCTUnwrap(
+        let mainModifiersRecorder: FlowSettingsShortcutRecorderControl = try XCTUnwrap(
             hotkeyConflictDescendant(
                 in: view,
-                identifier: "flowtab.settings.hotkey.quit-key"
+                identifier: "flowtab.settings.hotkey.main-modifiers"
             )
-        )
-        let quitDropdown: FlowDropdownControl = try XCTUnwrap(
-            hotkeyConflictDescendant(in: quitSelect, as: FlowDropdownControl.self)
         )
 
         XCTAssertFalse(conflictLabel.isHidden)
         XCTAssertEqual(conflictLabel.stringValue, AppStrings.text(.hotkeyConflict))
         XCTAssertEqual(conflictLabel.alignment, .center)
-        XCTAssertTrue(mainKeyConflictLabel.isHidden)
-        XCTAssertEqual(quitSelect.accessibilityHelp(), AppStrings.text(.hotkeyConflict))
-        XCTAssertEqual(quitDropdown.selectedIdentifierForTesting, SwitcherHotkeyKey.z.rawValue)
+        XCTAssertTrue(reverseConflictLabel.isHidden)
+        XCTAssertEqual(
+            mainModifiersRecorder.accessibilityHelp(),
+            AppStrings.text(.hotkeyConflict)
+        )
+        XCTAssertEqual(mainModifiersRecorder.recordedKeys, [.option])
         let conflictFrame = view.convert(conflictLabel.bounds, from: conflictLabel)
-        let quitControlFrame = view.convert(quitSelect.bounds, from: quitSelect)
-        XCTAssertEqual(conflictFrame.midX, quitControlFrame.midX, accuracy: 1)
-        XCTAssertLessThanOrEqual(conflictFrame.maxY, quitControlFrame.minY + 1)
+        let controlFrame = view.convert(
+            mainModifiersRecorder.bounds,
+            from: mainModifiersRecorder
+        )
+        XCTAssertEqual(conflictFrame.midX, controlFrame.midX, accuracy: 1)
+        XCTAssertLessThanOrEqual(conflictFrame.maxY, controlFrame.minY + 1)
 
         state.hotkeyConflict = nil
         view.update(with: state)
         XCTAssertTrue(conflictLabel.isHidden)
-        XCTAssertNil(quitSelect.accessibilityHelp())
+        XCTAssertNil(mainModifiersRecorder.accessibilityHelp())
     }
 
     @MainActor
     func testHotkeyConflictFeedbackUsesMicroTypography() throws {
         let state = HotkeySettingsCardState(
-            hotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
+            hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.option.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.z.rawValue,
-            inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
-            inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.space.rawValue,
+            inAppWindowHotkeyShortcutKeysRaw: "control+space",
             commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: true,
             appLanguageRaw: AppLanguage.simplifiedChinese.rawValue,
             hotkeyConflict: HotkeySettingsConflictPresentation(
-                field: .quitKey,
-                conflict: .mainAndQuit
+                field: .mainModifiers,
+                conflict: .mainAndReverseModifier
             )
         )
         let view = HotkeySettingsCardAppKitView()
@@ -239,7 +274,7 @@ extension FlowTabTests {
         let conflictLabel: NSTextField = try XCTUnwrap(
             hotkeyConflictDescendant(
                 in: view,
-                identifier: "flowtab.settings.hotkey.quit-key.conflict-status"
+                identifier: "flowtab.settings.hotkey.main-modifiers.conflict-status"
             )
         )
         let expectedFont = FlowTypography.appKit(.micro)
@@ -253,18 +288,20 @@ extension FlowTabTests {
     }
 
     private func hotkeyValues(
-        mainModifier: SwitcherPrimaryModifier,
+        mainModifier: SwitcherHotkeyKey,
         mainKey: SwitcherHotkeyKey,
         quitKey: SwitcherHotkeyKey,
-        inAppModifier: SwitcherPrimaryModifier,
+        inAppModifier: SwitcherHotkeyKey,
         inAppKey: SwitcherHotkeyKey
     ) -> AppKitSettingsHotkeyRawValues {
         AppKitSettingsHotkeyRawValues(
             hotkeyPrimaryModifierRaw: mainModifier.rawValue,
+            hotkeyReverseModifiersRaw: "shift",
             hotkeyMainKeyRaw: mainKey.rawValue,
             hotkeyQuitKeyRaw: quitKey.rawValue,
-            inAppWindowHotkeyPrimaryModifierRaw: inAppModifier.rawValue,
-            inAppWindowHotkeyMainKeyRaw: inAppKey.rawValue
+            inAppWindowHotkeyShortcutKeysRaw:
+                SwitcherHotkeyKeySet([inAppModifier, inAppKey]).rawValue,
+            inAppWindowHotkeyReverseKeysRaw: "shift"
         )
     }
 
@@ -316,11 +353,12 @@ private final class HotkeySettingsBridgeBindingState {
     var allowLaunchAtLogin = false
     var searchEnabled = true
     var searchDefaultScopeRaw = SwitcherSearchScope.app.rawValue
-    var hotkeyPrimaryModifierRaw = SwitcherPrimaryModifier.option.rawValue
+    var hotkeyPrimaryModifierRaw = SwitcherHotkeyKey.option.rawValue
+    var hotkeyReverseModifiersRaw = "shift"
     var hotkeyMainKeyRaw = SwitcherHotkeyKey.tab.rawValue
     var hotkeyQuitKeyRaw = SwitcherHotkeyKey.z.rawValue
-    var inAppWindowHotkeyPrimaryModifierRaw = SwitcherPrimaryModifier.control.rawValue
-    var inAppWindowHotkeyMainKeyRaw = SwitcherHotkeyKey.space.rawValue
+    var inAppWindowHotkeyShortcutKeysRaw = "control+space"
+    var inAppWindowHotkeyReverseKeysRaw = "shift"
 
     func binding<Value>(
         _ keyPath: ReferenceWritableKeyPath<HotkeySettingsBridgeBindingState, Value>

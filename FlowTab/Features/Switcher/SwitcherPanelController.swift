@@ -239,10 +239,10 @@ final class SwitcherPanelController {
     var panelVisibilityOverride: Bool?
     var panelOcclusionStateOverride: NSWindow.OcclusionState?
     var appIsActiveOverride: Bool?
-    var globalPrimaryModifierPressedOverride: Bool?
-    var inAppPrimaryModifierPressedOverride: Bool?
-    var globalMainKeyPressedOverride: Bool?
-    var inAppMainKeyPressedOverride: Bool?
+    var globalHotkeyHoldSetPressedOverride: Bool?
+    var inAppHotkeyHoldSetPressedOverride: Bool?
+    var globalMainKeySetPressedOverride: Bool?
+    var inAppMainKeySetPressedOverride: Bool?
     var panelContainsPointOverride: ((NSPoint) -> Bool)?
     var windowLayerPresentationDelayOverride: TimeInterval?
     var hideNonPanelWindowsOverride: (() -> Void)?

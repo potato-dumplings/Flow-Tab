@@ -207,15 +207,29 @@ extension FlowTabTests {
         )
 
         let hotkeyCard = try sectionCard(in: container.pageView, containingText: "快捷键")
-        try assertTextFieldIsVisiblyLaidOut("主修饰键", in: hotkeyCard)
-        try assertControlIsVisiblyLaidOut(
-            identifier: "flowtab.settings.hotkey.main-modifier",
-            in: hotkeyCard
-        )
-        try assertControlIsVisiblyLaidOut(
-            identifier: "flowtab.settings.hotkey.in-app-key",
-            in: hotkeyCard
-        )
+        for label in [
+            "主修饰键",
+            "反向修饰键",
+            "主切换按键",
+            "结束应用按键",
+            "应用内窗口",
+            "应用内反向修饰键"
+        ] {
+            try assertTextFieldIsVisiblyLaidOut(label, in: hotkeyCard)
+        }
+        for identifier in [
+            "flowtab.settings.hotkey.main-modifiers",
+            "flowtab.settings.hotkey.main-reverse-modifiers",
+            "flowtab.settings.hotkey.main-key",
+            "flowtab.settings.hotkey.quit-key",
+            "flowtab.settings.hotkey.in-app-shortcut",
+            "flowtab.settings.hotkey.in-app-reverse-modifiers"
+        ] {
+            try assertControlIsVisiblyLaidOut(
+                identifier: identifier,
+                in: hotkeyCard
+            )
+        }
     }
 
     @MainActor
@@ -395,11 +409,10 @@ extension FlowTabTests {
             searchEnabled: true,
             searchDefaultScopeRaw: SwitcherSearchScope.window.rawValue,
             hiddenAppCount: hiddenAppCount,
-            hotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
+            hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.option.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
-            inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
-            inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
+            inAppWindowHotkeyShortcutKeysRaw: "control+tab",
             commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: accessibilityTrusted,
             screenCaptureTrusted: screenCaptureTrusted,

@@ -317,141 +317,6 @@ extension FlowTabUITests {
         }
     }
 
-    func testSettingsHotkeySelectionsPersistAcrossRelaunch() throws {
-        let firstLaunchApp = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-runtime-log-level",
-                "DEBUG",
-                "--flowtab-ui-enable-verbose-logs",
-                "--flowtab-ui-record-hotkey-reload-diagnostics",
-                "--flowtab-ui-ax-trusted",
-                "YES",
-                "--flowtab-ui-screen-trusted",
-                "YES"
-            ]
-        )
-        launchFlowTabUITestApplication(firstLaunchApp)
-        openSettingsTab(in: firstLaunchApp)
-
-        let expectedSelections: [(control: String, option: String)] = [
-            (Identifier.settingsHotkeyMainModifier, "option"),
-            (Identifier.settingsHotkeyMainKey, "space"),
-            (Identifier.settingsHotkeyQuitKey, "z"),
-            (Identifier.settingsHotkeyInAppModifier, "command"),
-            (Identifier.settingsHotkeyInAppKey, "a")
-        ]
-        let baselineSelections: [(control: String, option: String)] = [
-            (Identifier.settingsHotkeyMainModifier, "control"),
-            (Identifier.settingsHotkeyMainKey, "x"),
-            (Identifier.settingsHotkeyQuitKey, "y"),
-            (Identifier.settingsHotkeyInAppModifier, "option"),
-            (Identifier.settingsHotkeyInAppKey, "b")
-        ]
-        for selection in baselineSelections {
-            selectOption(in: firstLaunchApp, controlIdentifier: selection.control, optionIdentifier: selection.option)
-        }
-        let hotkeyReloadLogSnapshot = makeRuntimeLogFileSnapshot()
-        for selection in expectedSelections {
-            selectOption(in: firstLaunchApp, controlIdentifier: selection.control, optionIdentifier: selection.option)
-            assertValue(of: element(in: firstLaunchApp, identifier: selection.control), equals: selection.option)
-        }
-
-        waitForRuntimeLogFiles(
-            containing: [
-                "updated main=Option + Space",
-                "quit=Option + Z",
-                "inApp=Command + A",
-                "hotkeyReloadNotification sender=AppDelegate main=Option + Space inApp=Command + A"
-            ],
-            since: hotkeyReloadLogSnapshot
-        )
-        let hotkeyTriggerLogSnapshot = makeRuntimeLogFileSnapshot()
-        firstLaunchApp.activate()
-        firstLaunchApp.typeKey(.space, modifierFlags: .option)
-        waitForRuntimeLogFiles(
-            containing: [
-                "presentationRecovery trigger=global_show action=trackInitialVisibility"
-            ],
-            since: hotkeyTriggerLogSnapshot
-        )
-        waitForRuntimeLogFiles(
-            matching: #"releaseConfirm (start|alreadyRunning) trigger=flags_changed"#,
-            since: hotkeyTriggerLogSnapshot,
-            description: "flags-changed release delivery reaches the confirmation state machine"
-        )
-        waitForRuntimeLogFiles(
-            matching: #"releaseConfirm confirmed trigger=(flags_changed|presentation_recovered) action=finishSelection"#,
-            since: hotkeyTriggerLogSnapshot,
-            description: "the first valid release confirmation commits the selection"
-        )
-
-        firstLaunchApp.terminate()
-
-        let relaunchApp = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-ax-trusted",
-                "YES",
-                "--flowtab-ui-screen-trusted",
-                "YES"
-            ]
-        )
-        launchFlowTabUITestApplication(relaunchApp)
-        openSettingsTab(in: relaunchApp)
-
-        for selection in expectedSelections {
-            assertValue(of: element(in: relaunchApp, identifier: selection.control), equals: selection.option)
-        }
-    }
-
-    func testSettingsHotkeyKeyDropdownOpensAsRightSideMenuWhenSpaceAllows() throws {
-        let app = makeApp(
-            additionalArguments:
-                hotkeyEffectArguments(resetDefaults: true)
-        )
-        launchFlowTabUITestApplication(app)
-
-        let controlIdentifier = Identifier.settingsHotkeyMainKey
-        guard
-            let control = waitForSettingsControl(
-                in: app,
-                identifier: controlIdentifier,
-                trigger: { openSettingsTab(in: app) }
-            )
-        else {
-            return
-        }
-        let controlFrame = control.frame
-        let visibleMaxX =
-            NSScreen.main?.visibleFrame.maxX ?? controlFrame.maxX
-        guard visibleMaxX - controlFrame.maxX >= 190 else {
-            throw XCTSkip(
-                "Current screen does not leave enough right-side room "
-                    + "for the side-menu UI assertion."
-            )
-        }
-
-        guard
-            let option = waitForSettingsDropdownOption(
-                in: app,
-                controlIdentifier: controlIdentifier,
-                optionIdentifier: "space",
-                trigger: { tapElement(control) }
-            )
-        else {
-            return
-        }
-        XCTAssertGreaterThanOrEqual(
-            option.frame.minX,
-            controlFrame.maxX - 1
-        )
-
-        tapElement(option)
-        assertValue(of: control, equals: "space")
-    }
-
     func testSettingsLanguageDropdownUsesLiveIntrinsicWidth() throws {
         let app = makeApp(additionalArguments: hotkeyEffectArguments(resetDefaults: true))
         launchFlowTabUITestApplication(app)
@@ -464,28 +329,29 @@ extension FlowTabUITests {
     }
 
     func testSettingsMainHotkeyRepresentativeMatrixTriggersSwitcher() throws {
-        let cases: [(modifier: String, key: String, shortcutText: String)] = [
-            ("option", "space", "Option + Space"),
-            ("control", "grave", "Control + `"),
-            ("command", "b", "Command + B")
+        let cases: [(
+            modifierFlags: XCUIElement.KeyModifierFlags,
+            modifier: String,
+            modifierText: String,
+            key: String,
+            shortcutText: String
+        )] = [
+            (.option, "option", "Option", "space", "Option + Space"),
+            (.control, "control", "Control", "c", "Control + C"),
+            (.command, "command", "Command", "b", "Command + B")
         ]
 
         for item in cases {
-            configureHotkeysThroughSettings(
-                rawSelections: [
-                    (Identifier.settingsHotkeyMainModifier, item.modifier),
-                    (Identifier.settingsHotkeyMainKey, item.key),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
-                    (Identifier.settingsHotkeyInAppKey, "c")
-                ],
-                expectedValues: [
-                    (Identifier.settingsHotkeyMainModifier, item.modifier),
-                    (Identifier.settingsHotkeyMainKey, item.key),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
-                    (Identifier.settingsHotkeyInAppKey, "c")
-                ],
+            configureShortcutsThroughSettings(
+                recordings: hotkeyRecordings(
+                    mainModifiers: item.modifierFlags,
+                    mainModifiersText: item.modifierText,
+                    mainKey: item.key,
+                    quitKey: "z",
+                    inAppModifiers: .option,
+                    inAppShortcutText: "Option + C",
+                    inAppKey: "c"
+                ),
                 expectedLogMarkers: [
                     "updated main=\(item.shortcutText)",
                     "hotkeyReloadNotification sender=AppDelegate main=\(item.shortcutText)"
@@ -533,53 +399,41 @@ extension FlowTabUITests {
 
     func testSettingsQuitHotkeyExplicitMatrixTerminatesSelectedApp() throws {
         let cases: [(
-            rawSelections: [(control: String, option: String)],
-            expectedValues: [(control: String, value: String)],
+            recordings: [FlowTabUITestShortcutRecording],
             triggerKey: String,
             expectedQuitShortcut: String
         )] = [
             (
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "space"),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "space"),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
+                hotkeyRecordings(
+                    mainModifiers: .option,
+                    mainModifiersText: "Option",
+                    mainKey: "space",
+                    quitKey: "z",
+                    inAppModifiers: .option,
+                    inAppShortcutText: "Option + B",
+                    inAppKey: "b"
+                ),
                 "z",
                 "Option + Z"
             ),
             (
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyQuitKey, "w"),
-                    (Identifier.settingsHotkeyMainKey, "q"),
-                    (Identifier.settingsHotkeyInAppModifier, "control"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "q"),
-                    (Identifier.settingsHotkeyQuitKey, "w"),
-                    (Identifier.settingsHotkeyInAppModifier, "control"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
+                hotkeyRecordings(
+                    mainModifiers: .option,
+                    mainModifiersText: "Option",
+                    mainKey: "q",
+                    quitKey: "w",
+                    inAppModifiers: .control,
+                    inAppShortcutText: "Control + B",
+                    inAppKey: "b"
+                ),
                 "w",
                 "Option + W"
             )
         ]
 
         for item in cases {
-            configureHotkeysThroughSettings(
-                rawSelections: item.rawSelections,
-                expectedValues: item.expectedValues,
+            configureShortcutsThroughSettings(
+                recordings: item.recordings,
                 expectedLogMarkers: [
                     "quit=\(item.expectedQuitShortcut)",
                     "hotkeyReloadNotification sender=AppDelegate"
@@ -667,7 +521,10 @@ extension FlowTabUITests {
         }
     }
 
-    func hotkeyEffectArguments(resetDefaults: Bool = false) -> [String] {
+    func hotkeyEffectArguments(
+        resetDefaults: Bool = false,
+        usesSystemAccessibilityPermission: Bool = false
+    ) -> [String] {
         var arguments: [String] = []
         if resetDefaults {
             arguments.append("--flowtab-ui-reset-defaults")
@@ -680,11 +537,15 @@ extension FlowTabUITests {
             "--flowtab-ui-record-hotkey-reload-diagnostics",
             "--flowtab-ui-enable-mock-hotkey-effects",
             "--flowtab-ui-mock-window-previews",
-            "--flowtab-ui-ax-trusted",
-            "YES",
             "--flowtab-ui-screen-trusted",
             "YES"
         ]
+        if !usesSystemAccessibilityPermission {
+            arguments += [
+                "--flowtab-ui-ax-trusted",
+                "YES"
+            ]
+        }
         return arguments
     }
 
@@ -712,26 +573,6 @@ extension FlowTabUITests {
             arguments.append("--flowtab-ui-open-switcher")
         }
         return arguments
-    }
-
-    func configureHotkeysThroughSettings(
-        rawSelections: [(control: String, option: String)],
-        expectedValues: [(control: String, value: String)],
-        expectedLogMarkers: [String]
-    ) {
-        let app = makeApp(additionalArguments: hotkeyEffectArguments(resetDefaults: true))
-        launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
-
-        let logSnapshot = makeRuntimeLogFileSnapshot()
-        for selection in rawSelections {
-            selectOption(in: app, controlIdentifier: selection.control, optionIdentifier: selection.option)
-        }
-        for expectedValue in expectedValues {
-            assertValue(of: element(in: app, identifier: expectedValue.control), equals: expectedValue.value)
-        }
-        waitForRuntimeLogFiles(containing: expectedLogMarkers, since: logSnapshot)
-        app.terminate()
     }
 
     func typeHotkey(in app: XCUIApplication, key: String, modifier: String) {
@@ -779,8 +620,8 @@ extension FlowTabUITests {
         ) else {
             return
         }
-        XCTAssertFalse(controls.modifier.isEnabled)
-        XCTAssertFalse(controls.key.isEnabled)
+        XCTAssertFalse(controls.shortcut.isEnabled)
+        XCTAssertFalse(controls.reverseModifiers.isEnabled)
     }
 
     private func assertSettingsPageSubtitleIsVisible(

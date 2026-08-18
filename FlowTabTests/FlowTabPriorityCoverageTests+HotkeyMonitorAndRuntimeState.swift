@@ -40,9 +40,9 @@ extension FlowTabPriorityCoverageTests {
     func testOptionTabHotkeyMonitorRoutesForwardAndBackwardPressReleaseCallbacks() {
         let monitor = OptionTabHotkeyMonitor(
             configuration: SwitcherHotkeyPreferencesStore.resolve(
-                primaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
-                mainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
-                quitKeyRaw: SwitcherHotkeyKey.q.rawValue
+                baseKeysRaw: SwitcherHotkeyKey.option.rawValue,
+                mainKeysRaw: SwitcherHotkeyKey.tab.rawValue,
+                quitKeysRaw: SwitcherHotkeyKey.q.rawValue
             ),
             signature: 0x54455354,
             forwardHotkeyID: 11,
@@ -713,6 +713,12 @@ extension FlowTabPriorityCoverageTests {
     func testOptionTabHotkeyMonitorSkipsHotkeyRegistrationWhenHandlerInstallFails() {
         var registerCalls: [UInt32] = []
         let monitor = OptionTabHotkeyMonitor(
+            configuration: SwitcherHotkeyConfiguration(
+                baseKeys: [.option],
+                reverseKeys: [.shift],
+                mainKeys: [.tab],
+                quitKeys: [.q]
+            ),
             signature: 0x54455354,
             forwardHotkeyID: 11,
             backwardHotkeyID: 22,
@@ -734,6 +740,12 @@ extension FlowTabPriorityCoverageTests {
         var removeHandlerCallCount = 0
         var installHandlerCallCount = 0
         let monitor = OptionTabHotkeyMonitor(
+            configuration: SwitcherHotkeyConfiguration(
+                baseKeys: [.option],
+                reverseKeys: [.shift],
+                mainKeys: [.tab],
+                quitKeys: [.q]
+            ),
             signature: 0x54455354,
             forwardHotkeyID: 11,
             backwardHotkeyID: 22,
@@ -785,6 +797,12 @@ extension FlowTabPriorityCoverageTests {
 
         var registerCalls: [UInt32] = []
         let monitor = OptionTabHotkeyMonitor(
+            configuration: SwitcherHotkeyConfiguration(
+                baseKeys: [.option],
+                reverseKeys: [.shift],
+                mainKeys: [.tab],
+                quitKeys: [.q]
+            ),
             signature: 0x54455354,
             forwardHotkeyID: 11,
             backwardHotkeyID: 22,

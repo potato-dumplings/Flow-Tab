@@ -244,42 +244,26 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testHotkeyKeySelectsPreferRightPlacementAndOtherSelectsDefaultBelow() throws {
+    func testHotkeyControlsUseRecordersAndOtherSelectsKeepDefaultPlacement() throws {
         let view = HotkeySettingsCardAppKitView()
         view.frame = NSRect(x: 0, y: 0, width: 860, height: 520)
         view.layoutSubtreeIfNeeded()
 
-        let mainModifier = try XCTUnwrap(descendant(
-            in: view,
-            identifier: "flowtab.settings.hotkey.main-modifier",
-            as: FlowSettingsSelectControl.self
-        ))
-        let mainKey = try XCTUnwrap(descendant(
-            in: view,
-            identifier: "flowtab.settings.hotkey.main-key",
-            as: FlowSettingsSelectControl.self
-        ))
-        let quitKey = try XCTUnwrap(descendant(
-            in: view,
-            identifier: "flowtab.settings.hotkey.quit-key",
-            as: FlowSettingsSelectControl.self
-        ))
-        let inAppModifier = try XCTUnwrap(descendant(
-            in: view,
-            identifier: "flowtab.settings.hotkey.in-app-modifier",
-            as: FlowSettingsSelectControl.self
-        ))
-        let inAppKey = try XCTUnwrap(descendant(
-            in: view,
-            identifier: "flowtab.settings.hotkey.in-app-key",
-            as: FlowSettingsSelectControl.self
-        ))
-
-        XCTAssertEqual(mainModifier.placementPreferenceForTesting, .defaultBelow)
-        XCTAssertEqual(mainKey.placementPreferenceForTesting, .preferRight)
-        XCTAssertEqual(quitKey.placementPreferenceForTesting, .preferRight)
-        XCTAssertEqual(inAppModifier.placementPreferenceForTesting, .defaultBelow)
-        XCTAssertEqual(inAppKey.placementPreferenceForTesting, .preferRight)
+        for identifier in [
+            "flowtab.settings.hotkey.main-modifiers",
+            "flowtab.settings.hotkey.main-reverse-modifiers",
+            "flowtab.settings.hotkey.main-key",
+            "flowtab.settings.hotkey.quit-key",
+            "flowtab.settings.hotkey.in-app-shortcut",
+            "flowtab.settings.hotkey.in-app-reverse-modifiers"
+        ] {
+            let recorder = try XCTUnwrap(descendant(
+                in: view,
+                identifier: identifier,
+                as: FlowSettingsShortcutRecorderControl.self
+            ))
+            XCTAssertFalse(recorder.subviews.contains { $0 is FlowDropdownControl })
+        }
 
         let defaultSelect = FlowSettingsSelectControl(frame: .zero)
         defaultSelect.configure(options: [(id: "tab", title: "Tab")])

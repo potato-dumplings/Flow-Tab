@@ -757,77 +757,71 @@ extension FlowTabTests {
 
     func testInAppWindowHotkeyResolveAndLoadNormalizeInvalidValues() {
         let resolved = InAppWindowHotkeyPreferencesStore.resolve(
-            primaryModifierRaw: "invalid",
-            mainKeyRaw: "invalid"
+            shortcutKeysRaw: "invalid"
         )
-        XCTAssertEqual(resolved.primaryModifier, .control)
-        XCTAssertEqual(resolved.mainKey, .tab)
+        XCTAssertEqual(resolved.shortcutKeys, [.control, .tab])
 
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
         defer { clearIsolatedUserDefaults(userDefaults) }
-        userDefaults.set("invalid", forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier)
-        userDefaults.set("invalid", forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey)
+        userDefaults.set(
+            "invalid",
+            forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+        )
 
         let configuration = InAppWindowHotkeyPreferencesStore.load(userDefaults: userDefaults)
-        XCTAssertEqual(configuration.primaryModifier, .control)
-        XCTAssertEqual(configuration.mainKey, .tab)
-        XCTAssertEqual(configuration.quitKey, .q)
+        XCTAssertEqual(configuration.baseKeys, [.control, .tab])
+        XCTAssertEqual(configuration.quitKeys, [.q])
         XCTAssertEqual(
-            userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier),
-            InAppWindowHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
-        )
-        XCTAssertEqual(
-            userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey),
-            InAppWindowHotkeyPreferencesStore.defaultMainKey.rawValue
+            userDefaults.string(
+                forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+            ),
+            InAppWindowHotkeyPreferencesStore.defaultShortcutKeys.rawValue
         )
     }
 
     func testInAppWindowHotkeyResolveAvoidingMainConflictFallsBackToNonConflictingModifier() {
         let mainConfiguration = SwitcherHotkeyConfiguration(
-            primaryModifier: .control,
-            mainKey: .tab,
-            quitKey: .q
+            baseKeys: [.control],
+            reverseKeys: [.shift],
+            mainKeys: [.tab],
+            quitKeys: [.q]
         )
 
         let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
-            primaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
-            mainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
+            shortcutKeysRaw: "control+tab",
             switcherConfiguration: mainConfiguration
         )
-        XCTAssertEqual(resolved.primaryModifier, .option)
-        XCTAssertEqual(resolved.mainKey, .tab)
+        XCTAssertEqual(resolved.shortcutKeys, [.option, .tab])
     }
 
     func testInAppWindowHotkeyResolveAvoidingMainConflictKeepsNonConflictingShortcut() {
         let mainConfiguration = SwitcherHotkeyConfiguration(
-            primaryModifier: .option,
-            mainKey: .tab,
-            quitKey: .q
+            baseKeys: [.option],
+            reverseKeys: [.shift],
+            mainKeys: [.tab],
+            quitKeys: [.q]
         )
 
         let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
-            primaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
-            mainKeyRaw: SwitcherHotkeyKey.space.rawValue,
+            shortcutKeysRaw: "option+space",
             switcherConfiguration: mainConfiguration
         )
-        XCTAssertEqual(resolved.primaryModifier, .option)
-        XCTAssertEqual(resolved.mainKey, .space)
+        XCTAssertEqual(resolved.shortcutKeys, [.option, .space])
     }
 
     func testInAppWindowHotkeyResolveAvoidingQuitConflictFallsBackToNonConflictingModifier() {
         let mainConfiguration = SwitcherHotkeyConfiguration(
-            primaryModifier: .option,
-            mainKey: .tab,
-            quitKey: .q
+            baseKeys: [.option],
+            reverseKeys: [.shift],
+            mainKeys: [.tab],
+            quitKeys: [.q]
         )
 
         let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
-            primaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
-            mainKeyRaw: SwitcherHotkeyKey.q.rawValue,
+            shortcutKeysRaw: "option+q",
             switcherConfiguration: mainConfiguration
         )
-        XCTAssertEqual(resolved.primaryModifier, .control)
-        XCTAssertEqual(resolved.mainKey, .q)
+        XCTAssertEqual(resolved.shortcutKeys, [.control, .q])
     }
 
     func testSwitcherBehaviorAndVisibilityPreferenceDefaults() {
@@ -1194,11 +1188,10 @@ extension FlowTabTests {
         commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
     ) -> HotkeySettingsCardState {
         HotkeySettingsCardState(
-            hotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.command.rawValue,
+            hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.command.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
-            inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
-            inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
+            inAppWindowHotkeyShortcutKeysRaw: "option+tab",
             commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
             accessibilityTrusted: true,
             appLanguageRaw: AppLanguage.simplifiedChinese.rawValue
@@ -1221,11 +1214,10 @@ extension FlowTabTests {
             searchEnabled: true,
             searchDefaultScopeRaw: SwitcherSearchScope.app.rawValue,
             hiddenAppCount: 2,
-            hotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
+            hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.option.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
-            inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
-            inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
+            inAppWindowHotkeyShortcutKeysRaw: "control+tab",
             commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: false,
             screenCaptureTrusted: false,

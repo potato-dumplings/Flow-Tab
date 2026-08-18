@@ -1,6 +1,7 @@
 import AppKit
 import Carbon
 import CoreGraphics
+import FlowTabCore
 
 extension SwitcherPanelController {
     func beginHotkeyReplaySuppressionUntilRelease(
@@ -37,10 +38,10 @@ extension SwitcherPanelController {
             readback: { [weak self] _, _ in
                 guard let self else { return nil }
                 return sessionKinds.contains { sessionKind in
-                    self.isPrimaryModifierPressedInHardwareState(
+                    self.isHotkeyHoldSetPressedInHardwareState(
                         for: sessionKind
                     )
-                        || self.isSessionMainKeyPressedInHardwareState(
+                        || self.isSessionMainKeySetPressedInHardwareState(
                             for: sessionKind
                         )
                 }
@@ -139,7 +140,7 @@ extension SwitcherPanelController {
                     )
                     return nil
                 }
-                return self.isPrimaryModifierLikelyPressed()
+                return self.isHotkeyHoldSetLikelyPressed()
             },
             onStarted: { [weak self] generation in
                 self?.modifierReleaseState = .releaseObserved(
@@ -204,80 +205,65 @@ extension SwitcherPanelController {
         modifierReleaseObservationOwner.isGenerationCurrent(generation)
     }
 
-    func isPrimaryModifierFlagsEvent(_ event: NSEvent) -> Bool {
-        modifierKeyCodes(for: activePrimaryModifier()).contains(event.keyCode)
+    func isHotkeyHoldModifierFlagsEvent(_ event: NSEvent) -> Bool {
+        let key = SwitcherHotkeyKey(keyCode: event.keyCode)
+        return key.modifier != nil
+            && activeHotkeyHoldKeys().contains(key)
     }
 
-    func isPrimaryModifierPressedInHardwareState() -> Bool {
-        isPrimaryModifierPressedInHardwareState(
+    func isHotkeyHoldSetPressedInHardwareState() -> Bool {
+        isHotkeyHoldSetPressedInHardwareState(
             for: activeHotkeySessionKind ?? .globalAppSwitcher
         )
     }
 
-    func isPrimaryModifierPressedInHardwareState(
+    func isHotkeyHoldSetPressedInHardwareState(
         for sessionKind: HotkeySessionKind
     ) -> Bool {
         switch sessionKind {
         case .globalAppSwitcher:
-            if let globalPrimaryModifierPressedOverride {
-                return globalPrimaryModifierPressedOverride
+            if let globalHotkeyHoldSetPressedOverride {
+                return globalHotkeyHoldSetPressedOverride
             }
         case .inAppWindowSwitcher:
-            if let inAppPrimaryModifierPressedOverride {
-                return inAppPrimaryModifierPressedOverride
+            if let inAppHotkeyHoldSetPressedOverride {
+                return inAppHotkeyHoldSetPressedOverride
             }
         }
 
-        return modifierKeyCodes(
-            for: primaryModifier(for: sessionKind)
-        ).contains { keyCode in
-            CGEventSource.keyState(
-                .combinedSessionState,
-                key: CGKeyCode(keyCode)
-            )
-        }
-    }
-
-    func isSessionMainKeyPressedInHardwareState(
-        for sessionKind: HotkeySessionKind
-    ) -> Bool {
-        switch sessionKind {
-        case .globalAppSwitcher:
-            if let globalMainKeyPressedOverride {
-                return globalMainKeyPressedOverride
-            }
-        case .inAppWindowSwitcher:
-            if let inAppMainKeyPressedOverride {
-                return inAppMainKeyPressedOverride
-            }
-        }
-
-        let keyCode: CGKeyCode
-        switch sessionKind {
-        case .globalAppSwitcher:
-            keyCode = CGKeyCode(
-                SwitcherHotkeyPreferencesStore.load().mainKey.keyCode
-            )
-        case .inAppWindowSwitcher:
-            keyCode = CGKeyCode(
-                InAppWindowHotkeyPreferencesStore.load().mainKey.keyCode
-            )
-        }
-        return CGEventSource.keyState(
-            .combinedSessionState,
-            key: keyCode
+        return isHotkeyKeySetPressedInHardwareState(
+            hotkeyHoldKeys(for: sessionKind)
         )
     }
 
-    func isPrimaryModifierLikelyPressed(event: NSEvent? = nil) -> Bool {
-        if isPrimaryModifierPressedInHardwareState() {
+    func isSessionMainKeySetPressedInHardwareState(
+        for sessionKind: HotkeySessionKind
+    ) -> Bool {
+        switch sessionKind {
+        case .globalAppSwitcher:
+            if let globalMainKeySetPressedOverride {
+                return globalMainKeySetPressedOverride
+            }
+        case .inAppWindowSwitcher:
+            if let inAppMainKeySetPressedOverride {
+                return inAppMainKeySetPressedOverride
+            }
+        }
+
+        return isHotkeyKeySetPressedInHardwareState(
+            hotkeyConfiguration(for: sessionKind).mainKeys
+        )
+    }
+
+    func isHotkeyHoldSetLikelyPressed(event: NSEvent? = nil) -> Bool {
+        if isHotkeyHoldSetPressedInHardwareState() {
             return true
         }
         guard let event else { return false }
-        let eventFlags = event.modifierFlags.intersection(
-            .deviceIndependentFlagsMask
+        return isHotkeyKeySetPressedInHardwareState(
+            activeHotkeyHoldKeys(),
+            eventModifierFlags: event.modifierFlags
         )
-        return eventFlags.contains(activePrimaryModifierFlag())
     }
 
     private var modifierReleaseConfirmationSampleInterval: TimeInterval {
@@ -336,32 +322,60 @@ extension SwitcherPanelController {
         for sessionKinds: [HotkeySessionKind]
     ) -> Set<UInt16> {
         sessionKinds.reduce(into: Set<UInt16>()) { keyCodes, sessionKind in
+            let configuration = hotkeyConfiguration(for: sessionKind)
             keyCodes.formUnion(
-                modifierKeyCodes(for: primaryModifier(for: sessionKind))
+                configuration.mainShortcut.keys.physicalKeyCodes
             )
-            switch sessionKind {
-            case .globalAppSwitcher:
-                keyCodes.insert(
-                    SwitcherHotkeyPreferencesStore.load().mainKey.keyCode
-                )
-            case .inAppWindowSwitcher:
-                keyCodes.insert(
-                    InAppWindowHotkeyPreferencesStore.load().mainKey.keyCode
-                )
-            }
+            keyCodes.formUnion(
+                configuration.backwardShortcut.keys.physicalKeyCodes
+            )
         }
     }
 
-    private func modifierKeyCodes(
-        for modifier: SwitcherPrimaryModifier
-    ) -> Set<UInt16> {
-        switch modifier {
-        case .option:
-            return [UInt16(kVK_Option), UInt16(kVK_RightOption)]
-        case .control:
-            return [UInt16(kVK_Control), UInt16(kVK_RightControl)]
-        case .command:
-            return [UInt16(kVK_Command), UInt16(kVK_RightCommand)]
+    func isHotkeyKeySetPressedInHardwareState(
+        _ keys: SwitcherHotkeyKeySet,
+        eventModifierFlags: NSEvent.ModifierFlags? = nil
+    ) -> Bool {
+        guard !keys.isEmpty else { return false }
+        return keys.orderedKeys.allSatisfy { key in
+            isHotkeyKeyPressedInHardwareState(
+                key,
+                eventModifierFlags: eventModifierFlags
+            )
         }
     }
+
+    func isAnyHotkeyKeyPressedInHardwareState(
+        _ keys: SwitcherHotkeyKeySet,
+        eventModifierFlags: NSEvent.ModifierFlags? = nil
+    ) -> Bool {
+        keys.orderedKeys.contains { key in
+            isHotkeyKeyPressedInHardwareState(
+                key,
+                eventModifierFlags: eventModifierFlags
+            )
+        }
+    }
+
+    private func isHotkeyKeyPressedInHardwareState(
+        _ key: SwitcherHotkeyKey,
+        eventModifierFlags: NSEvent.ModifierFlags?
+    ) -> Bool {
+        if let modifier = key.modifier,
+           let eventModifierFlags {
+            let observed = KeyModifier(
+                eventModifierFlags: eventModifierFlags.intersection(
+                    .deviceIndependentFlagsMask
+                )
+            )
+            return observed.contains(modifier)
+        }
+        return key.physicalKeyCodes.contains { keyCode in
+            CGEventSource.keyState(
+                .combinedSessionState,
+                key: CGKeyCode(keyCode)
+            )
+        }
+    }
+
 }

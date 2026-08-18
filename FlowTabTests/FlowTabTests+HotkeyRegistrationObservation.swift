@@ -303,21 +303,24 @@ extension FlowTabTests {
     }
 
     private func makeHotkeyRegistrationRequest(
-        mainModifier: SwitcherPrimaryModifier,
+        mainModifier: SwitcherHotkeyKey,
         mainKey: SwitcherHotkeyKey,
-        inAppModifier: SwitcherPrimaryModifier = .option,
+        inAppModifier: SwitcherHotkeyKey = .option,
         inAppKey: SwitcherHotkeyKey = .grave
     ) -> HotkeyRegistrationRequest {
         HotkeyRegistrationRequest(
             mainConfiguration: SwitcherHotkeyConfiguration(
-                primaryModifier: mainModifier,
-                mainKey: mainKey,
-                quitKey: .q
+                baseKeys: SwitcherHotkeyKeySet([mainModifier]),
+                reverseKeys: [.shift],
+                mainKeys: SwitcherHotkeyKeySet([mainKey]),
+                quitKeys: [.q]
             ),
-            inAppWindowConfiguration: SwitcherHotkeyConfiguration(
-                primaryModifier: inAppModifier,
-                mainKey: inAppKey,
-                quitKey: .q
+            inAppWindowConfiguration: .inApp(
+                shortcutKeys: SwitcherHotkeyKeySet([
+                    inAppModifier,
+                    inAppKey
+                ]),
+                reverseKeys: [.shift]
             )
         )
     }

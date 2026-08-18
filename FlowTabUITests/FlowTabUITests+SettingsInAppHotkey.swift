@@ -9,23 +9,19 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         openSettingsTab(in: app)
 
-        selectOption(
+        recordShortcut(
+            in: app,
+            FlowTabUITestShortcutRecording.key(
+                controlIdentifier: Identifier.settingsHotkeyQuitKey,
+                key: "z",
+                expectedValue: "Z"
+            )
+        )
+        enterShortcut(
             in: app,
             controlIdentifier: Identifier.settingsHotkeyQuitKey,
-            optionIdentifier: "z"
-        )
-        assertValue(
-            of: element(
-                in: app,
-                identifier: Identifier.settingsHotkeyQuitKey
-            ),
-            equals: "z"
-        )
-
-        selectOption(
-            in: app,
-            controlIdentifier: Identifier.settingsHotkeyQuitKey,
-            optionIdentifier: "tab"
+            key: "tab",
+            modifierFlags: []
         )
 
         assertValue(
@@ -33,44 +29,43 @@ extension FlowTabUITests {
                 in: app,
                 identifier: Identifier.settingsHotkeyQuitKey
             ),
-            equals: "z"
+            equals: "Z"
         )
         assertHotkeyConflictVisible(
             in: app,
             controlIdentifier: Identifier.settingsHotkeyQuitKey
         )
 
-        selectOption(
+        recordShortcut(
+            in: app,
+            FlowTabUITestShortcutRecording.key(
+                controlIdentifier: Identifier.settingsHotkeyMainKey,
+                key: "space",
+                expectedValue: "Space"
+            )
+        )
+        recordShortcut(
+            in: app,
+            FlowTabUITestShortcutRecording(
+                controlIdentifier: Identifier.settingsHotkeyInAppShortcut,
+                key: "b",
+                modifierFlags: .option,
+                expectedValue: "Option + B"
+            )
+        )
+        enterShortcut(
             in: app,
             controlIdentifier: Identifier.settingsHotkeyMainKey,
-            optionIdentifier: "space"
+            key: "b",
+            modifierFlags: []
         )
+
         assertValue(
             of: element(
                 in: app,
                 identifier: Identifier.settingsHotkeyMainKey
             ),
-            equals: "space"
-        )
-        selectOption(
-            in: app,
-            controlIdentifier: Identifier.settingsHotkeyInAppKey,
-            optionIdentifier: "b"
-        )
-        selectOption(
-            in: app,
-            controlIdentifier: Identifier.settingsHotkeyInAppModifier,
-            optionIdentifier: "option"
-        )
-        selectOption(
-            in: app,
-            controlIdentifier: Identifier.settingsHotkeyMainKey,
-            optionIdentifier: "b"
-        )
-
-        assertValue(
-            of: element(in: app, identifier: Identifier.settingsHotkeyMainKey),
-            equals: "space"
+            equals: "Space"
         )
         assertHotkeyConflictVisible(
             in: app,
@@ -86,46 +81,32 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         openSettingsTab(in: app)
 
-        selectOption(
+        recordShortcut(
             in: app,
-            controlIdentifier: Identifier.settingsHotkeyInAppKey,
-            optionIdentifier: "q"
+            FlowTabUITestShortcutRecording(
+                controlIdentifier: Identifier.settingsHotkeyInAppShortcut,
+                key: "q",
+                modifierFlags: .command,
+                expectedValue: "Command + Q"
+            )
         )
-        selectOption(
+        enterShortcut(
             in: app,
-            controlIdentifier: Identifier.settingsHotkeyInAppModifier,
-            optionIdentifier: "command"
-        )
-        assertValue(
-            of: element(
-                in: app,
-                identifier: Identifier.settingsHotkeyInAppModifier
-            ),
-            equals: "command"
-        )
-        selectOption(
-            in: app,
-            controlIdentifier: Identifier.settingsHotkeyInAppModifier,
-            optionIdentifier: "option"
+            controlIdentifier: Identifier.settingsHotkeyInAppShortcut,
+            key: "q",
+            modifierFlags: .option
         )
 
         assertValue(
             of: element(
                 in: app,
-                identifier: Identifier.settingsHotkeyInAppModifier
+                identifier: Identifier.settingsHotkeyInAppShortcut
             ),
-            equals: "command"
-        )
-        assertValue(
-            of: element(
-                in: app,
-                identifier: Identifier.settingsHotkeyInAppKey
-            ),
-            equals: "q"
+            equals: "Command + Q"
         )
         assertHotkeyConflictVisible(
             in: app,
-            controlIdentifier: Identifier.settingsHotkeyInAppModifier
+            controlIdentifier: Identifier.settingsHotkeyInAppShortcut
         )
     }
 
@@ -137,15 +118,19 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         openSettingsTab(in: app)
 
-        selectOption(
+        recordShortcut(
             in: app,
-            controlIdentifier: Identifier.settingsHotkeyQuitKey,
-            optionIdentifier: "z"
+            FlowTabUITestShortcutRecording.key(
+                controlIdentifier: Identifier.settingsHotkeyQuitKey,
+                key: "z",
+                expectedValue: "Z"
+            )
         )
-        selectOption(
+        enterShortcut(
             in: app,
             controlIdentifier: Identifier.settingsHotkeyQuitKey,
-            optionIdentifier: "tab"
+            key: "tab",
+            modifierFlags: []
         )
 
         let conflictStatus = element(
@@ -166,53 +151,45 @@ extension FlowTabUITests {
             trigger: { tapElement(shortcutHintToggle) }
         )
         assertValue(
-            of: element(in: app, identifier: Identifier.settingsHotkeyQuitKey),
-            equals: "z"
+            of: element(
+                in: app,
+                identifier: Identifier.settingsHotkeyQuitKey
+            ),
+            equals: "Z"
         )
     }
 
     func testSettingsInAppHotkeyExplicitMatrixStartsFocusedWindowSession() throws {
         let cases: [(
-            rawSelections: [(control: String, option: String)],
-            expectedValues: [(control: String, value: String)],
+            recordings: [FlowTabUITestShortcutRecording],
             triggerModifier: String,
             triggerKey: String,
             expectedInAppShortcut: String
         )] = [
             (
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "space"),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "space"),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
+                hotkeyRecordings(
+                    mainModifiers: .option,
+                    mainModifiersText: "Option",
+                    mainKey: "space",
+                    quitKey: "z",
+                    inAppModifiers: .option,
+                    inAppShortcutText: "Option + B",
+                    inAppKey: "b"
+                ),
                 "option",
                 "b",
                 "Option + B"
             ),
             (
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "b"),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "control"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "b"),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "control"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
+                hotkeyRecordings(
+                    mainModifiers: .option,
+                    mainModifiersText: "Option",
+                    mainKey: "b",
+                    quitKey: "z",
+                    inAppModifiers: .control,
+                    inAppShortcutText: "Control + B",
+                    inAppKey: "b"
+                ),
                 "control",
                 "b",
                 "Control + B"
@@ -223,9 +200,8 @@ extension FlowTabUITests {
             .bundleIdentifier
 
         for item in cases {
-            configureHotkeysThroughSettings(
-                rawSelections: item.rawSelections,
-                expectedValues: item.expectedValues,
+            configureShortcutsThroughSettings(
+                recordings: item.recordings,
                 expectedLogMarkers: [
                     "inApp=\(item.expectedInAppShortcut)",
                     "hotkeyReloadNotification sender=AppDelegate"

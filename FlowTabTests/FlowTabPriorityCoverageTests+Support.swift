@@ -333,6 +333,48 @@ extension FlowTabPriorityCoverageTests {
             userDefaults.removeObject(forKey: key)
         }
     }
+    func installTemporarySwitcherHotkeyConfiguration(
+        _ configuration: SwitcherHotkeyConfiguration
+    ) -> () -> Void {
+        let defaults = UserDefaults.standard
+        let values: [(String, String)] = [
+            (
+                AppPreferenceKeys.hotkeyPrimaryModifier,
+                configuration.baseKeys.rawValue
+            ),
+            (
+                AppPreferenceKeys.hotkeyReverseModifiers,
+                configuration.reverseKeys.rawValue
+            ),
+            (
+                AppPreferenceKeys.hotkeyMainKey,
+                configuration.mainKeys.rawValue
+            ),
+            (
+                AppPreferenceKeys.hotkeyQuitKey,
+                configuration.quitKeys.rawValue
+            )
+        ]
+        let previousValues = values.reduce(
+            into: [String: Any]()
+        ) { result, entry in
+            if let value = defaults.object(forKey: entry.0) {
+                result[entry.0] = value
+            }
+        }
+        for (key, value) in values {
+            defaults.set(value, forKey: key)
+        }
+        return {
+            for (key, _) in values {
+                self.restoreUserDefaultsValue(
+                    previousValues[key],
+                    forKey: key,
+                    userDefaults: defaults
+                )
+            }
+        }
+    }
     func enableCurrentAppInSwitcherForTesting() -> () -> Void {
         let defaults = UserDefaults.standard
         let previousShowInCommandTab = defaults.object(forKey: AppPreferenceKeys.showInCommandTab)

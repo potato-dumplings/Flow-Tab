@@ -7,6 +7,16 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerQuitShortcutTriggersTerminateSelectedAppFlow()
     {
+        let restoreHotkeyConfiguration =
+            installTemporarySwitcherHotkeyConfiguration(
+                SwitcherHotkeyConfiguration(
+                    baseKeys: [.option],
+                    reverseKeys: [.shift],
+                    mainKeys: [.tab],
+                    quitKeys: [.q]
+                )
+            )
+        defer { restoreHotkeyConfiguration() }
         let scheduler =
             ManualTerminatePressFeedbackScheduler()
         let runtimeProjectionService =
@@ -46,11 +56,9 @@ extension FlowTabPriorityCoverageTests {
             controller.handleKeyDownForTesting(
                 Self.makeKeyDownEvent(
                     keyCode:
-                        hotkeyConfiguration.quitKeyCode,
+                        hotkeyConfiguration.quitKeys.orderedKeys[0].keyCode,
                     modifierFlags:
-                        hotkeyConfiguration
-                        .primaryModifier
-                        .eventModifierFlag
+                        hotkeyConfiguration.baseKeys.modifiers.eventModifierFlags
                 )
             )
         )
@@ -147,8 +155,8 @@ extension FlowTabPriorityCoverageTests {
             model.terminateRequestOverride = nil
             controller.cancelSelectionForTesting()
         }
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
+        controller.globalMainKeySetPressedOverride = false
         controller.appIsActiveOverride = false
 
         XCTAssertFalse(
@@ -271,6 +279,16 @@ extension FlowTabPriorityCoverageTests {
             enabled: true,
             defaultScope: .app
         ) {
+            let restoreHotkeyConfiguration =
+                installTemporarySwitcherHotkeyConfiguration(
+                    SwitcherHotkeyConfiguration(
+                        baseKeys: [.option],
+                        reverseKeys: [.shift],
+                        mainKeys: [.tab],
+                        quitKeys: [.q]
+                    )
+                )
+            defer { restoreHotkeyConfiguration() }
             let scheduler =
                 ManualTerminatePressFeedbackScheduler()
             let initialApps =
@@ -355,11 +373,9 @@ extension FlowTabPriorityCoverageTests {
                     Self.makeKeyDownEvent(
                         keyCode:
                             hotkeyConfiguration
-                            .quitKeyCode,
+                            .quitKeys.orderedKeys[0].keyCode,
                         modifierFlags:
-                            hotkeyConfiguration
-                            .primaryModifier
-                            .eventModifierFlag
+                            hotkeyConfiguration.baseKeys.modifiers.eventModifierFlags
                     )
                 )
             )

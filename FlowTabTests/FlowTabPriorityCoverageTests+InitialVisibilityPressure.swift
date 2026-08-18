@@ -210,7 +210,7 @@ extension FlowTabPriorityCoverageTests {
             controller.panelOcclusionStateOverride = nil
             controller.panel.orderOut(nil)
         }
-        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
         var activatedTarget: ActivationTarget?
         controller.modelForTesting.activationOverride = { target, _ in
             activatedTarget = target
@@ -397,7 +397,7 @@ extension FlowTabPriorityCoverageTests {
             makeInitialVisibilityProjectionPanelController(
                 recoveryScheduler: recoveryScheduler
             )
-        controller.globalPrimaryModifierPressedOverride = true
+        controller.globalHotkeyHoldSetPressedOverride = true
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         assertInitialVisibilityProjectionRead(
@@ -446,7 +446,7 @@ extension FlowTabPriorityCoverageTests {
                 scheduler: visibilityScheduler,
                 recoveryScheduler: recoveryScheduler
             )
-        controller.globalPrimaryModifierPressedOverride = true
+        controller.globalHotkeyHoldSetPressedOverride = true
 
         let iterationCount = 200
         let triggerPrefix = "initial_visibility_pressure_\(UUID().uuidString)"

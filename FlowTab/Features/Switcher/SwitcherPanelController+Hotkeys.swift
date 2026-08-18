@@ -78,7 +78,7 @@ extension SwitcherPanelController {
                 )
                 return
             }
-            guard isPrimaryModifierLikelyPressed() else {
+            guard isHotkeyHoldSetLikelyPressed() else {
                 logInputTrace(
                     "hotkeyPressed dir=\(directionText) panelVisible=1 modifierPressed=0 action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(nowMs))"
                 )
@@ -113,7 +113,7 @@ extension SwitcherPanelController {
         // Carbon hotkey "released" also fires when the main key (for example Tab) is released
         // while the modifier is still held. Ignore those events to avoid repeatedly spinning up
         // release-confirmation work during rapid cycling.
-        guard !isPrimaryModifierPressedInHardwareState() else { return }
+        guard !isHotkeyHoldSetPressedInHardwareState() else { return }
         let nowMs = monotonicMilliseconds()
         logInputTrace(
             "hotkeyReleased panelVisible=1 action=scheduleReleaseConfirm \(hotkeyInputEvidenceFields(receipt)) nowMs=\(formatMilliseconds(nowMs))"
@@ -136,7 +136,7 @@ extension SwitcherPanelController {
         }
         if isPanelPresented {
             guard activeHotkeySessionKind == .inAppWindowSwitcher else { return }
-            guard isPrimaryModifierLikelyPressed() else {
+            guard isHotkeyHoldSetLikelyPressed() else {
                 logInputTrace(
                     "inAppHotkeyPressed dir=\(directionText) panelVisible=1 modifierPressed=0 action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(nowMs))"
                 )
@@ -180,7 +180,7 @@ extension SwitcherPanelController {
         }
         guard isPanelPresented else { return }
         guard activeHotkeySessionKind == .inAppWindowSwitcher else { return }
-        guard !isPrimaryModifierPressedInHardwareState() else { return }
+        guard !isHotkeyHoldSetPressedInHardwareState() else { return }
         let nowMs = monotonicMilliseconds()
         logInputTrace(
             "inAppHotkeyReleased panelVisible=1 action=scheduleReleaseConfirm \(hotkeyInputEvidenceFields(receipt)) nowMs=\(formatMilliseconds(nowMs))"
@@ -236,7 +236,7 @@ extension SwitcherPanelController {
             return
         }
         if keyInput == .tabForward || keyInput == .tabBackward {
-            guard isPrimaryModifierLikelyPressed() else {
+            guard isHotkeyHoldSetLikelyPressed() else {
                 logInputTrace(
                     "advance key=\(keyInput.debugName) dropped=modifierNotPressed action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
                 )
@@ -335,37 +335,61 @@ extension SwitcherPanelController {
         }
     }
 
-    func activePrimaryModifier() -> SwitcherPrimaryModifier {
-        primaryModifier(for: activeHotkeySessionKind ?? .globalAppSwitcher)
+    func activeHotkeyHoldKeys() -> SwitcherHotkeyKeySet {
+        hotkeyHoldKeys(
+            for: activeHotkeySessionKind ?? .globalAppSwitcher
+        )
     }
 
-    func primaryModifier(for sessionKind: HotkeySessionKind) -> SwitcherPrimaryModifier {
+    func hotkeyHoldKeys(
+        for sessionKind: HotkeySessionKind
+    ) -> SwitcherHotkeyKeySet {
+        hotkeyConfiguration(for: sessionKind).baseKeys
+    }
+
+    func hotkeyConfiguration(
+        for sessionKind: HotkeySessionKind
+    ) -> SwitcherHotkeyConfiguration {
         if sessionKind == .inAppWindowSwitcher {
-            return InAppWindowHotkeyPreferencesStore.load().primaryModifier
+            return InAppWindowHotkeyPreferencesStore.load()
         }
-        return SwitcherHotkeyPreferencesStore.load().primaryModifier
-    }
-
-    func activePrimaryModifierFlag() -> NSEvent.ModifierFlags {
-        activePrimaryModifier().eventModifierFlag
+        return SwitcherHotkeyPreferencesStore.load()
     }
 
     func isTerminateSelectedAppShortcut(_ event: NSEvent) -> Bool {
         guard activeHotkeySessionKind != .inAppWindowSwitcher else { return false }
         let hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load()
-        guard event.keyCode == hotkeyConfiguration.quitKeyCode else { return false }
-
-        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        guard flags.contains(hotkeyConfiguration.primaryModifier.eventModifierFlag) else { return false }
-        guard !flags.contains(.shift) else { return false }
-
-        switch hotkeyConfiguration.primaryModifier {
-        case .option:
-            return !flags.contains(.command) && !flags.contains(.control)
-        case .control:
-            return !flags.contains(.command) && !flags.contains(.option)
-        case .command:
-            return !flags.contains(.control) && !flags.contains(.option)
+        let eventKey = SwitcherHotkeyKey(keyCode: event.keyCode)
+        guard hotkeyConfiguration.quitKeys.contains(eventKey) else {
+            return false
         }
+        if event.type == .keyDown, event.isARepeat {
+            return false
+        }
+        if let modifier = eventKey.modifier {
+            let pressedModifiers = KeyModifier(
+                eventModifierFlags: event.modifierFlags.intersection(
+                    .deviceIndependentFlagsMask
+                )
+            )
+            guard pressedModifiers.contains(modifier) else { return false }
+        }
+        let remainingKeys = hotkeyConfiguration.quitShortcut.keys
+            .subtracting([eventKey])
+        guard remainingKeys.isEmpty
+            || isHotkeyKeySetPressedInHardwareState(
+                remainingKeys,
+                eventModifierFlags: event.modifierFlags
+            )
+        else {
+            return false
+        }
+        let otherActionKeys = hotkeyConfiguration.reverseKeys.union(
+            hotkeyConfiguration.mainKeys
+        )
+        return !isAnyHotkeyKeyPressedInHardwareState(
+            otherActionKeys,
+            eventModifierFlags: event.modifierFlags
+        )
     }
 }

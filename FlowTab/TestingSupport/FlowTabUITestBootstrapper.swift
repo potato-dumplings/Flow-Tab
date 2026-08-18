@@ -84,6 +84,7 @@ enum FlowTabUITestBootstrapper {
             )
         FlowTabUITestAXSuppressionReadbackBootstrap
             .prepareIfNeeded()
+        FlowTabUITestShortcutEventInjectionBootstrap.prepareIfNeeded()
 
         if FlowTabTestLaunchOptions.resetsUserDefaultsOnLaunch {
             AppPreferenceKeys.allKeys.forEach { userDefaults.removeObject(forKey: $0) }
@@ -592,7 +593,7 @@ private final class SwitcherCommandNotificationObserver: NSObject {
                 hotkeyInputSourceID,
                 for: .inAppWindowSwitcher
             )
-            panelController.inAppPrimaryModifierPressedOverride = true
+            panelController.inAppHotkeyHoldSetPressedOverride = true
             panelController.handleInAppWindowHotkeyInput(
                 HotkeyInputEvent(
                     identity: HotkeyInputEventIdentity(
@@ -603,7 +604,7 @@ private final class SwitcherCommandNotificationObserver: NSObject {
                     isBackward: false
                 )
             )
-            panelController.inAppPrimaryModifierPressedOverride = nil
+            panelController.inAppHotkeyHoldSetPressedOverride = nil
         case .advanceDown:
             panelController.advance(.downArrow)
         case .advanceRight:

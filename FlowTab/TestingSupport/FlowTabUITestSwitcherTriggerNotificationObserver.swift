@@ -550,10 +550,10 @@ final class SwitcherTriggerNotificationObserver: NSObject {
         )
         switch trigger {
         case .global, .search:
-            panelController.globalPrimaryModifierPressedOverride =
+            panelController.globalHotkeyHoldSetPressedOverride =
                 true
         case .inApp:
-            panelController.inAppPrimaryModifierPressedOverride =
+            panelController.inAppHotkeyHoldSetPressedOverride =
                 true
         }
     }
@@ -562,8 +562,8 @@ final class SwitcherTriggerNotificationObserver: NSObject {
     private static func releasePrimaryModifierForTesting(
         panelController: SwitcherPanelController
     ) {
-        panelController.globalPrimaryModifierPressedOverride = nil
-        panelController.inAppPrimaryModifierPressedOverride = nil
+        panelController.globalHotkeyHoldSetPressedOverride = nil
+        panelController.inAppHotkeyHoldSetPressedOverride = nil
     }
 
     @MainActor

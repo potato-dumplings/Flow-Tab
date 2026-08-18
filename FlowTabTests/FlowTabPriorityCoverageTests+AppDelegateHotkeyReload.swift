@@ -73,14 +73,14 @@ extension FlowTabPriorityCoverageTests {
 
         let request = HotkeyRegistrationRequest(
             mainConfiguration: SwitcherHotkeyConfiguration(
-                primaryModifier: .command,
-                mainKey: .tab,
-                quitKey: .q
+                baseKeys: [.command],
+                reverseKeys: [.shift],
+                mainKeys: [.tab],
+                quitKeys: [.q]
             ),
-            inAppWindowConfiguration: SwitcherHotkeyConfiguration(
-                primaryModifier: .option,
-                mainKey: .grave,
-                quitKey: .q
+            inAppWindowConfiguration: .inApp(
+                shortcutKeys: [.option, .grave],
+                reverseKeys: [.shift]
             )
         )
         let expectedGeneration = baselineGeneration + 1
@@ -220,14 +220,14 @@ extension FlowTabPriorityCoverageTests {
 
         let request = HotkeyRegistrationRequest(
             mainConfiguration: SwitcherHotkeyConfiguration(
-                primaryModifier: .control,
-                mainKey: .space,
-                quitKey: .w
+                baseKeys: [.control],
+                reverseKeys: [.shift],
+                mainKeys: [.space],
+                quitKeys: [.w]
             ),
-            inAppWindowConfiguration: SwitcherHotkeyConfiguration(
-                primaryModifier: .option,
-                mainKey: .grave,
-                quitKey: .q
+            inAppWindowConfiguration: .inApp(
+                shortcutKeys: [.option, .grave],
+                reverseKeys: [.shift]
             )
         )
         NotificationCenter.default.post(

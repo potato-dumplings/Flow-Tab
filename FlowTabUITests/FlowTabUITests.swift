@@ -96,11 +96,14 @@ final class FlowTabUITests: XCTestCase {
         static let settingsPermissionLaunchAtLogin = "flowtab.settings.permission.launch-at-login"
         static let settingsPermissionTerminalContentPreviews =
             "flowtab.settings.permission.terminal-content-previews"
-        static let settingsHotkeyMainModifier = "flowtab.settings.hotkey.main-modifier"
+        static let settingsHotkeyMainModifiers = "flowtab.settings.hotkey.main-modifiers"
+        static let settingsHotkeyMainReverseModifiers =
+            "flowtab.settings.hotkey.main-reverse-modifiers"
         static let settingsHotkeyMainKey = "flowtab.settings.hotkey.main-key"
         static let settingsHotkeyQuitKey = "flowtab.settings.hotkey.quit-key"
-        static let settingsHotkeyInAppModifier = "flowtab.settings.hotkey.in-app-modifier"
-        static let settingsHotkeyInAppKey = "flowtab.settings.hotkey.in-app-key"
+        static let settingsHotkeyInAppShortcut = "flowtab.settings.hotkey.in-app-shortcut"
+        static let settingsHotkeyInAppReverseModifiers =
+            "flowtab.settings.hotkey.in-app-reverse-modifiers"
         static let settingsHotkeyMainTakeoverStatus = "flowtab.settings.hotkey.main-takeover-status"
         static func settingsHotkeyConflictStatus(
             for controlIdentifier: String

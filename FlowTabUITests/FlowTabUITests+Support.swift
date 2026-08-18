@@ -586,39 +586,6 @@ extension FlowTabUITests {
             }
         }
 
-        if [
-            Identifier.settingsHotkeyMainModifier,
-            Identifier.settingsHotkeyInAppModifier
-        ].contains(controlIdentifier) {
-            switch optionIdentifier {
-            case "option":
-                return ["Option"]
-            case "control":
-                return ["Control"]
-            case "command":
-                return ["Command"]
-            default:
-                return []
-            }
-        }
-
-        if [
-            Identifier.settingsHotkeyMainKey,
-            Identifier.settingsHotkeyQuitKey,
-            Identifier.settingsHotkeyInAppKey
-        ].contains(controlIdentifier) {
-            switch optionIdentifier {
-            case "tab":
-                return ["Tab"]
-            case "space":
-                return ["Space"]
-            case "grave":
-                return ["`"]
-            default:
-                return [optionIdentifier.uppercased()]
-            }
-        }
-
         return []
     }
     func elementStringValue(_ element: XCUIElement) -> String {

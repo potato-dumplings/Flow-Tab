@@ -11,6 +11,8 @@ struct AppDelegateTestHooks {
         UInt32,
         UInt32
     ) -> any HotkeyMonitoring)? = nil
+    var hotkeyChordEventAccessSnapshotProvider:
+        (() -> HotkeyChordEventAccessSnapshot)? = nil
     var commandTabTakeoverController: (any CommandTabTakeoverControlling)? = nil
     var stressRunner: (any TabSwitchStressRunning)? = nil
     var launchAtLoginManager: (any LaunchAtLoginManaging)? = nil
@@ -91,6 +93,13 @@ extension AppDelegate {
             backwardHotkeyID: backwardHotkeyID,
             startsMonitoring: false
         )
+    }
+
+    func currentHotkeyChordEventAccessSnapshot()
+        -> HotkeyChordEventAccessSnapshot
+    {
+        Self.testHooks.hotkeyChordEventAccessSnapshotProvider?()
+            ?? .current()
     }
 
     var hasPanelControllerForTesting: Bool {

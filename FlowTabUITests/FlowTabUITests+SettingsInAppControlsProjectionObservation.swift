@@ -8,34 +8,35 @@ enum FlowTabUITestSettingsInAppControlsProjectionPolicy {
 struct FlowTabUITestSettingsInAppControlsProjectionSnapshot: Equatable {
     let appState: XCUIApplication.State
     let settingsContentExists: Bool
-    let modifierExists: Bool
-    let modifierEnabled: Bool?
-    let keyExists: Bool
-    let keyEnabled: Bool?
+    let shortcutExists: Bool
+    let shortcutEnabled: Bool?
+    let reverseModifiersExists: Bool
+    let reverseModifiersEnabled: Bool?
 
     var isDisabledProjection: Bool {
         appState == .runningForeground
             && settingsContentExists
-            && modifierExists
-            && modifierEnabled == false
-            && keyExists
-            && keyEnabled == false
+            && shortcutExists
+            && shortcutEnabled == false
+            && reverseModifiersExists
+            && reverseModifiersEnabled == false
     }
 
     var diagnosticSummary: String {
         "isDisabledProjection=\(isDisabledProjection) "
             + "appState=\(String(describing: appState)) "
             + "settingsContentExists=\(settingsContentExists) "
-            + "modifierExists=\(modifierExists) "
-            + "modifierEnabled=\(String(describing: modifierEnabled)) "
-            + "keyExists=\(keyExists) "
-            + "keyEnabled=\(String(describing: keyEnabled))"
+            + "shortcutExists=\(shortcutExists) "
+            + "shortcutEnabled=\(String(describing: shortcutEnabled)) "
+            + "reverseModifiersExists=\(reverseModifiersExists) "
+            + "reverseModifiersEnabled="
+            + "\(String(describing: reverseModifiersEnabled))"
     }
 }
 
 struct FlowTabUITestSettingsInAppControls {
-    let modifier: XCUIElement
-    let key: XCUIElement
+    let shortcut: XCUIElement
+    let reverseModifiers: XCUIElement
 }
 
 final class FlowTabUITestSettingsInAppControlsProjectionObservationOwner {
@@ -176,10 +177,10 @@ extension FlowTabUITests {
         else {
             XCTFail(
                 "Settings in-app controls projection watchdog expired. "
-                    + "modifierIdentifier="
-                    + "\(Identifier.settingsHotkeyInAppModifier) "
-                    + "keyIdentifier="
-                    + "\(Identifier.settingsHotkeyInAppKey) "
+                    + "shortcutIdentifier="
+                    + "\(Identifier.settingsHotkeyInAppShortcut) "
+                    + "reverseModifiersIdentifier="
+                    + "\(Identifier.settingsHotkeyInAppReverseModifiers) "
                     + owner.diagnosticSummary,
                 file: file,
                 line: line
@@ -198,13 +199,14 @@ extension FlowTabUITests {
                 identifier: Identifier.settingsTabContent
             ),
             controls: FlowTabUITestSettingsInAppControls(
-                modifier: element(
+                shortcut: element(
                     in: app,
-                    identifier: Identifier.settingsHotkeyInAppModifier
+                    identifier: Identifier.settingsHotkeyInAppShortcut
                 ),
-                key: element(
+                reverseModifiers: element(
                     in: app,
-                    identifier: Identifier.settingsHotkeyInAppKey
+                    identifier:
+                        Identifier.settingsHotkeyInAppReverseModifiers
                 )
             )
         )
@@ -215,20 +217,21 @@ extension FlowTabUITests {
         elements: FlowTabUITestSettingsInAppProjectionElements
     ) -> () -> FlowTabUITestSettingsInAppControlsProjectionSnapshot {
         {
-            let modifierExists = elements.controls.modifier.exists
-            let keyExists = elements.controls.key.exists
+            let shortcutExists = elements.controls.shortcut.exists
+            let reverseModifiersExists =
+                elements.controls.reverseModifiers.exists
             return FlowTabUITestSettingsInAppControlsProjectionSnapshot(
                 appState: app.state,
                 settingsContentExists: elements.settingsContent.exists,
-                modifierExists: modifierExists,
-                modifierEnabled:
-                    modifierExists
-                        ? elements.controls.modifier.isEnabled
+                shortcutExists: shortcutExists,
+                shortcutEnabled:
+                    shortcutExists
+                        ? elements.controls.shortcut.isEnabled
                         : nil,
-                keyExists: keyExists,
-                keyEnabled:
-                    keyExists
-                        ? elements.controls.key.isEnabled
+                reverseModifiersExists: reverseModifiersExists,
+                reverseModifiersEnabled:
+                    reverseModifiersExists
+                        ? elements.controls.reverseModifiers.isEnabled
                         : nil
             )
         }

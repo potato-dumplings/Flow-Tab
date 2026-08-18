@@ -17,10 +17,11 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
     @Binding var searchDefaultScopeRaw: String
     let hiddenAppCount: Int
     @Binding var hotkeyPrimaryModifierRaw: String
+    @Binding var hotkeyReverseModifiersRaw: String
     @Binding var hotkeyMainKeyRaw: String
     @Binding var hotkeyQuitKeyRaw: String
-    @Binding var inAppWindowHotkeyPrimaryModifierRaw: String
-    @Binding var inAppWindowHotkeyMainKeyRaw: String
+    @Binding var inAppWindowHotkeyShortcutKeysRaw: String
+    @Binding var inAppWindowHotkeyReverseKeysRaw: String
     let commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
     let hotkeyConflict: HotkeySettingsConflictPresentation?
     let accessibilityTrusted: Bool
@@ -51,18 +52,24 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
         let searchEnabled = $searchEnabled
         let searchDefaultScopeRaw = $searchDefaultScopeRaw
         let hotkeyPrimaryModifierRaw = $hotkeyPrimaryModifierRaw
+        let hotkeyReverseModifiersRaw = $hotkeyReverseModifiersRaw
         let hotkeyMainKeyRaw = $hotkeyMainKeyRaw
         let hotkeyQuitKeyRaw = $hotkeyQuitKeyRaw
-        let inAppWindowHotkeyPrimaryModifierRaw = $inAppWindowHotkeyPrimaryModifierRaw
-        let inAppWindowHotkeyMainKeyRaw = $inAppWindowHotkeyMainKeyRaw
+        let inAppWindowHotkeyShortcutKeysRaw =
+            $inAppWindowHotkeyShortcutKeysRaw
+        let inAppWindowHotkeyReverseKeysRaw =
+            $inAppWindowHotkeyReverseKeysRaw
         let pageView = nsView.pageView
         let currentHotkeyValues = {
             AppKitSettingsHotkeyRawValues(
                 hotkeyPrimaryModifierRaw: hotkeyPrimaryModifierRaw.wrappedValue,
+                hotkeyReverseModifiersRaw: hotkeyReverseModifiersRaw.wrappedValue,
                 hotkeyMainKeyRaw: hotkeyMainKeyRaw.wrappedValue,
                 hotkeyQuitKeyRaw: hotkeyQuitKeyRaw.wrappedValue,
-                inAppWindowHotkeyPrimaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw.wrappedValue,
-                inAppWindowHotkeyMainKeyRaw: inAppWindowHotkeyMainKeyRaw.wrappedValue
+                inAppWindowHotkeyShortcutKeysRaw:
+                    inAppWindowHotkeyShortcutKeysRaw.wrappedValue,
+                inAppWindowHotkeyReverseKeysRaw:
+                    inAppWindowHotkeyReverseKeysRaw.wrappedValue
             )
         }
         let updateHotkeyContent = { [weak pageView] in
@@ -86,47 +93,74 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
         pageView.onSearchDefaultScopeChanged = { searchDefaultScopeRaw.wrappedValue = $0 }
         pageView.onManageAppVisibility = onManageAppVisibility
         pageView.onDismissHotkeyConflict = onDismissHotkeyConflict
-        pageView.onHotkeyPrimaryModifierChanged = {
+        pageView.onMainModifiersChanged = {
             onHotkeyChanged(
                 HotkeySettingsChangeCandidate(
-                    field: .mainModifier,
-                    values: currentHotkeyValues().replacing(.mainModifier, with: $0)
+                    field: .mainModifiers,
+                    values: currentHotkeyValues().replacing(
+                        .mainModifiers,
+                        with: $0.rawValue
+                    )
                 )
             )
             updateHotkeyContent()
         }
-        pageView.onHotkeyMainKeyChanged = {
+        pageView.onMainReverseModifiersChanged = {
+            onHotkeyChanged(
+                HotkeySettingsChangeCandidate(
+                    field: .mainReverseModifiers,
+                    values: currentHotkeyValues().replacing(
+                        .mainReverseModifiers,
+                        with: $0.rawValue
+                    )
+                )
+            )
+            updateHotkeyContent()
+        }
+        pageView.onMainKeyChanged = {
             onHotkeyChanged(
                 HotkeySettingsChangeCandidate(
                     field: .mainKey,
-                    values: currentHotkeyValues().replacing(.mainKey, with: $0)
+                    values: currentHotkeyValues().replacing(
+                        .mainKey,
+                        with: $0.rawValue
+                    )
                 )
             )
             updateHotkeyContent()
         }
-        pageView.onHotkeyQuitKeyChanged = {
+        pageView.onQuitKeyChanged = {
             onHotkeyChanged(
                 HotkeySettingsChangeCandidate(
                     field: .quitKey,
-                    values: currentHotkeyValues().replacing(.quitKey, with: $0)
+                    values: currentHotkeyValues().replacing(
+                        .quitKey,
+                        with: $0.rawValue
+                    )
                 )
             )
             updateHotkeyContent()
         }
-        pageView.onInAppWindowPrimaryModifierChanged = {
+        pageView.onInAppShortcutChanged = {
             onHotkeyChanged(
                 HotkeySettingsChangeCandidate(
-                    field: .inAppModifier,
-                    values: currentHotkeyValues().replacing(.inAppModifier, with: $0)
+                    field: .inAppShortcut,
+                    values: currentHotkeyValues().replacing(
+                        .inAppShortcut,
+                        with: $0.rawValue
+                    )
                 )
             )
             updateHotkeyContent()
         }
-        pageView.onInAppWindowMainKeyChanged = {
+        pageView.onInAppReverseModifiersChanged = {
             onHotkeyChanged(
                 HotkeySettingsChangeCandidate(
-                    field: .inAppKey,
-                    values: currentHotkeyValues().replacing(.inAppKey, with: $0)
+                    field: .inAppReverseModifiers,
+                    values: currentHotkeyValues().replacing(
+                        .inAppReverseModifiers,
+                        with: $0.rawValue
+                    )
                 )
             )
             updateHotkeyContent()
@@ -153,10 +187,13 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
                 searchDefaultScopeRaw: searchDefaultScopeRaw.wrappedValue,
                 hiddenAppCount: hiddenAppCount,
                 hotkeyPrimaryModifierRaw: hotkeyPrimaryModifierRaw.wrappedValue,
+                hotkeyReverseModifiersRaw: hotkeyReverseModifiersRaw.wrappedValue,
                 hotkeyMainKeyRaw: hotkeyMainKeyRaw.wrappedValue,
                 hotkeyQuitKeyRaw: hotkeyQuitKeyRaw.wrappedValue,
-                inAppWindowHotkeyPrimaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw.wrappedValue,
-                inAppWindowHotkeyMainKeyRaw: inAppWindowHotkeyMainKeyRaw.wrappedValue,
+                inAppWindowHotkeyShortcutKeysRaw:
+                    inAppWindowHotkeyShortcutKeysRaw.wrappedValue,
+                inAppWindowHotkeyReverseKeysRaw:
+                    inAppWindowHotkeyReverseKeysRaw.wrappedValue,
                 commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
                 accessibilityTrusted: accessibilityTrusted,
                 screenCaptureTrusted: screenCaptureTrusted,
@@ -174,14 +211,18 @@ private extension AppKitSettingsHotkeyRawValues {
         with rawValue: String
     ) -> AppKitSettingsHotkeyRawValues {
         AppKitSettingsHotkeyRawValues(
-            hotkeyPrimaryModifierRaw: field == .mainModifier
+            hotkeyPrimaryModifierRaw: field == .mainModifiers
                 ? rawValue : hotkeyPrimaryModifierRaw,
+            hotkeyReverseModifiersRaw: field == .mainReverseModifiers
+                ? rawValue : hotkeyReverseModifiersRaw,
             hotkeyMainKeyRaw: field == .mainKey ? rawValue : hotkeyMainKeyRaw,
             hotkeyQuitKeyRaw: field == .quitKey ? rawValue : hotkeyQuitKeyRaw,
-            inAppWindowHotkeyPrimaryModifierRaw: field == .inAppModifier
-                ? rawValue : inAppWindowHotkeyPrimaryModifierRaw,
-            inAppWindowHotkeyMainKeyRaw: field == .inAppKey
-                ? rawValue : inAppWindowHotkeyMainKeyRaw
+            inAppWindowHotkeyShortcutKeysRaw:
+                field == .inAppShortcut
+                ? rawValue : inAppWindowHotkeyShortcutKeysRaw,
+            inAppWindowHotkeyReverseKeysRaw:
+                field == .inAppReverseModifiers
+                ? rawValue : inAppWindowHotkeyReverseKeysRaw
         )
     }
 }

@@ -8,25 +8,25 @@ import Carbon
 extension FlowTabTests {
     func testResolveKeepsCommandWhenMainShortcutIsCommandTab() {
         let configuration = SwitcherHotkeyPreferencesStore.resolve(
-            primaryModifierRaw: SwitcherPrimaryModifier.command.rawValue,
-            mainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
-            quitKeyRaw: SwitcherHotkeyKey.q.rawValue
+            baseKeysRaw: SwitcherHotkeyKey.command.rawValue,
+            mainKeysRaw: SwitcherHotkeyKey.tab.rawValue,
+            quitKeysRaw: SwitcherHotkeyKey.q.rawValue
         )
 
-        XCTAssertEqual(configuration.primaryModifier, .command)
-        XCTAssertEqual(configuration.mainKey, .tab)
-        XCTAssertEqual(configuration.quitKey, .q)
+        XCTAssertEqual(configuration.baseKeys, [.command])
+        XCTAssertEqual(configuration.mainKeys, [.tab])
+        XCTAssertEqual(configuration.quitKeys, [.q])
     }
 
     func testResolveFallsBackQuitKeyWhenQuitEqualsMainKey() {
         let configuration = SwitcherHotkeyPreferencesStore.resolve(
-            primaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
-            mainKeyRaw: SwitcherHotkeyKey.q.rawValue,
-            quitKeyRaw: SwitcherHotkeyKey.q.rawValue
+            baseKeysRaw: SwitcherHotkeyKey.option.rawValue,
+            mainKeysRaw: SwitcherHotkeyKey.q.rawValue,
+            quitKeysRaw: SwitcherHotkeyKey.q.rawValue
         )
 
-        XCTAssertEqual(configuration.mainKey, .q)
-        XCTAssertEqual(configuration.quitKey, .w)
+        XCTAssertEqual(configuration.mainKeys, [.q])
+        XCTAssertEqual(configuration.quitKeys, [.w])
     }
 
     func testLoadPersistsNormalizedHotkeyValues() {
@@ -37,7 +37,7 @@ extension FlowTabTests {
         }
 
         userDefaults.set(
-            SwitcherPrimaryModifier.command.rawValue,
+            SwitcherHotkeyKey.command.rawValue,
             forKey: AppPreferenceKeys.hotkeyPrimaryModifier
         )
         userDefaults.set(
@@ -51,12 +51,12 @@ extension FlowTabTests {
 
         let configuration = SwitcherHotkeyPreferencesStore.load(userDefaults: userDefaults)
 
-        XCTAssertEqual(configuration.primaryModifier, .command)
-        XCTAssertEqual(configuration.mainKey, .tab)
-        XCTAssertEqual(configuration.quitKey, .q)
+        XCTAssertEqual(configuration.baseKeys, [.command])
+        XCTAssertEqual(configuration.mainKeys, [.tab])
+        XCTAssertEqual(configuration.quitKeys, [.q])
         XCTAssertEqual(
             userDefaults.string(forKey: AppPreferenceKeys.hotkeyPrimaryModifier),
-            SwitcherPrimaryModifier.command.rawValue
+            SwitcherHotkeyKey.command.rawValue
         )
         XCTAssertEqual(
             userDefaults.string(forKey: AppPreferenceKeys.hotkeyMainKey),
@@ -72,17 +72,22 @@ extension FlowTabTests {
 
     func testResolveFallsBackToDefaultValuesForInvalidHotkeyRawInputs() {
         let configuration = SwitcherHotkeyPreferencesStore.resolve(
-            primaryModifierRaw: "invalid-modifier",
-            mainKeyRaw: "invalid-main",
-            quitKeyRaw: "invalid-quit"
+            baseKeysRaw: "invalid-base",
+            mainKeysRaw: "invalid-main",
+            quitKeysRaw: "invalid-quit"
         )
 
-        XCTAssertEqual(configuration.primaryModifier, SwitcherHotkeyPreferencesStore.defaultPrimaryModifier)
-        XCTAssertEqual(configuration.mainKey, SwitcherHotkeyPreferencesStore.defaultMainKey)
-        XCTAssertEqual(configuration.quitKey, SwitcherHotkeyPreferencesStore.defaultQuitKey)
+        XCTAssertEqual(configuration.baseKeys, SwitcherHotkeyPreferencesStore.defaultBaseKeys)
+        XCTAssertEqual(configuration.mainKeys, SwitcherHotkeyPreferencesStore.defaultMainKeys)
+        XCTAssertEqual(configuration.quitKeys, SwitcherHotkeyPreferencesStore.defaultQuitKeys)
     }
 
     func testRuntimeActivatorOpenConfigurationActivatesTargetApp() {
+        XCTAssertTrue(
+            AppPreferenceKeys.allKeys.contains(
+                AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+            )
+        )
         let configuration = RuntimeActivator.makeOpenConfiguration()
 
         XCTAssertTrue(configuration.activates)
@@ -96,25 +101,29 @@ extension FlowTabTests {
 
     func testHotkeyConfigurationDerivedFieldsAreConsistent() {
         let configuration = SwitcherHotkeyConfiguration(
-            primaryModifier: .command,
-            mainKey: .space,
-            quitKey: .w
+            baseKeys: [.command],
+            reverseKeys: [.shift],
+            mainKeys: [.space],
+            quitKeys: [.w]
         )
 
-        XCTAssertEqual(configuration.forwardKeyCode, UInt32(SwitcherHotkeyKey.space.keyCode))
-        XCTAssertEqual(configuration.forwardModifiers, UInt32(cmdKey))
-        XCTAssertEqual(configuration.backwardModifiers, UInt32(cmdKey) | UInt32(shiftKey))
-        XCTAssertEqual(configuration.quitKeyCode, SwitcherHotkeyKey.w.keyCode)
+        XCTAssertEqual(
+            configuration.mainShortcut.carbonRegistration,
+            SwitcherHotkeyShortcut.CarbonRegistration(
+                keyCode: UInt32(SwitcherHotkeyKey.space.keyCode),
+                modifiers: UInt32(cmdKey)
+            )
+        )
+        XCTAssertEqual(
+            configuration.backwardShortcut.carbonRegistration?.modifiers,
+            UInt32(cmdKey) | UInt32(shiftKey)
+        )
         XCTAssertEqual(configuration.mainShortcutText, "Command + Space")
         XCTAssertEqual(configuration.backwardShortcutText, "Command + Shift + Space")
         XCTAssertEqual(configuration.quitShortcutText, "Command + W")
     }
 
-    func testSwitcherEnumsExposeStableIdentifiersAndDistinctKeyCodes() {
-        for modifier in SwitcherPrimaryModifier.allCases {
-            XCTAssertEqual(modifier.id, modifier.rawValue)
-        }
-
+    func testSwitcherKeysExposeStableIdentifiersAndDistinctKeyCodes() {
         for key in SwitcherHotkeyKey.allCases {
             XCTAssertEqual(key.id, key.rawValue)
         }
@@ -153,7 +162,7 @@ extension FlowTabTests {
 
         userDefaults.set(ThemeMode.dark.rawValue, forKey: AppPreferenceKeys.themeMode)
         userDefaults.set(
-            SwitcherPrimaryModifier.command.rawValue,
+            SwitcherHotkeyKey.command.rawValue,
             forKey: AppPreferenceKeys.hotkeyPrimaryModifier
         )
         userDefaults.set(SwitcherHotkeyKey.space.rawValue, forKey: AppPreferenceKeys.hotkeyMainKey)

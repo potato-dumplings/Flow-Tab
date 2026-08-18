@@ -20,7 +20,7 @@ extension SwitcherPanelController {
         )
         endPresentationSession()
         logInputTrace(
-            "cancelSelection trigger=\(trigger) \(primaryModifierHardwareStateSummary(for: sessionKind)) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+            "cancelSelection trigger=\(trigger) \(hotkeyHoldSetHardwareStateSummary(for: sessionKind)) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
         model.cancelSelection()
     }

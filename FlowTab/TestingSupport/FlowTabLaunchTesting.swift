@@ -21,6 +21,8 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-ax-suppression-readback-route"
     static let tabSwitchStressEvidenceNotificationArgument =
         "--flowtab-tab-stress-evidence-notification-name"
+    static let shortcutEventInjectionArgument =
+        "--flowtab-ui-enable-shortcut-event-injection"
 
     static var argumentsOverrideForTesting: [String]?
     static var environmentOverrideForTesting: [String: String]?
@@ -29,6 +31,7 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-ax-trusted",
         currentAppProjectionEvidenceRouteArgument,
         "--flowtab-ui-enable-mock-hotkey-effects",
+        shortcutEventInjectionArgument,
         "--flowtab-ui-enable-verbose-logs",
         "--flowtab-ui-frontmost-bundle-id",
         homeInitialProjectionApplicationRouteArgument,
@@ -403,6 +406,10 @@ enum FlowTabTestLaunchOptions {
 
     static var enablesMockHotkeyEffects: Bool {
         containsUITestArgument("--flowtab-ui-enable-mock-hotkey-effects")
+    }
+
+    static var enablesShortcutEventInjection: Bool {
+        containsUITestArgument(shortcutEventInjectionArgument)
     }
 
     static var runsTabSwitchStressTest: Bool {

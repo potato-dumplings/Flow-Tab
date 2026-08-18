@@ -48,6 +48,7 @@ final class SpyHotkeyMonitor: HotkeyMonitoring {
 
     private(set) var startCallCount = 0
     private(set) var stopCallCount = 0
+    private(set) var requireChordEventMonitoringCallCount = 0
     private var inputSequence: UInt64 = 0
 
     func start() {
@@ -56,6 +57,10 @@ final class SpyHotkeyMonitor: HotkeyMonitoring {
 
     func stop() {
         stopCallCount += 1
+    }
+
+    func requireChordEventMonitoring() {
+        requireChordEventMonitoringCallCount += 1
     }
 
     @discardableResult

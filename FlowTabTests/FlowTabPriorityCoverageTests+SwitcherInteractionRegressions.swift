@@ -34,8 +34,8 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertEqual(controller.modelForTesting.session?.selectedWindow?.id, "first-press-next")
-        controller.inAppPrimaryModifierPressedOverride = false
-        controller.inAppMainKeyPressedOverride = false
+        controller.inAppHotkeyHoldSetPressedOverride = false
+        controller.inAppMainKeySetPressedOverride = false
         controller.cancelSelectionForTesting()
     }
 

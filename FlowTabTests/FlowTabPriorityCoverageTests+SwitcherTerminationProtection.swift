@@ -285,8 +285,8 @@ extension FlowTabPriorityCoverageTests {
             terminateTargetProcessStateReader:
                 MutableTerminateTargetProcessStateReader()
         )
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
+        controller.globalMainKeySetPressedOverride = false
         controller.appIsActiveOverride = false
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
@@ -351,8 +351,8 @@ extension FlowTabPriorityCoverageTests {
             terminateInterruptionProtectionScheduler: scheduler,
             terminateTargetProcessStateReader: processStateReader
         )
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
+        controller.globalMainKeySetPressedOverride = false
         controller.appIsActiveOverride = false
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())

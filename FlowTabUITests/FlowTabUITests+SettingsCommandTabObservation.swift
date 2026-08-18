@@ -99,17 +99,13 @@ extension FlowTabUITests {
         }
         openSettingsTab(in: app)
 
-        selectOption(
+        recordShortcut(
             in: app,
-            controlIdentifier: Identifier.settingsHotkeyMainKey,
-            optionIdentifier: "space"
-        )
-        assertValue(
-            of: element(
-                in: app,
-                identifier: Identifier.settingsHotkeyMainKey
-            ),
-            equals: "space"
+            .key(
+                controlIdentifier: Identifier.settingsHotkeyMainKey,
+                key: "space",
+                expectedValue: "Space"
+            )
         )
 
         let activeTakeoverText =
@@ -188,31 +184,21 @@ extension FlowTabUITests {
         }
 
         assertCommandTabTakeoverMarker(expectedValue: true) {
-            selectOption(
+            recordShortcut(
                 in: app,
-                controlIdentifier:
-                    Identifier.settingsHotkeyMainModifier,
-                optionIdentifier: "command"
+                .modifiers(
+                    controlIdentifier: Identifier.settingsHotkeyMainModifiers,
+                    modifierFlags: .command,
+                    expectedValue: "Command"
+                )
             )
-            selectOption(
+            recordShortcut(
                 in: app,
-                controlIdentifier: Identifier.settingsHotkeyMainKey,
-                optionIdentifier: "tab"
-            )
-            assertValue(
-                of: element(
-                    in: app,
-                    identifier:
-                        Identifier.settingsHotkeyMainModifier
-                ),
-                equals: "command"
-            )
-            assertValue(
-                of: element(
-                    in: app,
-                    identifier: Identifier.settingsHotkeyMainKey
-                ),
-                equals: "tab"
+                .key(
+                    controlIdentifier: Identifier.settingsHotkeyMainKey,
+                    key: "tab",
+                    expectedValue: "Tab"
+                )
             )
 
             guard

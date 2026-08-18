@@ -325,7 +325,7 @@ extension SwitcherPanelController {
     ) {
         guard let sessionKind = activeHotkeySessionKind else { return }
         guard !model.isSearchActive else { return }
-        guard !isPrimaryModifierPressedInHardwareState(
+        guard !isHotkeyHoldSetPressedInHardwareState(
             for: sessionKind
         ) else { return }
         logInputTrace(

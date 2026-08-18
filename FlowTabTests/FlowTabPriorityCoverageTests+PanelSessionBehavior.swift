@@ -98,7 +98,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         let hotkeyInput = ManualHotkeyInputSource()
         hotkeyInput.register(on: controller, for: .globalAppSwitcher)
-        controller.globalPrimaryModifierPressedOverride = true
+        controller.globalHotkeyHoldSetPressedOverride = true
         let initialSelectedAppID = controller.modelForTesting.selectedApp?.id
 
         hotkeyInput.emit(
@@ -109,7 +109,7 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertNotEqual(controller.modelForTesting.selectedApp?.id, initialSelectedAppID)
 
-        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
         hotkeyInput.emit(
             phase: .released,
             to: controller,
@@ -132,7 +132,7 @@ extension FlowTabPriorityCoverageTests {
         hotkeyInput.register(on: controller, for: .globalAppSwitcher)
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.globalPrimaryModifierPressedOverride = true
+        controller.globalHotkeyHoldSetPressedOverride = true
         let initialAppID = controller.modelForTesting.selectedApp?.id
 
         let firstEvent = hotkeyInput.emit(
@@ -161,8 +161,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNotEqual(firstAdvancedAppID, initialAppID)
         XCTAssertNotEqual(secondAdvancedAppID, firstAdvancedAppID)
         XCTAssertEqual(controller.hotkeyInputOwner.inputGeneration, 2)
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
+        controller.globalMainKeySetPressedOverride = false
         controller.cancelSelectionForTesting()
     }
 
@@ -179,8 +179,8 @@ extension FlowTabPriorityCoverageTests {
         hotkeyInput.register(on: controller, for: .globalAppSwitcher)
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.globalPrimaryModifierPressedOverride = true
-        controller.globalMainKeyPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = true
+        controller.globalMainKeySetPressedOverride = false
         let finishingEvent = hotkeyInput.emit(
             phase: .pressed,
             to: controller,
@@ -204,7 +204,7 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertNil(controller.modelForTesting.session)
 
-        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
         hotkeyInput.emit(
             phase: .released,
             to: controller,
@@ -215,14 +215,14 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(releaseScheduler.pendingCount, 0)
         XCTAssertEqual(releaseEventSource.activeObserverCount, 0)
 
-        controller.globalPrimaryModifierPressedOverride = true
+        controller.globalHotkeyHoldSetPressedOverride = true
         hotkeyInput.emit(
             phase: .pressed,
             to: controller,
             for: .globalAppSwitcher
         )
         XCTAssertNotNil(controller.modelForTesting.session)
-        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
         controller.cancelSelectionForTesting()
     }
 
@@ -244,7 +244,7 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
 
         controller.scheduleModifierReleaseConfirmation(trigger: "presentation_recovered")
         let releaseGeneration = controller.modifierReleaseConfirmationGeneration
@@ -281,7 +281,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
 
         controller.scheduleModifierReleaseConfirmation(trigger: "generation_first")
         let firstGeneration = controller.modifierReleaseConfirmationGeneration
@@ -419,8 +419,8 @@ extension FlowTabPriorityCoverageTests {
             modifierReleaseObservationScheduler: releaseScheduler,
             modifierReleaseEventSource: releaseEventSource
         )
-        controller.globalPrimaryModifierPressedOverride = true
-        controller.globalMainKeyPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = true
+        controller.globalMainKeySetPressedOverride = false
 
         controller.beginHotkeyReplaySuppressionUntilRelease(
             for: .globalAppSwitcher,
@@ -434,7 +434,7 @@ extension FlowTabPriorityCoverageTests {
             .replaySuppression(trigger: "state_machine", generation: generation, releasedSamples: 0)
         )
 
-        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
         releaseEventSource.emitInputTransition()
 
         XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
@@ -464,8 +464,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(firstSessionGeneration, 1)
         XCTAssertTrue(controller.isPresentationSessionGenerationCurrent(firstSessionGeneration))
 
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
+        controller.globalMainKeySetPressedOverride = false
         controller.scheduleModifierReleaseConfirmation(trigger: "session_generation")
         XCTAssertTrue(controller.hasPendingModifierReleaseConfirmation)
 
@@ -1383,19 +1383,16 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.globalPrimaryModifierPressedOverride = false
-        let primaryModifierKeyCode: UInt16
-        switch controller.activePrimaryModifier() {
-        case .option:
-            primaryModifierKeyCode = UInt16(kVK_Option)
-        case .control:
-            primaryModifierKeyCode = UInt16(kVK_Control)
-        case .command:
-            primaryModifierKeyCode = UInt16(kVK_Command)
+        controller.globalHotkeyHoldSetPressedOverride = false
+        guard
+            let holdModifierKey = controller.activeHotkeyHoldKeys()
+                .orderedKeys.first(where: { $0.modifier != nil })
+        else {
+            return XCTFail("Expected a modifier in the active hotkey hold set")
         }
 
         controller.handleFlagsChangedForTesting(
-            Self.makeFlagsChangedEvent(keyCode: primaryModifierKeyCode)
+            Self.makeFlagsChangedEvent(keyCode: holdModifierKey.keyCode)
         )
 
         XCTAssertTrue(controller.hasPendingModifierReleaseConfirmation)
@@ -1490,7 +1487,7 @@ extension FlowTabPriorityCoverageTests {
                 panelVisibilityRecoveryObservationScheduler:
                     recoveryScheduler
             )
-        occlusionController.globalPrimaryModifierPressedOverride = true
+        occlusionController.globalHotkeyHoldSetPressedOverride = true
 
         XCTAssertTrue(occlusionController.beginGlobalHotkeySessionForTesting())
         occlusionController.panelOcclusionStateOverride = []

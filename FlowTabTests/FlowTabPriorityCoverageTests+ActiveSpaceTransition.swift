@@ -26,7 +26,7 @@ extension FlowTabPriorityCoverageTests {
             activeSpaceTransitionObservationScheduler:
                 transitionScheduler
         )
-        controller.globalPrimaryModifierPressedOverride = true
+        controller.globalHotkeyHoldSetPressedOverride = true
         controller.appIsActiveOverride = false
         var activateCallCount = 0
         controller.activateApplicationIgnoringOtherAppsOverride = {
@@ -103,7 +103,7 @@ extension FlowTabPriorityCoverageTests {
             activeSpaceTransitionObservationScheduler:
                 transitionScheduler
         )
-        controller.globalPrimaryModifierPressedOverride = true
+        controller.globalHotkeyHoldSetPressedOverride = true
         controller.panelVisibilityOverride = true
         controller.panelOcclusionStateOverride = .visible
 
@@ -152,7 +152,7 @@ extension FlowTabPriorityCoverageTests {
             activeSpaceTransitionObservationScheduler:
                 transitionScheduler
         )
-        controller.globalPrimaryModifierPressedOverride = true
+        controller.globalHotkeyHoldSetPressedOverride = true
         controller.panelVisibilityOverride = true
         controller.panelOcclusionStateOverride = .visible
 
@@ -221,8 +221,8 @@ extension FlowTabPriorityCoverageTests {
             activeSpaceTransitionObservationScheduler:
                 transitionScheduler
         )
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
+        controller.globalMainKeySetPressedOverride = false
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         controller.handleActiveSpaceDidChangeForTesting()
@@ -265,8 +265,8 @@ extension FlowTabPriorityCoverageTests {
             activeSpaceTransitionObservationScheduler:
                 transitionScheduler
         )
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
+        controller.globalMainKeySetPressedOverride = false
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         let terminatedAppID = controller.modelForTesting.selectedApp?.id
@@ -343,8 +343,8 @@ extension FlowTabPriorityCoverageTests {
             activeSpaceTransitionObservationScheduler:
                 transitionScheduler
         )
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
+        controller.globalMainKeySetPressedOverride = false
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         controller.handleActiveSpaceDidChangeForTesting()

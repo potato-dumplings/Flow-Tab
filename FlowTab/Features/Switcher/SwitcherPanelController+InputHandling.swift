@@ -101,7 +101,7 @@ extension SwitcherPanelController {
             if activeHotkeySessionKind == .inAppWindowSwitcher {
                 return true
             }
-            if SwitcherHotkeyPreferencesStore.load().mainKey == .tab {
+            if SwitcherHotkeyPreferencesStore.load().mainKeys.contains(.tab) {
                 return true
             }
             advance(event.modifierFlags.contains(.shift) ? .tabBackward : .tabForward)
@@ -349,8 +349,13 @@ extension SwitcherPanelController {
     }
 
     func handleFlagsChanged(_ event: NSEvent) {
-        let isPrimaryEvent = isPrimaryModifierFlagsEvent(event)
-        guard isPrimaryEvent else { return }
+        if isTerminateSelectedAppShortcut(event) {
+            terminateSelectedApp()
+            return
+        }
+        let isHotkeyHoldModifierEvent =
+            isHotkeyHoldModifierFlagsEvent(event)
+        guard isHotkeyHoldModifierEvent else { return }
         guard isPanelPresented else { return }
         guard !model.isSearchActive else { return }
         logInputTrace(
@@ -534,7 +539,7 @@ extension SwitcherPanelController {
             return
         }
         let shouldKeepSessionVisible = model.isSearchActive
-            || isPrimaryModifierPressedInHardwareState(for: sessionKind)
+            || isHotkeyHoldSetPressedInHardwareState(for: sessionKind)
         guard shouldKeepSessionVisible else {
             logSearchTrace(
                 "systemInterruption trigger=\(trigger) action=cancel reason=modifierReleased \(searchTraceStateSummary())"

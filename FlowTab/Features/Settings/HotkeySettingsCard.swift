@@ -2,125 +2,15 @@ import SwiftUI
 import AppKit
 import FlowTabCore
 
-struct AppKitHotkeySettingsCardContent: AppKitSettingsCardRepresentable {
-    typealias NSViewType = HotkeySettingsCardAppKitView
-
-    @Binding var hotkeyPrimaryModifierRaw: String
-    @Binding var hotkeyMainKeyRaw: String
-    @Binding var hotkeyQuitKeyRaw: String
-    @Binding var inAppWindowHotkeyPrimaryModifierRaw: String
-    @Binding var inAppWindowHotkeyMainKeyRaw: String
-    let commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
-    let accessibilityTrusted: Bool
-
-    final class Coordinator {
-        var hotkeyPrimaryModifierRaw: Binding<String>
-        var hotkeyMainKeyRaw: Binding<String>
-        var hotkeyQuitKeyRaw: Binding<String>
-        var inAppWindowHotkeyPrimaryModifierRaw: Binding<String>
-        var inAppWindowHotkeyMainKeyRaw: Binding<String>
-
-        init(
-            hotkeyPrimaryModifierRaw: Binding<String>,
-            hotkeyMainKeyRaw: Binding<String>,
-            hotkeyQuitKeyRaw: Binding<String>,
-            inAppWindowHotkeyPrimaryModifierRaw: Binding<String>,
-            inAppWindowHotkeyMainKeyRaw: Binding<String>
-        ) {
-            self.hotkeyPrimaryModifierRaw = hotkeyPrimaryModifierRaw
-            self.hotkeyMainKeyRaw = hotkeyMainKeyRaw
-            self.hotkeyQuitKeyRaw = hotkeyQuitKeyRaw
-            self.inAppWindowHotkeyPrimaryModifierRaw = inAppWindowHotkeyPrimaryModifierRaw
-            self.inAppWindowHotkeyMainKeyRaw = inAppWindowHotkeyMainKeyRaw
-        }
-
-        func update(
-            hotkeyPrimaryModifierRaw: Binding<String>,
-            hotkeyMainKeyRaw: Binding<String>,
-            hotkeyQuitKeyRaw: Binding<String>,
-            inAppWindowHotkeyPrimaryModifierRaw: Binding<String>,
-            inAppWindowHotkeyMainKeyRaw: Binding<String>
-        ) {
-            self.hotkeyPrimaryModifierRaw = hotkeyPrimaryModifierRaw
-            self.hotkeyMainKeyRaw = hotkeyMainKeyRaw
-            self.hotkeyQuitKeyRaw = hotkeyQuitKeyRaw
-            self.inAppWindowHotkeyPrimaryModifierRaw = inAppWindowHotkeyPrimaryModifierRaw
-            self.inAppWindowHotkeyMainKeyRaw = inAppWindowHotkeyMainKeyRaw
-        }
-
-        func setHotkeyPrimaryModifier(_ rawValue: String) {
-            hotkeyPrimaryModifierRaw.wrappedValue = rawValue
-        }
-
-        func setHotkeyMainKey(_ rawValue: String) {
-            hotkeyMainKeyRaw.wrappedValue = rawValue
-        }
-
-        func setHotkeyQuitKey(_ rawValue: String) {
-            hotkeyQuitKeyRaw.wrappedValue = rawValue
-        }
-
-        func setInAppWindowPrimaryModifier(_ rawValue: String) {
-            inAppWindowHotkeyPrimaryModifierRaw.wrappedValue = rawValue
-        }
-
-        func setInAppWindowMainKey(_ rawValue: String) {
-            inAppWindowHotkeyMainKeyRaw.wrappedValue = rawValue
-        }
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(
-            hotkeyPrimaryModifierRaw: $hotkeyPrimaryModifierRaw,
-            hotkeyMainKeyRaw: $hotkeyMainKeyRaw,
-            hotkeyQuitKeyRaw: $hotkeyQuitKeyRaw,
-            inAppWindowHotkeyPrimaryModifierRaw: $inAppWindowHotkeyPrimaryModifierRaw,
-            inAppWindowHotkeyMainKeyRaw: $inAppWindowHotkeyMainKeyRaw
-        )
-    }
-
-    func makeCardView(context _: Context) -> HotkeySettingsCardAppKitView {
-        HotkeySettingsCardAppKitView()
-    }
-
-    func updateCoordinator(_ coordinator: Coordinator) {
-        coordinator.update(
-            hotkeyPrimaryModifierRaw: $hotkeyPrimaryModifierRaw,
-            hotkeyMainKeyRaw: $hotkeyMainKeyRaw,
-            hotkeyQuitKeyRaw: $hotkeyQuitKeyRaw,
-            inAppWindowHotkeyPrimaryModifierRaw: $inAppWindowHotkeyPrimaryModifierRaw,
-            inAppWindowHotkeyMainKeyRaw: $inAppWindowHotkeyMainKeyRaw
-        )
-    }
-
-    func connect(_ view: HotkeySettingsCardAppKitView, coordinator: Coordinator) {
-        view.onHotkeyPrimaryModifierChanged = { coordinator.setHotkeyPrimaryModifier($0) }
-        view.onHotkeyMainKeyChanged = { coordinator.setHotkeyMainKey($0) }
-        view.onHotkeyQuitKeyChanged = { coordinator.setHotkeyQuitKey($0) }
-        view.onInAppWindowPrimaryModifierChanged = { coordinator.setInAppWindowPrimaryModifier($0) }
-        view.onInAppWindowMainKeyChanged = { coordinator.setInAppWindowMainKey($0) }
-    }
-
-    func makeState() -> HotkeySettingsCardState {
-        HotkeySettingsCardState(
-            hotkeyPrimaryModifierRaw: hotkeyPrimaryModifierRaw,
-            hotkeyMainKeyRaw: hotkeyMainKeyRaw,
-            hotkeyQuitKeyRaw: hotkeyQuitKeyRaw,
-            inAppWindowHotkeyPrimaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw,
-            inAppWindowHotkeyMainKeyRaw: inAppWindowHotkeyMainKeyRaw,
-            commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
-            accessibilityTrusted: accessibilityTrusted,
-            appLanguageRaw: AppLanguagePreferencesStore.load().rawValue
-        )
-    }
-}
-
 struct HotkeySettingsCardState: Equatable {
     let hotkeyPrimaryModifierRaw: String
+    var hotkeyReverseModifiersRaw =
+        SwitcherHotkeyPreferencesStore.defaultReverseKeys.rawValue
     let hotkeyMainKeyRaw: String
     let hotkeyQuitKeyRaw: String
-    let inAppWindowHotkeyPrimaryModifierRaw: String
-    let inAppWindowHotkeyMainKeyRaw: String
+    let inAppWindowHotkeyShortcutKeysRaw: String
+    var inAppWindowHotkeyReverseKeysRaw =
+        InAppWindowHotkeyPreferencesStore.defaultReverseKeys.rawValue
     let commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
     let accessibilityTrusted: Bool
     let appLanguageRaw: String
@@ -132,31 +22,27 @@ struct HotkeySettingsCardState: Equatable {
 
     var hotkeyConfiguration: SwitcherHotkeyConfiguration {
         SwitcherHotkeyPreferencesStore.resolve(
-            primaryModifierRaw: hotkeyPrimaryModifierRaw,
-            mainKeyRaw: hotkeyMainKeyRaw,
-            quitKeyRaw: hotkeyQuitKeyRaw
+            baseKeysRaw: hotkeyPrimaryModifierRaw,
+            reverseKeysRaw: hotkeyReverseModifiersRaw,
+            mainKeysRaw: hotkeyMainKeyRaw,
+            quitKeysRaw: hotkeyQuitKeyRaw
         )
     }
 
     var inAppWindowHotkeyConfiguration: SwitcherHotkeyConfiguration {
         let resolved = InAppWindowHotkeyPreferencesStore.resolve(
-            primaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw,
-            mainKeyRaw: inAppWindowHotkeyMainKeyRaw
+            shortcutKeysRaw: inAppWindowHotkeyShortcutKeysRaw,
+            reverseKeysRaw: inAppWindowHotkeyReverseKeysRaw
         )
-        return SwitcherHotkeyConfiguration(
-            primaryModifier: resolved.primaryModifier,
-            mainKey: resolved.mainKey,
-            quitKey: .q
-        )
+        return resolved.configuration
     }
 
     var mainUsesCommandTab: Bool {
-        hotkeyConfiguration.primaryModifier == .command && hotkeyConfiguration.mainKey == .tab
+        hotkeyConfiguration.usesCommandTab
     }
 
     var inAppUsesCommandTab: Bool {
-        inAppWindowHotkeyConfiguration.primaryModifier == .command
-            && inAppWindowHotkeyConfiguration.mainKey == .tab
+        inAppWindowHotkeyConfiguration.usesCommandTab
     }
 
     var mainSummaryText: String {
@@ -188,51 +74,54 @@ struct HotkeySettingsCardState: Equatable {
 }
 
 final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
-    var onHotkeyPrimaryModifierChanged: ((String) -> Void)?
-    var onHotkeyMainKeyChanged: ((String) -> Void)?
-    var onHotkeyQuitKeyChanged: ((String) -> Void)?
-    var onInAppWindowPrimaryModifierChanged: ((String) -> Void)?
-    var onInAppWindowMainKeyChanged: ((String) -> Void)?
+    var onMainModifiersChanged: ((SwitcherHotkeyKeySet) -> Void)?
+    var onMainReverseModifiersChanged: ((SwitcherHotkeyKeySet) -> Void)?
+    var onMainKeyChanged: ((SwitcherHotkeyKeySet) -> Void)?
+    var onQuitKeyChanged: ((SwitcherHotkeyKeySet) -> Void)?
+    var onInAppShortcutChanged: ((SwitcherHotkeyKeySet) -> Void)?
+    var onInAppReverseModifiersChanged: ((SwitcherHotkeyKeySet) -> Void)?
     var onInteraction: (() -> Void)?
 
     private let stackView = NSStackView()
-    private let mainPrimaryModifierSelect = FlowSettingsSelectControl(frame: .zero)
-    private let mainKeySelect = FlowSettingsSelectControl(frame: .zero)
-    private let quitKeySelect = FlowSettingsSelectControl(frame: .zero)
-    private let inAppPrimaryModifierSelect = FlowSettingsSelectControl(frame: .zero)
-    private let inAppMainKeySelect = FlowSettingsSelectControl(frame: .zero)
+    private let mainModifiersRecorder = FlowSettingsShortcutRecorderControl(frame: .zero)
+    private let mainReverseModifiersRecorder =
+        FlowSettingsShortcutRecorderControl(frame: .zero)
+    private let mainKeyRecorder = FlowSettingsShortcutRecorderControl(frame: .zero)
+    private let quitKeyRecorder = FlowSettingsShortcutRecorderControl(frame: .zero)
+    private let inAppShortcutRecorder = FlowSettingsShortcutRecorderControl(frame: .zero)
+    private let inAppReverseModifiersRecorder =
+        FlowSettingsShortcutRecorderControl(frame: .zero)
     private let mainSummaryLabel = HotkeySettingsCardAppKitView.makeSecondaryLabel()
     private let mainTakeoverStatusLabel = HotkeySettingsCardAppKitView.makeStatusLabel()
     private let divider = NSBox()
     private let inAppRowsContainer = NSStackView()
     private let inAppSummaryLabel = HotkeySettingsCardAppKitView.makeSecondaryLabel()
     private let inAppTakeoverStatusLabel = HotkeySettingsCardAppKitView.makeStatusLabel()
-    private lazy var mainPrimaryModifierRow = AppKitSettingsCardBaseView.makeControlRow(
-        title: "",
-        control: mainPrimaryModifierSelect,
-        validationIdentifier: HotkeySettingsField.mainModifier.conflictTestingIdentifier
+
+    private lazy var mainModifiersRow = makeControlRow(
+        control: mainModifiersRecorder,
+        field: .mainModifiers
     )
-    private lazy var mainKeyRow = AppKitSettingsCardBaseView.makeControlRow(
-        title: "",
-        control: mainKeySelect,
-        validationIdentifier: HotkeySettingsField.mainKey.conflictTestingIdentifier
+    private lazy var mainReverseModifiersRow = makeControlRow(
+        control: mainReverseModifiersRecorder,
+        field: .mainReverseModifiers
     )
-    private lazy var quitKeyRow = AppKitSettingsCardBaseView.makeControlRow(
-        title: "",
-        control: quitKeySelect,
-        validationIdentifier: HotkeySettingsField.quitKey.conflictTestingIdentifier
+    private lazy var mainKeyRow = makeControlRow(
+        control: mainKeyRecorder,
+        field: .mainKey
     )
-    private lazy var inAppPrimaryModifierRow = AppKitSettingsCardBaseView.makeControlRow(
-        title: "",
-        control: inAppPrimaryModifierSelect,
-        validationIdentifier: HotkeySettingsField.inAppModifier.conflictTestingIdentifier
+    private lazy var quitKeyRow = makeControlRow(
+        control: quitKeyRecorder,
+        field: .quitKey
     )
-    private lazy var inAppMainKeyRow = AppKitSettingsCardBaseView.makeControlRow(
-        title: "",
-        control: inAppMainKeySelect,
-        validationIdentifier: HotkeySettingsField.inAppKey.conflictTestingIdentifier
+    private lazy var inAppShortcutRow = makeControlRow(
+        control: inAppShortcutRecorder,
+        field: .inAppShortcut
     )
-    private var isApplyingState = false
+    private lazy var inAppReverseModifiersRow = makeControlRow(
+        control: inAppReverseModifiersRecorder,
+        field: .inAppReverseModifiers
+    )
     private var currentState: HotkeySettingsCardState?
 
     override init(frame frameRect: NSRect) {
@@ -263,28 +152,96 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
     }
 
     func update(with state: HotkeySettingsCardState) {
-        let selectionProjection = selectionProjection(for: state)
+        let mainConfiguration = state.hotkeyConfiguration
+        let inAppConfiguration = state.inAppWindowHotkeyConfiguration
         guard
             currentState != state
-                || selectionProjection.contains(where: { $0.control.selectionID != $0.rawValue })
+                || mainModifiersRecorder.recordedKeys
+                    != mainConfiguration.baseKeys
+                || mainReverseModifiersRecorder.recordedKeys
+                    != mainConfiguration.reverseKeys
+                || mainKeyRecorder.recordedKeys
+                    != mainConfiguration.mainKeys
+                || quitKeyRecorder.recordedKeys
+                    != mainConfiguration.quitKeys
+                || inAppShortcutRecorder.recordedKeys
+                    != inAppConfiguration.baseKeys
+                || inAppReverseModifiersRecorder.recordedKeys
+                    != inAppConfiguration.reverseKeys
+                || inAppShortcutRecorder.isEnabled != state.accessibilityTrusted
         else {
             return
         }
         currentState = state
 
-        isApplyingState = true
-        for selection in selectionProjection {
-            selectItem(in: selection.control, rawValue: selection.rawValue)
-        }
-        isApplyingState = false
+        let recordingPrompt = AppStrings.text(.hotkeyRecorderPrompt, language: state.language)
+        let modifierRequiredPrompt = AppStrings.text(
+            .hotkeyRecorderModifierRequired,
+            language: state.language
+        )
+
+        mainModifiersRecorder.update(
+            keys: mainConfiguration.baseKeys,
+            recordingPrompt: recordingPrompt,
+            keyRequiredPrompt: modifierRequiredPrompt,
+            accessibilityLabel: AppStrings.text(
+                .hotkeyRowMainModifiers,
+                language: state.language
+            )
+        )
+        mainReverseModifiersRecorder.update(
+            keys: mainConfiguration.reverseKeys,
+            recordingPrompt: recordingPrompt,
+            keyRequiredPrompt: modifierRequiredPrompt,
+            accessibilityLabel: AppStrings.text(
+                .hotkeyRowMainReverseModifiers,
+                language: state.language
+            )
+        )
+        mainKeyRecorder.update(
+            keys: mainConfiguration.mainKeys,
+            recordingPrompt: recordingPrompt,
+            keyRequiredPrompt: modifierRequiredPrompt,
+            accessibilityLabel: AppStrings.text(
+                .hotkeyRowMainKey,
+                language: state.language
+            )
+        )
+        quitKeyRecorder.update(
+            keys: mainConfiguration.quitKeys,
+            recordingPrompt: recordingPrompt,
+            keyRequiredPrompt: modifierRequiredPrompt,
+            accessibilityLabel: AppStrings.text(
+                .hotkeyRowQuitKey,
+                language: state.language
+            )
+        )
+        inAppShortcutRecorder.update(
+            keys: inAppConfiguration.baseKeys,
+            recordingPrompt: recordingPrompt,
+            keyRequiredPrompt: modifierRequiredPrompt,
+            accessibilityLabel: AppStrings.text(
+                .hotkeyRowInAppShortcut,
+                language: state.language
+            )
+        )
+        inAppReverseModifiersRecorder.update(
+            keys: inAppConfiguration.reverseKeys,
+            recordingPrompt: recordingPrompt,
+            keyRequiredPrompt: modifierRequiredPrompt,
+            accessibilityLabel: AppStrings.text(
+                .hotkeyRowInAppReverseModifiers,
+                language: state.language
+            )
+        )
 
         mainSummaryLabel.stringValue = state.mainSummaryText
         updateMainTakeoverStatus(with: state)
         updateConflictStatus(with: state)
 
         inAppRowsContainer.alphaValue = state.accessibilityTrusted ? 1 : 0.55
-        inAppPrimaryModifierSelect.isEnabled = state.accessibilityTrusted
-        inAppMainKeySelect.isEnabled = state.accessibilityTrusted
+        inAppShortcutRecorder.isEnabled = state.accessibilityTrusted
+        inAppReverseModifiersRecorder.isEnabled = state.accessibilityTrusted
         inAppSummaryLabel.stringValue = state.inAppSummaryText
         updateInAppTakeoverStatus(with: state)
         updateLocalizedRows(language: state.language)
@@ -313,70 +270,47 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
             stackView.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor)
         ])
 
-        configure(
-            selectControl: mainPrimaryModifierSelect,
-            options: SwitcherPrimaryModifier.allCases.map { (id: $0.rawValue, title: $0.displayName) },
-            onSelectionChanged: { [weak self] rawValue in
-                self?.handleMainPrimaryModifierChanged(rawValue)
-            }
-        )
-        configure(
-            selectControl: mainKeySelect,
-            options: SwitcherHotkeyKey.allCases.map { (id: $0.rawValue, title: $0.displayName) },
-            placementPreference: .preferRight,
-            onSelectionChanged: { [weak self] rawValue in
-                self?.handleMainKeyChanged(rawValue)
-            }
-        )
-        configure(
-            selectControl: quitKeySelect,
-            options: SwitcherHotkeyKey.allCases.map { (id: $0.rawValue, title: $0.displayName) },
-            placementPreference: .preferRight,
-            onSelectionChanged: { [weak self] rawValue in
-                self?.handleQuitKeyChanged(rawValue)
-            }
-        )
-        configure(
-            selectControl: inAppPrimaryModifierSelect,
-            options: SwitcherPrimaryModifier.allCases.map { (id: $0.rawValue, title: $0.displayName) },
-            onSelectionChanged: { [weak self] rawValue in
-                self?.handleInAppPrimaryModifierChanged(rawValue)
-            }
-        )
-        configure(
-            selectControl: inAppMainKeySelect,
-            options: SwitcherHotkeyKey.allCases.map { (id: $0.rawValue, title: $0.displayName) },
-            placementPreference: .preferRight,
-            onSelectionChanged: { [weak self] rawValue in
-                self?.handleInAppMainKeyChanged(rawValue)
-            }
-        )
-        mainPrimaryModifierSelect.setFlowTabTestingIdentifier(
-            HotkeySettingsField.mainModifier.controlTestingIdentifier
-        )
-        mainKeySelect.setFlowTabTestingIdentifier(
-            HotkeySettingsField.mainKey.controlTestingIdentifier
-        )
-        quitKeySelect.setFlowTabTestingIdentifier(
-            HotkeySettingsField.quitKey.controlTestingIdentifier
-        )
-        inAppPrimaryModifierSelect.setFlowTabTestingIdentifier(
-            HotkeySettingsField.inAppModifier.controlTestingIdentifier
-        )
-        inAppMainKeySelect.setFlowTabTestingIdentifier(
-            HotkeySettingsField.inAppKey.controlTestingIdentifier
-        )
+        configureKeyRecorder(mainModifiersRecorder) { [weak self] keys in
+            self?.onMainModifiersChanged?(keys)
+        }
+        configureKeyRecorder(mainReverseModifiersRecorder) { [weak self] keys in
+            self?.onMainReverseModifiersChanged?(keys)
+        }
+        configureKeyRecorder(mainKeyRecorder) { [weak self] keys in
+            self?.onMainKeyChanged?(keys)
+        }
+        configureKeyRecorder(quitKeyRecorder) { [weak self] keys in
+            self?.onQuitKeyChanged?(keys)
+        }
+        configureKeyRecorder(inAppShortcutRecorder) { [weak self] keys in
+            self?.onInAppShortcutChanged?(keys)
+        }
+        configureKeyRecorder(inAppReverseModifiersRecorder) { [weak self] keys in
+            self?.onInAppReverseModifiersChanged?(keys)
+        }
+
+        for field in HotkeySettingsField.allCases {
+            recorder(for: field).setFlowTabTestingIdentifier(
+                field.controlTestingIdentifier
+            )
+        }
         mainSummaryLabel.setFlowTabTestingIdentifier("flowtab.settings.hotkey.main-summary")
         inAppSummaryLabel.setFlowTabTestingIdentifier("flowtab.settings.hotkey.in-app-summary")
-        mainTakeoverStatusLabel.setFlowTabTestingIdentifier("flowtab.settings.hotkey.main-takeover-status")
-        inAppTakeoverStatusLabel.setFlowTabTestingIdentifier("flowtab.settings.hotkey.in-app-takeover-status")
+        mainTakeoverStatusLabel.setFlowTabTestingIdentifier(
+            "flowtab.settings.hotkey.main-takeover-status"
+        )
+        inAppTakeoverStatusLabel.setFlowTabTestingIdentifier(
+            "flowtab.settings.hotkey.in-app-takeover-status"
+        )
 
-        stackView.addArrangedSubview(mainPrimaryModifierRow)
-        stackView.addArrangedSubview(mainKeyRow)
-        stackView.addArrangedSubview(quitKeyRow)
-        mainPrimaryModifierRow.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
-        mainKeyRow.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
-        quitKeyRow.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
+        for row in [
+            mainModifiersRow,
+            mainReverseModifiersRow,
+            mainKeyRow,
+            quitKeyRow
+        ] {
+            addFullWidthArrangedSubview(row, to: stackView)
+        }
         stackView.addArrangedSubview(mainSummaryLabel)
         stackView.addArrangedSubview(mainTakeoverStatusLabel)
 
@@ -392,75 +326,41 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         inAppRowsContainer.translatesAutoresizingMaskIntoConstraints = false
         inAppRowsContainer.setContentHuggingPriority(.required, for: .vertical)
         inAppRowsContainer.setContentCompressionResistancePriority(.required, for: .vertical)
-        inAppRowsContainer.addArrangedSubview(inAppPrimaryModifierRow)
-        inAppRowsContainer.addArrangedSubview(inAppMainKeyRow)
-        inAppPrimaryModifierRow.widthAnchor.constraint(equalTo: inAppRowsContainer.widthAnchor).isActive = true
-        inAppMainKeyRow.widthAnchor.constraint(equalTo: inAppRowsContainer.widthAnchor).isActive = true
+        addFullWidthArrangedSubview(inAppShortcutRow, to: inAppRowsContainer)
+        addFullWidthArrangedSubview(
+            inAppReverseModifiersRow,
+            to: inAppRowsContainer
+        )
 
         stackView.addArrangedSubview(inAppRowsContainer)
         stackView.addArrangedSubview(inAppSummaryLabel)
         stackView.addArrangedSubview(inAppTakeoverStatusLabel)
     }
 
-    private func configure(
-        selectControl: FlowSettingsSelectControl,
-        options: [(id: String, title: String)],
-        placementPreference: FlowDropdownPlacementPreference = .defaultBelow,
-        onSelectionChanged: @escaping (String) -> Void
-    ) {
-        selectControl.onSelectionChanged = onSelectionChanged
-        selectControl.onInteraction = { [weak self] in
-            self?.onInteraction?()
-        }
-        AppKitSettingsCardBaseView.configure(
-            selectControl: selectControl,
-            options: options,
-            placementPreference: placementPreference
+    private func makeControlRow(
+        control: NSView,
+        field: HotkeySettingsField
+    ) -> AppKitSettingsControlRow {
+        AppKitSettingsCardBaseView.makeControlRow(
+            title: "",
+            control: control,
+            validationIdentifier: field.conflictTestingIdentifier
         )
     }
 
-    private func selectItem(in selectControl: FlowSettingsSelectControl, rawValue: String) {
-        AppKitSettingsCardBaseView.selectItem(in: selectControl, rawValue: rawValue)
+    private func configureKeyRecorder(
+        _ recorder: FlowSettingsShortcutRecorderControl,
+        onKeysChanged: @escaping (SwitcherHotkeyKeySet) -> Void
+    ) {
+        recorder.onKeysChanged = onKeysChanged
+        recorder.onInteraction = { [weak self] in
+            self?.onInteraction?()
+        }
     }
 
-    private func selectionProjection(
-        for state: HotkeySettingsCardState
-    ) -> [(control: FlowSettingsSelectControl, rawValue: String)] {
-        [
-            (mainPrimaryModifierSelect, state.hotkeyConfiguration.primaryModifier.rawValue),
-            (mainKeySelect, state.hotkeyConfiguration.mainKey.rawValue),
-            (quitKeySelect, state.hotkeyConfiguration.quitKey.rawValue),
-            (
-                inAppPrimaryModifierSelect,
-                state.inAppWindowHotkeyConfiguration.primaryModifier.rawValue
-            ),
-            (inAppMainKeySelect, state.inAppWindowHotkeyConfiguration.mainKey.rawValue)
-        ]
-    }
-
-    private func handleMainPrimaryModifierChanged(_ rawValue: String) {
-        guard !isApplyingState else { return }
-        onHotkeyPrimaryModifierChanged?(rawValue)
-    }
-
-    private func handleMainKeyChanged(_ rawValue: String) {
-        guard !isApplyingState else { return }
-        onHotkeyMainKeyChanged?(rawValue)
-    }
-
-    private func handleQuitKeyChanged(_ rawValue: String) {
-        guard !isApplyingState else { return }
-        onHotkeyQuitKeyChanged?(rawValue)
-    }
-
-    private func handleInAppPrimaryModifierChanged(_ rawValue: String) {
-        guard !isApplyingState else { return }
-        onInAppWindowPrimaryModifierChanged?(rawValue)
-    }
-
-    private func handleInAppMainKeyChanged(_ rawValue: String) {
-        guard !isApplyingState else { return }
-        onInAppWindowMainKeyChanged?(rawValue)
+    private func addFullWidthArrangedSubview(_ view: NSView, to stack: NSStackView) {
+        stack.addArrangedSubview(view)
+        view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
     }
 
     private func updateMainTakeoverStatus(with state: HotkeySettingsCardState) {
@@ -483,16 +383,37 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
 
     private func row(for field: HotkeySettingsField) -> AppKitSettingsControlRow {
         switch field {
-        case .mainModifier:
-            return mainPrimaryModifierRow
+        case .mainModifiers:
+            return mainModifiersRow
+        case .mainReverseModifiers:
+            return mainReverseModifiersRow
         case .mainKey:
             return mainKeyRow
         case .quitKey:
             return quitKeyRow
-        case .inAppModifier:
-            return inAppPrimaryModifierRow
-        case .inAppKey:
-            return inAppMainKeyRow
+        case .inAppShortcut:
+            return inAppShortcutRow
+        case .inAppReverseModifiers:
+            return inAppReverseModifiersRow
+        }
+    }
+
+    private func recorder(
+        for field: HotkeySettingsField
+    ) -> FlowSettingsShortcutRecorderControl {
+        switch field {
+        case .mainModifiers:
+            return mainModifiersRecorder
+        case .mainReverseModifiers:
+            return mainReverseModifiersRecorder
+        case .mainKey:
+            return mainKeyRecorder
+        case .quitKey:
+            return quitKeyRecorder
+        case .inAppShortcut:
+            return inAppShortcutRecorder
+        case .inAppReverseModifiers:
+            return inAppReverseModifiersRecorder
         }
     }
 
@@ -534,11 +455,24 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
     }
 
     private func updateLocalizedRows(language: AppLanguage) {
-        mainPrimaryModifierRow.updateTitle(AppStrings.text(.hotkeyRowMainModifier, language: language))
-        mainKeyRow.updateTitle(AppStrings.text(.hotkeyRowMainKey, language: language))
-        quitKeyRow.updateTitle(AppStrings.text(.hotkeyRowQuitKey, language: language))
-        inAppPrimaryModifierRow.updateTitle(AppStrings.text(.hotkeyRowInAppModifier, language: language))
-        inAppMainKeyRow.updateTitle(AppStrings.text(.hotkeyRowInAppKey, language: language))
+        mainModifiersRow.updateTitle(
+            AppStrings.text(.hotkeyRowMainModifiers, language: language)
+        )
+        mainReverseModifiersRow.updateTitle(
+            AppStrings.text(.hotkeyRowMainReverseModifiers, language: language)
+        )
+        mainKeyRow.updateTitle(
+            AppStrings.text(.hotkeyRowMainKey, language: language)
+        )
+        quitKeyRow.updateTitle(
+            AppStrings.text(.hotkeyRowQuitKey, language: language)
+        )
+        inAppShortcutRow.updateTitle(
+            AppStrings.text(.hotkeyRowInAppShortcut, language: language)
+        )
+        inAppReverseModifiersRow.updateTitle(
+            AppStrings.text(.hotkeyRowInAppReverseModifiers, language: language)
+        )
     }
 
     private static func makeSecondaryLabel() -> NSTextField {
@@ -584,16 +518,18 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
 private extension HotkeySettingsField {
     var controlTestingIdentifier: String {
         switch self {
-        case .mainModifier:
-            return "flowtab.settings.hotkey.main-modifier"
+        case .mainModifiers:
+            return "flowtab.settings.hotkey.main-modifiers"
+        case .mainReverseModifiers:
+            return "flowtab.settings.hotkey.main-reverse-modifiers"
         case .mainKey:
             return "flowtab.settings.hotkey.main-key"
         case .quitKey:
             return "flowtab.settings.hotkey.quit-key"
-        case .inAppModifier:
-            return "flowtab.settings.hotkey.in-app-modifier"
-        case .inAppKey:
-            return "flowtab.settings.hotkey.in-app-key"
+        case .inAppShortcut:
+            return "flowtab.settings.hotkey.in-app-shortcut"
+        case .inAppReverseModifiers:
+            return "flowtab.settings.hotkey.in-app-reverse-modifiers"
         }
     }
 

@@ -59,11 +59,14 @@ struct HomeLandingView: View {
     @AppStorage(AppPreferenceKeys.showPermissionReminder)
     private var showPermissionReminder = true
     @AppStorage(AppPreferenceKeys.hotkeyPrimaryModifier)
-    private var hotkeyPrimaryModifierRaw = SwitcherHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
+    private var hotkeyPrimaryModifierRaw = SwitcherHotkeyPreferencesStore.defaultBaseKeys.rawValue
+    @AppStorage(AppPreferenceKeys.hotkeyReverseModifiers)
+    private var hotkeyReverseModifiersRaw =
+        SwitcherHotkeyPreferencesStore.defaultReverseKeys.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyMainKey)
-    private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
+    private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKeys.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyQuitKey)
-    private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
+    private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKeys.rawValue
     @StateObject private var permissionObservationOwner:
         HomePermissionObservationOwner
     @StateObject private var initialProjectionObservationOwner: HomeInitialProjectionObservationOwner
@@ -88,9 +91,10 @@ struct HomeLandingView: View {
 
     private var hotkeyConfiguration: SwitcherHotkeyConfiguration {
         SwitcherHotkeyPreferencesStore.resolve(
-            primaryModifierRaw: hotkeyPrimaryModifierRaw,
-            mainKeyRaw: hotkeyMainKeyRaw,
-            quitKeyRaw: hotkeyQuitKeyRaw
+            baseKeysRaw: hotkeyPrimaryModifierRaw,
+            reverseKeysRaw: hotkeyReverseModifiersRaw,
+            mainKeysRaw: hotkeyMainKeyRaw,
+            quitKeysRaw: hotkeyQuitKeyRaw
         )
     }
 

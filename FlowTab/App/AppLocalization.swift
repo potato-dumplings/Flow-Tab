@@ -71,11 +71,14 @@ enum AppStringKey: String {
     case hotkeySummaryReverseLabel
     case hotkeySummaryQuitLabel
     case hotkeySummaryInAppLabel
-    case hotkeyRowMainModifier
+    case hotkeyRowMainModifiers
+    case hotkeyRowMainReverseModifiers
     case hotkeyRowMainKey
     case hotkeyRowQuitKey
-    case hotkeyRowInAppModifier
-    case hotkeyRowInAppKey
+    case hotkeyRowInAppShortcut
+    case hotkeyRowInAppReverseModifiers
+    case hotkeyRecorderPrompt
+    case hotkeyRecorderModifierRequired
     case settingsPageTitle
     case settingsPageSubtitle
     case settingsCardAppearanceTitle
@@ -228,11 +231,14 @@ enum AppStrings {
             .hotkeySummaryReverseLabel: "反向",
             .hotkeySummaryQuitLabel: "结束应用",
             .hotkeySummaryInAppLabel: "应用内窗口",
-            .hotkeyRowMainModifier: "主修饰键",
+            .hotkeyRowMainModifiers: "主修饰键",
+            .hotkeyRowMainReverseModifiers: "反向修饰键",
             .hotkeyRowMainKey: "主切换按键",
             .hotkeyRowQuitKey: "结束应用按键",
-            .hotkeyRowInAppModifier: "应用内窗口修饰键",
-            .hotkeyRowInAppKey: "应用内窗口按键",
+            .hotkeyRowInAppShortcut: "应用内窗口",
+            .hotkeyRowInAppReverseModifiers: "应用内反向修饰键",
+            .hotkeyRecorderPrompt: "请按下快捷键",
+            .hotkeyRecorderModifierRequired: "请至少按下一个按键",
             .settingsPageTitle: "设置",
             .settingsPageSubtitle: "基础显示设置、快捷键与权限",
             .settingsCardAppearanceTitle: "外观",
@@ -298,7 +304,7 @@ enum AppStrings {
             .permissionScreenRequest: "请求屏幕录制权限",
             .permissionScreenManageActionLabel: "管理屏幕录制权限",
             .permissionScreenRequestActionLabel: "请求屏幕录制权限",
-            .permissionAccessibilityDetail: "用于应用切换、应用内窗口切换和最小化窗口处理。",
+            .permissionAccessibilityDetail: "用于应用切换、应用内窗口切换、多普通键快捷键监听和最小化窗口处理。",
             .permissionScreenDetail: "用于显示窗口真实预览画面；未授权时仅显示兜底信息。",
             .permissionHomeReminderToggle: "无权限时是否在首页提示获取权限",
             .permissionLaunchAtLoginToggle: "允许开机启动 FlowTab",
@@ -380,11 +386,14 @@ enum AppStrings {
             .hotkeySummaryReverseLabel: "Reverse",
             .hotkeySummaryQuitLabel: "Quit app",
             .hotkeySummaryInAppLabel: "In-app windows",
-            .hotkeyRowMainModifier: "Main modifier",
+            .hotkeyRowMainModifiers: "Main modifiers",
+            .hotkeyRowMainReverseModifiers: "Reverse modifiers",
             .hotkeyRowMainKey: "Main switch key",
             .hotkeyRowQuitKey: "Quit app key",
-            .hotkeyRowInAppModifier: "In-app window modifier",
-            .hotkeyRowInAppKey: "In-app window key",
+            .hotkeyRowInAppShortcut: "In-app windows",
+            .hotkeyRowInAppReverseModifiers: "In-app reverse modifiers",
+            .hotkeyRecorderPrompt: "Press shortcut",
+            .hotkeyRecorderModifierRequired: "Press at least one key",
             .settingsPageTitle: "Settings",
             .settingsPageSubtitle: "Display, hotkeys, and permissions",
             .settingsCardAppearanceTitle: "Appearance",
@@ -450,7 +459,7 @@ enum AppStrings {
             .permissionScreenRequest: "Request",
             .permissionScreenManageActionLabel: "Manage Screen Recording permission",
             .permissionScreenRequestActionLabel: "Request Screen Recording permission",
-            .permissionAccessibilityDetail: "Used for app switching, in-app window switching, and minimized-window handling.",
+            .permissionAccessibilityDetail: "Used for app switching, in-app window switching, multi-key shortcut monitoring, and minimized-window handling.",
             .permissionScreenDetail: "Used for real window previews; fallback info is shown when not granted.",
             .permissionHomeReminderToggle: "Show Home reminder when permissions are missing",
             .permissionLaunchAtLoginToggle: "Allow FlowTab to launch at login",
