@@ -220,6 +220,45 @@ struct RuntimeSpaceTopologySnapshot: Equatable {
             currentSignature: currentSignature
         )
     }
+
+    func resolvingCurrentSpaces(
+        fromOnscreenWindowIDs onscreenWindowIDs: Set<CGWindowID>
+    ) -> RuntimeSpaceTopologySnapshot {
+        guard currentSpaceIDByDisplay.isEmpty else { return self }
+
+        let exactCurrentSpaceIDs: Set<Int> = Set(onscreenWindowIDs.compactMap { windowID -> Int? in
+            guard let spaceIDs = spaceIDsByCGWindowID[windowID],
+                  spaceIDs.count == 1
+            else {
+                return nil
+            }
+            return spaceIDs.first
+        })
+        let inferredCurrentSpaceIDs = exactCurrentSpaceIDs.isEmpty
+            ? Set(onscreenWindowIDs.flatMap { spaceIDsByCGWindowID[$0] ?? [] })
+            : exactCurrentSpaceIDs
+        guard !inferredCurrentSpaceIDs.isEmpty else { return self }
+
+        let resolvedSpacesByID = Dictionary(
+            uniqueKeysWithValues: spacesByID.map { spaceID, space in
+                (
+                    spaceID,
+                    RuntimeSpaceTopologySpace(
+                        id: space.id,
+                        displayID: space.displayID,
+                        isCurrent: inferredCurrentSpaceIDs.contains(spaceID)
+                    )
+                )
+            }
+        )
+        return RuntimeSpaceTopologySnapshot(
+            currentSpaceIDByDisplay: currentSpaceIDByDisplay,
+            spacesByID: resolvedSpacesByID,
+            windowIDsBySpaceID: windowIDsBySpaceID,
+            spaceIDsByCGWindowID: spaceIDsByCGWindowID,
+            fullscreenWindowIDBySpaceID: fullscreenWindowIDBySpaceID
+        )
+    }
 }
 
 struct RuntimeSpaceTopologyDiff: Equatable {

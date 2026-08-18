@@ -479,8 +479,7 @@ extension FlowTabUITests {
                     )
                 )
             },
-            activeWindowTitle: title,
-            expectedTitleIsObservable: title != nil
+            activeWindowTitle: title
         )
     }
 }

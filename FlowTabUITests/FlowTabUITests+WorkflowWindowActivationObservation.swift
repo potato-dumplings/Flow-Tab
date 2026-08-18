@@ -13,7 +13,6 @@ struct FlowTabUITestWorkflowWindowActivationSnapshot: Equatable {
     let frontmostBundleIdentifier: String?
     let topmostCGWindow: WorkflowCGWindowObservation?
     let activeWindowTitle: String?
-    let expectedTitleIsObservable: Bool
 
     func matches(
         bundleIdentifier: String,
@@ -29,8 +28,7 @@ struct FlowTabUITestWorkflowWindowActivationSnapshot: Equatable {
         } ?? "nil"
         return "frontmostBundle=\(frontmostBundleIdentifier ?? "nil") "
             + "topmostCGWindow=\(windowSummary) "
-            + "activeWindowTitle=\(activeWindowTitle ?? "nil") "
-            + "expectedTitleIsObservable=\(expectedTitleIsObservable)"
+            + "activeWindowTitle=\(activeWindowTitle ?? "nil")"
     }
 }
 
@@ -330,7 +328,6 @@ extension FlowTabUITests {
                         ),
                 readback: {
                     self.workflowWindowActivationSnapshot(
-                        title: title,
                         app: workflowApp
                     )
                 }
@@ -356,7 +353,6 @@ extension FlowTabUITests {
     }
 
     func workflowWindowActivationSnapshot(
-        title: String,
         app workflowApp: SpaceFixtureResolvedWorkflow.App
     ) -> FlowTabUITestWorkflowWindowActivationSnapshot {
         let bundleIdentifier =
@@ -375,11 +371,6 @@ extension FlowTabUITests {
                 activeWindowTitle(
                     forBundleIdentifier:
                         bundleIdentifier
-                ),
-            expectedTitleIsObservable:
-                workflowWindowTitleIsObservable(
-                    title,
-                    app: workflowApp
                 )
         )
     }

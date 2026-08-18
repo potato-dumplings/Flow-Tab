@@ -5,6 +5,21 @@ import FlowTabCore
 
 private typealias FactDiagnostics = RuntimeFactCollectionDiagnostics
 
+private enum RuntimeCGWindowCollectionScope {
+    case visibility
+    case authoritativeTopology
+
+    init(options: CGWindowListOption) {
+        self = options.contains(.optionOnScreenOnly)
+            ? .visibility
+            : .authoritativeTopology
+    }
+
+    var recordsTopologyBaseline: Bool {
+        self == .authoritativeTopology
+    }
+}
+
 final class RuntimeSystemRepairFactProvider {
     private let cgWindowListProvider: RuntimeCGWindowListProviding
     private let spaceTopologyProvider: RuntimeSpaceTopologyProviding
@@ -311,12 +326,24 @@ final class RuntimeSystemRepairFactProvider {
             )
         }
         let parseReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let spaceTopologySnapshot = spaceTopologyProvider.snapshot(for: windowIDs)
-        let spaceTopologyDiff = windowRecordStore.recordSpaceTopologySnapshot(
-            spaceTopologySnapshot,
-            now: now,
-            reconciliationCoordinator: reconciliationCoordinator
+        let collectionScope = RuntimeCGWindowCollectionScope(options: options)
+        let onscreenWindowIDs = Set(
+            windowsByPID.values.flatMap { windows in
+                windows.lazy.filter(\.isOnscreen).map(\.id)
+            }
         )
+        let spaceTopologySnapshot = spaceTopologyProvider
+            .snapshot(for: windowIDs)
+            .resolvingCurrentSpaces(
+                fromOnscreenWindowIDs: onscreenWindowIDs
+            )
+        let spaceTopologyDiff = collectionScope.recordsTopologyBaseline
+            ? windowRecordStore.recordSpaceTopologySnapshot(
+                spaceTopologySnapshot,
+                now: now,
+                reconciliationCoordinator: reconciliationCoordinator
+            )
+            : nil
         let spaceIDsByWindowID = Dictionary(
             uniqueKeysWithValues: spaceTopologySnapshot.spaceIDsByCGWindowID.map { windowID, spaceIDs in
                 (windowID, Array(spaceIDs).sorted())
@@ -324,7 +351,10 @@ final class RuntimeSystemRepairFactProvider {
         )
         let spaceReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let scope = options.contains(.optionOnScreenOnly) ? "onscreen" : "all"
-        let signatureLogFields = spaceTopologyDiff.signatureLogFields
+        let signatureLogFields = spaceTopologyLogFields(
+            snapshot: spaceTopologySnapshot,
+            diff: spaceTopologyDiff
+        )
         FactDiagnostics.logTiming(
             "collectCGWindows",
             fields: [
@@ -334,7 +364,7 @@ final class RuntimeSystemRepairFactProvider {
                 ("accepted", "\(windowIDs.count)"),
                 ("pids", "\(windowsByPID.count)"),
                 ("spaceIDs", "\(spaceIDsByWindowID.count)"),
-                ("affected", "\(spaceTopologyDiff.affectedCGWindowIDs.count)")
+                ("affected", "\(spaceTopologyDiff?.affectedCGWindowIDs.count ?? 0)")
             ] + signatureLogFields + [
                 ("copyMs", FactDiagnostics.formatMilliseconds(copyReadyMs - startMs)),
                 ("parseMs", FactDiagnostics.formatMilliseconds(parseReadyMs - copyReadyMs)),
@@ -350,6 +380,24 @@ final class RuntimeSystemRepairFactProvider {
             windowsByPID: enrichedWindowsByPID,
             spaceTopologyDiff: spaceTopologyDiff
         )
+    }
+
+    private func spaceTopologyLogFields(
+        snapshot: RuntimeSpaceTopologySnapshot,
+        diff: RuntimeSpaceTopologyDiff?
+    ) -> [(String, String)] {
+        if let diff {
+            return diff.signatureLogFields
+        }
+        let signature = snapshot.signature
+        return [
+            ("topologyObservation", "visibilityOnly"),
+            ("signatureDisplays", "\(signature.displays.count)"),
+            ("signatureSpaces", "\(signature.trackedSpaceCount)"),
+            ("signatureWindows", "\(signature.trackedWindowCount)"),
+            ("signatureFullscreen", "\(signature.fullscreenWindowCount)"),
+            ("signature", signature.diagnosticSummary)
+        ]
     }
 
 }

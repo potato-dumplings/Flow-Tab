@@ -173,4 +173,166 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(fields["signature"], "d=1,current=11,spaces=2,windows=3,fullscreen=1")
         XCTAssertFalse(fields["signature"]?.contains(" ") == true)
     }
+
+    func testRuntimeCGVisibilitySamplingDoesNotReplaceAuthoritativeSpaceTopologyBaseline() throws {
+        let visibleWindowID = CGWindowID(240_101)
+        let offSpaceWindowID = CGWindowID(240_102)
+        let pid: pid_t = 18_401
+        let coordinator = RuntimeReconciliationCoordinator()
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let provider = RuntimeSystemRepairFactProvider(
+            cgWindowListProvider: ScopeSensitiveRuntimeCGWindowListProvider(
+                onScreenWindowInfo: [
+                    makeRawCGWindowInfo(
+                        pid: pid,
+                        windowID: visibleWindowID,
+                        title: "Visible Window"
+                    )
+                ],
+                allWindowInfo: [
+                    makeRawCGWindowInfo(
+                        pid: pid,
+                        windowID: visibleWindowID,
+                        title: "Visible Window"
+                    ),
+                    makeRawCGWindowInfo(
+                        pid: pid,
+                        windowID: offSpaceWindowID,
+                        title: "Off-Space Window",
+                        isOnscreen: false
+                    )
+                ]
+            ),
+            spaceTopologyProvider: WindowScopedRuntimeSpaceTopologyProvider(
+                spaceIDByWindowID: [
+                    visibleWindowID: 10,
+                    offSpaceWindowID: 11
+                ]
+            ),
+            windowRecordStore: windowRecordStore,
+            reconciliationCoordinator: coordinator
+        )
+
+        let authoritativeCollection = provider.collectCGWindowsWithSpaceTopologyDiff(
+            options: [.optionAll, .excludeDesktopElements],
+            now: 1
+        )
+        XCTAssertEqual(
+            authoritativeCollection.spaceTopologyDiff?.affectedCGWindowIDs,
+            [visibleWindowID, offSpaceWindowID]
+        )
+        let initialRequest = try XCTUnwrap(coordinator.readyRequests().first)
+        coordinator.completeRequest(id: initialRequest.id)
+
+        let visibilityCollection = provider.collectCGWindowsWithSpaceTopologyDiff(
+            options: [.optionOnScreenOnly, .excludeDesktopElements],
+            now: 2
+        )
+
+        XCTAssertNil(visibilityCollection.spaceTopologyDiff)
+        XCTAssertEqual(
+            visibilityCollection.windowsByPID[pid]?.first?.spaceIDs,
+            [10]
+        )
+        XCTAssertFalse(coordinator.hasPendingRequests())
+
+        let repeatedAuthoritativeCollection = provider.collectCGWindowsWithSpaceTopologyDiff(
+            options: [.optionAll, .excludeDesktopElements],
+            now: 3
+        )
+        XCTAssertEqual(
+            repeatedAuthoritativeCollection.spaceTopologyDiff?.affectedCGWindowIDs,
+            []
+        )
+        XCTAssertFalse(coordinator.hasPendingRequests())
+
+        let movedProvider = RuntimeSystemRepairFactProvider(
+            cgWindowListProvider: ScopeSensitiveRuntimeCGWindowListProvider(
+                onScreenWindowInfo: [
+                    makeRawCGWindowInfo(
+                        pid: pid,
+                        windowID: offSpaceWindowID,
+                        title: "Off-Space Window"
+                    )
+                ],
+                allWindowInfo: [
+                    makeRawCGWindowInfo(
+                        pid: pid,
+                        windowID: visibleWindowID,
+                        title: "Visible Window",
+                        isOnscreen: false
+                    ),
+                    makeRawCGWindowInfo(
+                        pid: pid,
+                        windowID: offSpaceWindowID,
+                        title: "Off-Space Window"
+                    )
+                ]
+            ),
+            spaceTopologyProvider: WindowScopedRuntimeSpaceTopologyProvider(
+                spaceIDByWindowID: [
+                    visibleWindowID: 10,
+                    offSpaceWindowID: 11
+                ]
+            ),
+            windowRecordStore: windowRecordStore,
+            reconciliationCoordinator: coordinator
+        )
+        let movedAuthoritativeCollection = movedProvider.collectCGWindowsWithSpaceTopologyDiff(
+            options: [.optionAll, .excludeDesktopElements],
+            now: 4
+        )
+        XCTAssertEqual(
+            movedAuthoritativeCollection.spaceTopologyDiff?.affectedCGWindowIDs,
+            [visibleWindowID, offSpaceWindowID]
+        )
+        XCTAssertEqual(
+            movedAuthoritativeCollection.spaceTopologyDiff?
+                .currentSignature.displays.first?.currentSpaceID,
+            11
+        )
+        XCTAssertEqual(coordinator.readyRequests().map(\.target), [.spaceTopology])
+    }
+}
+
+private struct ScopeSensitiveRuntimeCGWindowListProvider: RuntimeCGWindowListProviding {
+    let onScreenWindowInfo: [[String: Any]]
+    let allWindowInfo: [[String: Any]]
+
+    func windowInfo(
+        options: CGWindowListOption,
+        relativeToWindow windowID: CGWindowID
+    ) -> [[String: Any]]? {
+        options.contains(.optionOnScreenOnly)
+            ? onScreenWindowInfo
+            : allWindowInfo
+    }
+}
+
+private struct WindowScopedRuntimeSpaceTopologyProvider: RuntimeSpaceTopologyProviding {
+    let spaceIDByWindowID: [CGWindowID: Int]
+
+    func snapshot(for windowIDs: [CGWindowID]) -> RuntimeSpaceTopologySnapshot {
+        let spaceIDsByCGWindowID = Dictionary(
+            uniqueKeysWithValues: windowIDs.compactMap { windowID in
+                spaceIDByWindowID[windowID].map { (windowID, Set([$0])) }
+            }
+        )
+        let includedSpaceIDs = Set(spaceIDsByCGWindowID.values.flatMap { $0 })
+        return RuntimeSpaceTopologySnapshot(
+            spacesByID: Dictionary(
+                uniqueKeysWithValues: includedSpaceIDs.map { spaceID in
+                    (
+                        spaceID,
+                        RuntimeSpaceTopologySpace(
+                            id: spaceID,
+                            displayID: nil,
+                            isCurrent: false
+                        )
+                    )
+                }
+            ),
+            spaceIDsByCGWindowID: spaceIDsByCGWindowID
+        )
+    }
 }

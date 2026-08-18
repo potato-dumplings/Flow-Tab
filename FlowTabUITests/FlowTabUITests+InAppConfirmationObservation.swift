@@ -285,7 +285,6 @@ extension FlowTabUITests {
                 },
                 activationReadback: {
                     self.workflowWindowActivationSnapshot(
-                        title: title,
                         app: workflowApp
                     )
                 }

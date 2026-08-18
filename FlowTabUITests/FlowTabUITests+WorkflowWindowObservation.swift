@@ -89,51 +89,6 @@ extension FlowTabUITests {
         )
     }
 
-    func workflowWindowTitleIsObservable(
-        _ title: String,
-        app workflowApp: SpaceFixtureResolvedWorkflow.App
-    ) -> Bool {
-        let expectedTitles = Set([title, "Selected Tab: \(title)"])
-        return workflowWindowTitleExistsInXCTest(
-            expectedTitles,
-            bundleIdentifier: workflowApp.identity.bundleIdentifier
-        ) || workflowWindowTitleExistsInAX(
-            expectedTitles,
-            bundleIdentifier: workflowApp.identity.bundleIdentifier
-        )
-    }
-
-    private func workflowWindowTitleExistsInXCTest(
-        _ expectedTitles: Set<String>,
-        bundleIdentifier: String
-    ) -> Bool {
-        let fixtureApp = XCUIApplication(bundleIdentifier: bundleIdentifier)
-        return expectedTitles.contains { fixtureApp.staticTexts[$0].exists }
-    }
-
-    private func workflowWindowTitleExistsInAX(
-        _ expectedTitles: Set<String>,
-        bundleIdentifier: String
-    ) -> Bool {
-        guard let runningApp = NSRunningApplication
-            .runningApplications(withBundleIdentifier: bundleIdentifier)
-            .first(where: { !$0.isTerminated })
-        else {
-            return false
-        }
-
-        let appElement = AXUIElementCreateApplication(runningApp.processIdentifier)
-        return axWindows(in: appElement).contains {
-            var remainingNodeBudget = 250
-            return axTreeContainsExpectedTitle(
-                $0,
-                expectedTitles: expectedTitles,
-                remainingDepth: 8,
-                remainingNodeBudget: &remainingNodeBudget
-            )
-        }
-    }
-
     func activeWindowTitle(forBundleIdentifier bundleIdentifier: String) -> String? {
         guard let runningApp = NSRunningApplication
             .runningApplications(withBundleIdentifier: bundleIdentifier)
@@ -252,7 +207,6 @@ extension FlowTabUITests {
                         ),
                 readback: {
                     self.workflowWindowActivationSnapshot(
-                        title: title,
                         app: workflowApp
                     )
                 }
@@ -619,74 +573,4 @@ extension FlowTabUITests {
         return (titleValue as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func axWindows(in appElement: AXUIElement) -> [AXUIElement] {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            appElement,
-            kAXWindowsAttribute as CFString,
-            &value
-        ) == .success else {
-            return []
-        }
-        return value as? [AXUIElement] ?? []
-    }
-
-    private func axTreeContainsExpectedTitle(
-        _ element: AXUIElement,
-        expectedTitles: Set<String>,
-        remainingDepth: Int,
-        remainingNodeBudget: inout Int
-    ) -> Bool {
-        guard remainingDepth >= 0, remainingNodeBudget > 0 else {
-            return false
-        }
-        remainingNodeBudget -= 1
-        if axElementMatchesExpectedTitle(element, expectedTitles: expectedTitles) {
-            return true
-        }
-        return axChildren(in: element).contains {
-            axTreeContainsExpectedTitle(
-                $0,
-                expectedTitles: expectedTitles,
-                remainingDepth: remainingDepth - 1,
-                remainingNodeBudget: &remainingNodeBudget
-            )
-        }
-    }
-
-    private func axElementMatchesExpectedTitle(
-        _ element: AXUIElement,
-        expectedTitles: Set<String>
-    ) -> Bool {
-        [
-            kAXTitleAttribute as CFString,
-            kAXValueAttribute as CFString,
-            kAXDescriptionAttribute as CFString
-        ].contains {
-            guard let value = axStringAttribute($0, in: element) else {
-                return false
-            }
-            return expectedTitles.contains(value)
-        }
-    }
-
-    private func axChildren(in element: AXUIElement) -> [AXUIElement] {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            element,
-            kAXChildrenAttribute as CFString,
-            &value
-        ) == .success else {
-            return []
-        }
-        return value as? [AXUIElement] ?? []
-    }
-
-    private func axStringAttribute(_ attribute: CFString, in element: AXUIElement) -> String? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute, &value) == .success else {
-            return nil
-        }
-        return (value as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
 }
