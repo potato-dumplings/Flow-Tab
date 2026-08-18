@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import SwiftUI
 
 struct SwitcherPointerSelectionActions {
@@ -10,19 +11,80 @@ struct SwitcherPointerSelectionActions {
     let commitSearchResult: (String) -> Void
 }
 
+enum SwitcherPointerSelectionTarget: Hashable {
+    case application(appID: String)
+    case window(appID: String, windowID: String)
+    case searchResult(resultID: String)
+
+    var diagnosticSummary: String {
+        switch self {
+        case .application(let appID):
+            return "targetKind=application targetID=\(Self.escaped(appID))"
+        case .window(let appID, let windowID):
+            return "targetKind=window targetID=\(Self.escaped(windowID))"
+                + " targetAppID=\(Self.escaped(appID))"
+        case .searchResult(let resultID):
+            return "targetKind=searchResult targetID=\(Self.escaped(resultID))"
+        }
+    }
+
+    static func escaped(_ value: String) -> String {
+        value.addingPercentEncoding(
+            withAllowedCharacters: diagnosticAllowedCharacters
+        ) ?? ""
+    }
+
+    private static let diagnosticAllowedCharacters =
+        CharacterSet.alphanumerics.union(
+            CharacterSet(charactersIn: "-._~")
+        )
+}
+
+struct SwitcherPointerSelectionGateBlockedEvidence: Equatable {
+    let generation: UInt64
+    let target: SwitcherPointerSelectionTarget
+
+    var diagnosticSummary: String {
+        "\(target.diagnosticSummary) generation=\(generation)"
+    }
+}
+
+enum SwitcherPointerSelectionGateDecision: Equatable {
+    case allowed
+    case blocked(SwitcherPointerSelectionGateBlockedEvidence)
+    case duplicateBlocked
+
+    var allowsSelection: Bool {
+        self == .allowed
+    }
+
+    var newBlockedEvidence:
+        SwitcherPointerSelectionGateBlockedEvidence?
+    {
+        guard case .blocked(let evidence) = self else {
+            return nil
+        }
+        return evidence
+    }
+}
+
 struct SwitcherPointerSelectionGate: Equatable {
     static let defaultMovementThreshold: CGFloat = 1
 
     private let movementThreshold: CGFloat
     private var resetLocation: CGPoint?
+    private var blockedTargets: Set<SwitcherPointerSelectionTarget> = []
     private(set) var isArmed = false
+    private(set) var generation: UInt64 = 0
 
     init(movementThreshold: CGFloat = Self.defaultMovementThreshold) {
         self.movementThreshold = movementThreshold
     }
 
     mutating func reset(currentLocation: CGPoint?) {
+        generation &+= 1
         resetLocation = currentLocation
+        blockedTargets.removeAll(keepingCapacity: false)
         isArmed = false
     }
 
@@ -40,6 +102,24 @@ struct SwitcherPointerSelectionGate: Equatable {
             isArmed = true
         }
         return isArmed
+    }
+
+    mutating func evaluateSelection(
+        of target: SwitcherPointerSelectionTarget,
+        at location: CGPoint
+    ) -> SwitcherPointerSelectionGateDecision {
+        guard !recordPointerMoved(to: location) else {
+            return .allowed
+        }
+        guard blockedTargets.insert(target).inserted else {
+            return .duplicateBlocked
+        }
+        return .blocked(
+            SwitcherPointerSelectionGateBlockedEvidence(
+                generation: generation,
+                target: target
+            )
+        )
     }
 }
 

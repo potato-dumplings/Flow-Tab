@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import Foundation
 import FlowTabCore
 import XCTest
@@ -46,29 +45,6 @@ private func makeProjectionPublicationWindowRecord(
 }
 
 extension FlowTabTests {
-    @MainActor
-    func testHomeRuntimeProjectionUpdatePublisherDeliversBackgroundPostsOnMainThread() async {
-        let notificationCenter = NotificationCenter()
-        let delivered = expectation(description: "Home receives the runtime projection update")
-        let cancellable = HomeRuntimeProjectionUpdatePublisher.publisher(
-            notificationCenter: notificationCenter
-        )
-        .sink { _ in
-            XCTAssertTrue(Thread.isMainThread)
-            delivered.fulfill()
-        }
-
-        DispatchQueue.global(qos: .userInitiated).async {
-            notificationCenter.post(
-                name: .runtimeAppSwitcherProjectionDidUpdate,
-                object: nil
-            )
-        }
-
-        await fulfillment(of: [delivered], timeout: 1)
-        withExtendedLifetime(cancellable) {}
-    }
-
     func testFlowTabTestLaunchOptionsParsesFrontmostBundleIdentifierOverride() {
         withLaunchArgumentsForTesting(
             ["FlowTab", "--flowtab-ui-frontmost-bundle-id", "com.example.fixture.chrome"]
@@ -166,10 +142,8 @@ extension FlowTabTests {
 }
 
 extension FlowTabPriorityCoverageTests {
-    func testRuntimeReconciliationCoordinatorDuplicateSignalPreservesRetryBackoff() throws {
-        let coordinator = RuntimeReconciliationCoordinator(
-            retryPolicy: RuntimeReconciliationRetryPolicy(delays: [0.5])
-        )
+    func testRuntimeReconciliationCoordinatorNewSignalResumesEvidenceWait() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
         let dirty = coordinator.markAppDirty(
             appID: "com.example.editor",
             pid: 18_405,
@@ -178,7 +152,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let started = try XCTUnwrap(coordinator.startRequest(id: dirty.id))
         let retry = try XCTUnwrap(
-            coordinator.scheduleRetryAfterTransientEmptyCurrentAppWindowPayload(
+            coordinator.deferRequestAfterTransientEmptyCurrentAppWindowPayload(
                 id: started.id,
                 now: 10.1
             )
@@ -192,11 +166,10 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertEqual(duplicate.id, retry.id)
-        XCTAssertEqual(duplicate.state, .waitingRetry)
+        XCTAssertEqual(duplicate.state, .pending)
         XCTAssertEqual(duplicate.attempt, 1)
-        XCTAssertEqual(duplicate.notBefore, 10.6, accuracy: 0.0001)
-        XCTAssertTrue(coordinator.readyRequests(now: 10.59).isEmpty)
-        XCTAssertEqual(coordinator.readyRequests(now: 10.6).map(\.id), [dirty.id])
+        XCTAssertEqual(duplicate.lastObservedAt, 10.2, accuracy: 0.0001)
+        XCTAssertEqual(coordinator.readyRequests().map(\.id), [dirty.id])
     }
 
     func testRuntimeProjectionServiceDropsRepeatedAXWindowRepairSignalsWhenAccessibilityIsUnavailable() {
@@ -234,7 +207,7 @@ extension FlowTabPriorityCoverageTests {
         let finalExecutionCount = executionCount
         lock.unlock()
         XCTAssertEqual(finalExecutionCount, 0)
-        XCTAssertTrue(coordinator.readyRequests(now: .greatestFiniteMagnitude).isEmpty)
+        XCTAssertTrue(coordinator.readyRequests().isEmpty)
         let diagnostics = service.runtimeReadModelDiagnostics()
         XCTAssertTrue(diagnostics.dirtyAppIDs.isEmpty)
         XCTAssertTrue(diagnostics.dirtyPIDs.isEmpty)
@@ -436,9 +409,53 @@ extension FlowTabPriorityCoverageTests {
                 ])
             }
         )
+        let projected = expectation(
+            description:
+                "unmetCondition=exact current-app projection published"
+        )
+        projected.assertForOverFulfill = false
+        let projectionObserver = NotificationCenter.default
+            .addObserver(
+                forName:
+                    .runtimeCurrentAppWindowProjectionDidUpdate,
+                object: service,
+                queue: .main
+            ) { notification in
+                guard notification.userInfo?[
+                        RuntimeProjectionNotificationUserInfoKey
+                            .appID
+                    ] as? String == appID,
+                      let evidence = notification.userInfo?[
+                        RuntimeProjectionNotificationUserInfoKey
+                            .currentAppWindowProjectionUpdateEvidence
+                      ] as?
+                        RuntimeCurrentAppWindowProjectionUpdateEvidence,
+                      evidence.appID == appID,
+                      evidence.processIdentifier == pid,
+                      evidence.windowIDs.isEmpty
+                else {
+                    return
+                }
+                XCTAssertGreaterThan(
+                    evidence.sourceGeneration.projection,
+                    0
+                )
+                projected.fulfill()
+            }
+        defer {
+            NotificationCenter.default.removeObserver(
+                projectionObserver
+            )
+        }
 
         service.signalAXWindowDestroyed(appID: appID, pid: pid, axWindowID: axWindowID)
         service.waitForMaintenanceQueueForTesting()
+        wait(
+            for: [projected],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .runtimeProjectionMainThreadDelivery
+        )
 
         XCTAssertEqual(
             readModelStore.readAppSwitcherProjection()?
@@ -491,7 +508,7 @@ extension FlowTabPriorityCoverageTests {
                 model: LiveSwitcherModel(runtimeProjectionService: service)
             )
 
-            XCTAssertTrue(controller.presentSearchHotkeySessionForTesting())
+            XCTAssertFalse(controller.presentSearchHotkeySessionForTesting())
             XCTAssertFalse(controller.modelForTesting.isSearchActive)
             XCTAssertFalse(controller.isPanelPresented)
 
@@ -643,7 +660,12 @@ extension FlowTabPriorityCoverageTests {
             object: service
         )
         service.signalAppWindowsChanged(appID: appID, pid: pid)
-        wait(for: [publication], timeout: 1)
+        wait(
+            for: [publication],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .committedSearchIndexPublication
+        )
         service.waitForMaintenanceQueueForTesting()
 
         let searchRead = readModelStore.readCommittedSearchIndexForSearch()
@@ -660,7 +682,10 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionNotificationPublisherDeliversBackgroundPostsOnMainThread() async {
         let notificationCenter = NotificationCenter()
         let notificationObject = NSObject()
-        let delivered = expectation(description: "Runtime projection update reaches observers")
+        let delivered = expectation(
+            description: "unmetCondition=runtimeProjectionUpdateDeliveredOnMainThread"
+        )
+        delivered.assertForOverFulfill = true
         let observer = notificationCenter.addObserver(
             forName: .runtimeAppSwitcherProjectionDidUpdate,
             object: notificationObject,
@@ -681,7 +706,12 @@ extension FlowTabPriorityCoverageTests {
             )
         }
 
-        await fulfillment(of: [delivered], timeout: 1)
+        await fulfillment(
+            of: [delivered],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .runtimeProjectionMainThreadDelivery
+        )
     }
 
     @MainActor
@@ -693,27 +723,69 @@ extension FlowTabPriorityCoverageTests {
             .runtimeCommittedSearchIndexDidUpdate
         ]
         let publishers = DispatchGroup()
+        let publisherCompletion = expectation(
+            description: "All runtime projection notification publishers returned"
+        )
+        let publicationEvidence = RuntimeProjectionNotificationPublicationEvidence()
+
+        for _ in notificationNames {
+            publishers.enter()
+        }
+        publishers.notify(queue: .main) {
+            publisherCompletion.fulfill()
+        }
 
         for name in notificationNames {
-            publishers.enter()
             DispatchQueue.global(qos: .userInitiated).async {
                 NotificationCenter.default.post(name: name, object: nil)
+                publicationEvidence.recordCompletion(of: name)
                 publishers.leave()
             }
         }
 
-        let publicationResult = publishers.wait(timeout: .now() + 0.5)
+        let publicationResult = publishers.wait(
+            timeout: .now()
+                + RuntimeProjectionNotificationPublicationTestPolicy
+                    .mainActorNonblockingWatchdog
+        )
         XCTAssertEqual(
             publicationResult,
             .success,
-            "Runtime projection publishers must not synchronously wait for MainActor delivery."
+            """
+            Runtime projection publishers must return without synchronously waiting for \
+            MainActor delivery. completed=\(publicationEvidence.completedNames) \
+            expected=\(notificationNames.map(\.rawValue).sorted())
+            """
         )
 
-        let cleanupDeadline = Date().addingTimeInterval(1)
-        while publishers.wait(timeout: .now()) == .timedOut, Date() < cleanupDeadline {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.01))
-        }
+        wait(
+            for: [publisherCompletion],
+            timeout: RuntimeProjectionNotificationPublicationTestPolicy
+                .publisherCompletionWatchdog
+        )
         XCTAssertEqual(publishers.wait(timeout: .now()), .success)
         withExtendedLifetime(controller) {}
+    }
+}
+
+private enum RuntimeProjectionNotificationPublicationTestPolicy {
+    static let mainActorNonblockingWatchdog: DispatchTimeInterval = .milliseconds(500)
+    static let publisherCompletionWatchdog: TimeInterval = 1
+}
+
+private final class RuntimeProjectionNotificationPublicationEvidence: @unchecked Sendable {
+    private let lock = NSLock()
+    private var names: [Notification.Name] = []
+
+    var completedNames: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return names.map(\.rawValue).sorted()
+    }
+
+    func recordCompletion(of name: Notification.Name) {
+        lock.lock()
+        names.append(name)
+        lock.unlock()
     }
 }

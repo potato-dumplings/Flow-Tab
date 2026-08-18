@@ -17,12 +17,13 @@ extension FlowTabUITests {
             },
             flowTabLaunchTraceLabel: "option.spaceBacked"
         ) { _, app in
+            defer { runtimeLogSnapshot.cancel() }
+
             waitForSpaceBackedWindowLayerProjection(
                 title: targetTitle,
                 appName: targetApp.appName,
                 since: runtimeLogSnapshot
             )
-            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: "option.spaceBacked")
             let diagnosticsSummary = try assertGlobalSwitcherWindowStateReady(
                 for: targetApp,
                 in: app,
@@ -41,8 +42,59 @@ extension FlowTabUITests {
             )
 
             let activationLogSnapshot = makeRuntimeLogFileSnapshot()
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "option.spaceBacked.confirm")
-            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
+            defer { activationLogSnapshot.cancel() }
+
+            let dismissalOwner =
+                FlowTabUITestElementNonExistenceObservationOwner(
+                    elementIdentifier:
+                        diagnosticsSummary.identifier,
+                    readback: { diagnosticsSummary.exists }
+                )
+            dismissalOwner.start()
+            defer { dismissalOwner.cancel() }
+
+            guard
+                let initialDismissalEvidence =
+                    dismissalOwner.latestEvidence,
+                initialDismissalEvidence.source
+                    == .initialReadback,
+                initialDismissalEvidence.value.exists
+            else {
+                XCTFail(
+                    "Space-backed Option+Tab confirmation requires "
+                        + "the exact diagnostics element before the "
+                        + "trigger. "
+                        + dismissalOwner.diagnosticSummary
+                )
+                return
+            }
+
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                .confirm,
+                traceLabel: "option.spaceBacked.confirm"
+            )
+            dismissalOwner.markTriggerCompleted()
+
+            guard
+                let dismissalEvidence =
+                    dismissalOwner.waitForResolution(
+                        timeout:
+                            FlowTabUITestRuntimeTruthWatchdogPolicy
+                                .optionTabSwitcherDismissal
+                    )
+            else {
+                XCTFail(
+                    "Space-backed Option+Tab switcher dismissal "
+                        + "watchdog expired. "
+                        + dismissalOwner.diagnosticSummary
+                )
+                return
+            }
+            XCTAssertFalse(
+                dismissalEvidence.value.exists,
+                "Space-backed Option+Tab confirmation must dismiss "
+                    + "the exact switcher diagnostics element."
+            )
             assertSpaceBackedWindowRequestSource(
                 selection,
                 appID: targetApp.identity.bundleIdentifier,
@@ -54,6 +106,7 @@ extension FlowTabUITests {
             )
             assertSpaceBackedCGActivationReadbackFailure(
                 selection,
+                appID: targetApp.identity.bundleIdentifier,
                 since: activationLogSnapshot
             )
         }
@@ -76,32 +129,61 @@ extension FlowTabUITests {
             flowTabLaunchTraceLabel: "option.provisionalHidden"
         ) { _, app in
             assertHiddenProvisionalCGOnlyRuntimeLog(appName: targetApp.appName, since: runtimeLogSnapshot)
-            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: "option.provisionalHidden")
+            runtimeLogSnapshot.cancel()
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
 
-            try postFlowTabUITestSelectSwitcherAppAndWaitForDelivery(
+            _ = try performAndWaitForSwitcherAppSelection(
+                in: app,
                 bundleIdentifier: targetApp.identity.bundleIdentifier,
-                traceLabel: "option.provisionalHidden.selectApp"
+                appProjectionExpectation:
+                    .exactEntry(
+                        targetApp.identity.bundleIdentifier
+                            + ":1"
+                    ),
+                timeout:
+                    FlowTabUITestRuntimeTruthWatchdogPolicy
+                        .switcherDiagnosticsAppSelectionProjectionApplication,
+                trigger: {
+                    postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                        .global,
+                        traceLabel:
+                            "option.provisionalHidden"
+                    )
+                    try FlowTabUITestSwitcherCommandPayload.write(
+                        targetApp.identity.bundleIdentifier
+                    )
+                    postFlowTabUITestSwitcherCommand(
+                        .selectApp,
+                        traceLabel:
+                            "option.provisionalHidden.selectApp"
+                    )
+                }
             )
-            XCTAssertTrue(
-                waitForSwitcherAppsSummary(
-                    diagnosticsSummary,
-                    toContain: "\(targetApp.identity.bundleIdentifier):1",
-                    timeout: 4
-                ),
-                """
-                Option+Tab switcher did not count only the AX-backed user window for \(targetApp.appName).
 
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-
+            let advanceEvidenceSnapshot =
+                makeRuntimeLogFileSnapshot()
             postFlowTabUITestSwitcherCommandAndWaitForDelivery(
                 .advanceDown,
                 traceLabel: "option.provisionalHidden.enterWindowState"
             )
-            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+            let escapedAppName =
+                NSRegularExpression.escapedPattern(
+                    for: targetApp.appName
+                )
+            waitForRuntimeLogFiles(
+                matching:
+                    "advance key=downArrow "
+                    + "app=\(escapedAppName) "
+                    + "windows=1 mode=appCycle",
+                since: advanceEvidenceSnapshot,
+                timeout:
+                    FlowTabUITestRuntimeTruthWatchdogPolicy
+                        .provisionalHiddenSingleWindowAdvance,
+                description:
+                    "single eligible window remains in app cycle "
+                    + "after manual Down"
+            )
+            advanceEvidenceSnapshot.cancel()
             XCTAssertFalse(
                 switcherPanelDiagnosticsValue(diagnosticsSummary, key: "mode").hasPrefix("windowCycle"),
                 """
@@ -188,14 +270,17 @@ extension FlowTabUITests {
     private func waitForSpaceBackedWindowLayerProjection(
         title: String,
         appName: String,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         let escapedAppName = NSRegularExpression.escapedPattern(for: appName)
         let escapedTitle = NSRegularExpression.escapedPattern(for: title)
         waitForRuntimeLogFiles(
             matching: #"window-entries app=\#(escapedAppName) .*title=\#(escapedTitle)[^\n]*ax=0[^\n]*sticky=0[^\n]*source=nil:spaceEvidence=(observed|inferredFromTopology|inferredFromFullscreenGeometry):publicAXRecovery=1"#,
             since: snapshot,
-            timeout: 8,
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .spaceBackedWindowLayerProjectionPublication,
             description: "space-backed CG-only window-layer projection before switcher trigger"
         )
     }
@@ -203,14 +288,17 @@ extension FlowTabUITests {
     private func assertSpaceBackedWindowLayerSource(
         _ selection: RuntimeTruthWindowSelection,
         appName: String,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         let escapedAppName = NSRegularExpression.escapedPattern(for: appName)
         let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
         waitForRuntimeLogFiles(
             matching: #"window-entries app=\#(escapedAppName) .*id=cg:[0-9]+:\#(selection.windowNumber):title=\#(escapedTitle)[^\n]*ax=0:cg=\#(selection.windowNumber):sticky=0:source=nil:spaceEvidence=(observed|inferredFromTopology|inferredFromFullscreenGeometry):publicAXRecovery=1"#,
             since: snapshot,
-            timeout: 8,
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .spaceBackedSelectedWindowLayerSourceReadback,
             description: "space-backed CG-only window-layer source"
         )
     }
@@ -218,57 +306,73 @@ extension FlowTabUITests {
     private func assertSpaceBackedWindowRequestSource(
         _ selection: RuntimeTruthWindowSelection,
         appID: String,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         let escapedAppID = NSRegularExpression.escapedPattern(for: appID)
         let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
         waitForRuntimeLogFiles(
             matching: #"window-request appID=\#(escapedAppID) pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) title=\#(escapedTitle)[^\n]*ax=0[^\n]*sticky=false source=nil publicAXRecovery=1"#,
             since: snapshot,
-            timeout: 8,
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .spaceBackedWindowRequestPublication,
             description: "space-backed CG-only window request source"
         )
     }
 
     private func assertSpaceBackedCGActivationRoute(
         _ selection: RuntimeTruthWindowSelection,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         waitForRuntimeLogFiles(
             matching: #"focus-attempt route=cg result=[a-zA-Z]+ pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) targetCG=\#(selection.windowNumber)"#,
             since: snapshot,
-            timeout: 8,
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .spaceBackedCGActivationRoutePublication,
             description: "space-backed CG-only activation route"
         )
     }
 
     private func assertSpaceBackedCGActivationReadbackFailure(
         _ selection: RuntimeTruthWindowSelection,
-        since snapshot: [String: UInt64]
+        appID: String,
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         waitForRuntimeLogFiles(
             matching: #"binding-readback-mismatch route=cg pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) reason=targetCGNotVisible targetCG=\#(selection.windowNumber)"#,
             since: snapshot,
-            timeout: 8,
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .spaceBackedCGActivationReadbackMismatchPublication,
             description: "space-backed CG-only activation readback mismatch"
         )
+        let escapedAppID = NSRegularExpression.escapedPattern(for: appID)
         waitForRuntimeLogFiles(
-            matching: #"focus-recovery exhausted generation=[0-9]+ attempts=[0-9]+ pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) targetCG=\#(selection.windowNumber)"#,
+            matching: #"focus-recovery state=watchdogExpired unmetCondition=exactTargetWindowFocusedOrFrontmost generation=[0-9]+ appID=\#(escapedAppID) pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) targetCG=\#(selection.windowNumber) pollingAttempt=[0-9]+ lastTrigger=watchdogReadback conditionSatisfied=0 processTerminated=0 targetVisible=0 focusedCG=nil frontmostCG=(?:nil|[0-9]+) visibleCG=[0-9,]*"#,
             since: snapshot,
-            timeout: 8,
-            description: "space-backed CG-only activation recovery exhaustion"
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .spaceBackedCGActivationRecoveryFailurePublication,
+            description: "space-backed CG-only activation recovery failure"
         )
     }
 
     private func assertHiddenProvisionalCGOnlyRuntimeLog(
         appName: String,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         let escapedAppName = NSRegularExpression.escapedPattern(for: appName)
         waitForRuntimeLogFiles(
             matching: #"\#(escapedAppName) hidden-provisional-cg windows=1"#,
             since: snapshot,
-            timeout: 8,
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .provisionalHiddenProjectionPublication,
             description: "desktop provisional CG-only hidden from window layer"
         )
     }

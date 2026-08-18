@@ -406,7 +406,8 @@ extension LiveSwitcherModel {
     }
 
     func flushCurrentSearchComputationForCommit() {
-        let shouldResetSelection = pendingSearchComputationTask != nil
+        let shouldResetSelection =
+            searchSchedulingOwner.hasPendingWork
         cancelPendingSearchComputation()
         searchCoordinator.rebuildResults(resetSelection: shouldResetSelection)
         publishSearchStateIfNeeded()
@@ -414,50 +415,28 @@ extension LiveSwitcherModel {
 
     func scheduleSearchComputation(resetSelection: Bool, debounced: Bool) {
         guard searchViewState.isActive else { return }
-        pendingSearchComputationTask?.cancel()
-        searchComputationRevision &+= 1
-        let revision = searchComputationRevision
-        guard let input = searchCoordinator.makeComputationInput(resetSelection: resetSelection) else {
+        guard
+            let input = searchCoordinator.makeComputationInput(
+                resetSelection: resetSelection
+            )
+        else {
+            cancelPendingSearchComputation()
             return
         }
-        let debounceDelay = debounced ? searchDebounceNanoseconds : 0
-
-        pendingSearchComputationTask = Task { [weak self] in
+        searchSchedulingOwner.schedule(
+            input: input,
+            debounced: debounced
+        ) { [weak self] output in
             guard let self else { return }
-            if debounceDelay > 0 {
-                try? await Task.sleep(nanoseconds: debounceDelay)
-            }
-            guard !Task.isCancelled else { return }
-
-            let startedAt = DispatchTime.now().uptimeNanoseconds
-            let output = await Task.detached(priority: .userInitiated) {
-                SwitcherSearchCoordinator.computeOutput(from: input)
-            }.value
-            let elapsed = DispatchTime.now().uptimeNanoseconds - startedAt
-
-            await MainActor.run {
-                guard revision == self.searchComputationRevision else { return }
-                self.pendingSearchComputationTask = nil
-                if self.searchCoordinator.applyComputationOutput(output) {
-                    self.publishSearchStateIfNeeded()
-                    self.onSearchStateChanged?()
-                }
-                self.updateSearchDebounceWindow(lastComputationNanoseconds: elapsed)
+            if self.searchCoordinator.applyComputationOutput(output) {
+                self.publishSearchStateIfNeeded()
+                self.onSearchStateChanged?()
             }
         }
     }
 
-    func updateSearchDebounceWindow(lastComputationNanoseconds: UInt64) {
-        let elapsedMilliseconds = Double(lastComputationNanoseconds) / 1_000_000
-        if elapsedMilliseconds > 16 {
-            searchDebounceNanoseconds = 45_000_000
-        } else if elapsedMilliseconds > 10 {
-            searchDebounceNanoseconds = 35_000_000
-        } else if elapsedMilliseconds > 6 {
-            searchDebounceNanoseconds = 25_000_000
-        } else {
-            searchDebounceNanoseconds = 14_000_000
-        }
+    func cancelPendingSearchComputation() {
+        searchSchedulingOwner.cancel()
     }
 
     func publishSearchStateIfNeeded() {

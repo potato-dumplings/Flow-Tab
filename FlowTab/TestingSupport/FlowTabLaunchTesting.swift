@@ -1,20 +1,43 @@
 #if FLOWTAB_TESTING
-import AppKit
 import Foundation
 
 enum FlowTabTestLaunchOptions {
     static let uiTestingEnvironmentKey = "FLOWTAB_UI_TESTING"
     static let uiTestingEnvironmentValue = "1"
     static let unitTestingBundlePathEnvironmentKey = "XCTestBundlePath"
+    static let projectionAcknowledgementRouteArgument =
+        "--flowtab-ui-projection-acknowledgement-route"
+    static let currentAppProjectionEvidenceRouteArgument =
+        "--flowtab-ui-current-app-projection-evidence-route"
+    static let homeInitialProjectionApplicationRouteArgument =
+        "--flowtab-ui-home-initial-projection-application-notification-name"
+    static let homeInitialProjectionApplicationReadbackPathArgument =
+        "--flowtab-ui-home-initial-projection-application-readback-path"
+    static let initialPresentationResolutionNotificationArgument =
+        "--flowtab-ui-initial-presentation-resolution-notification-name"
+    static let initialPresentationResolutionReadbackPathArgument =
+        "--flowtab-ui-initial-presentation-resolution-readback-path"
+    static let axSuppressionReadbackRouteArgument =
+        "--flowtab-ui-ax-suppression-readback-route"
+    static let tabSwitchStressEvidenceNotificationArgument =
+        "--flowtab-tab-stress-evidence-notification-name"
+    static let shortcutEventInjectionArgument =
+        "--flowtab-ui-enable-shortcut-event-injection"
 
     static var argumentsOverrideForTesting: [String]?
     static var environmentOverrideForTesting: [String: String]?
 
     private static let uiTestArguments: Set<String> = [
         "--flowtab-ui-ax-trusted",
+        currentAppProjectionEvidenceRouteArgument,
         "--flowtab-ui-enable-mock-hotkey-effects",
+        shortcutEventInjectionArgument,
         "--flowtab-ui-enable-verbose-logs",
         "--flowtab-ui-frontmost-bundle-id",
+        homeInitialProjectionApplicationRouteArgument,
+        homeInitialProjectionApplicationReadbackPathArgument,
+        initialPresentationResolutionNotificationArgument,
+        initialPresentationResolutionReadbackPathArgument,
         "--flowtab-ui-initial-panel-occlusion-stale-ms",
         "--flowtab-ui-listen-switcher-trigger",
         "--flowtab-ui-mock-launch-at-login-service",
@@ -25,6 +48,9 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-open-in-app-window-switcher",
         "--flowtab-ui-open-switcher",
         "--flowtab-ui-open-switcher-search",
+        "--flowtab-ui-permission-state-path",
+        axSuppressionReadbackRouteArgument,
+        projectionAcknowledgementRouteArgument,
         "--flowtab-ui-record-hotkey-reload-diagnostics",
         "--flowtab-ui-redacted-runtime-logs",
         "--flowtab-ui-reset-defaults",
@@ -100,12 +126,232 @@ enum FlowTabTestLaunchOptions {
         uiTestValue(after: "--flowtab-ui-frontmost-bundle-id")
     }
 
+    static var projectionAcknowledgementRoutes:
+        [FlowTabUITestProjectionAcknowledgementRoute]
+    {
+        guard isRunningUITests else { return [] }
+        var routes:
+            [FlowTabUITestProjectionAcknowledgementRoute] = []
+        var notificationNames: Set<String> = []
+        for index in arguments.indices
+        where arguments[index]
+            == projectionAcknowledgementRouteArgument
+        {
+            guard index + 3 < arguments.count else { continue }
+            let notificationName = arguments[index + 1]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let bundleIdentifier = arguments[index + 2]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !notificationName.isEmpty,
+                  !bundleIdentifier.isEmpty,
+                  let expectedWindowCount =
+                    Int(arguments[index + 3]),
+                  expectedWindowCount > 0,
+                  notificationNames.insert(
+                    notificationName
+                  ).inserted
+            else {
+                continue
+            }
+            routes.append(
+                FlowTabUITestProjectionAcknowledgementRoute(
+                    notificationName:
+                        Notification.Name(notificationName),
+                    bundleIdentifier: bundleIdentifier,
+                    expectedWindowCount: expectedWindowCount
+                )
+            )
+        }
+        return routes
+    }
+
+    static var currentAppProjectionEvidenceRoute:
+        FlowTabUITestCurrentAppProjectionEvidenceRoute?
+    {
+        guard isRunningUITests else { return nil }
+        for index in arguments.indices
+        where arguments[index]
+            == currentAppProjectionEvidenceRouteArgument
+        {
+            guard index + 3 < arguments.count else {
+                continue
+            }
+            let notificationName = arguments[index + 1]
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+            let bundleIdentifier = arguments[index + 2]
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+            let readbackPath = arguments[index + 3]
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+            guard !notificationName.isEmpty,
+                  !bundleIdentifier.isEmpty,
+                  !readbackPath.isEmpty,
+                  NSString(string: readbackPath).isAbsolutePath
+            else {
+                continue
+            }
+            return FlowTabUITestCurrentAppProjectionEvidenceRoute(
+                notificationName:
+                    Notification.Name(notificationName),
+                readbackURL:
+                    URL(
+                        fileURLWithPath: readbackPath,
+                        isDirectory: false
+                    )
+                    .standardizedFileURL,
+                bundleIdentifier: bundleIdentifier
+            )
+        }
+        return nil
+    }
+
+    static var homeInitialProjectionApplicationRoute:
+        FlowTabUITestHomeInitialProjectionApplicationRoute?
+    {
+        guard isRunningUITests,
+              let notificationName = uiTestValue(
+                after:
+                    homeInitialProjectionApplicationRouteArgument
+              )?.trimmingCharacters(
+                in: .whitespacesAndNewlines
+              ),
+              !notificationName.isEmpty,
+              let readbackPath = uiTestValue(
+                after:
+                    homeInitialProjectionApplicationReadbackPathArgument
+              )?.trimmingCharacters(
+                in: .whitespacesAndNewlines
+              ),
+              !readbackPath.isEmpty,
+              NSString(string: readbackPath).isAbsolutePath
+        else {
+            return nil
+        }
+        return FlowTabUITestHomeInitialProjectionApplicationRoute(
+            notificationName:
+                Notification.Name(notificationName),
+            readbackURL:
+                URL(
+                    fileURLWithPath: readbackPath,
+                    isDirectory: false
+                )
+                .standardizedFileURL
+        )
+    }
+
+    static var initialPresentationResolutionRoute:
+        FlowTabUITestInitialPresentationResolutionRoute?
+    {
+        guard isRunningUITests,
+              let notificationName = uiTestValue(
+                after:
+                    initialPresentationResolutionNotificationArgument
+              )?.trimmingCharacters(
+                in: .whitespacesAndNewlines
+              ),
+              !notificationName.isEmpty,
+              let readbackPath = uiTestValue(
+                after:
+                    initialPresentationResolutionReadbackPathArgument
+              )?.trimmingCharacters(
+                in: .whitespacesAndNewlines
+              ),
+              !readbackPath.isEmpty,
+              NSString(string: readbackPath).isAbsolutePath
+        else {
+            return nil
+        }
+        return FlowTabUITestInitialPresentationResolutionRoute(
+            notificationName:
+                Notification.Name(notificationName),
+            readbackURL:
+                URL(
+                    fileURLWithPath: readbackPath,
+                    isDirectory: false
+                )
+                .standardizedFileURL
+        )
+    }
+
+    static var axSuppressionReadbackRoutes:
+        [FlowTabUITestAXSuppressionReadbackRoute]
+    {
+        guard isRunningUITests else { return [] }
+        var routes:
+            [FlowTabUITestAXSuppressionReadbackRoute] = []
+        var completionNames: Set<String> = []
+        var verificationNames: Set<String> = []
+        for index in arguments.indices
+        where arguments[index]
+            == axSuppressionReadbackRouteArgument
+        {
+            guard index + 4 < arguments.count else {
+                continue
+            }
+            let completionName = arguments[index + 1]
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+            let verificationName = arguments[index + 2]
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+            let bundleIdentifier = arguments[index + 3]
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+            guard !completionName.isEmpty,
+                  !verificationName.isEmpty,
+                  !bundleIdentifier.isEmpty,
+                  let expectedWindowCount =
+                    Int(arguments[index + 4]),
+                  expectedWindowCount > 0,
+                  completionNames.insert(
+                    completionName
+                  ).inserted,
+                  verificationNames.insert(
+                    verificationName
+                  ).inserted
+            else {
+                continue
+            }
+            routes.append(
+                FlowTabUITestAXSuppressionReadbackRoute(
+                    completionNotificationName:
+                        Notification.Name(
+                            completionName
+                        ),
+                    verificationNotificationName:
+                        Notification.Name(
+                            verificationName
+                        ),
+                    bundleIdentifier:
+                        bundleIdentifier,
+                    expectedWindowCount:
+                        expectedWindowCount
+                )
+            )
+        }
+        return routes
+    }
+
     static var accessibilityTrustedOverride: Bool? {
-        uiTestBoolValue(after: "--flowtab-ui-ax-trusted")
+        if usesDynamicPermissionState {
+            return dynamicPermissionState?.accessibilityTrusted ?? false
+        }
+        return uiTestBoolValue(after: "--flowtab-ui-ax-trusted")
     }
 
     static var screenCaptureTrustedOverride: Bool? {
-        uiTestBoolValue(after: "--flowtab-ui-screen-trusted")
+        if usesDynamicPermissionState {
+            return dynamicPermissionState?.screenCaptureTrusted ?? false
+        }
+        return uiTestBoolValue(after: "--flowtab-ui-screen-trusted")
     }
 
     static var seededLogCount: Int? {
@@ -115,6 +361,10 @@ enum FlowTabTestLaunchOptions {
 
     static var mockRuntimeVariant: String? {
         uiTestValue(after: "--flowtab-ui-mock-runtime-variant")
+    }
+
+    static var keepsMockHomeProjectionDegraded: Bool {
+        mockRuntimeVariant == "degraded-home"
     }
 
     static var initialPanelOcclusionStaleMilliseconds: Int? {
@@ -158,6 +408,10 @@ enum FlowTabTestLaunchOptions {
         containsUITestArgument("--flowtab-ui-enable-mock-hotkey-effects")
     }
 
+    static var enablesShortcutEventInjection: Bool {
+        containsUITestArgument(shortcutEventInjectionArgument)
+    }
+
     static var runsTabSwitchStressTest: Bool {
         arguments.contains("--flowtab-tab-stress")
     }
@@ -187,6 +441,15 @@ enum FlowTabTestLaunchOptions {
         max(1, Double(value(after: "--flowtab-tab-stress-interval-ms") ?? "") ?? 20)
     }
 
+    static var tabSwitchStressEvidenceNotificationName:
+        String?
+    {
+        value(
+            after:
+                tabSwitchStressEvidenceNotificationArgument
+        )
+    }
+
     private static func value(after flag: String) -> String? {
         guard let index = arguments.firstIndex(of: flag) else { return nil }
         let nextIndex = arguments.index(after: index)
@@ -208,6 +471,37 @@ enum FlowTabTestLaunchOptions {
         return boolValue(after: flag)
     }
 
+    private struct DynamicPermissionState: Decodable {
+        let accessibilityTrusted: Bool
+        let screenCaptureTrusted: Bool
+    }
+
+    private static var usesDynamicPermissionState: Bool {
+        uiTestValue(after: "--flowtab-ui-permission-state-path") != nil
+    }
+
+    private static var dynamicPermissionState: DynamicPermissionState? {
+        guard
+            let rawPath = uiTestValue(
+                after: "--flowtab-ui-permission-state-path"
+            ),
+            NSString(string: rawPath).isAbsolutePath
+        else {
+            return nil
+        }
+        let stateURL = URL(
+            fileURLWithPath: rawPath,
+            isDirectory: false
+        ).standardizedFileURL
+        guard let data = try? Data(contentsOf: stateURL) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(
+            DynamicPermissionState.self,
+            from: data
+        )
+    }
+
     private static func boolValue(after flag: String) -> Bool? {
         guard let rawValue = value(after: flag)?.lowercased() else { return nil }
         switch rawValue {
@@ -217,44 +511,6 @@ enum FlowTabTestLaunchOptions {
             return false
         default:
             return nil
-        }
-    }
-}
-
-protocol TabSwitchStressRunning: AnyObject {
-    @MainActor func startIfNeeded()
-}
-
-@MainActor
-final class TabSwitchStressRunner: TabSwitchStressRunning {
-    static let shared = TabSwitchStressRunner()
-
-    private var task: Task<Void, Never>?
-
-    private init() {}
-
-    func startIfNeeded() {
-        guard task == nil else { return }
-        guard FlowTabTestLaunchOptions.runsTabSwitchStressTest else { return }
-
-        let sleepNanoseconds = UInt64(
-            FlowTabTestLaunchOptions.tabSwitchStressIntervalMilliseconds * 1_000_000
-        )
-        let endTime = Date().addingTimeInterval(
-            FlowTabTestLaunchOptions.tabSwitchStressDurationSeconds
-        )
-
-        task = Task { @MainActor in
-            defer { self.task = nil }
-
-            let cycle: [HomeTab] = [.home, .logs, .settings]
-            var index = 0
-            while Date() < endTime {
-                HomeTabState.shared.selectedTab = cycle[index % cycle.count]
-                index += 1
-                try? await Task.sleep(nanoseconds: sleepNanoseconds)
-            }
-            NSApp.terminate(nil)
         }
     }
 }

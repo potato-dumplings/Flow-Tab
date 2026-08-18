@@ -22,15 +22,19 @@ enum RuntimeProjectionReconciliationExecutionOutcome {
 struct RuntimeProjectionReconciliationDrainResult {
     var startedRequests: [RuntimeReconciliationRequest] = []
     var completedCount = 0
-    var deferredCount = 0
+    var deferredRequests: [RuntimeReconciliationRequest] = []
     var fullRepairEvidence: [RuntimeFullRepairEvidence] = []
     var currentAppRepairEvidence: [RuntimeCurrentAppRepairEvidence] = []
     var completedAffectedCGWindowIDs: Set<CGWindowID> = []
 
+    var deferredCount: Int {
+        deferredRequests.count
+    }
+
     mutating func append(_ result: RuntimeProjectionReconciliationDrainResult) {
         startedRequests.append(contentsOf: result.startedRequests)
         completedCount += result.completedCount
-        deferredCount += result.deferredCount
+        deferredRequests.append(contentsOf: result.deferredRequests)
         fullRepairEvidence.append(contentsOf: result.fullRepairEvidence)
         currentAppRepairEvidence.append(contentsOf: result.currentAppRepairEvidence)
         completedAffectedCGWindowIDs.formUnion(result.completedAffectedCGWindowIDs)
@@ -52,7 +56,6 @@ struct RuntimeProjectionReconciliationDrainer {
         includeFullRepair: Bool = true
     ) -> RuntimeProjectionReconciliationDrainResult {
         let readyRequests = repairProvider.readyReconciliationRequests(
-            now: now,
             includeFullRepair: includeFullRepair
         )
         let requests = maxRequests.map { Array(readyRequests.prefix($0)) } ?? readyRequests
@@ -79,11 +82,13 @@ struct RuntimeProjectionReconciliationDrainer {
                     contentsOf: outcome.currentAppRepairEvidence
                 )
             case .transientEmptyCurrentAppWindowPayload:
-                repairProvider.deferReconciliationRequestAfterTransientEmptyCurrentAppWindowPayload(
-                    id: startedRequest.id,
-                    now: now
-                )
-                result.deferredCount += 1
+                if let deferredRequest =
+                    repairProvider.deferReconciliationRequestAfterTransientEmptyCurrentAppWindowPayload(
+                        id: startedRequest.id,
+                        now: now
+                    ) {
+                    result.deferredRequests.append(deferredRequest)
+                }
             }
         }
         return result

@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import Darwin
 import Foundation
 
 @MainActor
@@ -8,7 +9,20 @@ protocol SpaceFixtureWindowing: AnyObject {
     var applicationAccessibilityElement: Any { get }
     func show(isKey: Bool)
     func close()
-    func enterFullScreen(completion: @escaping @MainActor () -> Void)
+    func windowCloseTopologySnapshot(
+        remainingWindowPlanIndices: [Int]
+    ) -> SpaceFixtureWindowCloseTopologySnapshot
+    func enterFullScreen(
+        completion: @escaping @MainActor () -> Void
+    ) -> any SpaceFixtureCancellable
+    func desktopPresentationSnapshot()
+        -> SpaceFixtureDesktopPresentationSnapshot
+    func observeDesktopPresentationChanges(
+        _ onChange:
+            @escaping @MainActor (
+                SpaceFixtureDesktopPresentationEvidenceSource
+            ) -> Void
+    ) -> any SpaceFixtureCancellable
     func updateWorkflowReadiness(windowTitles: [String])
 }
 
@@ -16,37 +30,131 @@ protocol SpaceFixtureWindowing: AnyObject {
 final class SpaceFixtureWindowCoordinator {
     typealias VisibleFrameProvider = () -> CGRect
     typealias WindowFactory = (SpaceFixtureWindowPlan) -> any SpaceFixtureWindowing
-    typealias FullscreenScheduler = (Int, @escaping @MainActor () -> Void) -> Void
     typealias ActivationHandler = () -> Void
     typealias ApplicationAccessibilityElementsPublisher = ([Any]) -> Void
-
-    private static let defaultApplicationAccessibilitySuppressionDelayMilliseconds = 5_000
-    private static let fullscreenAccessibilitySuppressionSettleDelayMilliseconds = 8_000
-    private static let desktopRefocusDelayMilliseconds = 1_200
-    private static let additionalFullscreenTransitionSpacingMilliseconds = 1_400
+    typealias ApplicationIdentityProvider =
+        () -> SpaceFixtureApplicationIdentity
+    private static let desktopRefocusWatchdogMilliseconds =
+        15_000
+    private static let desktopRefocusRetryIntervalMilliseconds =
+        100
 
     private let configuration: SpaceFixtureLaunchConfiguration
     private let visibleFrameProvider: VisibleFrameProvider
     private let windowFactory: WindowFactory
-    private let fullscreenScheduler: FullscreenScheduler
+    private let scheduler: any SpaceFixtureScheduling
+    private let fullscreenTransitionOwner:
+        SpaceFixtureFullscreenTransitionOwner
+    private let desktopRefocusOwner:
+        SpaceFixtureDesktopRefocusOwner
+    private let applicationAXSuppressionOwner:
+        SpaceFixtureApplicationAXSuppressionOwner
+    private let windowCloseFaultOwner:
+        SpaceFixtureWindowCloseFaultOwner
+    private let workflowReadinessOwner:
+        SpaceFixtureWorkflowReadinessOwner
     private let activateApplication: ActivationHandler
     private let applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher
+    private let applicationIdentityProvider:
+        ApplicationIdentityProvider
 
     private(set) var windows: [any SpaceFixtureWindowing] = []
     private var suppressesApplicationAccessibilityElements = false
+
+    var lastDesktopRefocusWatchdogFailure:
+        SpaceFixtureDesktopRefocusWatchdogFailure?
+    {
+        desktopRefocusOwner.lastFailure
+    }
+
+    var lastApplicationAXSuppressionWatchdogFailure:
+        SpaceFixtureApplicationAXSuppressionWatchdogFailure?
+    {
+        applicationAXSuppressionOwner.lastFailure
+    }
+
+    var lastWindowCloseFaultEvidence:
+        SpaceFixtureWindowCloseFaultEvidence?
+    {
+        windowCloseFaultOwner.lastEvidence
+    }
+
+    var lastWindowCloseFaultWatchdogFailure:
+        SpaceFixtureWindowCloseFaultWatchdogFailure?
+    {
+        windowCloseFaultOwner.lastFailure
+    }
+
+    var lastWorkflowReadinessEvidence:
+        SpaceFixtureWorkflowReadinessEvidence?
+    {
+        workflowReadinessOwner.lastEvidence
+    }
 
     init(
         configuration: SpaceFixtureLaunchConfiguration,
         visibleFrameProvider: VisibleFrameProvider? = nil,
         windowFactory: WindowFactory? = nil,
-        fullscreenScheduler: FullscreenScheduler? = nil,
+        scheduler: (any SpaceFixtureScheduling)? = nil,
         activateApplication: ActivationHandler? = nil,
-        applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher? = nil
+        applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher? = nil,
+        applicationAXSuppressionOwner:
+            SpaceFixtureApplicationAXSuppressionOwner? = nil,
+        windowCloseFaultOwner:
+            SpaceFixtureWindowCloseFaultOwner? = nil,
+        workflowReadinessOwner:
+            SpaceFixtureWorkflowReadinessOwner? = nil,
+        applicationIdentityProvider:
+            ApplicationIdentityProvider? = nil
     ) {
+        let resolvedScheduler = scheduler ?? SpaceFixtureScheduler()
         self.configuration = configuration
         self.visibleFrameProvider = visibleFrameProvider ?? Self.defaultVisibleFrame
         self.windowFactory = windowFactory ?? { AppKitSpaceFixtureWindow(plan: $0) }
-        self.fullscreenScheduler = fullscreenScheduler ?? Self.defaultFullscreenScheduler
+        self.scheduler = resolvedScheduler
+        fullscreenTransitionOwner =
+            SpaceFixtureFullscreenTransitionOwner(
+                scheduler: resolvedScheduler
+            )
+        desktopRefocusOwner =
+            SpaceFixtureDesktopRefocusOwner(
+                scheduler: resolvedScheduler
+            )
+        self.applicationAXSuppressionOwner =
+            applicationAXSuppressionOwner
+            ?? SpaceFixtureApplicationAXSuppressionOwner(
+                scheduler: resolvedScheduler,
+                exposureProvider: {
+                    Self.applicationAccessibilityExposure()
+                }
+            )
+        self.windowCloseFaultOwner =
+            windowCloseFaultOwner
+            ?? SpaceFixtureWindowCloseFaultOwner(
+                scheduler: resolvedScheduler,
+                evidencePublisher: { evidence in
+                    SpaceFixtureWindowCloseFaultEvidenceTransport
+                        .publish(
+                            evidence,
+                            route:
+                                configuration
+                                    .windowCloseFaultEvidenceRoute
+                        )
+                }
+            )
+        self.workflowReadinessOwner =
+            workflowReadinessOwner
+            ?? SpaceFixtureWorkflowReadinessOwner(
+                evidencePublisher: { evidence in
+                    SpaceFixtureWorkflowReadinessTransport
+                        .publish(
+                            evidence,
+                            route:
+                                configuration
+                                    .workflowReadinessRoute
+                        )
+                }
+            )
         self.activateApplication = activateApplication ?? {
             NSApplication.shared.activate(ignoringOtherApps: true)
         }
@@ -54,47 +162,201 @@ final class SpaceFixtureWindowCoordinator {
             NSApplication.shared.setAccessibilityChildren($0)
             NSApplication.shared.setAccessibilityWindows($0)
         }
+        self.applicationIdentityProvider =
+            applicationIdentityProvider ?? {
+                SpaceFixtureApplicationIdentity(
+                    bundleIdentifier:
+                        Bundle.main.bundleIdentifier
+                        ?? ProcessInfo.processInfo.processName,
+                    processIdentifier: getpid()
+                )
+            }
     }
 
     func launch() {
+        cancelScheduledWork()
+        suppressesApplicationAccessibilityElements = false
         let windowPlans = SpaceFixtureWindowPlanner.makePlans(
             configuration: configuration,
             visibleFrame: visibleFrameProvider()
         )
         windows = windowPlans.map(windowFactory)
-        let windowTitles = windowPlans.map(\.title)
+        let fullscreenWindows =
+            orderedFullscreenWindowsForTransition()
+        let desktopAnchorWindow =
+            desktopAnchorWindow(
+                for: fullscreenWindows
+            )
+        let applicationIdentity =
+            applicationIdentityProvider()
+        let readinessGeneration =
+            startWorkflowReadiness(
+                windowPlans: windowPlans,
+                fullscreenWindows: fullscreenWindows,
+                desktopAnchorWindow:
+                    desktopAnchorWindow,
+                applicationIdentity:
+                    applicationIdentity
+            )
+        prepareApplicationAXSuppressionIfNeeded(
+            readinessGeneration:
+                readinessGeneration,
+            applicationIdentity:
+                applicationIdentity
+        )
 
         let deferredPanelWindows = showInitialWindows()
         activateApplication()
         for panelWindow in deferredPanelWindows {
             panelWindow.show(isKey: true)
         }
-        windows.forEach { $0.updateWorkflowReadiness(windowTitles: windowTitles) }
         publishApplicationAccessibilityElements()
-        scheduleWindowCloseIfNeeded()
+        workflowReadinessOwner
+            .windowTopologyDidResolve(
+                planIndices:
+                    windows.map(\.plan.index),
+                observationGeneration:
+                    readinessGeneration
+            )
+        startWindowCloseFaultIfNeeded(
+            applicationIdentity: applicationIdentity
+        )
 
         guard !configuration.fullscreenWindowIndices.isEmpty else {
-            scheduleApplicationAccessibilitySuppressionIfNeeded()
+            applicationAXSuppressionOwner
+                .localTopologyStageDidResolve()
             return
         }
-        let fullscreenWindows = orderedFullscreenWindowsForTransition()
         guard !fullscreenWindows.isEmpty else {
-            scheduleApplicationAccessibilitySuppressionIfNeeded()
+            applicationAXSuppressionOwner
+                .localTopologyStageDidResolve()
             return
         }
-        scheduleFullscreenTransitions(fullscreenWindows)
+        scheduleFullscreenTransitions(
+            fullscreenWindows,
+            desktopAnchorWindow:
+                desktopAnchorWindow,
+            readinessGeneration:
+                readinessGeneration
+        )
     }
 
-    private func scheduleWindowCloseIfNeeded() {
-        guard let closeWindowIndex = configuration.closeWindowIndex else { return }
-        fullscreenScheduler(configuration.closeWindowDelayMilliseconds) {
-            guard let index = self.windows.firstIndex(where: { $0.plan.index == closeWindowIndex }) else {
-                return
+    func cancel() {
+        cancelScheduledWork()
+    }
+
+    private func startWorkflowReadiness(
+        windowPlans: [SpaceFixtureWindowPlan],
+        fullscreenWindows:
+            [any SpaceFixtureWindowing],
+        desktopAnchorWindow:
+            (any SpaceFixtureWindowing)?,
+        applicationIdentity:
+            SpaceFixtureApplicationIdentity
+    ) -> Int {
+        workflowReadinessOwner.start(
+            expectation:
+                SpaceFixtureWorkflowReadinessExpectation(
+                    identity:
+                        SpaceFixtureWorkflowReadinessIdentity(
+                            bundleIdentifier:
+                                applicationIdentity
+                                    .bundleIdentifier,
+                            processIdentifier:
+                                applicationIdentity
+                                    .processIdentifier
+                        ),
+                    windowPlanIndices:
+                        windowPlans.map(\.index),
+                    fullscreenWindowPlanIndices:
+                        fullscreenWindows
+                            .map(\.plan.index)
+                            .sorted(),
+                    desktopAnchorWindowPlanIndex:
+                        desktopAnchorWindow?
+                            .plan.index,
+                    requiresApplicationAXSuppression:
+                        !configuration
+                            .publishesApplicationAccessibilityChildren,
+                    windowTitles:
+                        windowPlans.map(\.title)
+                ),
+            onReady: { [weak self] evidence in
+                guard let self else { return }
+                self.windows.forEach {
+                    $0.updateWorkflowReadiness(
+                        windowTitles:
+                            evidence.snapshot.windowTitles
+                    )
+                }
             }
-            let window = self.windows.remove(at: index)
-            window.close()
-            self.publishApplicationAccessibilityElements()
+        )
+    }
+
+    private func startWindowCloseFaultIfNeeded(
+        applicationIdentity:
+            SpaceFixtureApplicationIdentity
+    ) {
+        guard let closeWindowIndex =
+                configuration.closeWindowIndex,
+              let policy =
+                SpaceFixtureWindowCloseFaultPolicy(
+                    targetWindowPlanIndex:
+                        closeWindowIndex,
+                    delayMilliseconds:
+                        configuration
+                            .closeWindowDelayMilliseconds
+                ),
+              let targetWindow =
+                windows.first(where: {
+                    $0.plan.index == closeWindowIndex
+                })
+        else {
+            return
         }
+        windowCloseFaultOwner.start(
+            policy: policy,
+            identity:
+                SpaceFixtureWindowCloseFaultIdentity(
+                    bundleIdentifier:
+                        applicationIdentity
+                            .bundleIdentifier,
+                    processIdentifier:
+                        applicationIdentity
+                            .processIdentifier
+                ),
+            triggerRoute:
+                configuration
+                    .windowCloseFaultTriggerRoute,
+            snapshotProvider: { [weak self, targetWindow] in
+                targetWindow.windowCloseTopologySnapshot(
+                    remainingWindowPlanIndices:
+                        self?.windows
+                            .map(\.plan.index) ?? []
+                )
+            },
+            applyClose: { [weak self, targetWindow] in
+                guard let self,
+                      let index = self.windows.firstIndex(
+                        where: {
+                            $0.plan.index
+                                == targetWindow.plan.index
+                        }
+                      )
+                else {
+                    return
+                }
+                targetWindow.close()
+                self.windows.remove(at: index)
+                self.publishApplicationAccessibilityElements()
+            },
+            onWatchdog: { failure in
+                NSLog(
+                    "SpaceFixture window close watchdog failed: %@",
+                    failure.logFields
+                )
+            }
+        )
     }
 
     private func showInitialWindows() -> [any SpaceFixtureWindowing] {
@@ -131,67 +393,136 @@ final class SpaceFixtureWindowCoordinator {
         return fullscreenWindows.filter { $0.plan.index != primaryFullscreenIndex } + [primaryWindow]
     }
 
-    private func scheduleFullscreenTransitions(_ fullscreenWindows: [any SpaceFixtureWindowing]) {
-        let desktopAnchorWindow = configuration.preservesDesktopAfterFullscreen
-            ? windows.first(where: { !$0.plan.isFullscreenTarget })
-            : nil
+    private func desktopAnchorWindow(
+        for fullscreenWindows:
+            [any SpaceFixtureWindowing]
+    ) -> (any SpaceFixtureWindowing)? {
+        guard configuration
+                .preservesDesktopAfterFullscreen,
+              !fullscreenWindows.isEmpty
+        else {
+            return nil
+        }
+        return windows.first {
+            !$0.plan.isFullscreenTarget
+        }
+    }
 
-        scheduleFullscreenTransition(
-            fullscreenWindows,
-            currentIndex: 0,
-            delayMilliseconds: configuration.enterFullscreenDelayMilliseconds,
-            desktopAnchorWindow: desktopAnchorWindow
+    private func scheduleFullscreenTransitions(
+        _ fullscreenWindows:
+            [any SpaceFixtureWindowing],
+        desktopAnchorWindow:
+            (any SpaceFixtureWindowing)?,
+        readinessGeneration: Int
+    ) {
+        fullscreenTransitionOwner.start(
+            windows: fullscreenWindows,
+            initialDelayMilliseconds:
+                configuration.enterFullscreenDelayMilliseconds,
+            onWillEnter: { [weak self] window, _, totalWindowCount in
+                guard let self else { return }
+                if totalWindowCount > 1 {
+                    self.activateApplication()
+                    window.show(isKey: true)
+                }
+            },
+            onDidEnter: { [weak self] _ in
+                self?.publishApplicationAccessibilityElements()
+            },
+            onComplete: { [weak self] completion in
+                guard let self else { return }
+                self.workflowReadinessOwner
+                    .fullscreenTopologyDidResolve(
+                        completion,
+                        observationGeneration:
+                            readinessGeneration
+                    )
+                self.resolveApplicationAXSuppressionTopology(
+                    desktopAnchorWindow,
+                    readinessGeneration:
+                        readinessGeneration
+                )
+            }
         )
     }
 
-    private func scheduleFullscreenTransition(
-        _ fullscreenWindows: [any SpaceFixtureWindowing],
-        currentIndex: Int,
-        delayMilliseconds: Int,
-        desktopAnchorWindow: (any SpaceFixtureWindowing)?
+    private func resolveApplicationAXSuppressionTopology(
+        _ desktopAnchorWindow:
+            (any SpaceFixtureWindowing)?,
+        readinessGeneration: Int
     ) {
-        guard fullscreenWindows.indices.contains(currentIndex) else {
-            scheduleDesktopRefocusIfNeeded(desktopAnchorWindow)
-            scheduleApplicationAccessibilitySuppressionAfterFullscreenSettleIfNeeded()
+        guard let desktopAnchorWindow else {
+            applicationAXSuppressionOwner
+                .localTopologyStageDidResolve()
             return
         }
 
-        let fullscreenWindow = fullscreenWindows[currentIndex]
-        fullscreenScheduler(delayMilliseconds) {
-            if fullscreenWindows.count > 1 {
+        desktopRefocusOwner.start(
+            window: desktopAnchorWindow,
+            watchdogMilliseconds:
+                Self.desktopRefocusWatchdogMilliseconds,
+            retryIntervalMilliseconds:
+                Self.desktopRefocusRetryIntervalMilliseconds,
+            trigger: { [weak self] in
+                guard let self else { return }
                 self.activateApplication()
-                fullscreenWindow.show(isKey: true)
-            }
-            fullscreenWindow.enterFullScreen {
-                let nextIndex = currentIndex + 1
+                desktopAnchorWindow.show(isKey: true)
+            },
+            onResolved: { [weak self] evidence in
+                guard let self else { return }
                 self.publishApplicationAccessibilityElements()
-                self.scheduleFullscreenTransition(
-                    fullscreenWindows,
-                    currentIndex: nextIndex,
-                    delayMilliseconds: Self.additionalFullscreenTransitionSpacingMilliseconds,
-                    desktopAnchorWindow: desktopAnchorWindow
+                self.workflowReadinessOwner
+                    .desktopPresentationDidResolve(
+                        evidence,
+                        observationGeneration:
+                            readinessGeneration
+                    )
+                self.applicationAXSuppressionOwner
+                    .localTopologyStageDidResolve()
+            },
+            onWatchdog: { failure in
+                NSLog(
+                    "SpaceFixture desktop refocus watchdog failed: %@",
+                    failure.logFields
                 )
             }
-        }
+        )
     }
 
-    private func scheduleDesktopRefocusIfNeeded(_ desktopAnchorWindow: (any SpaceFixtureWindowing)?) {
-        guard let desktopAnchorWindow else { return }
-
-        fullscreenScheduler(Self.desktopRefocusDelayMilliseconds) {
-            self.activateApplication()
-            desktopAnchorWindow.show(isKey: true)
-            self.publishApplicationAccessibilityElements()
-        }
-    }
-
-    private func scheduleApplicationAccessibilitySuppressionAfterFullscreenSettleIfNeeded() {
-        guard !configuration.fullscreenWindowIndices.isEmpty else {
-            scheduleApplicationAccessibilitySuppressionIfNeeded()
+    private func prepareApplicationAXSuppressionIfNeeded(
+        readinessGeneration: Int,
+        applicationIdentity:
+            SpaceFixtureApplicationIdentity
+    ) {
+        guard
+            !configuration
+                .publishesApplicationAccessibilityChildren
+        else {
             return
         }
-        scheduleApplicationAccessibilitySuppressionIfNeeded(
-            delayMilliseconds: Self.fullscreenAccessibilitySuppressionSettleDelayMilliseconds
+        applicationAXSuppressionOwner.start(
+            route: configuration.applicationAXSuppressionRoute,
+            identity: applicationIdentity,
+            expectedProjectionWindowCount:
+                configuration.windowCount,
+            expectedPublishedAXWindowCount:
+                windows.filter(
+                    \.plan.publishesApplicationAXWindow
+                ).count,
+            suppress: { [weak self] in
+                guard let self else { return }
+                self.suppressesApplicationAccessibilityElements =
+                    true
+                self.publishApplicationAccessibilityElements()
+            },
+            onResolved: { [weak self] exposure in
+                self?.workflowReadinessOwner
+                    .applicationAXExposureDidResolve(
+                        exposure,
+                        observationGeneration:
+                            readinessGeneration
+                    )
+            }
         )
     }
 
@@ -207,51 +538,35 @@ final class SpaceFixtureWindowCoordinator {
         )
     }
 
-    private func scheduleApplicationAccessibilitySuppressionIfNeeded(delayMilliseconds: Int? = nil) {
-        guard !configuration.publishesApplicationAccessibilityChildren else { return }
-        fullscreenScheduler(delayMilliseconds ?? applicationAccessibilitySuppressionDelayMilliseconds()) {
-            self.suppressesApplicationAccessibilityElements = true
-            self.publishApplicationAccessibilityElements()
-        }
+    private func cancelScheduledWork() {
+        fullscreenTransitionOwner.cancel()
+        desktopRefocusOwner.cancel()
+        applicationAXSuppressionOwner.cancel()
+        windowCloseFaultOwner.cancel()
+        workflowReadinessOwner.cancel()
+        SpaceFixtureWorkflowReadinessTransport
+            .removeReadbackEvidence(
+                route:
+                    configuration.workflowReadinessRoute
+            )
     }
 
-    private func applicationAccessibilitySuppressionDelayMilliseconds() -> Int {
-        guard !configuration.fullscreenWindowIndices.isEmpty else {
-            return Self.defaultApplicationAccessibilitySuppressionDelayMilliseconds
-        }
-        return max(
-            Self.defaultApplicationAccessibilitySuppressionDelayMilliseconds,
-            lastFullscreenTransitionDelayMilliseconds()
-                + Self.fullscreenAccessibilitySuppressionSettleDelayMilliseconds
+    private static func applicationAccessibilityExposure()
+        -> SpaceFixtureApplicationAXExposure
+    {
+        SpaceFixtureApplicationAXExposure(
+            childWindowCount:
+                NSApplication.shared
+                    .accessibilityChildren()?.count ?? 0,
+            windowsAttributeCount:
+                NSApplication.shared
+                    .accessibilityWindows()?.count ?? 0
         )
-    }
-
-    private func lastFullscreenTransitionDelayMilliseconds() -> Int {
-        fullscreenTransitionDelayMilliseconds(
-            offset: max(0, configuration.fullscreenWindowIndices.count - 1)
-        )
-    }
-
-    private func fullscreenTransitionDelayMilliseconds(offset: Int) -> Int {
-        configuration.enterFullscreenDelayMilliseconds
-            + max(0, offset) * Self.additionalFullscreenTransitionSpacingMilliseconds
     }
 
     private static func defaultVisibleFrame() -> CGRect {
         NSScreen.main?.visibleFrame
             ?? NSScreen.screens.first?.visibleFrame
             ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
-    }
-
-    private static func defaultFullscreenScheduler(
-        delayMilliseconds: Int,
-        action: @escaping @MainActor () -> Void
-    ) {
-        let deadline = DispatchTime.now() + .milliseconds(max(0, delayMilliseconds))
-        DispatchQueue.main.asyncAfter(deadline: deadline) {
-            Task { @MainActor in
-                action()
-            }
-        }
     }
 }

@@ -77,13 +77,17 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerGlobalHotkeyAdvanceAndReleaseCommitSession() async {
+    func testSwitcherPanelControllerGlobalHotkeyAdvanceAndReleaseCommitSession() {
+        let releaseScheduler = ManualModifierReleaseObservationScheduler()
+        let releaseEventSource = ManualModifierReleaseEventSource()
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(
                 runtimeProjectionService: RecordingRuntimeProjectionService(
                     appSwitcherApps: searchScenarioApps()
                 )
-            )
+            ),
+            modifierReleaseObservationScheduler: releaseScheduler,
+            modifierReleaseEventSource: releaseEventSource
         )
 
         var activatedTarget: ActivationTarget?
@@ -92,32 +96,147 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.globalPrimaryModifierPressedOverride = true
+        let hotkeyInput = ManualHotkeyInputSource()
+        hotkeyInput.register(on: controller, for: .globalAppSwitcher)
+        controller.globalHotkeyHoldSetPressedOverride = true
         let initialSelectedAppID = controller.modelForTesting.selectedApp?.id
 
-        controller.handleGlobalHotkey(isBackward: false)
+        hotkeyInput.emit(
+            phase: .pressed,
+            to: controller,
+            for: .globalAppSwitcher
+        )
 
         XCTAssertNotEqual(controller.modelForTesting.selectedApp?.id, initialSelectedAppID)
 
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.handleGlobalHotkeyReleased()
+        controller.globalHotkeyHoldSetPressedOverride = false
+        hotkeyInput.emit(
+            phase: .released,
+            to: controller,
+            for: .globalAppSwitcher
+        )
 
-        let didCommitGlobalRelease = await waitUntil("global hotkey release commits selection") {
-            controller.modelForTesting.session == nil && activatedTarget != nil
-        }
-        XCTAssertTrue(didCommitGlobalRelease)
+        XCTAssertNotNil(controller.modelForTesting.session)
+        XCTAssertTrue(controller.hasPendingModifierReleaseConfirmation)
+        releaseScheduler.fireNext()
+
         XCTAssertNil(controller.modelForTesting.session)
         XCTAssertNotNil(activatedTarget)
+        XCTAssertEqual(releaseEventSource.activeObserverCount, 0)
     }
 
     @MainActor
-    func testSwitcherPanelControllerKeepsFirstModifierReleaseConfirmationWhenTriggersOverlap() async {
+    func testSwitcherPanelControllerCountsDistinctImmediateHotkeyEventsOnceEach() {
+        let controller = makeAppSwitcherProjectionPanelController()
+        let hotkeyInput = ManualHotkeyInputSource()
+        hotkeyInput.register(on: controller, for: .globalAppSwitcher)
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.globalHotkeyHoldSetPressedOverride = true
+        let initialAppID = controller.modelForTesting.selectedApp?.id
+
+        let firstEvent = hotkeyInput.emit(
+            phase: .pressed,
+            to: controller,
+            for: .globalAppSwitcher
+        )
+        let firstAdvancedAppID = controller.modelForTesting.selectedApp?.id
+        hotkeyInput.deliver(
+            firstEvent,
+            to: controller,
+            for: .globalAppSwitcher
+        )
+        XCTAssertEqual(
+            controller.modelForTesting.selectedApp?.id,
+            firstAdvancedAppID
+        )
+
+        hotkeyInput.emit(
+            phase: .pressed,
+            to: controller,
+            for: .globalAppSwitcher
+        )
+        let secondAdvancedAppID = controller.modelForTesting.selectedApp?.id
+
+        XCTAssertNotEqual(firstAdvancedAppID, initialAppID)
+        XCTAssertNotEqual(secondAdvancedAppID, firstAdvancedAppID)
+        XCTAssertEqual(controller.hotkeyInputOwner.inputGeneration, 2)
+        controller.globalHotkeyHoldSetPressedOverride = false
+        controller.globalMainKeySetPressedOverride = false
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerReplayGateEndsOnObservedRelease() {
+        let releaseScheduler = ManualModifierReleaseObservationScheduler()
+        let releaseEventSource = ManualModifierReleaseEventSource()
+        let controller = makeAppSwitcherProjectionPanelController(
+            modifierReleaseObservationScheduler: releaseScheduler,
+            modifierReleaseEventSource: releaseEventSource
+        )
+        controller.modelForTesting.activationOverride = { _, _ in }
+        let hotkeyInput = ManualHotkeyInputSource()
+        hotkeyInput.register(on: controller, for: .globalAppSwitcher)
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.globalHotkeyHoldSetPressedOverride = true
+        controller.globalMainKeySetPressedOverride = false
+        let finishingEvent = hotkeyInput.emit(
+            phase: .pressed,
+            to: controller,
+            for: .globalAppSwitcher
+        )
+
+        controller.finishSelection()
+
+        XCTAssertNil(controller.modelForTesting.session)
+        XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
+        XCTAssertEqual(releaseScheduler.pendingCount, 1)
+        hotkeyInput.deliver(
+            finishingEvent,
+            to: controller,
+            for: .globalAppSwitcher
+        )
+        hotkeyInput.emit(
+            phase: .pressed,
+            to: controller,
+            for: .globalAppSwitcher
+        )
+        XCTAssertNil(controller.modelForTesting.session)
+
+        controller.globalHotkeyHoldSetPressedOverride = false
+        hotkeyInput.emit(
+            phase: .released,
+            to: controller,
+            for: .globalAppSwitcher
+        )
+
+        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
+        XCTAssertEqual(releaseScheduler.pendingCount, 0)
+        XCTAssertEqual(releaseEventSource.activeObserverCount, 0)
+
+        controller.globalHotkeyHoldSetPressedOverride = true
+        hotkeyInput.emit(
+            phase: .pressed,
+            to: controller,
+            for: .globalAppSwitcher
+        )
+        XCTAssertNotNil(controller.modelForTesting.session)
+        controller.globalHotkeyHoldSetPressedOverride = false
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerKeepsFirstModifierReleaseConfirmationWhenTriggersOverlap() {
+        let releaseScheduler = ManualModifierReleaseObservationScheduler()
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(
                 runtimeProjectionService: RecordingRuntimeProjectionService(
                     appSwitcherApps: searchScenarioApps()
                 )
-            )
+            ),
+            modifierReleaseObservationScheduler: releaseScheduler,
+            modifierReleaseEventSource: ManualModifierReleaseEventSource()
         )
         var activatedTargets: [ActivationTarget] = []
         controller.modelForTesting.activationOverride = { target, _ in
@@ -125,7 +244,7 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
 
         controller.scheduleModifierReleaseConfirmation(trigger: "presentation_recovered")
         let releaseGeneration = controller.modifierReleaseConfirmationGeneration
@@ -134,41 +253,56 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(controller.modifierReleaseConfirmationGeneration, releaseGeneration)
         XCTAssertEqual(
             controller.modifierReleaseState,
-            .releaseObserved(trigger: "presentation_recovered", generation: releaseGeneration)
+            .confirming(
+                trigger: "presentation_recovered",
+                generation: releaseGeneration,
+                releasedSamples: 1
+            )
         )
 
-        let didCommitRelease = await waitUntil("overlapping release triggers commit once") {
-            controller.modelForTesting.session == nil && activatedTargets.count == 1
-        }
-        XCTAssertTrue(didCommitRelease)
+        XCTAssertEqual(releaseScheduler.pendingCount, 1)
+        releaseScheduler.fireNext()
+
         XCTAssertEqual(activatedTargets.count, 1)
-        XCTAssertNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertFalse(controller.hasPendingModifierReleaseConfirmation)
     }
 
     @MainActor
     func testSwitcherPanelControllerReleaseConfirmationGenerationInvalidatesCanceledTask() {
+        let releaseScheduler = ManualModifierReleaseObservationScheduler()
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(
                 runtimeProjectionService: RecordingRuntimeProjectionService(
                     appSwitcherApps: searchScenarioApps()
                 )
-            )
+            ),
+            modifierReleaseObservationScheduler: releaseScheduler,
+            modifierReleaseEventSource: ManualModifierReleaseEventSource()
         )
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
 
         controller.scheduleModifierReleaseConfirmation(trigger: "generation_first")
         let firstGeneration = controller.modifierReleaseConfirmationGeneration
-        XCTAssertNotNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertTrue(controller.hasPendingModifierReleaseConfirmation)
         XCTAssertEqual(
             controller.modifierReleaseState,
-            .releaseObserved(trigger: "generation_first", generation: firstGeneration)
+            .confirming(
+                trigger: "generation_first",
+                generation: firstGeneration,
+                releasedSamples: 1
+            )
         )
 
         controller.cancelPendingModifierReleaseConfirmation()
-        XCTAssertNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertFalse(controller.hasPendingModifierReleaseConfirmation)
         XCTAssertEqual(controller.modifierReleaseConfirmationGeneration, firstGeneration + 1)
+        XCTAssertFalse(
+            controller.isModifierReleaseConfirmationGenerationCurrent(
+                firstGeneration
+            )
+        )
         XCTAssertEqual(
             controller.modifierReleaseState,
             .canceled(reason: .explicitCancel, generation: firstGeneration)
@@ -176,22 +310,20 @@ extension FlowTabPriorityCoverageTests {
 
         controller.scheduleModifierReleaseConfirmation(trigger: "generation_second")
         let secondGeneration = controller.modifierReleaseConfirmationGeneration
-        XCTAssertNotNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertTrue(controller.hasPendingModifierReleaseConfirmation)
         XCTAssertEqual(
             controller.modifierReleaseState,
-            .releaseObserved(trigger: "generation_second", generation: secondGeneration)
-        )
-
-        controller.clearPendingModifierReleaseConfirmationTaskIfCurrent(firstGeneration)
-        XCTAssertNotNil(controller.pendingModifierReleaseConfirmationTask)
-        XCTAssertEqual(
-            controller.modifierReleaseState,
-            .releaseObserved(trigger: "generation_second", generation: secondGeneration)
+            .confirming(
+                trigger: "generation_second",
+                generation: secondGeneration,
+                releasedSamples: 1
+            )
         )
 
         XCTAssertEqual(controller.modifierReleaseConfirmationGeneration, secondGeneration)
         controller.cancelPendingModifierReleaseConfirmation()
-        XCTAssertNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertFalse(controller.hasPendingModifierReleaseConfirmation)
+        XCTAssertEqual(releaseScheduler.pendingCount, 0)
         controller.cancelSelectionForTesting()
     }
 
@@ -246,14 +378,25 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     private func makeAppSwitcherProjectionPanelController(
-        apps: [AppSwitchCandidate]? = nil
+        apps: [AppSwitchCandidate]? = nil,
+        modifierReleaseObservationScheduler:
+            (any ModifierReleaseObservationScheduling)? = nil,
+        modifierReleaseEventSource:
+            (any ModifierReleaseEventObserving)? = nil,
+        panelVisibilityRecoveryObservationScheduler:
+            (any PanelVisibilityRecoveryObservationScheduling)? = nil
     ) -> SwitcherPanelController {
         SwitcherPanelController(
             model: LiveSwitcherModel(
                 runtimeProjectionService: RecordingRuntimeProjectionService(
                     appSwitcherApps: apps ?? searchScenarioApps()
                 )
-            )
+            ),
+            modifierReleaseObservationScheduler:
+                modifierReleaseObservationScheduler,
+            modifierReleaseEventSource: modifierReleaseEventSource,
+            panelVisibilityRecoveryObservationScheduler:
+                panelVisibilityRecoveryObservationScheduler
         )
     }
 
@@ -264,15 +407,20 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(controller.modifierReleaseConfirmationPolicy, .default)
         XCTAssertEqual(controller.modifierReleaseConfirmationSampleIntervalNs, 25_000_000)
         XCTAssertEqual(controller.modifierReleaseConfirmationSampleCount, 2)
-        XCTAssertEqual(controller.postFinishHotkeyIgnoreWindow, 0.02)
         XCTAssertEqual(controller.modifierReleaseState, .idle)
     }
 
     @MainActor
-    func testSwitcherPanelControllerHotkeyReplaySuppressionUsesReleaseStateGeneration() async {
-        let controller = SwitcherPanelController()
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
+    func testSwitcherPanelControllerHotkeyReplaySuppressionUsesReleaseStateGeneration() {
+        let releaseScheduler = ManualModifierReleaseObservationScheduler()
+        let releaseEventSource = ManualModifierReleaseEventSource()
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(),
+            modifierReleaseObservationScheduler: releaseScheduler,
+            modifierReleaseEventSource: releaseEventSource
+        )
+        controller.globalHotkeyHoldSetPressedOverride = true
+        controller.globalMainKeySetPressedOverride = false
 
         controller.beginHotkeyReplaySuppressionUntilRelease(
             for: .globalAppSwitcher,
@@ -286,9 +434,11 @@ extension FlowTabPriorityCoverageTests {
             .replaySuppression(trigger: "state_machine", generation: generation, releasedSamples: 0)
         )
 
-        let didEndSuppression = await waitForHotkeyReplaySuppressionToEnd(panelController: controller)
-        XCTAssertTrue(didEndSuppression)
+        controller.globalHotkeyHoldSetPressedOverride = false
+        releaseEventSource.emitInputTransition()
+
         XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
+        XCTAssertEqual(releaseScheduler.pendingCount, 0)
         XCTAssertEqual(
             controller.modifierReleaseState,
             .replaySuppressionEnded(trigger: "state_machine", generation: generation)
@@ -297,12 +447,15 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerPresentationSessionGenerationTracksSessionLifecycle() {
+        let releaseScheduler = ManualModifierReleaseObservationScheduler()
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(
                 runtimeProjectionService: RecordingRuntimeProjectionService(
                     appSwitcherApps: searchScenarioApps()
                 )
-            )
+            ),
+            modifierReleaseObservationScheduler: releaseScheduler,
+            modifierReleaseEventSource: ManualModifierReleaseEventSource()
         )
 
         XCTAssertEqual(controller.presentationSessionGeneration, 0)
@@ -311,20 +464,17 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(firstSessionGeneration, 1)
         XCTAssertTrue(controller.isPresentationSessionGenerationCurrent(firstSessionGeneration))
 
-        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalHotkeyHoldSetPressedOverride = false
+        controller.globalMainKeySetPressedOverride = false
         controller.scheduleModifierReleaseConfirmation(trigger: "session_generation")
-        let releaseGeneration = controller.modifierReleaseConfirmationGeneration
-        XCTAssertNotNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertTrue(controller.hasPendingModifierReleaseConfirmation)
 
         controller.cancelSelectionForTesting()
 
-        XCTAssertNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertFalse(controller.hasPendingModifierReleaseConfirmation)
         XCTAssertFalse(controller.isPresentationSessionGenerationCurrent(firstSessionGeneration))
         XCTAssertEqual(controller.presentationSessionGeneration, firstSessionGeneration + 1)
-        XCTAssertEqual(
-            controller.modifierReleaseState,
-            .canceled(reason: .explicitCancel, generation: releaseGeneration)
-        )
+        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         XCTAssertEqual(controller.presentationSessionGeneration, firstSessionGeneration + 2)
@@ -1224,25 +1374,33 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerFlagsChangedReleaseConfirmationEndsSession() async {
-        let controller = makeAppSwitcherProjectionPanelController()
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.globalPrimaryModifierPressedOverride = false
-
-        controller.handleFlagsChangedForTesting(
-            Self.makeFlagsChangedEvent(keyCode: UInt16(kVK_Option))
+    func testSwitcherPanelControllerFlagsChangedReleaseConfirmationEndsSession() {
+        let releaseScheduler = ManualModifierReleaseObservationScheduler()
+        let releaseEventSource = ManualModifierReleaseEventSource()
+        let controller = makeAppSwitcherProjectionPanelController(
+            modifierReleaseObservationScheduler: releaseScheduler,
+            modifierReleaseEventSource: releaseEventSource
         )
 
-        let didEndSession = await waitUntil(
-            "flags changed release confirmation ends session",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            controller.modelForTesting.session == nil
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.globalHotkeyHoldSetPressedOverride = false
+        guard
+            let holdModifierKey = controller.activeHotkeyHoldKeys()
+                .orderedKeys.first(where: { $0.modifier != nil })
+        else {
+            return XCTFail("Expected a modifier in the active hotkey hold set")
         }
-        XCTAssertTrue(didEndSession)
+
+        controller.handleFlagsChangedForTesting(
+            Self.makeFlagsChangedEvent(keyCode: holdModifierKey.keyCode)
+        )
+
+        XCTAssertTrue(controller.hasPendingModifierReleaseConfirmation)
+        XCTAssertEqual(releaseEventSource.activeObserverCount, 1)
+        releaseScheduler.fireNext()
+
         XCTAssertNil(controller.modelForTesting.session)
+        XCTAssertEqual(releaseEventSource.activeObserverCount, 0)
     }
 
     @MainActor
@@ -1264,67 +1422,6 @@ extension FlowTabPriorityCoverageTests {
 
             XCTAssertNil(controller.modelForTesting.session)
         }
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerActiveSpaceChangeKeepsSessionVisibleWithoutReactivatingApp() async {
-        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: searchScenarioApps())
-        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        let controller = SwitcherPanelController(model: model)
-        controller.globalPrimaryModifierPressedOverride = true
-        controller.appIsActiveOverride = false
-
-        var activateCallCount = 0
-        controller.activateApplicationIgnoringOtherAppsOverride = {
-            activateCallCount += 1
-        }
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.panelOcclusionStateOverride = []
-
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 60_000_000)
-            controller.panelOcclusionStateOverride = .visible
-        }
-
-        controller.handleActiveSpaceDidChangeForTesting()
-
-        let didRecoverVisibility = await waitUntil(
-            "active space recovery confirms panel visible",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            if case .visibleConfirmed = controller.panelVisibilityRecoveryState {
-                return true
-            }
-            return false
-        }
-        XCTAssertTrue(didRecoverVisibility)
-        XCTAssertNotNil(controller.modelForTesting.session)
-        XCTAssertEqual(activateCallCount, 0)
-        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerActiveSpaceNotificationSignalsRuntimeTopologyChange() async {
-        let runtimeProjectionService = RecordingRuntimeProjectionService()
-        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        let controller = SwitcherPanelController(model: model)
-
-        NSWorkspace.shared.notificationCenter.post(
-            name: NSWorkspace.activeSpaceDidChangeNotification,
-            object: nil
-        )
-
-        let didSignalRuntime = await waitUntil(
-            "active space notification signals runtime topology change",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            runtimeProjectionService.spaceTopologyChangeSignalCount() == 1
-        }
-        XCTAssertTrue(didSignalRuntime)
-        XCTAssertNil(controller.modelForTesting.session)
     }
 
     @MainActor
@@ -1382,331 +1479,43 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerActiveSpaceChangeCancelsSessionAfterModifierRelease() async {
-        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: searchScenarioApps())
-        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        let controller = SwitcherPanelController(model: model)
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.handleActiveSpaceDidChangeForTesting()
-
-        XCTAssertNil(controller.modelForTesting.session)
-        XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
-
-        let activeSpaceSuppressionEnded = await waitForHotkeyReplaySuppressionToEnd(panelController: controller)
-        XCTAssertTrue(activeSpaceSuppressionEnded)
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerTerminateRefreshIgnoresFollowUpActiveSpaceChangeAfterModifierRelease() async {
-        let initialApps = terminateScenarioApps()
-        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
-        let controller = SwitcherPanelController(
-            model: LiveSwitcherModel(
-                runtimeProjectionService: runtimeProjectionService
+    func testSwitcherPanelControllerRecoverableOcclusionKeepsSessionVisible() {
+        let recoveryScheduler =
+            ManualPanelVisibilityRecoveryObservationScheduler()
+        let occlusionController =
+            makeAppSwitcherProjectionPanelController(
+                panelVisibilityRecoveryObservationScheduler:
+                    recoveryScheduler
             )
-        )
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        let terminatedAppID = controller.modelForTesting.selectedApp?.id
-        guard let terminatedAppID else {
-            XCTFail("Expected selected app before terminate refresh")
-            return
-        }
-        XCTAssertEqual(controller.modelForTesting.selectedApp?.id, terminatedAppID)
-        assertAppSwitcherProjectionRead(
-            from: runtimeProjectionService,
-            maintenanceRequests: [.switcherSessionStarted]
-        )
-
-        controller.handleWorkspaceApplicationTerminatedForTesting(appID: terminatedAppID, pid: 42_300)
-
-        XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
-        assertAppSwitcherProjectionRead(
-            from: runtimeProjectionService,
-            readCount: 2,
-            maintenanceRequests: [.switcherSessionStarted]
-        )
-        XCTAssertNotNil(controller.modelForTesting.session)
-        XCTAssertFalse(controller.modelForTesting.session?.apps.contains { $0.id == terminatedAppID } ?? true)
-
-        controller.handleActiveSpaceDidChangeForTesting()
-
-        XCTAssertNotNil(controller.modelForTesting.session)
-        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
-        controller.cancelSelectionForTesting()
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerTerminateRequestProtectsPanelResignAfterModifierRelease() async {
-        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: terminateScenarioApps())
-        let controller = SwitcherPanelController(
-            model: LiveSwitcherModel(
-                runtimeProjectionService: runtimeProjectionService
-            )
-        )
-        controller.modelForTesting.terminateRequestOverride = { _ in
-            (sent: true, pid: 42_301)
-        }
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
-        controller.appIsActiveOverride = false
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        assertAppSwitcherProjectionRead(
-            from: runtimeProjectionService,
-            maintenanceRequests: [.switcherSessionStarted]
-        )
-        let selectedAppID = controller.modelForTesting.selectedApp?.id
-
-        controller.terminateSelectedApp()
-        let didEnterTerminateProtection = await waitUntil(
-            "terminate request enters interruption protection before panel resign",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            controller.modelForTesting.terminatingAppID == selectedAppID
-                && controller.shouldProtectTerminateSystemInterruption()
-        }
-        XCTAssertTrue(didEnterTerminateProtection)
-
-        XCTAssertEqual(controller.modelForTesting.terminatingAppID, selectedAppID)
-        XCTAssertEqual(
-            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
-            [.switcherSessionStarted, .appLifecycleRefresh]
-        )
-        XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
-        controller.handlePanelDidResignKeyForTesting()
-
-        XCTAssertNotNil(controller.modelForTesting.session)
-        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
-        controller.cancelSelectionForTesting()
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerRecoverableOcclusionKeepsSessionVisible() async {
-        let occlusionController = makeAppSwitcherProjectionPanelController()
-        occlusionController.globalPrimaryModifierPressedOverride = true
+        occlusionController.globalHotkeyHoldSetPressedOverride = true
 
         XCTAssertTrue(occlusionController.beginGlobalHotkeySessionForTesting())
         occlusionController.panelOcclusionStateOverride = []
 
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 60_000_000)
-            occlusionController.panelOcclusionStateOverride = .visible
-        }
-
         occlusionController.handlePanelOcclusionStateDidChangeForTesting()
+        occlusionController.panelVisibilityOverride = false
+        recoveryScheduler.fireConditionReadback()
+        occlusionController.panelVisibilityOverride = true
+        occlusionController.panelOcclusionStateOverride = .visible
+        occlusionController.handlePanelDidExposeForTesting()
 
-        let didRecoverVisibility = await waitUntil(
-            "recoverable occlusion confirms panel visible",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            if case .visibleConfirmed = occlusionController.panelVisibilityRecoveryState {
-                return true
-            }
-            return false
+        guard case .visibleConfirmed =
+            occlusionController.panelVisibilityRecoveryState
+        else {
+            return XCTFail(
+                "Occlusion recovery must complete from window evidence."
+            )
         }
-        XCTAssertTrue(didRecoverVisibility)
         XCTAssertNotNil(occlusionController.modelForTesting.session)
         XCTAssertFalse(occlusionController.suppressHotkeyReplayUntilReleaseForTesting)
     }
 
     @MainActor
-    func testSwitcherPanelControllerSystemInterruptionsCancelSessionAndSuppressReplayUntilRelease() async {
-        let controller = makeAppSwitcherProjectionPanelController()
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.handleActiveSpaceDidChangeForTesting()
-
-        XCTAssertNil(controller.modelForTesting.session)
-        XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
-
-        let activeSpaceSuppressionEnded = await waitForHotkeyReplaySuppressionToEnd(panelController: controller)
-        XCTAssertTrue(activeSpaceSuppressionEnded)
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.panelOcclusionStateOverride = []
-        controller.handlePanelOcclusionStateDidChangeForTesting()
-
-        XCTAssertNil(controller.modelForTesting.session)
-        XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
-
-        let occlusionSuppressionEnded = await waitForHotkeyReplaySuppressionToEnd(panelController: controller)
-        XCTAssertTrue(occlusionSuppressionEnded)
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.appIsActiveOverride = false
-        controller.handlePanelDidResignKeyForTesting()
-
-        XCTAssertNil(controller.modelForTesting.session)
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerDelayedAutoEnterWindowLayerTriggersAfterConfiguredDelay() async {
-        let controller = makeAppSwitcherProjectionPanelController()
-        controller.windowLayerPresentationDelayOverride = 0.01
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        XCTAssertEqual(controller.modelForTesting.session?.mode, .appCycle)
-
-        controller.scheduleDelayedWindowLayerEntryForTesting()
-
-        let didEnterWindowLayer = await waitUntil(
-            "configured delayed auto-enter switches to window layer",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            guard case .windowCycle = controller.modelForTesting.session?.mode else {
-                return false
-            }
-            return true
-        }
-        XCTAssertTrue(didEnterWindowLayer)
-        XCTAssertEqual(
-            controller.modelForTesting.session?.mode,
-            .windowCycle(appID: controller.modelForTesting.selectedApp?.id ?? "")
-        )
-        controller.cancelSelectionForTesting()
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerDelayedAutoEnterWindowLayerUsesPreferenceDelay() async {
-        await withTemporaryWindowLayerAutoEnterDelay(0.01) {
-            let controller = makeAppSwitcherProjectionPanelController()
-
-            XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-            XCTAssertEqual(controller.modelForTesting.session?.mode, .appCycle)
-
-            controller.scheduleDelayedWindowLayerEntryForTesting()
-
-            let didEnterWindowLayer = await waitUntil(
-                "preference delayed auto-enter switches to window layer",
-                timeoutNanoseconds: 1_000_000_000,
-                pollIntervalNanoseconds: 10_000_000
-            ) {
-                guard case .windowCycle = controller.modelForTesting.session?.mode else {
-                    return false
-                }
-                return true
-            }
-            XCTAssertTrue(didEnterWindowLayer)
-            XCTAssertEqual(
-                controller.modelForTesting.session?.mode,
-                .windowCycle(appID: controller.modelForTesting.selectedApp?.id ?? "")
-            )
-            controller.cancelSelectionForTesting()
-        }
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerDelayedAutoEnterUsesCommittedSelectedAppProjection() async {
-        let currentApp = NSRunningApplication.current
-        let appID = "com.example.deferred-window-snapshot"
-        let windows = [
-            WindowCandidate(id: "deferred-1", title: "Deferred One", isMinimized: false, lastActiveAt: 30),
-            WindowCandidate(id: "deferred-2", title: "Deferred Two", isMinimized: false, lastActiveAt: 20)
-        ]
-        let appOnlyCandidate = AppSwitchCandidate(
-            id: appID,
-            displayName: "Deferred Snapshot",
-            groupID: "deferred",
-            lastActiveAt: 100,
-            windows: []
-        )
-        let windowCandidate = AppSwitchCandidate(
-            id: appID,
-            displayName: "Deferred Snapshot",
-            groupID: "deferred",
-            lastActiveAt: 100,
-            windows: windows
-        )
-        let context = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: windows)
-        let selectedCurrentAppWindowPayload = RuntimeCurrentAppWindowPayload(
-            summary: RuntimeHomeAppSummary(
-                appID: appID,
-                displayName: "Deferred Snapshot",
-                groupID: "deferred",
-                lastActiveAt: 100,
-                windowCount: windows.count,
-                pid: currentApp.processIdentifier
-            ),
-            candidate: windowCandidate,
-            context: context,
-            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: currentApp)]
-        )
-        let freshness = RuntimeProjectionFreshness(
-            generatedAt: 12,
-            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
-            dirtyAppIDs: [],
-            dirtyPIDs: [],
-            dirtyCGWindowIDs: [],
-            pendingRepairScopes: [],
-            isCompleteForScope: true
-        )
-        let runtimeProjectionService = RecordingRuntimeProjectionService(
-            appSwitcherProjection: RuntimeAppSwitcherProjection(
-                apps: [appOnlyCandidate],
-                contextsByID: [:],
-                freshness: freshness
-            ),
-            currentAppWindowProjectionsByAppID: [
-                appID: RuntimeCurrentAppWindowProjection(
-                    appID: appID,
-                    currentAppWindowPayload: selectedCurrentAppWindowPayload,
-                    freshness: freshness
-                )
-            ]
-        )
-        let controller = SwitcherPanelController(
-            model: LiveSwitcherModel(
-                runtimeProjectionService: runtimeProjectionService
-            )
-        )
-        controller.windowLayerPresentationDelayOverride = 0.01
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        XCTAssertEqual(controller.modelForTesting.session?.selectedApp.windows.count, 0)
-        assertAppSwitcherProjectionRead(
-            from: runtimeProjectionService,
-            maintenanceRequests: [.switcherSessionStarted]
-        )
-        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 0)
-
-        controller.scheduleDelayedWindowLayerEntryForTesting()
-
-        let didUseProjection = await waitUntil(
-            "delayed auto-enter uses committed selected-app projection before switching",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            controller.modelForTesting.session?.mode == .windowCycle(appID: appID)
-        }
-        XCTAssertTrue(didUseProjection)
-        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
-        XCTAssertTrue(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().isEmpty)
-        XCTAssertEqual(
-            controller.modelForTesting.session?.mode,
-            .windowCycle(appID: appID)
-        )
-        XCTAssertEqual(
-            controller.modelForTesting.session?.selectedApp.windows.map(\.id),
-            ["deferred-1", "deferred-2"]
-        )
-        controller.cancelSelectionForTesting()
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerDelayedAutoEnterAppliesSelectedProjectionCommittedAfterDirtySignal() async {
+    func testSwitcherPanelControllerDelayedAutoEnterAppliesSelectedProjectionCommittedAfterDirtySignal() {
         let currentApp = NSRunningApplication.current
         let appID = "com.example.deferred-selected-projection"
+        let scheduler =
+            ManualDelayedWindowLayerEntryScheduler()
         let windows = [
             WindowCandidate(id: "deferred-after-dirty-1", title: "Deferred One", isMinimized: false, lastActiveAt: 30),
             WindowCandidate(id: "deferred-after-dirty-2", title: "Deferred Two", isMinimized: false, lastActiveAt: 20)
@@ -1759,7 +1568,8 @@ extension FlowTabPriorityCoverageTests {
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(
                 runtimeProjectionService: runtimeProjectionService
-            )
+            ),
+            delayedWindowLayerEntryScheduler: scheduler
         )
         controller.windowLayerPresentationDelayOverride = 0.05
 
@@ -1768,14 +1578,12 @@ extension FlowTabPriorityCoverageTests {
 
         controller.scheduleDelayedWindowLayerEntryForTesting()
 
-        let didRequestProjection = await waitUntil(
-            "delayed auto-enter requests selected-app projection maintenance",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            !runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().isEmpty
-        }
-        XCTAssertTrue(didRequestProjection)
+        XCTAssertEqual(
+            runtimeProjectionService
+                .selectedCurrentAppWindowChangeSignalsRecorded()
+                .map(\.appID),
+            [appID]
+        )
         XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
         runtimeProjectionService.setCurrentAppWindowProjection(
             RuntimeCurrentAppWindowProjection(
@@ -1785,117 +1593,28 @@ extension FlowTabPriorityCoverageTests {
             ),
             appID: appID
         )
-
-        let didUseProjection = await waitUntil(
-            "delayed auto-enter applies projection committed after dirty signal",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            controller.modelForTesting.session?.mode == .windowCycle(appID: appID)
-        }
-        XCTAssertTrue(didUseProjection)
+        XCTAssertTrue(
+            controller.handleCurrentAppWindowProjectionDidUpdateForTesting(
+                appID: appID
+            )
+        )
         XCTAssertGreaterThanOrEqual(
             runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID),
             2
         )
         XCTAssertEqual(
+            controller.modelForTesting.session?.mode,
+            .appCycle
+        )
+        XCTAssertEqual(
             controller.modelForTesting.session?.selectedApp.windows.map(\.id),
             ["deferred-after-dirty-1", "deferred-after-dirty-2"]
         )
-        controller.cancelSelectionForTesting()
-    }
 
-    @MainActor
-    func testSwitcherPanelControllerManualWindowLayerEntryAppliesProjectionBeforeLongAutoEnterDelay() async {
-        let currentApp = NSRunningApplication.current
-        let appID = "com.example.manual-selected-projection"
-        let windows = [
-            WindowCandidate(id: "manual-after-dirty-1", title: "Manual One", isMinimized: false, lastActiveAt: 30),
-            WindowCandidate(id: "manual-after-dirty-2", title: "Manual Two", isMinimized: false, lastActiveAt: 20)
-        ]
-        let appOnlyCandidate = AppSwitchCandidate(
-            id: appID,
-            displayName: "Manual Projection",
-            groupID: "manual",
-            lastActiveAt: 100,
-            windows: []
-        )
-        let windowCandidate = AppSwitchCandidate(
-            id: appID,
-            displayName: "Manual Projection",
-            groupID: "manual",
-            lastActiveAt: 100,
-            windows: windows
-        )
-        let emptyContext = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: [])
-        let repairedContext = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: windows)
-        let selectedCurrentAppWindowPayload = RuntimeCurrentAppWindowPayload(
-            summary: RuntimeHomeAppSummary(
-                appID: appID,
-                displayName: "Manual Projection",
-                groupID: "manual",
-                lastActiveAt: 100,
-                windowCount: windows.count,
-                pid: currentApp.processIdentifier
-            ),
-            candidate: windowCandidate,
-            context: repairedContext,
-            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: currentApp)]
-        )
-        let freshness = RuntimeProjectionFreshness(
-            generatedAt: 12,
-            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
-            dirtyAppIDs: [],
-            dirtyPIDs: [],
-            dirtyCGWindowIDs: [],
-            pendingRepairScopes: [],
-            isCompleteForScope: true
-        )
-        let runtimeProjectionService = RecordingRuntimeProjectionService(
-            appSwitcherProjection: RuntimeAppSwitcherProjection(
-                apps: [appOnlyCandidate],
-                contextsByID: [appID: emptyContext],
-                freshness: freshness
-            )
-        )
-        let controller = SwitcherPanelController(
-            model: LiveSwitcherModel(
-                runtimeProjectionService: runtimeProjectionService
-            )
-        )
-        controller.windowLayerPresentationDelayOverride = 30
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.advance(.downArrow)
-
-        let didRequestProjection = await waitUntil(
-            "manual window-layer entry requests selected-app projection maintenance",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            !runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().isEmpty
-        }
-        XCTAssertTrue(didRequestProjection)
-        runtimeProjectionService.setCurrentAppWindowProjection(
-            RuntimeCurrentAppWindowProjection(
-                appID: appID,
-                currentAppWindowPayload: selectedCurrentAppWindowPayload,
-                freshness: freshness
-            ),
-            appID: appID
-        )
-
-        let didUseProjection = await waitUntil(
-            "manual window-layer entry applies projection before long auto-enter delay",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            controller.modelForTesting.session?.mode == .windowCycle(appID: appID)
-        }
-        XCTAssertTrue(didUseProjection)
+        XCTAssertTrue(scheduler.fireNextDeadline())
         XCTAssertEqual(
-            controller.modelForTesting.session?.selectedApp.windows.map(\.id),
-            ["manual-after-dirty-1", "manual-after-dirty-2"]
+            controller.modelForTesting.session?.mode,
+            .windowCycle(appID: appID)
         )
         controller.cancelSelectionForTesting()
     }
@@ -1980,177 +1699,6 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(
             controller.modelForTesting.session?.selectedApp.windows.map(\.id),
             ["manual-commit-1", "manual-commit-2"]
-        )
-        controller.cancelSelectionForTesting()
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerCurrentAppProjectionCommitRefreshesFrozenWindowLayerPreview() {
-        let currentApp = NSRunningApplication.current
-        let appID = "com.example.open-layer-mutation"
-        let initialWindows = [
-            WindowCandidate(id: "open-layer-1", title: "Open Layer One", isMinimized: false, lastActiveAt: 30),
-            WindowCandidate(id: "open-layer-2", title: "Open Layer Two", isMinimized: false, lastActiveAt: 20)
-        ]
-        let remainingWindows = [initialWindows[0]]
-        let initialCandidate = AppSwitchCandidate(
-            id: appID,
-            displayName: "Open Layer Mutation",
-            groupID: "open-layer",
-            lastActiveAt: 100,
-            windows: initialWindows
-        )
-        let repairedCandidate = AppSwitchCandidate(
-            id: appID,
-            displayName: "Open Layer Mutation",
-            groupID: "open-layer",
-            lastActiveAt: 100,
-            windows: remainingWindows
-        )
-        let initialContext = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: initialWindows)
-        let repairedContext = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: remainingWindows)
-        let repairedCurrentAppWindowPayload = RuntimeCurrentAppWindowPayload(
-            summary: RuntimeHomeAppSummary(
-                appID: appID,
-                displayName: "Open Layer Mutation",
-                groupID: "open-layer",
-                lastActiveAt: 100,
-                windowCount: remainingWindows.count,
-                pid: currentApp.processIdentifier
-            ),
-            candidate: repairedCandidate,
-            context: repairedContext,
-            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: currentApp)]
-        )
-        let freshness = RuntimeProjectionFreshness(
-            generatedAt: 12,
-            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
-            dirtyAppIDs: [],
-            dirtyPIDs: [],
-            dirtyCGWindowIDs: [],
-            pendingRepairScopes: [],
-            isCompleteForScope: true
-        )
-        let runtimeProjectionService = RecordingRuntimeProjectionService(
-            appSwitcherProjection: RuntimeAppSwitcherProjection(
-                apps: [initialCandidate],
-                contextsByID: [appID: initialContext],
-                freshness: freshness
-            )
-        )
-        let controller = SwitcherPanelController(
-            model: LiveSwitcherModel(
-                runtimeProjectionService: runtimeProjectionService
-            )
-        )
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.advance(.downArrow)
-        XCTAssertEqual(controller.modelForTesting.session?.mode, .windowCycle(appID: appID))
-        XCTAssertEqual(
-            controller.modelForTesting.windowPreviewSnapshotForTesting().map(\.id),
-            ["open-layer-1", "open-layer-2"]
-        )
-
-        runtimeProjectionService.setCurrentAppWindowProjection(
-            RuntimeCurrentAppWindowProjection(
-                appID: appID,
-                currentAppWindowPayload: repairedCurrentAppWindowPayload,
-                freshness: freshness
-            ),
-            appID: appID
-        )
-        XCTAssertTrue(controller.handleCurrentAppWindowProjectionDidUpdateForTesting(appID: appID))
-
-        XCTAssertEqual(controller.modelForTesting.session?.selectedApp.windows.map(\.id), ["open-layer-1"])
-        XCTAssertEqual(
-            controller.modelForTesting.windowPreviewSnapshotForTesting().map(\.id),
-            ["open-layer-1"]
-        )
-        controller.cancelSelectionForTesting()
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerCurrentAppProjectionCommitKeepsWindowLayerWhenSelectedWindowIsRemoved() {
-        let currentApp = NSRunningApplication.current
-        let appID = "com.example.open-layer-selected-removed"
-        let initialWindows = [
-            WindowCandidate(id: "open-layer-remaining", title: "Open Layer Remaining", isMinimized: false, lastActiveAt: 30),
-            WindowCandidate(id: "open-layer-removed", title: "Open Layer Removed", isMinimized: false, lastActiveAt: 20)
-        ]
-        let remainingWindows = [initialWindows[0]]
-        let initialCandidate = AppSwitchCandidate(
-            id: appID,
-            displayName: "Open Layer Selected Removed",
-            groupID: "open-layer",
-            lastActiveAt: 100,
-            windows: initialWindows
-        )
-        let repairedCandidate = AppSwitchCandidate(
-            id: appID,
-            displayName: "Open Layer Selected Removed",
-            groupID: "open-layer",
-            lastActiveAt: 100,
-            windows: remainingWindows
-        )
-        let initialContext = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: initialWindows)
-        let repairedContext = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: remainingWindows)
-        let repairedCurrentAppWindowPayload = RuntimeCurrentAppWindowPayload(
-            summary: RuntimeHomeAppSummary(
-                appID: appID,
-                displayName: "Open Layer Selected Removed",
-                groupID: "open-layer",
-                lastActiveAt: 100,
-                windowCount: remainingWindows.count,
-                pid: currentApp.processIdentifier
-            ),
-            candidate: repairedCandidate,
-            context: repairedContext,
-            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: currentApp)]
-        )
-        let freshness = RuntimeProjectionFreshness(
-            generatedAt: 12,
-            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
-            dirtyAppIDs: [],
-            dirtyPIDs: [],
-            dirtyCGWindowIDs: [],
-            pendingRepairScopes: [],
-            isCompleteForScope: true
-        )
-        let runtimeProjectionService = RecordingRuntimeProjectionService(
-            appSwitcherProjection: RuntimeAppSwitcherProjection(
-                apps: [initialCandidate],
-                contextsByID: [appID: initialContext],
-                freshness: freshness
-            )
-        )
-        let controller = SwitcherPanelController(
-            model: LiveSwitcherModel(
-                runtimeProjectionService: runtimeProjectionService
-            )
-        )
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.advance(.downArrow)
-        controller.advance(.rightArrow)
-        XCTAssertEqual(controller.modelForTesting.session?.mode, .windowCycle(appID: appID))
-        XCTAssertEqual(controller.modelForTesting.session?.selectedWindow?.id, "open-layer-removed")
-
-        runtimeProjectionService.setCurrentAppWindowProjection(
-            RuntimeCurrentAppWindowProjection(
-                appID: appID,
-                currentAppWindowPayload: repairedCurrentAppWindowPayload,
-                freshness: freshness
-            ),
-            appID: appID
-        )
-        XCTAssertTrue(controller.handleCurrentAppWindowProjectionDidUpdateForTesting(appID: appID))
-
-        XCTAssertEqual(controller.modelForTesting.session?.mode, .windowCycle(appID: appID))
-        XCTAssertEqual(controller.modelForTesting.session?.selectedWindow?.id, "open-layer-remaining")
-        XCTAssertEqual(
-            controller.modelForTesting.windowPreviewSnapshotForTesting().map(\.id),
-            ["open-layer-remaining"]
         )
         controller.cancelSelectionForTesting()
     }
@@ -2302,7 +1850,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(previewLayerFrame.maxY, appLayerFrame.maxY, accuracy: 0.5)
     }
 
-    private func makeCompleteCurrentSpaceFullscreenProjectionForTesting(
+    func makeCompleteCurrentSpaceFullscreenProjectionForTesting(
+        currentSpaceID: Int = 7,
+        spaceGeneration: UInt64 = 1,
         isCompleteForScope: Bool = true,
         pendingRepairScopes: Set<String> = []
     ) -> RuntimeSpaceTopologyProjection {
@@ -2312,13 +1862,13 @@ extension FlowTabPriorityCoverageTests {
             let displayID = CGDirectDisplayID(number.uint32Value)
             return RuntimeDisplaySpaceSignature(
                 displayID: displayID,
-                currentSpaceID: 7,
-                spaceIDs: [7],
+                currentSpaceID: currentSpaceID,
+                spaceIDs: [currentSpaceID],
                 windowIDsBySpaceID: [
-                    7: [240_001]
+                    currentSpaceID: [240_001]
                 ],
                 fullscreenWindowIDBySpaceID: [
-                    7: 240_001
+                    currentSpaceID: 240_001
                 ]
             )
         }
@@ -2326,13 +1876,13 @@ extension FlowTabPriorityCoverageTests {
             ? [
                 RuntimeDisplaySpaceSignature(
                     displayID: nil,
-                    currentSpaceID: 7,
-                    spaceIDs: [7],
+                    currentSpaceID: currentSpaceID,
+                    spaceIDs: [currentSpaceID],
                     windowIDsBySpaceID: [
-                        7: [240_001]
+                        currentSpaceID: [240_001]
                     ],
                     fullscreenWindowIDBySpaceID: [
-                        7: 240_001
+                        currentSpaceID: 240_001
                     ]
                 )
             ]
@@ -2342,7 +1892,8 @@ extension FlowTabPriorityCoverageTests {
             affectedCGWindowIDs: [],
             freshness: RuntimeProjectionFreshness(
                 generatedAt: 10,
-                sourceGeneration: RuntimeReadModelGeneration(space: 1),
+                sourceGeneration:
+                    RuntimeReadModelGeneration(space: spaceGeneration),
                 dirtyAppIDs: [],
                 dirtyPIDs: [],
                 dirtyCGWindowIDs: [],

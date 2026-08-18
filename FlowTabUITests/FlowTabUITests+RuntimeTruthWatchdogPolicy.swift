@@ -1,0 +1,226 @@
+import Foundation
+import XCTest
+
+enum FlowTabUITestRuntimeTruthWatchdogPolicy {
+    static let optionTabInitialTopology: TimeInterval = 12
+    static let optionTabInitialWindowStateTopology: TimeInterval = 4
+    static let optionTabConfirmedWindowActivation: TimeInterval = 12
+    static let optionTabSwitcherDismissal: TimeInterval = 4
+    static let optionTabRelaunchWindowTopology: TimeInterval = 4
+    static let spaceBackedWindowLayerProjectionPublication: TimeInterval = 8
+    static let spaceBackedSelectedWindowLayerSourceReadback: TimeInterval = 8
+    static let spaceBackedWindowRequestPublication: TimeInterval = 8
+    static let spaceBackedCGActivationRoutePublication: TimeInterval = 8
+    static let spaceBackedCGActivationReadbackMismatchPublication: TimeInterval = 8
+    static let spaceBackedCGActivationRecoveryFailurePublication: TimeInterval = 8
+    static let provisionalHiddenProjectionPublication: TimeInterval = 8
+    static let provisionalHiddenSingleWindowAdvance: TimeInterval = 4
+    static let windowSearchInitialTopology: TimeInterval = 12
+    static let windowSearchInitialPresentationTopology: TimeInterval = 4
+    static let windowSearchConfirmedWindowActivation: TimeInterval = 12
+    static let windowSearchInputDismissal: TimeInterval = 4
+    static let windowSearchRelaunchWindowTopology: TimeInterval = 4
+    static let windowSearchDiagnosticsPublication: TimeInterval = 12
+    static let windowSearchCommittedProjectionPublication: TimeInterval = 8
+    static let windowSearchQueryProjectionPublication: TimeInterval = 8
+    static let windowSearchResultSelectionApplication: TimeInterval = 6
+    static let switcherDiagnosticsAppSelectionProjectionApplication:
+        TimeInterval = 20
+    static let switcherWindowCyclePreviewProjection:
+        TimeInterval = 20
+}
+
+extension FlowTabUITests {
+    func testRuntimeTruthWatchdogPolicyPreservesCompatibleBounds() {
+        let initialTopology =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .optionTabInitialTopology
+        XCTAssertEqual(initialTopology, 12)
+        XCTAssertTrue(initialTopology.isFinite && initialTopology > 0)
+
+        let initialWindowStateTopology =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .optionTabInitialWindowStateTopology
+        XCTAssertEqual(initialWindowStateTopology, 4)
+        XCTAssertTrue(initialWindowStateTopology.isFinite && initialWindowStateTopology > 0)
+
+        let confirmedWindowActivation =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .optionTabConfirmedWindowActivation
+        XCTAssertEqual(confirmedWindowActivation, 12)
+        XCTAssertTrue(confirmedWindowActivation.isFinite && confirmedWindowActivation > 0)
+
+        let switcherDismissal =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .optionTabSwitcherDismissal
+        XCTAssertEqual(switcherDismissal, 4)
+        XCTAssertTrue(switcherDismissal.isFinite && switcherDismissal > 0)
+
+        let relaunchWindowTopology =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .optionTabRelaunchWindowTopology
+        XCTAssertEqual(relaunchWindowTopology, 4)
+        XCTAssertTrue(relaunchWindowTopology.isFinite && relaunchWindowTopology > 0)
+
+        let spaceBackedWindowLayerProjectionPublication =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .spaceBackedWindowLayerProjectionPublication
+        XCTAssertEqual(spaceBackedWindowLayerProjectionPublication, 8)
+        XCTAssertTrue(
+            spaceBackedWindowLayerProjectionPublication.isFinite
+                && spaceBackedWindowLayerProjectionPublication > 0
+        )
+
+        let spaceBackedSelectedWindowLayerSourceReadback =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .spaceBackedSelectedWindowLayerSourceReadback
+        XCTAssertEqual(spaceBackedSelectedWindowLayerSourceReadback, 8)
+        XCTAssertTrue(
+            spaceBackedSelectedWindowLayerSourceReadback.isFinite
+                && spaceBackedSelectedWindowLayerSourceReadback > 0
+        )
+
+        let spaceBackedWindowRequestPublication =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .spaceBackedWindowRequestPublication
+        XCTAssertEqual(spaceBackedWindowRequestPublication, 8)
+        XCTAssertTrue(
+            spaceBackedWindowRequestPublication.isFinite
+                && spaceBackedWindowRequestPublication > 0
+        )
+
+        let spaceBackedCGActivationRoutePublication =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .spaceBackedCGActivationRoutePublication
+        XCTAssertEqual(spaceBackedCGActivationRoutePublication, 8)
+        XCTAssertTrue(
+            spaceBackedCGActivationRoutePublication.isFinite
+                && spaceBackedCGActivationRoutePublication > 0
+        )
+
+        let spaceBackedCGActivationReadbackMismatchPublication =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .spaceBackedCGActivationReadbackMismatchPublication
+        XCTAssertEqual(spaceBackedCGActivationReadbackMismatchPublication, 8)
+        XCTAssertTrue(
+            spaceBackedCGActivationReadbackMismatchPublication.isFinite
+                && spaceBackedCGActivationReadbackMismatchPublication > 0
+        )
+
+        let spaceBackedCGActivationRecoveryFailurePublication =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .spaceBackedCGActivationRecoveryFailurePublication
+        XCTAssertEqual(spaceBackedCGActivationRecoveryFailurePublication, 8)
+        XCTAssertTrue(
+            spaceBackedCGActivationRecoveryFailurePublication.isFinite
+                && spaceBackedCGActivationRecoveryFailurePublication > 0
+        )
+
+        let provisionalHiddenProjectionPublication =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .provisionalHiddenProjectionPublication
+        XCTAssertEqual(provisionalHiddenProjectionPublication, 8)
+        XCTAssertTrue(
+            provisionalHiddenProjectionPublication.isFinite
+                && provisionalHiddenProjectionPublication > 0
+        )
+
+        let provisionalHiddenSingleWindowAdvance =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .provisionalHiddenSingleWindowAdvance
+        XCTAssertEqual(provisionalHiddenSingleWindowAdvance, 4)
+        XCTAssertTrue(
+            provisionalHiddenSingleWindowAdvance.isFinite
+                && provisionalHiddenSingleWindowAdvance > 0
+        )
+
+        let windowSearchInitialTopology =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .windowSearchInitialTopology
+        XCTAssertEqual(windowSearchInitialTopology, 12)
+        XCTAssertTrue(windowSearchInitialTopology.isFinite && windowSearchInitialTopology > 0)
+
+        let windowSearchInitialPresentationTopology =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .windowSearchInitialPresentationTopology
+        XCTAssertEqual(windowSearchInitialPresentationTopology, 4)
+        XCTAssertTrue(windowSearchInitialPresentationTopology.isFinite && windowSearchInitialPresentationTopology > 0)
+
+        let windowSearchConfirmedWindowActivation =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .windowSearchConfirmedWindowActivation
+        XCTAssertEqual(windowSearchConfirmedWindowActivation, 12)
+        XCTAssertTrue(windowSearchConfirmedWindowActivation.isFinite && windowSearchConfirmedWindowActivation > 0)
+
+        let windowSearchInputDismissal =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .windowSearchInputDismissal
+        XCTAssertEqual(windowSearchInputDismissal, 4)
+        XCTAssertTrue(windowSearchInputDismissal.isFinite && windowSearchInputDismissal > 0)
+
+        let windowSearchRelaunchWindowTopology =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .windowSearchRelaunchWindowTopology
+        XCTAssertEqual(windowSearchRelaunchWindowTopology, 4)
+        XCTAssertTrue(windowSearchRelaunchWindowTopology.isFinite && windowSearchRelaunchWindowTopology > 0)
+
+        let windowSearchDiagnosticsPublication =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .windowSearchDiagnosticsPublication
+        XCTAssertEqual(windowSearchDiagnosticsPublication, 12)
+        XCTAssertTrue(windowSearchDiagnosticsPublication.isFinite && windowSearchDiagnosticsPublication > 0)
+
+        let windowSearchCommittedProjectionPublication =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .windowSearchCommittedProjectionPublication
+        XCTAssertEqual(windowSearchCommittedProjectionPublication, 8)
+        XCTAssertTrue(
+            windowSearchCommittedProjectionPublication.isFinite
+                && windowSearchCommittedProjectionPublication > 0
+        )
+
+        let windowSearchQueryProjectionPublication =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .windowSearchQueryProjectionPublication
+        XCTAssertEqual(windowSearchQueryProjectionPublication, 8)
+        XCTAssertTrue(
+            windowSearchQueryProjectionPublication.isFinite
+                && windowSearchQueryProjectionPublication > 0
+        )
+
+        let windowSearchResultSelectionApplication =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .windowSearchResultSelectionApplication
+        XCTAssertEqual(windowSearchResultSelectionApplication, 6)
+        XCTAssertTrue(
+            windowSearchResultSelectionApplication.isFinite
+                && windowSearchResultSelectionApplication > 0
+        )
+
+        let switcherDiagnosticsAppSelectionProjectionApplication =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .switcherDiagnosticsAppSelectionProjectionApplication
+        XCTAssertEqual(
+            switcherDiagnosticsAppSelectionProjectionApplication,
+            20
+        )
+        XCTAssertTrue(
+            switcherDiagnosticsAppSelectionProjectionApplication
+                .isFinite
+                && switcherDiagnosticsAppSelectionProjectionApplication
+                    > 0
+        )
+
+        let switcherWindowCyclePreviewProjection =
+            FlowTabUITestRuntimeTruthWatchdogPolicy
+                .switcherWindowCyclePreviewProjection
+        XCTAssertEqual(
+            switcherWindowCyclePreviewProjection,
+            20
+        )
+        XCTAssertTrue(
+            switcherWindowCyclePreviewProjection.isFinite
+                && switcherWindowCyclePreviewProjection > 0
+        )
+    }
+}

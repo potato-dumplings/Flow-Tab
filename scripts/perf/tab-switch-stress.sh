@@ -4,6 +4,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 BUILD_ROOT="$ROOT_DIR/.build-local"
 HOST_ARCH="$(uname -m)"
+PROCESS_EXIT_OBSERVATION_PATH="${ROOT_DIR}/scripts/perf/lib/process-exit-observation.sh"
+APP_TERMINATION_GRACE_MILLISECONDS=2000
+APP_TERMINATION_POLL_INTERVAL_SECONDS=0.1
+
+# shellcheck source=scripts/perf/lib/process-exit-observation.sh
+source "${PROCESS_EXIT_OBSERVATION_PATH}"
 
 usage() {
   cat <<'EOF'
@@ -36,6 +42,7 @@ HAS_CUSTOM_OUTPUT_DIR=false
 HAS_CUSTOM_BUILD_ROOT=false
 POSITIONAL_ARGS=()
 APP_PID=""
+APP_START_IDENTITY=""
 APP_REAPED=true
 APP_EXIT_STATUS="not_started"
 STATUS_FILE=""
@@ -97,8 +104,7 @@ reap_app() {
 }
 
 terminate_app() {
-  local wait_attempt=0
-  local process_state=""
+  local observation_status=0
 
   if [[ -z "$APP_PID" || "$APP_REAPED" == true ]]; then
     return
@@ -106,14 +112,15 @@ terminate_app() {
 
   if kill -0 "$APP_PID" 2>/dev/null; then
     kill -TERM "$APP_PID" 2>/dev/null || true
-    while kill -0 "$APP_PID" 2>/dev/null && [[ "$wait_attempt" -lt 20 ]]; do
-      if process_state="$(LC_ALL=C ps -p "$APP_PID" -o stat= 2>/dev/null | LC_ALL=C awk '{$1=$1; print}')" && [[ "$process_state" == Z* ]]; then
-        break
-      fi
-      sleep 0.1
-      wait_attempt=$((wait_attempt + 1))
-    done
-    if kill -0 "$APP_PID" 2>/dev/null && [[ "$process_state" != Z* ]]; then
+    flowtab_perf_wait_for_process_exit \
+      "$APP_PID" \
+      "$APP_START_IDENTITY" \
+      "$APP_TERMINATION_GRACE_MILLISECONDS" \
+      "$APP_TERMINATION_POLL_INTERVAL_SECONDS" \
+      || observation_status=$?
+    if [[ "$observation_status" -ne 0 ]] \
+      && [[ "$FLOWTAB_PERF_PROCESS_EXIT_CONDITION" != "identity_changed" ]]; then
+      echo "Escalating child termination to SIGKILL after evidence watchdog." >&2
       kill -KILL "$APP_PID" 2>/dev/null || true
     fi
   fi
@@ -324,6 +331,9 @@ echo "[2/3] Launching stress mode for ${DURATION_SECONDS}s (switch interval ${SW
   >"$APP_LOG" 2>&1 &
 APP_PID=$!
 APP_REAPED=false
+APP_START_IDENTITY="$(
+  flowtab_perf_process_start_identity "$APP_PID" 2>/dev/null || true
+)"
 
 while kill -0 "$APP_PID" 2>/dev/null; do
   if ! SAMPLE_LINE="$(LC_ALL=C ps -p "$APP_PID" -o stat= -o %cpu= -o rss= -o %mem= | LC_ALL=C awk '{$1=$1; print}')"; then

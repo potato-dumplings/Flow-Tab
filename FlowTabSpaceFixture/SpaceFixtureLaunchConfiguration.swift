@@ -56,6 +56,16 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
     let enterFullscreenDelayMilliseconds: Int
     let preservesDesktopAfterFullscreen: Bool
     let publishesApplicationAccessibilityChildren: Bool
+    let applicationAXSuppressionRoute:
+        SpaceFixtureApplicationAXSuppressionRoute?
+    let terminationFaultEvidenceRoute:
+        SpaceFixtureTerminationFaultEvidenceRoute?
+    let windowCloseFaultEvidenceRoute:
+        SpaceFixtureWindowCloseFaultEvidenceRoute?
+    let windowCloseFaultTriggerRoute:
+        SpaceFixtureWindowCloseFaultTriggerRoute?
+    let workflowReadinessRoute:
+        SpaceFixtureWorkflowReadinessRoute?
     let terminationDelayMilliseconds: Int
     let closeWindowIndex: Int?
     let closeWindowDelayMilliseconds: Int
@@ -88,6 +98,16 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         enterFullscreenDelayMilliseconds: Int,
         preservesDesktopAfterFullscreen: Bool,
         publishesApplicationAccessibilityChildren: Bool = true,
+        applicationAXSuppressionRoute:
+            SpaceFixtureApplicationAXSuppressionRoute? = nil,
+        terminationFaultEvidenceRoute:
+            SpaceFixtureTerminationFaultEvidenceRoute? = nil,
+        windowCloseFaultEvidenceRoute:
+            SpaceFixtureWindowCloseFaultEvidenceRoute? = nil,
+        windowCloseFaultTriggerRoute:
+            SpaceFixtureWindowCloseFaultTriggerRoute? = nil,
+        workflowReadinessRoute:
+            SpaceFixtureWorkflowReadinessRoute? = nil,
         terminationDelayMilliseconds: Int = 0,
         closeWindowIndex: Int? = nil,
         closeWindowDelayMilliseconds: Int = 0,
@@ -101,6 +121,16 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         self.enterFullscreenDelayMilliseconds = enterFullscreenDelayMilliseconds
         self.preservesDesktopAfterFullscreen = preservesDesktopAfterFullscreen
         self.publishesApplicationAccessibilityChildren = publishesApplicationAccessibilityChildren
+        self.applicationAXSuppressionRoute =
+            applicationAXSuppressionRoute
+        self.terminationFaultEvidenceRoute =
+            terminationFaultEvidenceRoute
+        self.windowCloseFaultEvidenceRoute =
+            windowCloseFaultEvidenceRoute
+        self.windowCloseFaultTriggerRoute =
+            windowCloseFaultTriggerRoute
+        self.workflowReadinessRoute =
+            workflowReadinessRoute
         self.terminationDelayMilliseconds = max(0, terminationDelayMilliseconds)
         self.closeWindowIndex = closeWindowIndex.flatMap { windows.indices.contains($0 - 1) ? $0 : nil }
         self.closeWindowDelayMilliseconds = max(0, closeWindowDelayMilliseconds)
@@ -117,6 +147,16 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         enterFullscreenDelayMilliseconds: Int,
         preservesDesktopAfterFullscreen: Bool,
         publishesApplicationAccessibilityChildren: Bool = true,
+        applicationAXSuppressionRoute:
+            SpaceFixtureApplicationAXSuppressionRoute? = nil,
+        terminationFaultEvidenceRoute:
+            SpaceFixtureTerminationFaultEvidenceRoute? = nil,
+        windowCloseFaultEvidenceRoute:
+            SpaceFixtureWindowCloseFaultEvidenceRoute? = nil,
+        windowCloseFaultTriggerRoute:
+            SpaceFixtureWindowCloseFaultTriggerRoute? = nil,
+        workflowReadinessRoute:
+            SpaceFixtureWorkflowReadinessRoute? = nil,
         terminationDelayMilliseconds: Int = 0,
         closeWindowIndex: Int? = nil,
         closeWindowDelayMilliseconds: Int = 0
@@ -155,6 +195,16 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             enterFullscreenDelayMilliseconds: max(0, enterFullscreenDelayMilliseconds),
             preservesDesktopAfterFullscreen: preservesDesktopAfterFullscreen,
             publishesApplicationAccessibilityChildren: publishesApplicationAccessibilityChildren,
+            applicationAXSuppressionRoute:
+                applicationAXSuppressionRoute,
+            terminationFaultEvidenceRoute:
+                terminationFaultEvidenceRoute,
+            windowCloseFaultEvidenceRoute:
+                windowCloseFaultEvidenceRoute,
+            windowCloseFaultTriggerRoute:
+                windowCloseFaultTriggerRoute,
+            workflowReadinessRoute:
+                workflowReadinessRoute,
             terminationDelayMilliseconds: terminationDelayMilliseconds,
             closeWindowIndex: closeWindowIndex,
             closeWindowDelayMilliseconds: closeWindowDelayMilliseconds
@@ -202,6 +252,26 @@ extension SpaceFixtureLaunchConfiguration {
             enterFullscreenDelayMilliseconds: normalizedDelayMilliseconds,
             preservesDesktopAfterFullscreen: arguments.contains("--preserve-desktop-after-fullscreen"),
             publishesApplicationAccessibilityChildren: !arguments.contains("--suppress-app-accessibility-children"),
+            applicationAXSuppressionRoute:
+                Self.applicationAXSuppressionRoute(
+                    arguments: arguments
+                ),
+            terminationFaultEvidenceRoute:
+                Self.terminationFaultEvidenceRoute(
+                    arguments: arguments
+                ),
+            windowCloseFaultEvidenceRoute:
+                Self.windowCloseFaultEvidenceRoute(
+                    arguments: arguments
+                ),
+            windowCloseFaultTriggerRoute:
+                Self.windowCloseFaultTriggerRoute(
+                    arguments: arguments
+                ),
+            workflowReadinessRoute:
+                Self.workflowReadinessRoute(
+                    arguments: arguments
+                ),
             terminationDelayMilliseconds: normalizedTerminationDelayMilliseconds,
             closeWindowIndex: Self.intValue(after: "--close-window-index", in: arguments),
             closeWindowDelayMilliseconds: normalizedCloseWindowDelayMilliseconds
@@ -258,6 +328,26 @@ extension SpaceFixtureLaunchConfiguration {
             ),
             preservesDesktopAfterFullscreen: arguments.contains("--preserve-desktop-after-fullscreen"),
             publishesApplicationAccessibilityChildren: !arguments.contains("--suppress-app-accessibility-children"),
+            applicationAXSuppressionRoute:
+                Self.applicationAXSuppressionRoute(
+                    arguments: arguments
+                ),
+            terminationFaultEvidenceRoute:
+                Self.terminationFaultEvidenceRoute(
+                    arguments: arguments
+                ),
+            windowCloseFaultEvidenceRoute:
+                Self.windowCloseFaultEvidenceRoute(
+                    arguments: arguments
+                ),
+            windowCloseFaultTriggerRoute:
+                Self.windowCloseFaultTriggerRoute(
+                    arguments: arguments
+                ),
+            workflowReadinessRoute:
+                Self.workflowReadinessRoute(
+                    arguments: arguments
+                ),
             terminationDelayMilliseconds: max(
                 0,
                 Self.intValue(after: "--terminate-delay-ms", in: arguments) ?? 0
@@ -325,6 +415,145 @@ extension SpaceFixtureLaunchConfiguration {
     ) -> String {
         let trimmedValue = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmedValue?.isEmpty == false ? trimmedValue! : fallback
+    }
+
+    private static func applicationAXSuppressionRoute(
+        arguments: [String]
+    ) -> SpaceFixtureApplicationAXSuppressionRoute? {
+        guard let acknowledgementName = stringValue(
+            after:
+                SpaceFixtureApplicationAXSuppressionRoute
+                    .projectionAcknowledgementArgument,
+            in: arguments
+        )?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !acknowledgementName.isEmpty,
+        let completionName = stringValue(
+            after:
+                SpaceFixtureApplicationAXSuppressionRoute
+                    .suppressionCompletionArgument,
+            in: arguments
+        )?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !completionName.isEmpty
+        else {
+            return nil
+        }
+        return SpaceFixtureApplicationAXSuppressionRoute(
+            projectionAcknowledgementNotificationName:
+                Notification.Name(acknowledgementName),
+            suppressionCompletionNotificationName:
+                Notification.Name(completionName)
+        )
+    }
+
+    private static func terminationFaultEvidenceRoute(
+        arguments: [String]
+    ) -> SpaceFixtureTerminationFaultEvidenceRoute? {
+        guard let notificationName = stringValue(
+            after:
+                SpaceFixtureTerminationFaultEvidenceRoute
+                    .notificationArgument,
+            in: arguments
+        )?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !notificationName.isEmpty
+        else {
+            return nil
+        }
+        return SpaceFixtureTerminationFaultEvidenceRoute(
+            notificationName: Notification.Name(
+                notificationName
+            )
+        )
+    }
+
+    private static func windowCloseFaultEvidenceRoute(
+        arguments: [String]
+    ) -> SpaceFixtureWindowCloseFaultEvidenceRoute? {
+        guard let notificationName = stringValue(
+            after:
+                SpaceFixtureWindowCloseFaultEvidenceRoute
+                    .notificationArgument,
+            in: arguments
+        )?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !notificationName.isEmpty
+        else {
+            return nil
+        }
+        return SpaceFixtureWindowCloseFaultEvidenceRoute(
+            notificationName: Notification.Name(
+                notificationName
+            )
+        )
+    }
+
+    private static func windowCloseFaultTriggerRoute(
+        arguments: [String]
+    ) -> SpaceFixtureWindowCloseFaultTriggerRoute? {
+        guard let notificationName = stringValue(
+            after:
+                SpaceFixtureWindowCloseFaultTriggerRoute
+                    .notificationArgument,
+            in: arguments
+        )?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !notificationName.isEmpty
+        else {
+            return nil
+        }
+        return SpaceFixtureWindowCloseFaultTriggerRoute(
+            notificationName: Notification.Name(
+                notificationName
+            )
+        )
+    }
+
+    private static func workflowReadinessRoute(
+        arguments: [String]
+    ) -> SpaceFixtureWorkflowReadinessRoute? {
+        guard let notificationName = stringValue(
+            after:
+                SpaceFixtureWorkflowReadinessRoute
+                    .notificationArgument,
+            in: arguments
+        )?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !notificationName.isEmpty
+        else {
+            return nil
+        }
+        let readbackURL: URL? =
+            stringValue(
+                after:
+                    SpaceFixtureWorkflowReadinessRoute
+                        .readbackPathArgument,
+                in: arguments
+            ).flatMap { value -> URL? in
+                let pathIntent =
+                    value.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                guard !pathIntent.isEmpty else {
+                    return nil
+                }
+                return resolveWorkflowReadinessReadbackURL(
+                    pathIntent
+                )
+            }
+        return SpaceFixtureWorkflowReadinessRoute(
+            notificationName: Notification.Name(
+                notificationName
+            ),
+            readbackURL: readbackURL
+        )
+    }
+
+    private static func resolveWorkflowReadinessReadbackURL(
+        _ pathIntent: String
+    ) -> URL {
+        if (pathIntent as NSString).isAbsolutePath {
+            return URL(fileURLWithPath: pathIntent)
+                .standardizedFileURL
+        }
+        return FileManager.default.temporaryDirectory
+            .appendingPathComponent(pathIntent)
+            .standardizedFileURL
     }
 
     fileprivate static func stringValue(after flag: String, in arguments: [String]) -> String? {

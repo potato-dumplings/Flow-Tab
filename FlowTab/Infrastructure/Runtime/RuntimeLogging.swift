@@ -30,6 +30,15 @@ enum RuntimeLogLevel: String, CaseIterable, Comparable, Identifiable {
     }
 }
 
+enum RuntimeLogRecordingPolicy {
+    static func shouldRecord(
+        level: RuntimeLogLevel,
+        minimumLevel: RuntimeLogLevel
+    ) -> Bool {
+        level >= minimumLevel
+    }
+}
+
 enum RuntimeLogPreferencesStore {
     static let defaultLevel: RuntimeLogLevel = .error
 
@@ -73,40 +82,12 @@ enum RuntimeLogCategory: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var isVerboseOnlyBelowWarning: Bool {
-        switch self {
-        case .activation,
-             .autoEnter,
-             .ax,
-             .axMatch,
-             .axObserver,
-             .hotKey,
-             .inputTrace,
-             .manual,
-             .preview,
-             .projection,
-             .recency,
-             .runtimeFacts,
-             .search,
-             .searchInput,
-             .searchModel,
-             .searchTrace,
-             .session,
-             .switcherLayout:
-            return true
-        case .app,
-             .permission,
-             .uiTest:
-            return false
-        }
-    }
-
     static func resolve(_ category: String) -> RuntimeLogCategory? {
         allCases.first { $0.rawValue == category }
     }
 }
 
-final class RuntimeDiagnostics {
+final class RuntimeDiagnostics: RuntimeLogLinesProviding {
     static let shared = RuntimeDiagnostics()
     private static let timestampFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -163,8 +144,15 @@ final class RuntimeDiagnostics {
         fileStore.clear()
     }
 
-    func clearAndWait() async throws {
+    @discardableResult
+    func clearAndWait() async throws -> RuntimeLogChange {
         try await fileStore.clearAndWait()
+    }
+
+    func observeChanges(
+        _ observer: @escaping (RuntimeLogChange) -> Void
+    ) -> RuntimeLogChangeObservation {
+        fileStore.observeChanges(observer)
     }
 }
 
@@ -210,6 +198,10 @@ final class RuntimeLogFileStore {
     var activeLogURL: URL?
     private var pendingLines: [String] = []
     private var flushWorkItem: DispatchWorkItem?
+    private var changeGeneration: UInt64 = 0
+    private var changeObservers: [
+        UUID: (RuntimeLogChange) -> Void
+    ] = [:]
 
     var logsDirectoryPath: String {
         logsDirectoryURL.path
@@ -235,6 +227,7 @@ final class RuntimeLogFileStore {
     func append(_ line: String) {
         queue.async {
             self.pendingLines.append(line)
+            self.publishChangeLocked(.appended)
             if self.pendingLines.count >= self.immediateFlushThreshold {
                 self.flushWorkItem?.cancel()
                 self.flushWorkItem = nil
@@ -275,11 +268,15 @@ final class RuntimeLogFileStore {
             self.flushWorkItem?.cancel()
             self.flushWorkItem = nil
             self.pendingLines.removeAll(keepingCapacity: false)
-            try? self.clearFilesLocked()
+            do {
+                try self.clearFilesLocked()
+                self.publishChangeLocked(.cleared)
+            } catch {}
         }
     }
 
-    func clearAndWait() async throws {
+    @discardableResult
+    func clearAndWait() async throws -> RuntimeLogChange {
         try await withCheckedThrowingContinuation { continuation in
             queue.async {
                 self.flushWorkItem?.cancel()
@@ -287,10 +284,28 @@ final class RuntimeLogFileStore {
                 self.pendingLines.removeAll(keepingCapacity: false)
                 do {
                     try self.clearFilesLocked()
-                    continuation.resume()
+                    let change = self.publishChangeLocked(.cleared)
+                    continuation.resume(returning: change)
                 } catch {
                     continuation.resume(throwing: error)
                 }
+            }
+        }
+    }
+
+    func observeChanges(
+        _ observer: @escaping (RuntimeLogChange) -> Void
+    ) -> RuntimeLogChangeObservation {
+        let observerID = UUID()
+        let baselineGeneration = queue.sync {
+            changeObservers[observerID] = observer
+            return changeGeneration
+        }
+        return RuntimeLogChangeObservation(
+            baselineGeneration: baselineGeneration
+        ) { [weak self] in
+            self?.queue.async {
+                self?.changeObservers.removeValue(forKey: observerID)
             }
         }
     }
@@ -354,7 +369,23 @@ final class RuntimeLogFileStore {
             let targetLogURL = try targetLogURLLocked(appendingByteCount: block.utf8.count)
             try appendToFileLocked(block, to: targetLogURL)
             try enforceMaxLogFilesLocked()
+            publishChangeLocked(.flushed)
         } catch {}
+    }
+
+    @discardableResult
+    private func publishChangeLocked(
+        _ kind: RuntimeLogChangeKind
+    ) -> RuntimeLogChange {
+        changeGeneration &+= 1
+        let change = RuntimeLogChange(
+            generation: changeGeneration,
+            kind: kind
+        )
+        for observer in Array(changeObservers.values) {
+            observer(change)
+        }
+        return change
     }
 
     private func appendToFileLocked(_ block: String, to url: URL) throws {
@@ -647,20 +678,15 @@ final class RuntimeLogFileStore {
 }
 
 enum RuntimeLog {
-    private static var isDiagnosticSessionActive: Bool {
-        RuntimeDiagnosticSessionStore.readIsActive()
-    }
-
     private static var minimumLevel: RuntimeLogLevel {
         RuntimeLogPreferencesStore.loadMinimumLevel()
     }
 
-    private static func shouldRecord(level: RuntimeLogLevel, category: String) -> Bool {
-        guard level >= minimumLevel else { return false }
-        if level < .warning {
-            return isDiagnosticSessionActive
-        }
-        return true
+    private static func shouldRecord(level: RuntimeLogLevel) -> Bool {
+        RuntimeLogRecordingPolicy.shouldRecord(
+            level: level,
+            minimumLevel: minimumLevel
+        )
     }
 
     private static func emit(
@@ -668,7 +694,7 @@ enum RuntimeLog {
         category: String,
         message: @autoclosure () -> String
     ) {
-        guard shouldRecord(level: level, category: category) else { return }
+        guard shouldRecord(level: level) else { return }
         RuntimeDiagnostics.shared.log(level: level, category: category, message: message())
     }
 
@@ -688,12 +714,12 @@ enum RuntimeLog {
         emit(level: .debug, category: category, message: message())
     }
 
-    static func isDebugEnabled(for category: String) -> Bool {
-        shouldRecord(level: .debug, category: category)
+    static func isDebugEnabled(for _: String) -> Bool {
+        shouldRecord(level: .debug)
     }
 
-    static func isDebugEnabled(for category: RuntimeLogCategory) -> Bool {
-        shouldRecord(level: .debug, category: category.rawValue)
+    static func isDebugEnabled(for _: RuntimeLogCategory) -> Bool {
+        shouldRecord(level: .debug)
     }
 
     static func info(_ category: String, _ message: @autoclosure () -> String) {

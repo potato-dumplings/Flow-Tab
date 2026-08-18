@@ -1,16 +1,92 @@
-import Combine
 import Foundation
 import FlowTabCore
 
 let homeRuntimeProjectionService = sharedRuntimeProjectionService
 
-enum HomeRuntimeProjectionUpdatePublisher {
-    static func publisher(
-        notificationCenter: NotificationCenter = .default
-    ) -> AnyPublisher<Notification, Never> {
-        notificationCenter.publisher(for: .runtimeAppSwitcherProjectionDidUpdate)
-            .receive(on: DispatchQueue.main)
-            .eraseToAnyPublisher()
+struct HomeProjectionEvidenceState: Equatable {
+    let isProjectionBacked: Bool
+    let sourceGeneration: RuntimeReadModelGeneration?
+    let isCompleteForScope: Bool
+
+    init(_ read: HomeAppSummaryProjectionRead) {
+        isProjectionBacked = read.isProjectionBacked
+        sourceGeneration = read.freshness?.sourceGeneration
+        isCompleteForScope =
+            read.freshness?.isCompleteForScope == true
+    }
+
+    init(_ projection: RuntimeHomeAppDetailProjection?) {
+        isProjectionBacked = projection != nil
+        sourceGeneration = projection?.freshness.sourceGeneration
+        isCompleteForScope =
+            projection?.freshness.isCompleteForScope == true
+    }
+}
+
+enum HomeProjectionEvidenceTransition: String, Equatable {
+    case baseline
+    case projectionBecameAvailable
+    case sourceGenerationAdvanced
+    case completenessSatisfied
+    case unchanged
+    case regressed
+
+    var shouldApply: Bool {
+        switch self {
+        case .baseline,
+             .projectionBecameAvailable,
+             .sourceGenerationAdvanced,
+             .completenessSatisfied:
+            true
+        case .unchanged, .regressed:
+            false
+        }
+    }
+}
+
+enum HomeProjectionEvidenceTransitionResolver {
+    static func transition(
+        from previous: HomeProjectionEvidenceState?,
+        to current: HomeProjectionEvidenceState
+    ) -> HomeProjectionEvidenceTransition {
+        guard let previous else { return .baseline }
+        guard previous.isProjectionBacked else {
+            return current.isProjectionBacked
+                ? .projectionBecameAvailable
+                : .unchanged
+        }
+        guard current.isProjectionBacked else { return .regressed }
+
+        switch (previous.sourceGeneration, current.sourceGeneration) {
+        case let (previousGeneration?, currentGeneration?):
+            if currentGeneration.isStrictlyLater(than: previousGeneration) {
+                return .sourceGenerationAdvanced
+            }
+            if currentGeneration == previousGeneration {
+                if !previous.isCompleteForScope,
+                   current.isCompleteForScope {
+                    return .completenessSatisfied
+                }
+                return previous.isCompleteForScope
+                    && !current.isCompleteForScope
+                    ? .regressed
+                    : .unchanged
+            }
+            return .regressed
+        case (nil, .some):
+            return .sourceGenerationAdvanced
+        case (.some, nil):
+            return .regressed
+        case (nil, nil):
+            if !previous.isCompleteForScope,
+               current.isCompleteForScope {
+                return .completenessSatisfied
+            }
+            return previous.isCompleteForScope
+                && !current.isCompleteForScope
+                ? .regressed
+                : .unchanged
+        }
     }
 }
 
@@ -47,14 +123,6 @@ enum HomeRuntimeProjectionReader {
         appSummaryProjection(from: service)?.summaries
     }
 
-    static func initialAppSummaryProjection(from service: any RuntimeProjectionServing) -> HomeAppSummaryProjectionRead? {
-        service.readHomeSummaryProjection().map(HomeAppSummaryProjectionRead.init(projection:))
-    }
-
-    static func initialAppSummaries(from service: any RuntimeProjectionServing) -> [RuntimeHomeAppSummary]? {
-        initialAppSummaryProjection(from: service)?.summaries
-    }
-
     static func appSummary(
         for appID: String,
         from service: any RuntimeProjectionServing
@@ -89,115 +157,25 @@ enum HomeRuntimeProjectionReader {
     }
 }
 
-enum HomeRuntimeRefreshReader {
-    static func appSummaryProjection(
-        from service: any RuntimeProjectionServing,
-        current summaries: [RuntimeHomeAppSummary]
+enum HomeAppSummaryProjectionReadback {
+    static func read(
+        from service: any RuntimeProjectionServing
     ) -> HomeAppSummaryProjectionRead {
-        guard let projectionRead = HomeRuntimeProjectionReader.appSummaryProjection(from: service) else {
-            service.requestAppSwitcherProjectionMaintenance(reason: .homeProjectionMissing)
-            return HomeAppSummaryProjectionRead(
-                summaries: summaries,
-                freshness: nil,
-                isProjectionBacked: false
-            )
-        }
-        return projectionRead
-    }
-
-    static func appSummaries(
-        from service: any RuntimeProjectionServing,
-        current summaries: [RuntimeHomeAppSummary]
-    ) -> [RuntimeHomeAppSummary] {
-        appSummaryProjection(from: service, current: summaries).summaries
-    }
-
-    static func appSummary(
-        for appID: String,
-        from service: any RuntimeProjectionServing,
-        current summaries: [RuntimeHomeAppSummary]
-    ) -> RuntimeHomeAppSummary? {
-        if let summary = HomeRuntimeProjectionReader.appSummary(for: appID, from: service) {
-            return summary
-        }
-        let currentSummary = summaries.first { $0.appID == appID }
-        signalMissingProjection(appID: appID, summary: currentSummary, service: service)
-        return currentSummary
-    }
-
-    static func appDetailProjection(
-        for appID: String,
-        from service: any RuntimeProjectionServing,
-        current detailProjection: RuntimeHomeAppDetailProjection?,
-        currentSummary: RuntimeHomeAppSummary?
-    ) -> RuntimeHomeAppDetailProjection? {
-        if let projection = HomeRuntimeProjectionReader.appDetailProjection(for: appID, from: service) {
-            if projection.candidate.windows.isEmpty,
-               !projection.freshness.isCompleteForScope {
-                signalMissingProjection(
-                    appID: appID,
-                    summary: projection.summary,
-                    service: service
-                )
-            }
-            return projection
-        }
-        signalMissingProjection(
-            appID: appID,
-            summary: detailProjection?.summary ?? currentSummary,
-            service: service
-        )
-        return detailProjection
-    }
-
-    private static func signalMissingProjection(
-        appID: String,
-        summary: RuntimeHomeAppSummary?,
-        service: any RuntimeProjectionServing
-    ) {
-        guard let pid = summary?.pid, pid > 0 else {
-            service.requestAppSwitcherProjectionMaintenance(reason: .homeProjectionMissing)
-            return
-        }
-        service.signalAppWindowsChanged(appID: appID, pid: pid)
-    }
-}
-
-enum HomeRuntimeProjectionRefreshPolicy {
-    static func shouldRequestAppSummaryRefresh(
-        appSummaryCount: Int,
-        loadingWindowCountAppCount: Int
-    ) -> Bool {
-        appSummaryCount > 0 && loadingWindowCountAppCount == 0
-    }
-}
-
-enum HomeInitialAppSummaryReader {
-    static func appSummaryProjection(from service: any RuntimeProjectionServing) -> HomeAppSummaryProjectionRead {
-        HomeRuntimeProjectionReader.initialAppSummaryProjection(from: service)
+        HomeRuntimeProjectionReader.appSummaryProjection(from: service)
             ?? HomeAppSummaryProjectionRead(
                 summaries: [],
                 freshness: nil,
                 isProjectionBacked: false
             )
     }
-
-    static func appSummaries(from service: any RuntimeProjectionServing) -> [RuntimeHomeAppSummary] {
-        appSummaryProjection(from: service).summaries
-    }
 }
 
-enum HomeInitialRuntimeProjectionBootstrapper {
-    @discardableResult
-    static func requestIfNeeded(
-        projectionRead: HomeAppSummaryProjectionRead,
-        currentAppSummaryCount: Int,
-        from service: any RuntimeProjectionServing
+enum HomeInitialAppSummaryUpdatePolicy {
+    static func shouldCommitSingleAppSummary(
+        appID: String,
+        selectedAppID: String?,
+        loadingWindowCountAppIDs: Set<String>
     ) -> Bool {
-        guard currentAppSummaryCount == 0, !projectionRead.isProjectionBacked else {
-            return false
-        }
-        service.requestAppSwitcherProjectionMaintenance(reason: .homeProjectionMissing)
-        return true
+        loadingWindowCountAppIDs.isEmpty || appID == selectedAppID
     }
 }

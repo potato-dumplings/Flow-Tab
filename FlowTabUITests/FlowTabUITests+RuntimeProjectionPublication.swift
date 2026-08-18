@@ -1,7 +1,30 @@
 import XCTest
 
+private enum FlowTabUITestRuntimeProjectionPublicationPolicy {
+    static let windowResultPublicationWatchdog: TimeInterval = 8
+}
+
 extension FlowTabUITests {
+    func testRuntimeProjectionPublicationWatchdogPolicyCompatibility() {
+        XCTAssertEqual(
+            FlowTabUITestRuntimeProjectionPublicationPolicy
+                .windowResultPublicationWatchdog,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestRuntimeProjectionPublicationPolicy
+                .windowResultPublicationWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestRuntimeProjectionPublicationPolicy
+                .windowResultPublicationWatchdog,
+            0
+        )
+    }
+
     func testWindowSearchPublishesMockWindowRowsAtLaunch() throws {
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
         let app = makeApp(
             additionalArguments: [
                 "--flowtab-ui-reset-defaults",
@@ -21,15 +44,39 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-        XCTAssertTrue(searchInput.waitForExistence(timeout: 5))
-        app.typeText("Inbox")
-
+        let foregroundReadinessSatisfied =
+            waitForFlowTabUITestApplicationToBecomeReady(
+                app,
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .foregroundActivation
+            )
         XCTAssertTrue(
-            element(in: app, identifier: Identifier.switcherSearchWindowMockMailInbox)
-                .waitForExistence(timeout: 8)
+            foregroundReadinessSatisfied,
+            "Runtime-projection FlowTab foreground watchdog expired. "
+                + "finalState=\(String(describing: app.state))"
+        )
+
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: readiness
+        )
+        let result = performAndWaitForCommittedSearchWindowResult(
+            in: app,
+            scope: "window",
+            query: "Inbox",
+            title: "Inbox",
+            appName: "Mock Mail",
+            timeout:
+                FlowTabUITestRuntimeProjectionPublicationPolicy
+                    .windowResultPublicationWatchdog,
+            trigger: {
+                app.typeText("Inbox")
+            }
+        )
+        XCTAssertEqual(
+            result?.identifier,
+            Identifier.switcherSearchWindowMockMailInbox
         )
     }
 
@@ -40,6 +87,8 @@ extension FlowTabUITests {
             workflow.apps.first { $0.expectedWindowTitles.contains(targetWindowTitle) },
             "Switcher workflow must include a real fixture window titled \(targetWindowTitle)"
         )
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
 
         try runRealSpaceFixtureWorkflow(
             workflow,
@@ -52,18 +101,26 @@ extension FlowTabUITests {
                 "window"
             ]
         ) { _, app in
-            let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-            XCTAssertTrue(searchInput.waitForExistence(timeout: 8))
+            _ = requireInitialFlowTabSearchInput(
+                in: app,
+                observedBy: readiness
+            )
 
-            app.typeText(targetWindowTitle)
-            XCTAssertNotNil(
-                waitForSearchWindowResult(
+            let result =
+                performAndWaitForCommittedSearchWindowResult(
                     in: app,
+                    scope: "window",
+                    query: targetWindowTitle,
                     title: targetWindowTitle,
                     appName: targetApp.appName,
-                    timeout: 8
+                    timeout:
+                        FlowTabUITestRuntimeProjectionPublicationPolicy
+                            .windowResultPublicationWatchdog,
+                    trigger: {
+                        app.typeText(targetWindowTitle)
+                    }
                 )
-            )
+            XCTAssertNotNil(result)
         }
     }
 }

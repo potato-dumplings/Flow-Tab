@@ -2,9 +2,23 @@ import AppKit
 import Foundation
 import XCTest
 
+private typealias SupportWatchdog =
+    FlowTabUITestSupportWatchdogPolicy
+
 private enum FlowTabUITestAppEnvironmentKey {
     static let appPath = "FLOWTAB_UI_TEST_APP_PATH"
     static let uiTesting = "FLOWTAB_UI_TESTING"
+}
+
+private enum FlowTabUITestOptionSelectionPolicy {
+    static let scrollingWatchdog: TimeInterval = 30
+}
+
+private enum FlowTabUITestSwitcherTriggerDeliveryPolicy {
+    static let receiptWatchdogFailureObservationTimeout:
+        TimeInterval = 4
+    static let presentationCompletionWatchdogFailureObservationTimeout:
+        TimeInterval = 12
 }
 
 private enum FlowTabUITestAppDefaults {
@@ -84,14 +98,6 @@ private extension FlowTabUITestAppIdentity {
     }
 }
 
-struct SwitcherWindowCardObservation: Equatable {
-    let identifier: String
-    let title: String
-    let value: String
-    let frame: CGRect
-    let hasImage: Bool
-}
-
 private extension String {
     var trimmedFlowTabUITestValue: String {
         trimmingCharacters(in: .whitespacesAndNewlines)
@@ -131,8 +137,17 @@ func launchFlowTabUITestApplication(
     if shouldActivateFlowTabUITestApplicationAfterLaunch(environment: environment) {
         logFlowTabUITestLaunchTrace(traceLabel, phase: "before app.activate")
         app.activate()
-        _ = app.wait(for: .runningForeground, timeout: 12)
-        logFlowTabUITestLaunchTrace(traceLabel, phase: "after app.activate")
+        let becameForeground = app.wait(
+            for: .runningForeground,
+            timeout: SupportWatchdog.foregroundActivation
+        )
+        logFlowTabUITestLaunchTrace(
+            traceLabel,
+            phase:
+                "after app.activate "
+                + "becameForeground=\(becameForeground) "
+                + "finalState=\(String(describing: app.state))"
+        )
     }
 }
 
@@ -155,8 +170,20 @@ func waitForFlowTabUITestApplicationToBecomeReady(
 
     logFlowTabUITestLaunchTrace(traceLabel, phase: "before fallback app.activate")
     app.activate()
-    let becameReady = app.wait(for: .runningForeground, timeout: min(timeout, 4))
-    logFlowTabUITestLaunchTrace(traceLabel, phase: "after fallback app.activate")
+    let becameReady = app.wait(
+        for: .runningForeground,
+        timeout: min(
+            timeout,
+            SupportWatchdog.fallbackForegroundActivation
+        )
+    )
+    logFlowTabUITestLaunchTrace(
+        traceLabel,
+        phase:
+            "after fallback app.activate "
+            + "becameReady=\(becameReady) "
+            + "finalState=\(String(describing: app.state))"
+    )
     return becameReady
 }
 
@@ -171,17 +198,6 @@ func logFlowTabUITestTrace(_ message: String) {
     if let data = line.data(using: .utf8) {
         FileHandle.standardError.write(data)
     }
-}
-
-func waitForFrontmostBundleIdentifier(_ bundleIdentifier: String, timeout: TimeInterval) -> Bool {
-    let deadline = Date().addingTimeInterval(timeout)
-    repeat {
-        if NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundleIdentifier {
-            return true
-        }
-        RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-    } while Date() < deadline
-    return false
 }
 
 enum FlowTabUITestSwitcherTrigger {
@@ -210,6 +226,7 @@ enum FlowTabUITestSwitcherCommand {
     case selectSearchResult
     case searchConfirm
     case confirm
+    case runtimeLogProbe
 
     var notificationName: Notification.Name {
         switch self {
@@ -244,6 +261,10 @@ enum FlowTabUITestSwitcherCommand {
         case .confirm:
             return Notification.Name(
                 "io.github.potato-dumplings.flowtab.ui-test.switcher-command.confirm"
+            )
+        case .runtimeLogProbe:
+            return Notification.Name(
+                "io.github.potato-dumplings.flowtab.ui-test.switcher-command.runtime-log-probe"
             )
         }
     }
@@ -297,20 +318,24 @@ func postFlowTabUITestSwitcherCommand(
 
 func terminateFlowTabUITestApplicationIfRunning(
     environment: [String: String] = ProcessInfo.processInfo.environment
-) {
+) -> [FlowTabUITestApplicationTerminationEvidence] {
     let identity = FlowTabUITestAppIdentity.configured(environment: environment)
-    for target in identity.runningApplicationTargets {
+    return identity.runningApplicationTargets.map { target in
         let app: XCUIApplication
+        let targetDescription: String
         switch target {
         case .url(let appURL):
             app = XCUIApplication(url: appURL)
+            targetDescription = "url:\(appURL.standardizedFileURL.path)"
         case .bundleIdentifier(let bundleIdentifier):
             app = XCUIApplication(bundleIdentifier: bundleIdentifier)
+            targetDescription = "bundle:\(bundleIdentifier)"
         }
 
-        if app.state == .runningForeground || app.state == .runningBackground {
-            app.terminate()
-        }
+        return terminateFlowTabUITestApplication(
+            app,
+            targetDescription: targetDescription
+        )
     }
 }
 
@@ -321,23 +346,52 @@ extension FlowTabUITests {
     func postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
         _ trigger: FlowTabUITestSwitcherTrigger,
         traceLabel: String,
-        timeout: TimeInterval = 4
+        receiptTimeout: TimeInterval =
+            FlowTabUITestSwitcherTriggerDeliveryPolicy
+                .receiptWatchdogFailureObservationTimeout,
+        completionTimeout: TimeInterval =
+            FlowTabUITestSwitcherTriggerDeliveryPolicy
+                .presentationCompletionWatchdogFailureObservationTimeout
     ) {
         let logSnapshot = makeRuntimeLogFileSnapshot()
+        let owner =
+            FlowTabUITestSwitcherTriggerDeliveryObservationOwner(
+                notificationName:
+                    trigger.notificationName.rawValue,
+                baseline: logSnapshot
+            )
+        owner.start()
+        defer { owner.cancel() }
+
         postFlowTabUITestSwitcherTrigger(trigger, traceLabel: traceLabel)
-        waitForRuntimeLogFiles(
-            containing: [
-                "completed switcher trigger notification name=\(trigger.notificationName.rawValue) presented=1"
-            ],
-            since: logSnapshot,
-            timeout: timeout
-        )
+        guard owner.waitForReceipt(timeout: receiptTimeout)
+        else {
+            XCTFail(
+                "Switcher trigger receipt watchdog expired "
+                    + "in \(logSnapshot.logsDirectoryURL.path). "
+                    + owner.receiptDiagnosticSummary
+            )
+            return
+        }
+        guard
+            owner.waitForCompletion(
+                timeout: completionTimeout
+            )
+        else {
+            XCTFail(
+                "Switcher presentation completion watchdog "
+                    + "expired in "
+                    + "\(logSnapshot.logsDirectoryURL.path). "
+                    + owner.completionDiagnosticSummary
+            )
+            return
+        }
     }
 
     func postFlowTabUITestSwitcherCommandAndWaitForDelivery(
         _ command: FlowTabUITestSwitcherCommand,
         traceLabel: String,
-        timeout: TimeInterval = 4
+        timeout: TimeInterval = SupportWatchdog.switcherCommandDelivery
     ) {
         let logSnapshot = makeRuntimeLogFileSnapshot()
         postFlowTabUITestSwitcherCommand(command, traceLabel: traceLabel)
@@ -353,7 +407,7 @@ extension FlowTabUITests {
     func postFlowTabUITestSwitcherSearchQueryAndWaitForDelivery(
         _ query: String,
         traceLabel: String,
-        timeout: TimeInterval = 4
+        timeout: TimeInterval = SupportWatchdog.switcherCommandDelivery
     ) throws {
         try FlowTabUITestSwitcherCommandPayload.write(query)
         postFlowTabUITestSwitcherCommandAndWaitForDelivery(
@@ -363,53 +417,30 @@ extension FlowTabUITests {
         )
     }
 
-    func postFlowTabUITestSelectSwitcherAppAndWaitForDelivery(
-        bundleIdentifier: String,
-        traceLabel: String,
-        timeout: TimeInterval = 4
-    ) throws {
-        try FlowTabUITestSwitcherCommandPayload.write(bundleIdentifier)
-        postFlowTabUITestSwitcherCommandAndWaitForDelivery(
-            .selectApp,
-            traceLabel: traceLabel,
-            timeout: timeout
-        )
-    }
-
-    func postFlowTabUITestSelectSearchResultAndWaitForDelivery(
-        resultID: String,
-        traceLabel: String,
-        timeout: TimeInterval = 4
-    ) throws {
-        try FlowTabUITestSwitcherCommandPayload.write(resultID)
-        postFlowTabUITestSwitcherCommandAndWaitForDelivery(
-            .selectSearchResult,
-            traceLabel: traceLabel,
-            timeout: timeout
-        )
-    }
-
     func settingsReminderToggle(in app: XCUIApplication) -> XCUIElement {
         toggleElement(in: app, identifier: Identifier.permissionReminderSwitch)
     }
     func openSettingsTab(in app: XCUIApplication) {
-        XCTAssertTrue(
-            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.settingsTabButton), timeout: 6)
+        _ = assertSidebarTabProjectionAfterNavigation(
+            in: app,
+            target: .settings
         )
-        XCTAssertTrue(element(in: app, identifier: Identifier.settingsTabContent).waitForExistence(timeout: 6))
     }
     func openLogsTab(in app: XCUIApplication) {
-        XCTAssertTrue(
-            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsTabButton), timeout: 6)
+        _ = assertSidebarTabProjectionAfterNavigation(
+            in: app,
+            target: .logs
         )
-        XCTAssertTrue(element(in: app, identifier: Identifier.logsTabContent).waitForExistence(timeout: 6))
     }
     func element(in app: XCUIApplication, identifier: String) -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
     }
     func toggleElement(in app: XCUIApplication, identifier: String) -> XCUIElement {
         let switchElement = app.switches[identifier]
-        if switchElement.exists || switchElement.waitForExistence(timeout: 1) {
+        if switchElement.exists
+            || switchElement.waitForExistence(
+                timeout: SupportWatchdog.briefElementDiscovery
+            ) {
             return switchElement
         }
         return app.checkBoxes[identifier]
@@ -435,31 +466,59 @@ extension FlowTabUITests {
         optionIdentifier: String
     ) {
         let control = element(in: app, identifier: controlIdentifier)
-        XCTAssertTrue(control.waitForExistence(timeout: 6), "Missing control: \(controlIdentifier)")
+        XCTAssertTrue(
+            control.waitForExistence(
+                timeout: SupportWatchdog.settingsControlDiscovery
+            ),
+            "unmetCondition=settingsControlExists "
+                + "identifier=\(controlIdentifier) "
+                + "finalExists=\(control.exists)"
+        )
         tapElement(control)
 
         if control.elementType == .radioGroup {
             let segmentedOptionQuery = control.descendants(matching: .any).matching(identifier: optionIdentifier)
-            if tapFirstHittable(in: segmentedOptionQuery, timeout: 1) {
+            if tapFirstHittable(
+                in: segmentedOptionQuery,
+                timeout: SupportWatchdog.briefElementDiscovery
+            ) {
                 return
             }
         }
 
         let scopedOptionIdentifier = "\(controlIdentifier).option.\(optionIdentifier)"
         let scopedOptionsQuery = app.descendants(matching: .any).matching(identifier: scopedOptionIdentifier)
-        if tapFirstHittable(in: scopedOptionsQuery, timeout: 2) {
+        if tapFirstHittable(
+            in: scopedOptionsQuery,
+            timeout: SupportWatchdog.scopedOptionDiscovery
+        ) {
             return
         }
         let scopedScrollContainer = app.scrollViews["\(controlIdentifier).options"]
-        if tapFirstHittableAfterScrolling(in: scopedOptionsQuery, scrollContainer: scopedScrollContainer, timeout: 4) {
+        if tapFirstHittableAfterScrolling(
+            in: scopedOptionsQuery,
+            scrollContainer: scopedScrollContainer,
+            timeout:
+                FlowTabUITestOptionSelectionPolicy
+                    .scrollingWatchdog
+        ) {
             return
         }
 
         let optionsQuery = app.descendants(matching: .any).matching(identifier: optionIdentifier)
-        if tapFirstHittable(in: optionsQuery, timeout: 3) {
+        if tapFirstHittable(
+            in: optionsQuery,
+            timeout: SupportWatchdog.genericOptionDiscovery
+        ) {
             return
         }
-        if tapFirstHittable(in: app.menuItems.matching(identifier: optionIdentifier), timeout: 1) {
+        let menuOptionsQuery = app.menuItems.matching(
+            identifier: optionIdentifier
+        )
+        if tapFirstHittable(
+            in: menuOptionsQuery,
+            timeout: SupportWatchdog.briefElementDiscovery
+        ) {
             return
         }
 
@@ -467,20 +526,41 @@ extension FlowTabUITests {
             controlIdentifier: controlIdentifier,
             optionIdentifier: optionIdentifier
         )
+        var titleReadbacks: [String] = []
         for title in titleCandidates {
             let titleQuery = app.descendants(matching: .any).matching(
                 NSPredicate(format: "label == %@", title)
             )
-            if tapFirstHittable(in: titleQuery, timeout: 1) {
+            if tapFirstHittable(
+                in: titleQuery,
+                timeout: SupportWatchdog.briefElementDiscovery
+            ) {
                 return
             }
             let menuItemQuery = app.menuItems.matching(NSPredicate(format: "label == %@", title))
-            if tapFirstHittable(in: menuItemQuery, timeout: 1) {
+            if tapFirstHittable(
+                in: menuItemQuery,
+                timeout: SupportWatchdog.briefElementDiscovery
+            ) {
                 return
             }
+            titleReadbacks.append(
+                "title=\(String(reflecting: title)) "
+                    + "elementCount=\(titleQuery.count) "
+                    + "menuItemCount=\(menuItemQuery.count)"
+            )
         }
 
-        XCTFail("Missing or non-hittable option: \(optionIdentifier)")
+        XCTFail(
+            "unmetCondition=settingsOptionHittable "
+                + "controlIdentifier=\(controlIdentifier) "
+                + "controlType=\(String(describing: control.elementType)) "
+                + "optionIdentifier=\(optionIdentifier) "
+                + "finalScopedCount=\(scopedOptionsQuery.count) "
+                + "finalGenericCount=\(optionsQuery.count) "
+                + "finalMenuCount=\(menuOptionsQuery.count) "
+                + "finalTitleReadbacks=\(titleReadbacks)"
+        )
     }
 
     func selectOptionTitleCandidates(controlIdentifier: String, optionIdentifier: String) -> [String] {
@@ -506,39 +586,6 @@ extension FlowTabUITests {
             }
         }
 
-        if [
-            Identifier.settingsHotkeyMainModifier,
-            Identifier.settingsHotkeyInAppModifier
-        ].contains(controlIdentifier) {
-            switch optionIdentifier {
-            case "option":
-                return ["Option"]
-            case "control":
-                return ["Control"]
-            case "command":
-                return ["Command"]
-            default:
-                return []
-            }
-        }
-
-        if [
-            Identifier.settingsHotkeyMainKey,
-            Identifier.settingsHotkeyQuitKey,
-            Identifier.settingsHotkeyInAppKey
-        ].contains(controlIdentifier) {
-            switch optionIdentifier {
-            case "tab":
-                return ["Tab"]
-            case "space":
-                return ["Space"]
-            case "grave":
-                return ["`"]
-            default:
-                return [optionIdentifier.uppercased()]
-            }
-        }
-
         return []
     }
     func elementStringValue(_ element: XCUIElement) -> String {
@@ -550,364 +597,11 @@ extension FlowTabUITests {
         }
         return element.label
     }
-    func homeWindowRows(in app: XCUIApplication) -> [XCUIElement] {
-        let rowIdentifierPrefix = "flowtab.home.window."
-        let rowPredicate = NSPredicate(format: "identifier BEGINSWITH %@", rowIdentifierPrefix)
-        let buttonRows = app.buttons
-            .matching(rowPredicate)
-            .allElementsBoundByIndex
-        if !buttonRows.isEmpty {
-            return buttonRows
-        }
-
-        return app.descendants(matching: .any)
-            .matching(rowPredicate)
-            .allElementsBoundByIndex
-    }
-    func homeWindowRow(_ row: XCUIElement, contains title: String) -> Bool {
-        [
-            row.label,
-            elementStringValue(row)
-        ]
-        .contains { source in
-            source.localizedCaseInsensitiveContains(title)
-        }
-    }
-    func waitForHomeWindowRow(
-        in app: XCUIApplication,
-        title: String,
-        timeout: TimeInterval
-    ) -> XCUIElement? {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestRowIdentifiers: [String] = []
-        repeat {
-            let rows = homeWindowRows(in: app)
-            latestRowIdentifiers = rows.map(\.identifier)
-            if let row = rows.first(where: { homeWindowRow($0, contains: title) }) {
-                return row
-            }
-
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected a Home window row containing \(title), \
-            found \(latestRowIdentifiers.sorted()).
-            """
-        )
-        return nil
-    }
-    func waitForHomeWindowTitle(
-        _ title: String,
-        in app: XCUIApplication,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if app.staticTexts[title].exists {
-                return true
-            }
-            if homeWindowRows(in: app).contains(where: { homeWindowRow($0, contains: title) }) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-    func assertHomeWindowTitle(
-        _ title: String,
-        in app: XCUIApplication,
-        timeout: TimeInterval = 12,
-        message: String? = nil
-    ) {
-        XCTAssertTrue(
-            waitForHomeWindowTitle(title, in: app, timeout: timeout),
-            message ?? "Missing Home window title: \(title)"
-        )
-    }
-    func assertHomeWindowTitlesAbsent(
-        _ titles: [String],
-        in app: XCUIApplication,
-        timeout: TimeInterval = 5
-    ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let rows = homeWindowRows(in: app)
-            let unexpectedTitles = titles.filter { title in
-                app.staticTexts[title].exists
-                    || rows.contains(where: { homeWindowRow($0, contains: title) })
-            }
-            if unexpectedTitles.isEmpty {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        let rows = homeWindowRows(in: app)
-        let unexpectedTitles = titles.filter { title in
-            app.staticTexts[title].exists
-                || rows.contains(where: { homeWindowRow($0, contains: title) })
-        }
-        XCTFail("Unexpected visible Home window titles: \(unexpectedTitles)")
-    }
-    func switcherWindowCardObservations(in app: XCUIApplication) -> [SwitcherWindowCardObservation] {
-        var seenIdentifiers: Set<String> = []
-        return app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "flowtab.switcher.window."))
-            .allElementsBoundByAccessibilityElement
-            .compactMap { element -> SwitcherWindowCardObservation? in
-                guard element.exists else { return nil }
-                let identifier = element.identifier
-                guard seenIdentifiers.insert(identifier).inserted else { return nil }
-                let title = element.label.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !title.isEmpty else { return nil }
-                let value = elementStringValue(element)
-                let frame = element.frame
-                let imageMarker = self.element(
-                    in: app,
-                    identifier: previewImageIdentifier(for: identifier)
-                )
-                return SwitcherWindowCardObservation(
-                    identifier: identifier,
-                    title: title,
-                    value: value,
-                    frame: frame,
-                    hasImage: value.contains("preview=image") || imageMarker.exists
-                )
-            }
-    }
-
-    func previewImageIdentifier(for windowIdentifier: String) -> String {
-        let windowPrefix = "flowtab.switcher.window."
-        let imagePrefix = "flowtab.switcher.window-preview-image."
-        guard windowIdentifier.hasPrefix(windowPrefix) else {
-            return "\(imagePrefix)\(windowIdentifier)"
-        }
-        return imagePrefix + windowIdentifier.dropFirst(windowPrefix.count)
-    }
-
-    func waitForSwitcherWindowCards(
-        in app: XCUIApplication,
-        expectedTitles: [String],
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        let expectedTitleCounts = windowTitleCounts(expectedTitles)
-        let cardQuery = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "flowtab.switcher.window."))
-
-        repeat {
-            if cardQuery.count == expectedTitles.count,
-               expectedTitleCounts.allSatisfy({ title, count in
-                   cardQuery.matching(NSPredicate(format: "label == %@", title)).count == count
-               }) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        let latestTitleCounts = Dictionary(
-            uniqueKeysWithValues: expectedTitleCounts.keys.map { title in
-                (
-                    title,
-                    cardQuery.matching(NSPredicate(format: "label == %@", title)).count
-                )
-            }
-        )
-        XCTFail(
-            """
-            Expected switcher window cards to expose \(expectedTitles.sorted()), \
-            found cardCount=\(cardQuery.count) matchingTitleCounts=\(latestTitleCounts) \
-            expectedTitleCounts=\(expectedTitleCounts).
-            """
-        )
-        return false
-    }
-    func assertValue(of element: XCUIElement, equals expectedValue: String, timeout: TimeInterval = 5) {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if element.exists && elementStringValue(element) == expectedValue {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        XCTFail("Expected value '\(expectedValue)' for \(element.identifier), actual: '\(elementStringValue(element))'")
-    }
-    private func windowTitleCounts(_ titles: [String]) -> [String: Int] {
-        titles.reduce(into: [:]) { counts, title in
-            counts[title, default: 0] += 1
-        }
-    }
-    func assertValuePrefix(of element: XCUIElement, expectedPrefix: String, timeout: TimeInterval = 5) {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if element.exists && elementStringValue(element).hasPrefix(expectedPrefix) {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        XCTFail(
-            "Expected prefix '\(expectedPrefix)' for \(element.identifier), actual: '\(elementStringValue(element))'"
-        )
-    }
-    func waitForLogs(
-        in app: XCUIApplication,
-        containing markers: [String],
-        timeout: TimeInterval = 8
-    ) {
-        let logsLines = app.descendants(matching: .any)
-            .matching(identifier: Identifier.logsLines)
-            .firstMatch
-        XCTAssertTrue(logsLines.waitForExistence(timeout: timeout), "Missing logs container")
-
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestValue = ""
-        repeat {
-            latestValue = elementStringValue(logsLines)
-            if markers.allSatisfy({ latestValue.contains($0) }) {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        } while Date() < deadline
-
-        let missingMarkers = markers.filter { !latestValue.contains($0) }
-        XCTFail("Missing log markers \(missingMarkers). Latest logs: \(latestValue)")
-    }
-    func makeRuntimeLogFileSnapshot() -> [String: UInt64] {
-        runtimeLogFiles().reduce(into: [:]) { result, url in
-            guard let size = runtimeLogFileSize(url) else { return }
-            result[url.path] = size
-        }
-    }
-    func waitForRuntimeLogFiles(
-        containing markers: [String],
-        since snapshot: [String: UInt64],
-        timeout: TimeInterval = 8
-    ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        let logsDirectoryURL = runtimeLogsDirectoryURL()
-        var latestValue = ""
-        repeat {
-            latestValue = runtimeLogContents(since: snapshot)
-            if markers.allSatisfy({ latestValue.contains($0) }) {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        } while Date() < deadline
-
-        let missingMarkers = markers.filter { !latestValue.contains($0) }
-        XCTFail(
-            "Missing runtime log markers \(missingMarkers) in \(logsDirectoryURL.path). Latest logs: \(latestValue)"
-        )
-    }
-
-    func waitForRuntimeLogFiles(
-        matching pattern: String,
-        since snapshot: [String: UInt64],
-        timeout: TimeInterval = 8,
-        description: String
-    ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        let logsDirectoryURL = runtimeLogsDirectoryURL()
-        let regex: NSRegularExpression
-        do {
-            regex = try NSRegularExpression(pattern: pattern)
-        } catch {
-            return XCTFail("Invalid runtime log regex \(pattern): \(error)")
-        }
-        var latestValue = ""
-        repeat {
-            latestValue = runtimeLogContents(since: snapshot)
-            let range = NSRange(latestValue.startIndex..<latestValue.endIndex, in: latestValue)
-            if regex.firstMatch(in: latestValue, range: range) != nil {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        } while Date() < deadline
-
-        XCTFail(
-            "Missing runtime log pattern \(description) / \(pattern) in \(logsDirectoryURL.path). Latest logs: \(latestValue)"
-        )
-    }
-
-    func waitForRuntimeLogFiles(
-        containing requiredMarkers: [String],
-        containingOneOf alternativeMarkers: [String],
-        since snapshot: [String: UInt64],
-        timeout: TimeInterval = 8
-    ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        let logsDirectoryURL = runtimeLogsDirectoryURL()
-        var latestValue = ""
-        repeat {
-            latestValue = runtimeLogContents(since: snapshot)
-            if
-                requiredMarkers.allSatisfy({ latestValue.contains($0) }),
-                alternativeMarkers.contains(where: { latestValue.contains($0) })
-            {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        } while Date() < deadline
-
-        let missingRequiredMarkers = requiredMarkers.filter { !latestValue.contains($0) }
-        let missingAlternativeMarkers = alternativeMarkers.filter { !latestValue.contains($0) }
-        XCTFail(
-            "Missing runtime log markers required=\(missingRequiredMarkers) anyOf=\(missingAlternativeMarkers) in \(logsDirectoryURL.path). Latest logs: \(latestValue)"
-        )
-    }
-    func runtimeLogContentsSinceSnapshot(_ snapshot: [String: UInt64]) -> String {
-        runtimeLogContents(since: snapshot)
-    }
-    private func runtimeLogsDirectoryURL() -> URL {
-        let fallbackURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-        let baseURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? fallbackURL
-        return baseURL.appendingPathComponent("FlowTab/logs", isDirectory: true)
-    }
-    private func runtimeLogFiles() -> [URL] {
-        let directoryURL = runtimeLogsDirectoryURL()
-        let files = (try? FileManager.default.contentsOfDirectory(
-            at: directoryURL,
-            includingPropertiesForKeys: [.contentModificationDateKey],
-            options: [.skipsHiddenFiles]
-        )) ?? []
-        return files
-            .filter { $0.pathExtension == "log" }
-            .sorted { lhs, rhs in
-                let lhsDate = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
-                    ?? .distantPast
-                let rhsDate = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
-                    ?? .distantPast
-                return lhsDate < rhsDate
-            }
-    }
-    private func runtimeLogFileSize(_ url: URL) -> UInt64? {
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else {
-            return nil
-        }
-        return (attributes[.size] as? NSNumber)?.uint64Value
-    }
-    private func runtimeLogContents(since snapshot: [String: UInt64]) -> String {
-        runtimeLogFiles()
-            .compactMap { url -> String? in
-                guard let data = try? Data(contentsOf: url) else { return nil }
-                let offset = min(Int(snapshot[url.path] ?? 0), data.count)
-                let newData = data.dropFirst(offset)
-                return String(data: newData, encoding: .utf8)
-            }
-            .joined(separator: "\n")
-    }
     func replaceText(in field: XCUIElement, with text: String, app: XCUIApplication) {
         tapElement(field)
         app.typeKey("a", modifierFlags: .command)
         app.typeKey(.delete, modifierFlags: [])
         app.typeText(text)
-    }
-    func commitEditing(in app: XCUIApplication) {
-        app.typeKey(.tab, modifierFlags: [])
-        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
     }
     func tapElement(_ element: XCUIElement) {
         if element.isHittable {
@@ -916,236 +610,27 @@ extension FlowTabUITests {
         }
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
-    func assertLogVisibility(
-        at logLevel: String,
-        visibleIdentifiers: [String],
-        hiddenIdentifiers: [String]
-    ) {
-        let app = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-seed-logs",
-                "4",
-                "--flowtab-ui-runtime-log-level",
-                logLevel,
-                "-showPermissionReminder",
-                "NO"
-            ]
-        )
-        launchFlowTabUITestApplication(app)
-        defer {
-            if app.state == .runningForeground || app.state == .runningBackground {
-                app.terminate()
-            }
-        }
-
-        XCTAssertTrue(
-            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsTabButton), timeout: 5),
-            "Failed to open logs tab at level \(logLevel)"
-        )
-
-        let logsTabContent = app.descendants(matching: .any)
-            .matching(identifier: Identifier.logsTabContent)
-            .firstMatch
-        XCTAssertTrue(logsTabContent.waitForExistence(timeout: 5), "Missing logs tab content at level \(logLevel)")
-
-        let logsLines = app.descendants(matching: .any)
-            .matching(identifier: Identifier.logsLines)
-            .firstMatch
-        XCTAssertTrue(logsLines.waitForExistence(timeout: 8), "Missing logs container at level \(logLevel)")
-
-        for identifier in visibleIdentifiers {
-            let line = app.descendants(matching: .any)
-                .matching(identifier: identifier)
-                .firstMatch
-            XCTAssertTrue(
-                line.waitForExistence(timeout: 8),
-                "Expected visible log row \(identifier) at level \(logLevel)"
-            )
-        }
-
-        RunLoop.current.run(until: Date().addingTimeInterval(1.2))
-
-        for identifier in hiddenIdentifiers {
-            let line = app.descendants(matching: .any)
-                .matching(identifier: identifier)
-                .firstMatch
-            XCTAssertFalse(
-                line.exists,
-                "Expected hidden log row \(identifier) at level \(logLevel)"
-            )
-        }
-    }
     func waitForNonExistence(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
         let predicate = NSPredicate(format: "exists == false")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
-    func waitForFocusedWorkflowWindow(
-        title: String,
-        app workflowApp: SpaceFixtureResolvedWorkflow.App,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestFrontmostBundleIdentifier: String?
-        var latestFocusedTitle: String?
-        repeat {
-            latestFrontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            latestFocusedTitle = activeWindowTitle(forBundleIdentifier: workflowApp.identity.bundleIdentifier)
-            if latestFrontmostBundleIdentifier == workflowApp.identity.bundleIdentifier,
-               (
-                   latestFocusedTitle == title
-                       || workflowWindowTitleIsObservable(title, app: workflowApp)
-               ) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected frontmost window \(workflowApp.appName) / \(title), \
-            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil") \
-            with active window title \(latestFocusedTitle ?? "nil").
-            """
-        )
-        return false
-    }
-
-    func waitForFrontmostWorkflowWindow(
-        windowNumber: CGWindowID,
-        title: String,
-        app workflowApp: SpaceFixtureResolvedWorkflow.App,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestFrontmostBundleIdentifier: String?
-        var latestWindowNumber: CGWindowID?
-        var latestFocusedTitle: String?
-        repeat {
-            latestFrontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            let latestCGWindow = frontmostCGWindow(
-                forBundleIdentifier: workflowApp.identity.bundleIdentifier,
-                expectedTitle: title,
-                expectedWindowNumber: windowNumber
-            )
-            latestWindowNumber = latestCGWindow?.number
-            latestFocusedTitle = activeWindowTitle(forBundleIdentifier: workflowApp.identity.bundleIdentifier)
-            if latestFrontmostBundleIdentifier == workflowApp.identity.bundleIdentifier,
-               (
-                   latestCGWindow?.matches(number: windowNumber, title: title) == true
-                       || workflowWindowTitleIsObservable(title, app: workflowApp)
-               ) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected frontmost window \(workflowApp.appName) / \(title) / \(windowNumber), \
-            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil") \
-            with active window title \(latestFocusedTitle ?? "nil") \
-            and window number \(latestWindowNumber.map(String.init) ?? "nil").
-            """
-        )
-        return false
-    }
-
-    func assertStaticTextsAbsent(
-        _ titles: [String],
-        in app: XCUIApplication,
-        timeout: TimeInterval = 5
+    func terminateAppIfRunning(
+        file: StaticString = #filePath,
+        line: UInt = #line
     ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let unexpectedTitles = titles.filter { app.staticTexts[$0].exists }
-            if unexpectedTitles.isEmpty {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        let unexpectedTitles = titles.filter { app.staticTexts[$0].exists }
-        XCTFail("Unexpected visible window titles: \(unexpectedTitles)")
-    }
-    func tapFirstHittable(in query: XCUIElementQuery, timeout: TimeInterval) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let count = query.count
-            for index in 0..<count {
-                let element = query.element(boundBy: index)
-                if element.exists && element.isHittable {
-                    element.tap()
-                    return true
-                }
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-    func tapFirstHittableAfterScrolling(
-        in query: XCUIElementQuery,
-        scrollContainer: XCUIElement,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let count = query.count
-            var sawExistingElement = false
-            for index in 0..<count {
-                let element = query.element(boundBy: index)
-                if element.exists && element.isHittable {
-                    element.tap()
-                    return true
-                }
-                if element.exists, scrollContainer.exists {
-                    sawExistingElement = true
-                    let deltaY = dropdownOptionScrollDeltaY(for: element, in: scrollContainer)
-                    scrollContainer.scroll(byDeltaX: 0, deltaY: deltaY)
-                    break
-                }
-            }
-            if !sawExistingElement, scrollContainer.exists {
-                scrollContainer.scroll(byDeltaX: 0, deltaY: -420)
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-    private func dropdownOptionScrollDeltaY(
-        for element: XCUIElement,
-        in container: XCUIElement
-    ) -> CGFloat {
-        let elementFrame = element.frame
-        let containerFrame = container.frame
-        guard isUsableFrame(elementFrame), isUsableFrame(containerFrame) else {
-            return -420
-        }
-        if elementFrame.maxY > containerFrame.maxY {
-            return -min(max(elementFrame.maxY - containerFrame.maxY, 180), 520)
-        }
-        if elementFrame.minY < containerFrame.minY {
-            return min(max(containerFrame.minY - elementFrame.minY, 180), 520)
-        }
-        return elementFrame.midY >= containerFrame.midY ? -240 : 240
-    }
-    func hasHittableElement(in query: XCUIElementQuery, timeout: TimeInterval) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let count = query.count
-            for index in 0..<count {
-                let element = query.element(boundBy: index)
-                if element.exists && element.isHittable {
-                    return true
-                }
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-    func terminateAppIfRunning() {
-        terminateFlowTabUITestApplicationIfRunning()
+        let failures =
+            terminateFlowTabUITestApplicationIfRunning()
+                .filter { !$0.isSatisfied }
+        XCTAssertTrue(
+            failures.isEmpty,
+            "FlowTab UI test application termination did not reach "
+                + "the exact not-running state. "
+                + failures.map(\.diagnosticSummary)
+                    .joined(separator: " | "),
+            file: file,
+            line: line
+        )
     }
 
     func testFlowTabUITestAppIdentityUsesEnvironmentOverridePath() {

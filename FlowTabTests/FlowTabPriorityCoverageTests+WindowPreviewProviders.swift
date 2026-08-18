@@ -32,7 +32,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(result.source, .special(appID: "com.apple.Terminal"))
     }
 
-    private func assertPreviewProviderSessionStartedFromAppSwitcherProjection(
+    func assertPreviewProviderSessionStartedFromAppSwitcherProjection(
         _ runtimeProjectionService: RecordingRuntimeProjectionService,
         file: StaticString = #filePath,
         line: UInt = #line
@@ -384,151 +384,6 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
-    @MainActor
-    func testLiveSwitcherModelUsesPreviewProviderResolverForTerminalPreview() async {
-        let currentApp = NSRunningApplication.current
-        let appID = "com.apple.Terminal"
-        let windows = [
-            WindowCandidate(
-                id: AXWindowInspector.makeWindowID(pid: currentApp.processIdentifier, index: 0),
-                title: "Server",
-                isMinimized: false,
-                lastActiveAt: 30
-            ),
-            WindowCandidate(
-                id: AXWindowInspector.makeWindowID(pid: currentApp.processIdentifier, index: 1),
-                title: "Shell",
-                isMinimized: false,
-                lastActiveAt: 20
-            )
-        ]
-        let app = AppSwitchCandidate(
-            id: appID,
-            displayName: "Terminal",
-            groupID: "terminal",
-            lastActiveAt: 100,
-            windows: windows
-        )
-        let context = makeRuntimeAppContext(
-            appID: appID,
-            runningApp: currentApp,
-            windows: windows
-        )
-        let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
-        let specialProvider = FakeSpecialWindowPreviewProvider(
-            supportedAppID: appID,
-            result: .success(
-                image: makeColorImage(color: .systemGreen),
-                resolvedWindowID: nil,
-                titleBarStyle: .dark,
-                source: .special(appID: appID)
-            )
-        )
-        let genericProvider = FakeGenericWindowPreviewProvider(
-            result: .failure(.transientSystemError)
-        )
-        model.previewProviderResolver = WindowPreviewProviderResolver(
-            specialProviders: [specialProvider],
-            genericProvider: genericProvider
-        )
-
-        XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
-        assertPreviewProviderSessionStartedFromAppSwitcherProjection(runtimeProjectionService)
-
-        _ = model.windowPreviewSnapshotForTesting(visibleRange: 0..<2)
-        let published = await waitUntil("terminal preview provider publishes results") {
-            let snapshot = model.windowPreviewSnapshotForTesting(visibleRange: 0..<2)
-            return snapshot.count == 2 && snapshot.allSatisfy(\.hasImage)
-        }
-        XCTAssertTrue(published)
-
-        let completedSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: 0..<2)
-        XCTAssertEqual(completedSnapshot.count, 2)
-        XCTAssertTrue(completedSnapshot.allSatisfy(\.hasImage))
-        XCTAssertEqual(specialProvider.callCount, 2)
-        XCTAssertEqual(genericProvider.callCount, 0)
-    }
-
-    @MainActor
-    func testLiveSwitcherModelUsesFallbackWhenTerminalProviderFails() async {
-        let currentApp = NSRunningApplication.current
-        let appID = "com.apple.Terminal"
-        let windows = [
-            WindowCandidate(
-                id: AXWindowInspector.makeWindowID(pid: currentApp.processIdentifier, index: 0),
-                title: "Server",
-                isMinimized: false,
-                lastActiveAt: 30
-            ),
-            WindowCandidate(
-                id: AXWindowInspector.makeWindowID(pid: currentApp.processIdentifier, index: 1),
-                title: "Shell",
-                isMinimized: false,
-                lastActiveAt: 20
-            )
-        ]
-        let app = AppSwitchCandidate(
-            id: appID,
-            displayName: "Terminal",
-            groupID: "terminal",
-            lastActiveAt: 100,
-            windows: windows
-        )
-        let context = makeRuntimeAppContext(
-            appID: appID,
-            runningApp: currentApp,
-            windows: windows
-        )
-        let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
-        let specialProvider = FakeSpecialWindowPreviewProvider(
-            supportedAppID: appID,
-            result: .failure(.specialProviderUnavailable)
-        )
-        let genericProvider = FakeGenericWindowPreviewProvider(
-            result: .success(
-                image: makeColorImage(color: .systemRed),
-                resolvedWindowID: 24_002,
-                titleBarStyle: nil,
-                source: .genericScreenshot
-            )
-        )
-        model.previewProviderResolver = WindowPreviewProviderResolver(
-            specialProviders: [specialProvider],
-            genericProvider: genericProvider
-        )
-
-        XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
-        assertPreviewProviderSessionStartedFromAppSwitcherProjection(runtimeProjectionService)
-
-        _ = model.windowPreviewSnapshotForTesting(visibleRange: 0..<1)
-        let published = await waitUntil("terminal preview provider publishes failure") {
-            guard specialProvider.callCount == 1 else { return false }
-            return model.previewCaptureStatesForTesting().values.contains { state in
-                if case .failed = state {
-                    return true
-                }
-                return false
-            }
-        }
-        XCTAssertTrue(published)
-
-        let completedSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: 0..<1)
-        XCTAssertEqual(completedSnapshot.count, 1)
-        XCTAssertFalse(completedSnapshot[0].hasImage)
-        XCTAssertEqual(specialProvider.callCount, 1)
-        XCTAssertEqual(genericProvider.callCount, 0)
-        guard
-            case let .failed(reason, retryAfterGeneration?) =
-                model.previewCaptureStatesForTesting().values.first
-        else {
-            return XCTFail("Expected terminal provider failure state")
-        }
-        XCTAssertEqual(reason, .specialProviderUnavailable)
-        XCTAssertEqual(retryAfterGeneration, model.previewCaptureGeneration + 1)
-    }
-
     private func makePreviewRequest(
         appID: String,
         windowID: String? = nil,
@@ -714,7 +569,7 @@ extension FlowTabPriorityCoverageTests {
     }
 }
 
-private final class FakeSpecialWindowPreviewProvider: SpecialWindowPreviewProviding {
+final class FakeSpecialWindowPreviewProvider: SpecialWindowPreviewProviding {
     private let supportedAppID: String
     private let result: WindowPreviewResult
     private let lock = NSLock()
@@ -743,7 +598,7 @@ private final class FakeSpecialWindowPreviewProvider: SpecialWindowPreviewProvid
     }
 }
 
-private final class FakeGenericWindowPreviewProvider: GenericWindowPreviewProviding {
+final class FakeGenericWindowPreviewProvider: GenericWindowPreviewProviding {
     private let result: WindowPreviewResult
     private let lock = NSLock()
     private var batches: [[WindowPreviewRequest]] = []

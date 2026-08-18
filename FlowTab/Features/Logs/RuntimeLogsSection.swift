@@ -2,38 +2,55 @@ import SwiftUI
 import AppKit
 
 struct DiagnosticsRefreshPolicy: Equatable {
-    var intervalNanoseconds: UInt64
     var lineLimit: Int
 
     static let runtimeLogs = DiagnosticsRefreshPolicy(
-        intervalNanoseconds: 1_000_000_000,
         lineLimit: 300
     )
 }
 
 @MainActor
-private final class RuntimeLogLinesViewModel: ObservableObject {
+final class RuntimeLogLinesViewModel: ObservableObject {
     @Published private(set) var lines: [String] = []
     @Published private(set) var isClearing = false
 
-    private let refreshPolicy: DiagnosticsRefreshPolicy = .runtimeLogs
+    private let diagnostics: any RuntimeLogLinesProviding
+    private let refreshPolicy: DiagnosticsRefreshPolicy
     private var lineLimit: Int {
         refreshPolicy.lineLimit
     }
-    private var refreshIntervalNs: UInt64 {
-        refreshPolicy.intervalNanoseconds
-    }
-    private var refreshTask: Task<Void, Never>?
+    private var changeObservation: RuntimeLogChangeObservation?
+    private var reloadTask: Task<Void, Never>?
     private var refreshGeneration: UInt64 = 0
+    private var latestRequestedChangeGeneration: UInt64?
+
+    init(
+        diagnostics: any RuntimeLogLinesProviding = RuntimeDiagnostics.shared,
+        refreshPolicy: DiagnosticsRefreshPolicy = .runtimeLogs
+    ) {
+        self.diagnostics = diagnostics
+        self.refreshPolicy = refreshPolicy
+    }
 
     func start(minimumLevel: RuntimeLogLevel) {
         stop()
         refreshGeneration &+= 1
         let generation = refreshGeneration
-        refreshTask = Task { [weak self] in
-            guard let self else { return }
-            await self.runRefreshLoop(minimumLevel: minimumLevel, generation: generation)
+        let observation = diagnostics.observeChanges { [weak self] change in
+            Task { @MainActor [weak self] in
+                self?.requestReload(
+                    changeGeneration: change.generation,
+                    minimumLevel: minimumLevel,
+                    refreshGeneration: generation
+                )
+            }
         }
+        changeObservation = observation
+        requestReload(
+            changeGeneration: observation.baselineGeneration,
+            minimumLevel: minimumLevel,
+            refreshGeneration: generation
+        )
     }
 
     func clearStoredLogs(minimumLevel: RuntimeLogLevel) async {
@@ -41,83 +58,90 @@ private final class RuntimeLogLinesViewModel: ObservableObject {
         isClearing = true
         defer { isClearing = false }
 
-        stop()
+        let generation = refreshGeneration
         do {
-            try await RuntimeDiagnostics.shared.clearAndWait()
+            let change = try await diagnostics.clearAndWait()
+            guard generation == refreshGeneration else { return }
             lines = []
+            requestReload(
+                changeGeneration: change.generation,
+                minimumLevel: minimumLevel,
+                refreshGeneration: generation
+            )
         } catch {
-            await reload(minimumLevel: minimumLevel, generation: refreshGeneration)
+            guard generation == refreshGeneration else { return }
+            start(minimumLevel: minimumLevel)
         }
-        start(minimumLevel: minimumLevel)
     }
 
     func stop() {
-        refreshTask?.cancel()
-        refreshTask = nil
+        changeObservation?.cancel()
+        changeObservation = nil
+        reloadTask?.cancel()
+        reloadTask = nil
+        latestRequestedChangeGeneration = nil
         refreshGeneration &+= 1
     }
 
     deinit {
-        refreshTask?.cancel()
+        changeObservation?.cancel()
+        reloadTask?.cancel()
     }
 
-    private func runRefreshLoop(minimumLevel: RuntimeLogLevel, generation: UInt64) async {
-        await reload(minimumLevel: minimumLevel, generation: generation)
-        while !Task.isCancelled, generation == refreshGeneration {
-            try? await Task.sleep(nanoseconds: refreshIntervalNs)
-            await reload(minimumLevel: minimumLevel, generation: generation)
+    private func requestReload(
+        changeGeneration: UInt64,
+        minimumLevel: RuntimeLogLevel,
+        refreshGeneration: UInt64
+    ) {
+        guard refreshGeneration == self.refreshGeneration else { return }
+        if let latestRequestedChangeGeneration,
+           changeGeneration <= latestRequestedChangeGeneration {
+            return
+        }
+        latestRequestedChangeGeneration = changeGeneration
+        guard reloadTask == nil else { return }
+        reloadTask = Task { [weak self] in
+            await self?.runReloadLoop(
+                minimumLevel: minimumLevel,
+                refreshGeneration: refreshGeneration
+            )
         }
     }
 
-    private func reload(minimumLevel: RuntimeLogLevel, generation: UInt64) async {
-        let nextLines = await RuntimeDiagnostics.shared.readRecentLines(
-            limit: lineLimit,
-            minimumLevel: minimumLevel
-        )
-        guard !Task.isCancelled else { return }
-        guard generation == refreshGeneration else { return }
-        lines = nextLines
+    private func runReloadLoop(
+        minimumLevel: RuntimeLogLevel,
+        refreshGeneration: UInt64
+    ) async {
+        while !Task.isCancelled,
+              refreshGeneration == self.refreshGeneration,
+              let requestedChangeGeneration =
+                  latestRequestedChangeGeneration {
+            let nextLines = await diagnostics.readRecentLines(
+                limit: lineLimit,
+                minimumLevel: minimumLevel,
+                since: nil
+            )
+            guard !Task.isCancelled else { return }
+            guard refreshGeneration == self.refreshGeneration else { return }
+            guard requestedChangeGeneration
+                    == latestRequestedChangeGeneration
+            else {
+                continue
+            }
+            lines = nextLines
+            reloadTask = nil
+            return
+        }
     }
 }
 
 struct RuntimeLogsSection: View {
-    @Binding var diagnosticSessionExpiration: Double
     @Binding var runtimeLogLevelRaw: String
     let hotkeyShortcutText: String
     let appLanguage: AppLanguage
     let targetAppearance: NSAppearance
 
     @StateObject private var logsViewModel = RuntimeLogLinesViewModel()
-    @State private var diagnosticSessionNow = Date()
-
-    private var isDiagnosticSessionActive: Bool {
-        diagnosticSessionExpiration > diagnosticSessionNow.timeIntervalSince1970
-    }
-
-    private var diagnosticSessionToggle: Binding<Bool> {
-        Binding(
-            get: { isDiagnosticSessionActive },
-            set: { shouldEnable in
-                diagnosticSessionNow = Date()
-                if shouldEnable {
-                    diagnosticSessionExpiration = RuntimeDiagnosticSessionStore.start(
-                        now: diagnosticSessionNow
-                    ).timeIntervalSince1970
-                } else {
-                    RuntimeDiagnosticSessionStore.stop()
-                    diagnosticSessionExpiration = 0
-                }
-            }
-        )
-    }
-
-    private var diagnosticSessionRemainingMinutes: Int {
-        let remaining = max(
-            0,
-            diagnosticSessionExpiration - diagnosticSessionNow.timeIntervalSince1970
-        )
-        return max(1, Int(ceil(remaining / 60)))
-    }
 
     private var selectedLogLevel: RuntimeLogLevel {
         RuntimeLogPreferencesStore.resolve(rawValue: runtimeLogLevelRaw)
@@ -136,18 +160,24 @@ struct RuntimeLogsSection: View {
     }
 
     private func accessibilityIdentifier(forLogLine line: String, index: Int) -> String {
-        if line.contains("[DEBUG] [UITest]") {
-            return "flowtab.logs.line.seeded.debug"
+#if FLOWTAB_TESTING
+        let seededCategoryToken = "[\(FlowTabUITestBootstrapper.seededLogCategory)]"
+        if FlowTabTestLaunchOptions.isRunningUITests,
+           line.contains(seededCategoryToken) {
+            if line.contains("[DEBUG]") {
+                return "flowtab.logs.line.seeded.debug"
+            }
+            if line.contains("[INFO]") {
+                return "flowtab.logs.line.seeded.info"
+            }
+            if line.contains("[WARN]") {
+                return "flowtab.logs.line.seeded.warn"
+            }
+            if line.contains("[ERROR]") {
+                return "flowtab.logs.line.seeded.error"
+            }
         }
-        if line.contains("[INFO] [UITest]") {
-            return "flowtab.logs.line.seeded.info"
-        }
-        if line.contains("[WARN] [UITest]") {
-            return "flowtab.logs.line.seeded.warn"
-        }
-        if line.contains("[ERROR] [UITest]") {
-            return "flowtab.logs.line.seeded.error"
-        }
+#endif
         return "flowtab.logs.line.row.\(index)"
     }
 
@@ -174,33 +204,6 @@ struct RuntimeLogsSection: View {
             subtitle: AppStrings.text(.logsSectionSubtitle, language: appLanguage)
         ) {
             VStack(alignment: .leading, spacing: 10) {
-                Toggle(isOn: diagnosticSessionToggle) {
-                    Text(AppStrings.text(.logsEnableVerbose, language: appLanguage))
-                        .font(FlowTypography.swiftUI(.formLabel))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                    .toggleStyle(.switch)
-                    .accessibilityIdentifier("flowtab.logs.diagnostic-session")
-
-                if isDiagnosticSessionActive {
-                    Text(
-                        AppStrings.text(
-                            .logsDiagnosticSessionStatus,
-                            replacements: ["minutes": "\(diagnosticSessionRemainingMinutes)"],
-                            language: appLanguage
-                        )
-                    )
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("flowtab.logs.diagnostic-session-status")
-                }
-
-                Text(AppStrings.text(.logsPrivacyNotice, language: appLanguage))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("flowtab.logs.privacy-notice")
-
                 HStack(spacing: 10) {
                     Text(AppStrings.text(.logsLevel, language: appLanguage))
                         .font(FlowTypography.swiftUI(.formLabel))
@@ -212,6 +215,12 @@ struct RuntimeLogsSection: View {
                     )
                     .frame(width: 120)
                 }
+
+                Text(AppStrings.text(.logsPrivacyNotice, language: appLanguage))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("flowtab.logs.privacy-notice")
 
                 Text(
                     AppStrings.text(
@@ -292,10 +301,6 @@ struct RuntimeLogsSection: View {
             }
         }
         .onAppear {
-            diagnosticSessionNow = Date()
-            if !RuntimeDiagnosticSessionStore.isActive(now: diagnosticSessionNow) {
-                diagnosticSessionExpiration = 0
-            }
             synchronizeLogLevelIfNeeded()
             logsViewModel.start(minimumLevel: selectedLogLevel)
         }
@@ -309,18 +314,6 @@ struct RuntimeLogsSection: View {
         }
         .onDisappear {
             logsViewModel.stop()
-        }
-        .task(id: diagnosticSessionExpiration) {
-            guard diagnosticSessionExpiration > 0 else { return }
-            while !Task.isCancelled {
-                diagnosticSessionNow = Date()
-                if !isDiagnosticSessionActive {
-                    RuntimeDiagnosticSessionStore.stop()
-                    diagnosticSessionExpiration = 0
-                    return
-                }
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-            }
         }
     }
 }

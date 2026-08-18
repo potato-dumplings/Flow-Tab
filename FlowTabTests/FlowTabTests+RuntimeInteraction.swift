@@ -5,7 +5,30 @@ import XCTest
 import FlowTabCore
 import Carbon
 
+private enum RuntimeInteractionWatchdogPolicy {
+    static let keyboardReadinessEvent: TimeInterval = 1
+    static let mainQueueTransition: TimeInterval = 1
+}
+
 extension FlowTabTests {
+    func testRuntimeInteractionWatchdogPolicyPreservesKeyboardReadinessEventBound() {
+        let keyboardReadinessEvent =
+            RuntimeInteractionWatchdogPolicy.keyboardReadinessEvent
+
+        XCTAssertEqual(keyboardReadinessEvent, 1)
+        XCTAssertTrue(keyboardReadinessEvent.isFinite)
+        XCTAssertGreaterThan(keyboardReadinessEvent, 0)
+    }
+
+    func testRuntimeInteractionWatchdogPolicyPreservesMainQueueTransitionBound() {
+        let mainQueueTransition =
+            RuntimeInteractionWatchdogPolicy.mainQueueTransition
+
+        XCTAssertEqual(mainQueueTransition, 1)
+        XCTAssertTrue(mainQueueTransition.isFinite)
+        XCTAssertGreaterThan(mainQueueTransition, 0)
+    }
+
     @MainActor
     func testSearchSystemTextInputBridgeConfiguresVisiblePlainTextResponder() {
         let harness = SearchSystemTextInputBridgeTestHarness()
@@ -43,6 +66,169 @@ extension FlowTabTests {
         XCTAssertEqual(textView.textContainer?.lineBreakMode, .byClipping)
         XCTAssertEqual(textView.textContainer?.widthTracksTextView, false)
         XCTAssertEqual(textView.textContainer?.heightTracksTextView, true)
+    }
+
+    @MainActor
+    func testSearchSystemTextInputBridgePublishesExactKeyboardReadiness()
+        async
+    {
+        let readiness =
+            expectation(
+                description:
+                    "unmetCondition=exactSearchKeyboardReadiness callback"
+            )
+        let harness = SearchSystemTextInputBridgeTestHarness()
+        harness.observeKeyboardReadiness { isReady in
+            if isReady {
+                readiness.fulfill()
+            }
+        }
+        XCTAssertTrue(harness.hasKeyboardReadinessTestObserver)
+        let window = harness.installInKeyWindow()
+        defer {
+            harness.closeHostingWindow()
+            XCTAssertFalse(
+                harness.hasKeyboardReadinessTestObserver
+            )
+        }
+
+        XCTAssertTrue(harness.keyboardReadinessChanges.isEmpty)
+        XCTAssertFalse(window.firstResponder === harness.textView)
+
+        harness.synchronize(
+            query: "",
+            cursorPosition: 0,
+            isSearchActive: true
+        )
+
+        await fulfillment(
+            of: [readiness],
+            timeout:
+                RuntimeInteractionWatchdogPolicy
+                    .keyboardReadinessEvent
+        )
+        let readinessEvidence =
+            searchInputKeyboardReadinessEvidence(
+                harness: harness,
+                window: window
+            )
+        XCTAssertTrue(window.isKeyWindow, readinessEvidence)
+        XCTAssertTrue(
+            window.firstResponder === harness.textView,
+            readinessEvidence
+        )
+        XCTAssertEqual(
+            harness.textView.accessibilityIdentifier(),
+            "flowtab.switcher.search.input"
+        )
+        XCTAssertEqual(
+            harness.keyboardReadinessChanges,
+            [true],
+            readinessEvidence
+        )
+
+        harness.postHostingWindowDidBecomeKey()
+        harness.postHostingWindowDidBecomeKey()
+        await waitForSearchInputMainQueueTurn()
+        XCTAssertEqual(
+            harness.keyboardReadinessChanges,
+            [true]
+        )
+    }
+
+    @MainActor
+    func testSearchSystemTextInputBridgeWaitsForKeyWindowEvidence()
+        async
+    {
+        let readiness =
+            expectation(
+                description:
+                    "unmetCondition=delayedKeyWindowKeyboardReadiness callback"
+            )
+        let harness = SearchSystemTextInputBridgeTestHarness()
+        harness.observeKeyboardReadiness { isReady in
+            if isReady {
+                readiness.fulfill()
+            }
+        }
+        XCTAssertTrue(harness.hasKeyboardReadinessTestObserver)
+        let window = harness.installInWindow()
+        defer {
+            harness.closeHostingWindow()
+            XCTAssertFalse(
+                harness.hasKeyboardReadinessTestObserver
+            )
+        }
+
+        XCTAssertTrue(harness.keyboardReadinessChanges.isEmpty)
+
+        harness.synchronize(
+            query: "",
+            cursorPosition: 0,
+            isSearchActive: true
+        )
+        await waitForSearchInputMainQueueTurn()
+
+        XCTAssertFalse(window.isKeyWindow)
+        XCTAssertTrue(
+            harness.keyboardReadinessChanges.isEmpty
+        )
+
+        harness.makeHostingWindowKey()
+        await fulfillment(
+            of: [readiness],
+            timeout:
+                RuntimeInteractionWatchdogPolicy
+                    .keyboardReadinessEvent
+        )
+        let readinessEvidence =
+            searchInputKeyboardReadinessEvidence(
+                harness: harness,
+                window: window
+            )
+
+        XCTAssertTrue(window.isKeyWindow, readinessEvidence)
+        XCTAssertTrue(
+            window.firstResponder === harness.textView,
+            readinessEvidence
+        )
+        XCTAssertEqual(
+            harness.keyboardReadinessChanges,
+            [true],
+            readinessEvidence
+        )
+    }
+
+    @MainActor
+    func testSearchSystemTextInputBridgeCancelsStaleReadiness()
+        async
+    {
+        let harness = SearchSystemTextInputBridgeTestHarness()
+        let window = harness.installInWindow()
+        defer { harness.closeHostingWindow() }
+
+        harness.synchronize(
+            query: "",
+            cursorPosition: 0,
+            isSearchActive: true
+        )
+        harness.synchronize(
+            query: "",
+            cursorPosition: 0,
+            isSearchActive: false
+        )
+        await waitForSearchInputMainQueueTurn()
+
+        harness.makeHostingWindowKey()
+        await waitForSearchInputMainQueueTurn()
+
+        XCTAssertTrue(window.isKeyWindow)
+        XCTAssertFalse(
+            window.firstResponder === harness.textView
+        )
+        XCTAssertFalse(
+            harness.keyboardReadinessChanges.contains(true)
+        )
     }
 
     @MainActor
@@ -155,7 +341,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testTerminateSelectedAppBehaviorKeepsAppUntilWorkspaceTerminationArrives() async {
+    func testTerminateSelectedAppBehaviorKeepsAppUntilWorkspaceTerminationArrives() {
         let initialApps = terminateScenarioApps()
         let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
@@ -171,8 +357,12 @@ extension FlowTabTests {
         let terminatedPID = pid_t(42_000)
         model.terminateRequestOverride = { _ in (sent: true, pid: terminatedPID) }
 
-        let layoutRefreshed = expectation(description: "post terminate layout refreshed")
-        model.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
+        var layoutRefreshCount = 0
+        model.onSessionLayoutChanged = { layoutRefreshCount += 1 }
+        defer {
+            model.onSessionLayoutChanged = nil
+            model.cancelSelection()
+        }
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
@@ -186,9 +376,15 @@ extension FlowTabTests {
         XCTAssertEqual(model.pendingTerminateRequest?.appID, terminatedAppID)
         XCTAssertEqual(model.pendingTerminateRequest?.pid, terminatedPID)
         XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
+        XCTAssertEqual(layoutRefreshCount, 0)
 
         XCTAssertTrue(model.handleApplicationTerminated(appID: terminatedAppID, pid: terminatedPID))
-        await fulfillment(of: [layoutRefreshed], timeout: 1.0)
+        XCTAssertEqual(
+            layoutRefreshCount,
+            1,
+            "unmetCondition=terminationLayoutPublished "
+                + "finalLayoutRefreshCount=\(layoutRefreshCount)"
+        )
         XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
         assertRuntimeProjectionSessionRead(
             from: runtimeProjectionService,
@@ -199,7 +395,6 @@ extension FlowTabTests {
         XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
         XCTAssertNil(model.terminatingAppID)
         XCTAssertNil(model.pendingTerminateRequest)
-        model.cancelSelection()
     }
 
     @MainActor
@@ -231,7 +426,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testHandleApplicationTerminatedRefreshesFromRuntimeProjectionWithoutFullSnapshot() async {
+    func testHandleApplicationTerminatedRefreshesFromRuntimeProjectionWithoutFullSnapshot() {
         let initialApps = terminateScenarioApps()
         let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
@@ -245,12 +440,20 @@ extension FlowTabTests {
 
         let refreshedApps = initialApps.filter { $0.id != terminatedAppID }
 
-        let layoutRefreshed = expectation(description: "layout refreshed from runtime projection")
-        model.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
+        var layoutRefreshCount = 0
+        model.onSessionLayoutChanged = { layoutRefreshCount += 1 }
+        defer {
+            model.onSessionLayoutChanged = nil
+            model.cancelSelection()
+        }
 
         XCTAssertTrue(model.handleApplicationTerminated(appID: terminatedAppID, pid: 42_012))
-
-        await fulfillment(of: [layoutRefreshed], timeout: 1.0)
+        XCTAssertEqual(
+            layoutRefreshCount,
+            1,
+            "unmetCondition=terminationLayoutPublished "
+                + "finalLayoutRefreshCount=\(layoutRefreshCount)"
+        )
         assertRuntimeProjectionSessionRead(from: runtimeProjectionService, minimumReadCount: 2)
         XCTAssertEqual(
             runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID),
@@ -267,7 +470,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testTerminateSelectedAppUnitKeepsPendingRequestWithoutSurfaceTimeout() async {
+    func testTerminateSelectedAppUnitKeepsPendingRequestWithoutSurfaceTimeout() {
         let initialApps = terminateScenarioApps()
         let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
@@ -278,11 +481,17 @@ extension FlowTabTests {
             return
         }
 
-        model.terminateRequestOverride = { _ in (sent: true, pid: 42_001) }
+        let terminatedPID = pid_t(42_001)
+        model.terminateRequestOverride = { _ in
+            (sent: true, pid: terminatedPID)
+        }
 
-        let noDeferredLayoutRefresh = expectation(description: "no deferred layout refresh")
-        noDeferredLayoutRefresh.isInverted = true
-        model.onSessionLayoutChanged = { noDeferredLayoutRefresh.fulfill() }
+        var layoutRefreshCount = 0
+        model.onSessionLayoutChanged = { layoutRefreshCount += 1 }
+        defer {
+            model.onSessionLayoutChanged = nil
+            model.cancelSelection()
+        }
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
@@ -294,7 +503,12 @@ extension FlowTabTests {
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
         XCTAssertEqual(model.terminatingAppID, terminatedAppID)
 
-        await fulfillment(of: [noDeferredLayoutRefresh], timeout: 0.01)
+        XCTAssertEqual(
+            layoutRefreshCount,
+            0,
+            "unmetCondition=layoutRefreshRequiresTerminationEvidence "
+                + "finalLayoutRefreshCount=\(layoutRefreshCount)"
+        )
         XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
         assertRuntimeProjectionSessionRead(
             from: runtimeProjectionService,
@@ -304,7 +518,8 @@ extension FlowTabTests {
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
         XCTAssertEqual(model.terminatingAppID, terminatedAppID)
         XCTAssertEqual(model.pendingTerminateRequest?.appID, terminatedAppID)
-        model.cancelSelection()
+        XCTAssertEqual(model.pendingTerminateRequest?.pid, terminatedPID)
+        XCTAssertEqual(model.pendingTerminateRequest?.generation, 1)
     }
 
     @MainActor
@@ -366,7 +581,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testTerminateSelectedAppUnitRefreshesOnWorkspaceTerminateAfterPendingRequest() async {
+    func testTerminateSelectedAppUnitRefreshesOnWorkspaceTerminateAfterPendingRequest() {
         let initialApps = terminateScenarioApps()
         let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
@@ -381,11 +596,13 @@ extension FlowTabTests {
 
         model.terminateRequestOverride = { _ in (sent: true, pid: 42_002) }
 
-        let deferredLayoutRefresh = expectation(description: "deferred layout refresh")
         var layoutRefreshCount = 0
         model.onSessionLayoutChanged = {
             layoutRefreshCount += 1
-            deferredLayoutRefresh.fulfill()
+        }
+        defer {
+            model.onSessionLayoutChanged = nil
+            model.cancelSelection()
         }
 
         let result = model.terminateSelectedApp()
@@ -397,7 +614,6 @@ extension FlowTabTests {
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
 
-        await Task.yield()
         XCTAssertEqual(layoutRefreshCount, 0)
         XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
         assertRuntimeProjectionSessionRead(
@@ -406,10 +622,18 @@ extension FlowTabTests {
         )
         XCTAssertEqual(model.terminatingAppID, terminatedAppID)
 
-        model.handleApplicationTerminated(appID: terminatedAppID, pid: 42_002)
-
-        await fulfillment(of: [deferredLayoutRefresh], timeout: 1.0)
-        XCTAssertEqual(layoutRefreshCount, 1)
+        XCTAssertTrue(
+            model.handleApplicationTerminated(
+                appID: terminatedAppID,
+                pid: 42_002
+            )
+        )
+        XCTAssertEqual(
+            layoutRefreshCount,
+            1,
+            "unmetCondition=terminationLayoutPublished "
+                + "finalLayoutRefreshCount=\(layoutRefreshCount)"
+        )
         XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
         assertRuntimeProjectionSessionRead(
             from: runtimeProjectionService,
@@ -418,7 +642,6 @@ extension FlowTabTests {
         )
         XCTAssertEqual(model.appCount, appsAfterTermination.count)
         XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
-        model.cancelSelection()
     }
 
     private func assertRuntimeProjectionSessionRead(
@@ -440,6 +663,53 @@ extension FlowTabTests {
             file: file,
             line: line
         )
+    }
+
+    @MainActor
+    private func waitForSearchInputMainQueueTurn()
+        async
+    {
+        var didDeliverMainQueueTurn = false
+        let mainQueueTurn =
+            expectation(
+                description:
+                    "unmetCondition=searchInputMainQueueTransition callback"
+            )
+        let mainQueueTurnWorkItem = DispatchWorkItem {
+            didDeliverMainQueueTurn = true
+            mainQueueTurn.fulfill()
+        }
+        defer { mainQueueTurnWorkItem.cancel() }
+        DispatchQueue.main.async(execute: mainQueueTurnWorkItem)
+        await fulfillment(
+            of: [mainQueueTurn],
+            timeout:
+                RuntimeInteractionWatchdogPolicy
+                    .mainQueueTransition
+        )
+        XCTAssertTrue(
+            didDeliverMainQueueTurn,
+            "unmetCondition=searchInputMainQueueTransition "
+                + "finalCallbackDelivered="
+                + "\(didDeliverMainQueueTurn ? 1 : 0)"
+        )
+    }
+
+    @MainActor
+    private func searchInputKeyboardReadinessEvidence(
+        harness: SearchSystemTextInputBridgeTestHarness,
+        window: NSWindow
+    ) -> String {
+        let responder = window.firstResponder.map {
+            String(describing: type(of: $0))
+        } ?? "nil"
+        return "unmetCondition=exactSearchKeyboardReadiness "
+            + "finalWindowKey=\(window.isKeyWindow ? 1 : 0) "
+            + "finalResponderMatches="
+            + "\(window.firstResponder === harness.textView ? 1 : 0) "
+            + "finalResponder=\(responder) "
+            + "finalReadinessChanges="
+            + "\(harness.keyboardReadinessChanges)"
     }
 
 }

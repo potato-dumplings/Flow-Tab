@@ -3,9 +3,9 @@ import Foundation
 extension SwitcherPanelController {
     func finishSelection() {
         guard isPanelPresented || hasActivePresentationSession else { return }
-        ignoreHotkeyPressesUntil = ProcessInfo.processInfo.systemUptime + postFinishHotkeyIgnoreWindow
+        beginSelectionEndReplaySuppression(trigger: "finishSelection")
         logInputTrace(
-            "finishSelection nowMs=\(formatMilliseconds(monotonicMilliseconds())) ignoreUntilMs=\(formatMilliseconds(ignoreHotkeyPressesUntil * 1_000))"
+            "finishSelection nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
         model.commitSelection()
         endPresentationSession()
@@ -14,11 +14,31 @@ extension SwitcherPanelController {
     func cancelSelection(trigger: String) {
         guard isPanelPresented || hasActivePresentationSession else { return }
         let sessionKind = activeHotkeySessionKind
+        beginSelectionEndReplaySuppression(
+            sessionKind: sessionKind,
+            trigger: trigger
+        )
         endPresentationSession()
-        ignoreHotkeyPressesUntil = ProcessInfo.processInfo.systemUptime + postFinishHotkeyIgnoreWindow
         logInputTrace(
-            "cancelSelection trigger=\(trigger) \(primaryModifierHardwareStateSummary(for: sessionKind)) nowMs=\(formatMilliseconds(monotonicMilliseconds())) ignoreUntilMs=\(formatMilliseconds(ignoreHotkeyPressesUntil * 1_000))"
+            "cancelSelection trigger=\(trigger) \(hotkeyHoldSetHardwareStateSummary(for: sessionKind)) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
         model.cancelSelection()
+    }
+
+    private func beginSelectionEndReplaySuppression(
+        sessionKind: HotkeySessionKind? = nil,
+        trigger: String
+    ) {
+        let resolvedSessionKind = sessionKind ?? activeHotkeySessionKind
+        if let resolvedSessionKind {
+            beginHotkeyReplaySuppressionUntilRelease(
+                for: resolvedSessionKind,
+                trigger: "selection_end:\(trigger)"
+            )
+        } else {
+            beginHotkeyReplaySuppressionUntilReleaseForKnownSessionKinds(
+                trigger: "selection_end:\(trigger)"
+            )
+        }
     }
 }

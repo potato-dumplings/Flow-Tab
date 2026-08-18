@@ -3,261 +3,18 @@ import Carbon
 import Foundation
 import Darwin
 
-enum SwitcherPrimaryModifier: String, CaseIterable, Identifiable, Sendable {
-    case option
-    case control
-    case command
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .option:
-            return "Option"
-        case .control:
-            return "Control"
-        case .command:
-            return "Command"
-        }
-    }
-
-    var carbonModifier: UInt32 {
-        switch self {
-        case .option:
-            return UInt32(optionKey)
-        case .control:
-            return UInt32(controlKey)
-        case .command:
-            return UInt32(cmdKey)
-        }
-    }
-
-    var eventModifierFlag: NSEvent.ModifierFlags {
-        switch self {
-        case .option:
-            return .option
-        case .control:
-            return .control
-        case .command:
-            return .command
-        }
-    }
-}
-
-enum SwitcherHotkeyKey: String, CaseIterable, Identifiable, Sendable {
-    case tab
-    case space
-    case grave
-    case a
-    case b
-    case c
-    case d
-    case e
-    case f
-    case g
-    case h
-    case i
-    case j
-    case k
-    case l
-    case m
-    case n
-    case o
-    case p
-    case q
-    case r
-    case s
-    case t
-    case u
-    case v
-    case w
-    case x
-    case y
-    case z
-
-    var id: String { rawValue }
-
-    var keyCode: UInt16 {
-        switch self {
-        case .tab:
-            return UInt16(kVK_Tab)
-        case .space:
-            return UInt16(kVK_Space)
-        case .grave:
-            return UInt16(kVK_ANSI_Grave)
-        case .a:
-            return UInt16(kVK_ANSI_A)
-        case .b:
-            return UInt16(kVK_ANSI_B)
-        case .c:
-            return UInt16(kVK_ANSI_C)
-        case .d:
-            return UInt16(kVK_ANSI_D)
-        case .e:
-            return UInt16(kVK_ANSI_E)
-        case .f:
-            return UInt16(kVK_ANSI_F)
-        case .g:
-            return UInt16(kVK_ANSI_G)
-        case .h:
-            return UInt16(kVK_ANSI_H)
-        case .i:
-            return UInt16(kVK_ANSI_I)
-        case .j:
-            return UInt16(kVK_ANSI_J)
-        case .k:
-            return UInt16(kVK_ANSI_K)
-        case .l:
-            return UInt16(kVK_ANSI_L)
-        case .m:
-            return UInt16(kVK_ANSI_M)
-        case .n:
-            return UInt16(kVK_ANSI_N)
-        case .o:
-            return UInt16(kVK_ANSI_O)
-        case .p:
-            return UInt16(kVK_ANSI_P)
-        case .q:
-            return UInt16(kVK_ANSI_Q)
-        case .r:
-            return UInt16(kVK_ANSI_R)
-        case .s:
-            return UInt16(kVK_ANSI_S)
-        case .t:
-            return UInt16(kVK_ANSI_T)
-        case .u:
-            return UInt16(kVK_ANSI_U)
-        case .v:
-            return UInt16(kVK_ANSI_V)
-        case .w:
-            return UInt16(kVK_ANSI_W)
-        case .x:
-            return UInt16(kVK_ANSI_X)
-        case .y:
-            return UInt16(kVK_ANSI_Y)
-        case .z:
-            return UInt16(kVK_ANSI_Z)
-        }
-    }
-
-    var displayName: String {
-        switch self {
-        case .tab:
-            return "Tab"
-        case .space:
-            return "Space"
-        case .grave:
-            return "`"
-        default:
-            return rawValue.uppercased()
-        }
-    }
-}
-
-struct SwitcherHotkeyConfiguration: Sendable {
-    let primaryModifier: SwitcherPrimaryModifier
-    let mainKey: SwitcherHotkeyKey
-    let quitKey: SwitcherHotkeyKey
-
-    var forwardKeyCode: UInt32 {
-        UInt32(mainKey.keyCode)
-    }
-
-    var forwardModifiers: UInt32 {
-        primaryModifier.carbonModifier
-    }
-
-    var backwardModifiers: UInt32 {
-        primaryModifier.carbonModifier | UInt32(shiftKey)
-    }
-
-    var quitKeyCode: UInt16 {
-        quitKey.keyCode
-    }
-
-    var mainShortcutText: String {
-        "\(primaryModifier.displayName) + \(mainKey.displayName)"
-    }
-
-    var backwardShortcutText: String {
-        "\(primaryModifier.displayName) + Shift + \(mainKey.displayName)"
-    }
-
-    var quitShortcutText: String {
-        "\(primaryModifier.displayName) + \(quitKey.displayName)"
-    }
-}
-
 protocol CommandTabTakeoverControlling: AnyObject {
     func reconcileIfNeeded(shouldTakeOver: Bool) -> Bool
     func restoreSystemShortcutsIfNeeded()
 }
 
 protocol HotkeyMonitoring: AnyObject {
-    var onHotkeyPressed: ((Bool) -> Void)? { get set }
-    var onHotkeyReleased: ((Bool) -> Void)? { get set }
+    var inputSourceID: HotkeyInputSourceID { get }
+    var onHotkeyEvent: ((HotkeyInputEvent) -> Void)? { get set }
 
+    func start()
     func stop()
-}
-
-enum SwitcherHotkeyPreferencesStore {
-    static let defaultPrimaryModifier: SwitcherPrimaryModifier = .option
-    static let defaultMainKey: SwitcherHotkeyKey = .tab
-    static let defaultQuitKey: SwitcherHotkeyKey = .q
-
-    static func load(userDefaults: UserDefaults = .standard) -> SwitcherHotkeyConfiguration {
-        let primaryModifierRaw = userDefaults.string(forKey: AppPreferenceKeys.hotkeyPrimaryModifier)
-            ?? defaultPrimaryModifier.rawValue
-        let mainKeyRaw = userDefaults.string(forKey: AppPreferenceKeys.hotkeyMainKey)
-            ?? defaultMainKey.rawValue
-        let quitKeyRaw = userDefaults.string(forKey: AppPreferenceKeys.hotkeyQuitKey)
-            ?? defaultQuitKey.rawValue
-
-        let configuration = resolve(
-            primaryModifierRaw: primaryModifierRaw,
-            mainKeyRaw: mainKeyRaw,
-            quitKeyRaw: quitKeyRaw
-        )
-
-        if primaryModifierRaw != configuration.primaryModifier.rawValue {
-            userDefaults.set(configuration.primaryModifier.rawValue, forKey: AppPreferenceKeys.hotkeyPrimaryModifier)
-        }
-        if mainKeyRaw != configuration.mainKey.rawValue {
-            userDefaults.set(configuration.mainKey.rawValue, forKey: AppPreferenceKeys.hotkeyMainKey)
-        }
-        if quitKeyRaw != configuration.quitKey.rawValue {
-            userDefaults.set(configuration.quitKey.rawValue, forKey: AppPreferenceKeys.hotkeyQuitKey)
-        }
-
-        return configuration
-    }
-
-    static func resolve(
-        primaryModifierRaw: String,
-        mainKeyRaw: String,
-        quitKeyRaw: String
-    ) -> SwitcherHotkeyConfiguration {
-        let primaryModifier = SwitcherPrimaryModifier(rawValue: primaryModifierRaw) ?? defaultPrimaryModifier
-        let mainKey = SwitcherHotkeyKey(rawValue: mainKeyRaw) ?? defaultMainKey
-        var quitKey = SwitcherHotkeyKey(rawValue: quitKeyRaw) ?? defaultQuitKey
-
-        if quitKey == mainKey {
-            quitKey = defaultQuitFallback(excluding: mainKey)
-        }
-
-        return SwitcherHotkeyConfiguration(
-            primaryModifier: primaryModifier,
-            mainKey: mainKey,
-            quitKey: quitKey
-        )
-    }
-
-    private static func defaultQuitFallback(excluding key: SwitcherHotkeyKey) -> SwitcherHotkeyKey {
-        if key != .q {
-            return .q
-        }
-        return .w
-    }
+    func requireChordEventMonitoring()
 }
 
 final class CommandTabTakeoverController {
@@ -407,17 +164,18 @@ final class CommandTabTakeoverController {
 extension CommandTabTakeoverController: CommandTabTakeoverControlling {}
 
 final class OptionTabHotkeyMonitor {
-    enum HotkeyEventPhase {
-        case pressed
-        case released
-    }
+    typealias HotkeyEventPhase = HotkeyInputEvent.Phase
 
-    var onHotkeyPressed: ((Bool) -> Void)?
-    var onHotkeyReleased: ((Bool) -> Void)?
+    let inputSourceID = HotkeyInputSourceID()
+    var onHotkeyEvent: ((HotkeyInputEvent) -> Void)?
 
     private var eventHandlerRef: EventHandlerRef?
     private var hotkeyRefs: [UInt32: EventHotKeyRef] = [:]
     private var registeredHotkeyIDs: Set<UInt32> = []
+    private var chordEventMonitor: HotkeyChordEventMonitor?
+    private var requiresChordEventMonitoring = false
+    private let inputSequenceLock = NSLock()
+    private var inputSequence: UInt64 = 0
 
     private let signature: OSType
     private let forwardHotkeyID: UInt32
@@ -427,8 +185,16 @@ final class OptionTabHotkeyMonitor {
     private let hotkeyRegistrarOverride: ((UInt32, UInt32, UInt32) -> Bool)?
     private let hotkeyUnregisterOverride: ((UInt32) -> Void)?
     private let eventHandlerRemoverOverride: (() -> Void)?
+    private let chordEventMonitorStarterOverride:
+        ((SwitcherHotkeyConfiguration) -> Bool)?
+    private let chordEventMonitorStopperOverride: (() -> Void)?
 
     private(set) var isEventHandlerInstalledForTesting = false
+    private var isChordEventMonitorInstalledForTesting = false
+    var isChordEventMonitorActiveForTesting: Bool {
+        isChordEventMonitorInstalledForTesting
+            || chordEventMonitor?.isActive == true
+    }
 
     init(
         configuration: SwitcherHotkeyConfiguration = SwitcherHotkeyPreferencesStore.load(),
@@ -439,7 +205,10 @@ final class OptionTabHotkeyMonitor {
         handlerInstallerOverride: (() -> Bool)? = nil,
         hotkeyRegistrarOverride: ((UInt32, UInt32, UInt32) -> Bool)? = nil,
         hotkeyUnregisterOverride: ((UInt32) -> Void)? = nil,
-        eventHandlerRemoverOverride: (() -> Void)? = nil
+        eventHandlerRemoverOverride: (() -> Void)? = nil,
+        chordEventMonitorStarterOverride:
+            ((SwitcherHotkeyConfiguration) -> Bool)? = nil,
+        chordEventMonitorStopperOverride: (() -> Void)? = nil
     ) {
         self.hotkeyConfiguration = configuration
         self.signature = signature
@@ -449,9 +218,29 @@ final class OptionTabHotkeyMonitor {
         self.hotkeyRegistrarOverride = hotkeyRegistrarOverride
         self.hotkeyUnregisterOverride = hotkeyUnregisterOverride
         self.eventHandlerRemoverOverride = eventHandlerRemoverOverride
+        self.chordEventMonitorStarterOverride =
+            chordEventMonitorStarterOverride
+        self.chordEventMonitorStopperOverride =
+            chordEventMonitorStopperOverride
         guard startsMonitoring else { return }
+        start()
+    }
+
+    func start() {
+        if requiresChordEventMonitoring
+            || !hotkeyConfiguration.supportsCarbonRegistration
+        {
+            startChordEventMonitor()
+            return
+        }
+        guard eventHandlerRef == nil else { return }
+        guard !isEventHandlerInstalledForTesting else { return }
         guard installHandler() else { return }
         registerHotkeys()
+    }
+
+    func requireChordEventMonitoring() {
+        requiresChordEventMonitoring = true
     }
 
     deinit {
@@ -459,6 +248,13 @@ final class OptionTabHotkeyMonitor {
     }
 
     func stop() {
+        chordEventMonitor?.stop()
+        chordEventMonitor = nil
+        if isChordEventMonitorInstalledForTesting {
+            chordEventMonitorStopperOverride?()
+            isChordEventMonitorInstalledForTesting = false
+        }
+
         if let hotkeyUnregisterOverride {
             for id in registeredHotkeyIDs.sorted() {
                 hotkeyUnregisterOverride(id)
@@ -482,6 +278,40 @@ final class OptionTabHotkeyMonitor {
             eventHandlerRemoverOverride()
         }
         isEventHandlerInstalledForTesting = false
+    }
+
+    private func startChordEventMonitor() {
+        guard chordEventMonitor == nil else { return }
+        guard !isChordEventMonitorInstalledForTesting else { return }
+        if let chordEventMonitorStarterOverride {
+            isChordEventMonitorInstalledForTesting =
+                chordEventMonitorStarterOverride(hotkeyConfiguration)
+            return
+        }
+        let monitor = HotkeyChordEventMonitor(
+            configuration: hotkeyConfiguration
+        )
+        monitor.onTransition = { [weak self] transition in
+            self?.dispatchChordTransition(transition)
+        }
+        guard monitor.start() else {
+            RuntimeLog.error(
+                .hotKey,
+                "chord event monitor unavailable "
+                    + "forward=\(hotkeyConfiguration.mainShortcutText) "
+                    + "backward=\(hotkeyConfiguration.backwardShortcutText)"
+            )
+            return
+        }
+        chordEventMonitor = monitor
+        let tapMode = monitor.activeTapMode?.rawValue ?? "unknown"
+        RuntimeLog.info(
+            .hotKey,
+            "chord event monitor active "
+                + "mode=\(tapMode) "
+                + "forward=\(hotkeyConfiguration.mainShortcutText) "
+                + "backward=\(hotkeyConfiguration.backwardShortcutText)"
+        )
     }
 
     @discardableResult
@@ -529,15 +359,25 @@ final class OptionTabHotkeyMonitor {
     }
 
     private func registerHotkeys() {
+        guard
+            let forward = hotkeyConfiguration.mainShortcut.carbonRegistration,
+            let backward = hotkeyConfiguration.backwardShortcut.carbonRegistration
+        else {
+            RuntimeLog.error(
+                .hotKey,
+                "Carbon registration requested for a key-set chord"
+            )
+            return
+        }
         registerHotkey(
             id: forwardHotkeyID,
-            keyCode: hotkeyConfiguration.forwardKeyCode,
-            modifiers: hotkeyConfiguration.forwardModifiers
+            keyCode: forward.keyCode,
+            modifiers: forward.modifiers
         )
         registerHotkey(
             id: backwardHotkeyID,
-            keyCode: hotkeyConfiguration.forwardKeyCode,
-            modifiers: hotkeyConfiguration.backwardModifiers
+            keyCode: backward.keyCode,
+            modifiers: backward.modifiers
         )
     }
 
@@ -652,18 +492,15 @@ final class OptionTabHotkeyMonitor {
             return passThroughStatus
         }
 
-        let phase: String
+        let phase: HotkeyInputEvent.Phase
         let direction: String
-        let callback: ((Bool) -> Void)?
         let isBackward: Bool
         switch id {
         case forwardHotkeyID:
             if isPressedEvent {
-                phase = "pressed"
-                callback = onHotkeyPressed
+                phase = .pressed
             } else if isReleasedEvent {
-                phase = "released"
-                callback = onHotkeyReleased
+                phase = .released
             } else {
                 return passThroughStatus
             }
@@ -671,11 +508,9 @@ final class OptionTabHotkeyMonitor {
             isBackward = false
         case backwardHotkeyID:
             if isPressedEvent {
-                phase = "pressed"
-                callback = onHotkeyPressed
+                phase = .pressed
             } else if isReleasedEvent {
-                phase = "released"
-                callback = onHotkeyReleased
+                phase = .released
             } else {
                 return passThroughStatus
             }
@@ -684,18 +519,56 @@ final class OptionTabHotkeyMonitor {
         default:
             return passThroughStatus
         }
+        let inputEvent = HotkeyInputEvent(
+            identity: nextInputEventIdentity(),
+            phase: phase,
+            isBackward: isBackward
+        )
+        let phaseText = phase == .pressed ? "pressed" : "released"
         RuntimeLog.debug(
             .hotKey,
-            "dispatch phase=\(phase) dir=\(direction) id=\(id) nowMs=\(RuntimePerformanceClock.formatMilliseconds(eventReceivedMs))"
+            "dispatch phase=\(phaseText) dir=\(direction) id=\(id) source=\(inputSourceID.rawValue.uuidString) sequence=\(inputEvent.identity.sequence) nowMs=\(RuntimePerformanceClock.formatMilliseconds(eventReceivedMs))"
         )
         let callbackStartMs = RuntimePerformanceClock.monotonicMilliseconds()
-        callback?(isBackward)
+        onHotkeyEvent?(inputEvent)
         let callbackEndMs = RuntimePerformanceClock.monotonicMilliseconds()
         RuntimeLog.debug(
             .hotKey,
-            "dispatched phase=\(phase) dir=\(direction) id=\(id) callbackMs=\(RuntimePerformanceClock.formatMilliseconds(callbackEndMs - callbackStartMs)) totalMs=\(RuntimePerformanceClock.formatMilliseconds(callbackEndMs - eventReceivedMs))"
+            "dispatched phase=\(phaseText) dir=\(direction) id=\(id) source=\(inputSourceID.rawValue.uuidString) sequence=\(inputEvent.identity.sequence) callbackMs=\(RuntimePerformanceClock.formatMilliseconds(callbackEndMs - callbackStartMs)) totalMs=\(RuntimePerformanceClock.formatMilliseconds(callbackEndMs - eventReceivedMs))"
         )
         return noErr
+    }
+
+    private func nextInputEventIdentity() -> HotkeyInputEventIdentity {
+        inputSequenceLock.lock()
+        inputSequence &+= 1
+        let sequence = inputSequence
+        inputSequenceLock.unlock()
+        return HotkeyInputEventIdentity(
+            sourceID: inputSourceID,
+            sequence: sequence
+        )
+    }
+
+    private func dispatchChordTransition(
+        _ transition: HotkeyChordTransition
+    ) {
+        let inputEvent = HotkeyInputEvent(
+            identity: nextInputEventIdentity(),
+            phase: transition.phase,
+            isBackward: transition.isBackward
+        )
+        let phase = transition.phase == .pressed
+            ? "pressed" : "released"
+        let direction = transition.isBackward
+            ? "backward" : "forward"
+        RuntimeLog.debug(
+            .hotKey,
+            "dispatch chord phase=\(phase) dir=\(direction) "
+                + "source=\(inputSourceID.rawValue.uuidString) "
+                + "sequence=\(inputEvent.identity.sequence)"
+        )
+        onHotkeyEvent?(inputEvent)
     }
 }
 

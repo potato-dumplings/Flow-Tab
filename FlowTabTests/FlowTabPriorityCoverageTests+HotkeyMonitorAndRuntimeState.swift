@@ -10,52 +10,39 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeAXWindowChangeMonitorRoutesKnownDestroyedAXWindowThroughTypedCallback() {
         let pid: pid_t = 18_405
         let knownWindow = AXUIElementCreateApplication(pid)
-        let unrelatedWindow = AXUIElementCreateApplication(pid + 1)
         let knownWindowID = AXWindowInspectorForTesting.makeWindowID(pid: pid, index: 0)
         AXLiveWindowRegistry.shared.replaceWindows(forPID: pid, with: [knownWindow])
         defer { AXLiveWindowRegistry.shared.remove(pid: pid) }
 
         let monitor = RuntimeAXWindowChangeMonitor()
         var destroyedEvents: [(String, pid_t, String)] = []
-        var changedEvents: [(String, pid_t)] = []
+        var changedEvents: [RuntimeAXWindowChangeEvidence] = []
         monitor.onAXWindowDestroyed = { appID, pid, axWindowID in
             destroyedEvents.append((appID, pid, axWindowID))
         }
-        monitor.onAppWindowChanged = { appID, pid in
-            changedEvents.append((appID, pid))
-        }
+        monitor.onAppWindowChanged = { changedEvents.append($0) }
 
-        let installedAt = ProcessInfo.processInfo.systemUptime - 1
         monitor.handleAXNotification(
             appID: "com.example.editor",
             pid: pid,
             notification: kAXUIElementDestroyedNotification as CFString,
             element: knownWindow,
-            installedAt: installedAt
-        )
-        monitor.handleAXNotification(
-            appID: "com.example.editor",
-            pid: pid,
-            notification: kAXUIElementDestroyedNotification as CFString,
-            element: unrelatedWindow,
-            installedAt: installedAt
+            bindingGeneration: 0
         )
 
         XCTAssertEqual(destroyedEvents.count, 1)
         XCTAssertEqual(destroyedEvents.first?.0, "com.example.editor")
         XCTAssertEqual(destroyedEvents.first?.1, pid)
         XCTAssertEqual(destroyedEvents.first?.2, knownWindowID)
-        XCTAssertEqual(changedEvents.count, 1)
-        XCTAssertEqual(changedEvents.first?.0, "com.example.editor")
-        XCTAssertEqual(changedEvents.first?.1, pid)
+        XCTAssertTrue(changedEvents.isEmpty)
     }
 
     func testOptionTabHotkeyMonitorRoutesForwardAndBackwardPressReleaseCallbacks() {
         let monitor = OptionTabHotkeyMonitor(
             configuration: SwitcherHotkeyPreferencesStore.resolve(
-                primaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
-                mainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
-                quitKeyRaw: SwitcherHotkeyKey.q.rawValue
+                baseKeysRaw: SwitcherHotkeyKey.option.rawValue,
+                mainKeysRaw: SwitcherHotkeyKey.tab.rawValue,
+                quitKeysRaw: SwitcherHotkeyKey.q.rawValue
             ),
             signature: 0x54455354,
             forwardHotkeyID: 11,
@@ -63,12 +50,9 @@ extension FlowTabPriorityCoverageTests {
             startsMonitoring: false
         )
 
-        var events: [String] = []
-        monitor.onHotkeyPressed = { isBackward in
-            events.append(isBackward ? "press-backward" : "press-forward")
-        }
-        monitor.onHotkeyReleased = { isBackward in
-            events.append(isBackward ? "release-backward" : "release-forward")
+        var events: [HotkeyInputEvent] = []
+        monitor.onHotkeyEvent = { event in
+            events.append(event)
         }
 
         XCTAssertEqual(
@@ -88,17 +72,19 @@ extension FlowTabPriorityCoverageTests {
             noErr
         )
 
+        XCTAssertEqual(events.map(\.phase), [.pressed, .released, .pressed, .released])
+        XCTAssertEqual(events.map(\.isBackward), [false, false, true, true])
         XCTAssertEqual(
-            events,
-            ["press-forward", "release-forward", "press-backward", "release-backward"]
+            events.map(\.identity.sourceID),
+            Array(repeating: monitor.inputSourceID, count: 4)
         )
+        XCTAssertEqual(events.map(\.identity.sequence), [1, 2, 3, 4])
     }
 
     func testOptionTabHotkeyMonitorPassesThroughUnrelatedEvents() {
         let monitor = OptionTabHotkeyMonitor(signature: 0x54455354, startsMonitoring: false)
         var callbackCount = 0
-        monitor.onHotkeyPressed = { _ in callbackCount += 1 }
-        monitor.onHotkeyReleased = { _ in callbackCount += 1 }
+        monitor.onHotkeyEvent = { _ in callbackCount += 1 }
 
         XCTAssertEqual(
             monitor.dispatchHotkeyEventForTesting(signature: 0x42414421, id: 1, phase: .pressed),
@@ -119,12 +105,9 @@ extension FlowTabPriorityCoverageTests {
             startsMonitoring: false
         )
 
-        var events: [String] = []
-        monitor.onHotkeyPressed = { isBackward in
-            events.append(isBackward ? "press-backward" : "press-forward")
-        }
-        monitor.onHotkeyReleased = { isBackward in
-            events.append(isBackward ? "release-backward" : "release-forward")
+        var events: [HotkeyInputEvent] = []
+        monitor.onHotkeyEvent = { event in
+            events.append(event)
         }
 
         let unsupportedKind = makeCarbonHotkeyEvent(
@@ -176,7 +159,9 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertEqual(monitor.handleHotkeyEventForTesting(backwardReleased), noErr)
 
-        XCTAssertEqual(events, ["press-forward", "release-backward"])
+        XCTAssertEqual(events.map(\.phase), [.pressed, .released])
+        XCTAssertEqual(events.map(\.isBackward), [false, true])
+        XCTAssertEqual(events.map(\.identity.sequence), [1, 2])
     }
 
     func testRuntimeAppLayerProjectionFilterCoversCurrentProcessAndMinimizedApps() {
@@ -725,136 +710,15 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(focusedWindowPointer, Unmanaged.passUnretained(windows[2]).toOpaque())
     }
 
-    @MainActor
-    func testLiveSwitcherModelHandleApplicationTerminatedRefreshesSessionAndKeepsPreferredNextSelection() async {
-        let initialApps = terminateScenarioApps()
-        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
-        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-
-        XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        assertAppSwitcherProjectionRead(
-            from: runtimeProjectionService,
-            expectedReadCount: 1
-        )
-        XCTAssertEqual(model.selectedApp?.id, "com.example.code")
-
-        let layoutRefreshed = expectation(description: "layout refreshed after app termination")
-        model.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
-
-        model.handleApplicationTerminated(appID: "com.example.code", pid: 42_300)
-
-        await fulfillment(of: [layoutRefreshed], timeout: 1.0)
-        XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), ["com.example.code"])
-        assertAppSwitcherProjectionRead(
-            from: runtimeProjectionService,
-            expectedReadCount: 2
-        )
-        XCTAssertEqual(model.appCount, 2)
-        XCTAssertEqual(model.selectedApp?.id, "com.example.browser")
-    }
-
-    @MainActor
-    func testLiveSwitcherModelHandleApplicationTerminatedPreservesSearchStateDuringRefresh() async {
-        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let initialApps = self.searchScenarioApps()
-            let runtimeProjectionService = RecordingRuntimeProjectionService(
-                appSwitcherApps: initialApps
-            )
-            let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-            let refreshedApps = initialApps.filter { $0.id != "com.example.code" }
-
-            XCTAssertTrue(model.startSession(triggerDirection: .forward))
-            XCTAssertTrue(model.enterSearchMode())
-            model.synchronizeSearchInput(query: "bro", cursorPosition: 3)
-
-            let didApplyInitialSearch = await waitUntil(
-                "initial search query applies before termination refresh",
-                timeoutNanoseconds: 1_000_000_000,
-                pollIntervalNanoseconds: 10_000_000
-            ) {
-                model.isSearchActive
-                    && model.searchViewState.query == "bro"
-                    && model.searchResultCount >= 1
-            }
-            XCTAssertTrue(didApplyInitialSearch)
-            XCTAssertTrue(model.isSearchActive)
-            XCTAssertEqual(model.searchViewState.query, "bro")
-
-            let layoutRefreshed = expectation(description: "layout refreshed while preserving search state")
-            model.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
-            runtimeProjectionService.installAppSwitcherProjection(apps: refreshedApps)
-
-            model.handleApplicationTerminated(appID: "com.example.code", pid: 42_300)
-
-            await fulfillment(of: [layoutRefreshed], timeout: 1.0)
-            let didPreserveSearchAfterRefresh = await waitUntil(
-                "termination refresh preserves active search results",
-                timeoutNanoseconds: 1_000_000_000,
-                pollIntervalNanoseconds: 10_000_000
-            ) {
-                model.appCount == 2
-                    && model.isSearchActive
-                    && model.searchViewState.scope == .app
-                    && model.searchViewState.query == "bro"
-                    && model.searchResultCount >= 1
-            }
-            XCTAssertTrue(didPreserveSearchAfterRefresh)
-
-            XCTAssertEqual(model.appCount, 2)
-            XCTAssertTrue(model.isSearchActive)
-            XCTAssertEqual(model.searchViewState.scope, .app)
-            XCTAssertEqual(model.searchViewState.query, "bro")
-            XCTAssertGreaterThanOrEqual(model.searchResultCount, 1)
-        }
-    }
-
-    @MainActor
-    func testLiveSwitcherModelHandleApplicationTerminatedIgnoresUntrackedApp() {
-        let initialApps = terminateScenarioApps()
-        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
-        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-
-        XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        assertAppSwitcherProjectionRead(
-            from: runtimeProjectionService,
-            expectedReadCount: 1
-        )
-        let selectedAppID = model.selectedApp?.id
-
-        model.handleApplicationTerminated(appID: "com.example.unrelated", pid: 99_999)
-
-        XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
-        assertAppSwitcherProjectionRead(
-            from: runtimeProjectionService,
-            expectedReadCount: 1
-        )
-        XCTAssertEqual(model.appCount, initialApps.count)
-        XCTAssertEqual(model.selectedApp?.id, selectedAppID)
-    }
-
-    private func assertAppSwitcherProjectionRead(
-        from runtimeProjectionService: RecordingRuntimeProjectionService,
-        expectedReadCount: Int,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        XCTAssertEqual(
-            runtimeProjectionService.appSwitcherProjectionReadCount(),
-            expectedReadCount,
-            file: file,
-            line: line
-        )
-        XCTAssertEqual(
-            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
-            [.switcherSessionStarted],
-            file: file,
-            line: line
-        )
-    }
-
     func testOptionTabHotkeyMonitorSkipsHotkeyRegistrationWhenHandlerInstallFails() {
         var registerCalls: [UInt32] = []
         let monitor = OptionTabHotkeyMonitor(
+            configuration: SwitcherHotkeyConfiguration(
+                baseKeys: [.option],
+                reverseKeys: [.shift],
+                mainKeys: [.tab],
+                quitKeys: [.q]
+            ),
             signature: 0x54455354,
             forwardHotkeyID: 11,
             backwardHotkeyID: 22,
@@ -870,16 +734,26 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(registerCalls.isEmpty)
     }
 
-    func testOptionTabHotkeyMonitorStopUnregistersOnlySuccessfullyRegisteredHotkeys() {
+    func testOptionTabHotkeyMonitorExplicitStartIsIdempotentAndStopCleansUp() {
         var registerCalls: [UInt32] = []
         var unregisterCalls: [UInt32] = []
         var removeHandlerCallCount = 0
+        var installHandlerCallCount = 0
         let monitor = OptionTabHotkeyMonitor(
+            configuration: SwitcherHotkeyConfiguration(
+                baseKeys: [.option],
+                reverseKeys: [.shift],
+                mainKeys: [.tab],
+                quitKeys: [.q]
+            ),
             signature: 0x54455354,
             forwardHotkeyID: 11,
             backwardHotkeyID: 22,
-            startsMonitoring: true,
-            handlerInstallerOverride: { true },
+            startsMonitoring: false,
+            handlerInstallerOverride: {
+                installHandlerCallCount += 1
+                return true
+            },
             hotkeyRegistrarOverride: { id, _, _ in
                 registerCalls.append(id)
                 return id == 11
@@ -888,7 +762,14 @@ extension FlowTabPriorityCoverageTests {
             eventHandlerRemoverOverride: { removeHandlerCallCount += 1 }
         )
 
+        XCTAssertFalse(monitor.isEventHandlerInstalledForTesting)
+        XCTAssertTrue(registerCalls.isEmpty)
+
+        monitor.start()
+        monitor.start()
+
         XCTAssertTrue(monitor.isEventHandlerInstalledForTesting)
+        XCTAssertEqual(installHandlerCallCount, 1)
         XCTAssertEqual(registerCalls, [11, 22])
 
         monitor.stop()
@@ -900,14 +781,8 @@ extension FlowTabPriorityCoverageTests {
 
     func testOptionTabHotkeyMonitorRegistrationFailureLogsError() async {
         let defaults = UserDefaults.standard
-        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
         defer {
-            restoreUserDefaultsValue(
-                previousExpiration,
-                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
-                userDefaults: defaults
-            )
             restoreUserDefaultsValue(
                 previousLevel,
                 forKey: AppPreferenceKeys.runtimeLogLevel,
@@ -916,13 +791,18 @@ extension FlowTabPriorityCoverageTests {
             RuntimeDiagnostics.shared.clear()
         }
 
-        RuntimeDiagnosticSessionStore.stop(userDefaults: defaults)
         defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         RuntimeDiagnostics.shared.clear()
         _ = await RuntimeDiagnostics.shared.makeReadSnapshot()
 
         var registerCalls: [UInt32] = []
         let monitor = OptionTabHotkeyMonitor(
+            configuration: SwitcherHotkeyConfiguration(
+                baseKeys: [.option],
+                reverseKeys: [.shift],
+                mainKeys: [.tab],
+                quitKeys: [.q]
+            ),
             signature: 0x54455354,
             forwardHotkeyID: 11,
             backwardHotkeyID: 22,

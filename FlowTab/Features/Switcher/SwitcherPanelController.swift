@@ -5,80 +5,27 @@ import SwiftUI
 import FlowTabCore
 
 struct PanelVisibilityRecoveryPolicy: Equatable {
-    var initialPresentationGraceWindow: TimeInterval
-    var interruptionAttemptDelaysNanoseconds: [UInt64]
-    var hardReorderDelayNanoseconds: UInt64
+    var initialPresentationRecoveryEscalationInterval: TimeInterval
+    var interruptionMaximumAttemptCount: Int
+    var interruptionConditionReadbackInterval: TimeInterval
+    var interruptionWatchdogInterval: TimeInterval
 
     static let `default` = PanelVisibilityRecoveryPolicy(
-        initialPresentationGraceWindow: 0.35,
-        interruptionAttemptDelaysNanoseconds: [
-            0,
-            50_000_000,
-            150_000_000,
-            300_000_000
-        ],
-        hardReorderDelayNanoseconds: 10_000_000
+        initialPresentationRecoveryEscalationInterval: 0.35,
+        interruptionMaximumAttemptCount: 4,
+        interruptionConditionReadbackInterval: 0.01,
+        interruptionWatchdogInterval: 1.0
     )
 }
 
 struct ModifierReleaseConfirmationPolicy: Equatable {
     var sampleIntervalNanoseconds: UInt64
     var requiredReleasedSampleCount: Int
-    var postFinishHotkeyIgnoreWindow: TimeInterval
 
     static let `default` = ModifierReleaseConfirmationPolicy(
         sampleIntervalNanoseconds: 25_000_000,
-        requiredReleasedSampleCount: 2,
-        postFinishHotkeyIgnoreWindow: 0.02
+        requiredReleasedSampleCount: 2
     )
-}
-
-struct PanelVisibilitySnapshot: Equatable {
-    let panelPresented: Bool
-    let userVisible: Bool
-    let occlusionVisible: Bool
-    let panelKey: Bool
-    let appActive: Bool
-    let searchActive: Bool
-    let inputFocused: Bool
-    let firstResponder: String
-
-    var logFields: String {
-        "panelVisible=\(panelPresented ? 1 : 0) "
-            + "userVisible=\(userVisible ? 1 : 0) "
-            + "occlusionVisible=\(occlusionVisible ? 1 : 0) "
-            + "panelKey=\(panelKey ? 1 : 0) "
-            + "appActive=\(appActive ? 1 : 0) "
-            + "searchActive=\(searchActive ? 1 : 0) "
-            + "inputFocused=\(inputFocused ? 1 : 0) "
-            + "firstResponder=\(firstResponder)"
-    }
-}
-
-struct PanelVisibilityRecoveryDiagnostic: Equatable {
-    let trigger: String
-    let generation: Int?
-    let attempt: Int?
-    let totalAttempts: Int?
-    let mode: SwitcherPanelController.PanelVisibilityRecoveryMode
-    let before: PanelVisibilitySnapshot
-    let after: PanelVisibilitySnapshot
-
-    var logMessage: String {
-        var fields = [
-            "presentationRecovery",
-            "trigger=\(trigger)",
-            "action=visibilityReadback",
-            "mode=\(mode.debugName)",
-            "generation=\(generation.map(String.init) ?? "nil")"
-        ]
-        if let attempt, let totalAttempts {
-            fields.append("attempt=\(attempt)/\(totalAttempts)")
-        }
-        fields.append("before{\(before.logFields)}")
-        fields.append("after{\(after.logFields)}")
-        return fields.joined(separator: " ")
-    }
 }
 
 @MainActor
@@ -138,6 +85,7 @@ final class SwitcherPanelController {
 
     let model: LiveSwitcherModel
     let panel: SwitcherOverlayPanel
+    let runtimeProjectionNotificationObject: AnyObject
 
     var keyDownMonitor: Any?
     var localFlagsChangedMonitor: Any?
@@ -153,29 +101,40 @@ final class SwitcherPanelController {
     var currentAppWindowProjectionDidUpdateObserver: NSObjectProtocol?
     var committedSearchIndexDidUpdateObserver: NSObjectProtocol?
     var panelOcclusionObserver: NSObjectProtocol?
+    var panelDidBecomeKeyObserver: NSObjectProtocol?
+    var panelDidExposeObserver: NSObjectProtocol?
     var panelDidResignKeyObserver: NSObjectProtocol?
     var suppressHotkeyReplayUntilRelease = false
-    var suppressHotkeyReplayTask: Task<Void, Never>?
-    var pendingModifierReleaseConfirmationTask: Task<Void, Never>?
-    var modifierReleaseConfirmationGeneration = 0
+    let hotkeyInputOwner = SwitcherHotkeyInputOwner()
+    let modifierReleaseObservationOwner: ModifierReleaseObservationOwner
+    let initialPanelVisibilityObservationOwner:
+        InitialPanelVisibilityObservationOwner
+    let panelVisibilityRecoveryObservationOwner:
+        PanelVisibilityRecoveryObservationOwner
+    let activeSpaceTransitionObservationOwner:
+        ActiveSpaceTransitionObservationOwner
+    let terminateInterruptionProtectionObservationOwner:
+        TerminateInterruptionProtectionObservationOwner
+    let delayedWindowLayerEntryObservationOwner:
+        DelayedWindowLayerEntryObservationOwner
+    let manualWindowLayerEntryObservationOwner:
+        ManualWindowLayerEntryObservationOwner
+    let terminatePressFeedbackCompletionOwner:
+        TerminatePressFeedbackCompletionOwner
+    let terminatePressFeedbackPolicy: TerminatePressFeedbackPolicy
+    let initialWindowOnlyPreviewRevealObservationOwner:
+        InitialWindowOnlyPreviewRevealObservationOwner
+    let panelPresentationDiagnosticProbeOwner:
+        PanelPresentationDiagnosticProbeOwner
+    let terminateTargetProcessStateReader:
+        any TerminateTargetProcessStateReading
     var modifierReleaseState: ModifierReleaseState = .idle
     var presentationSessionGeneration = 0
-    var panelPresentationRecoveryTask: Task<Void, Never>?
-    var initialWindowOnlyPreviewRevealTask: Task<Void, Never>?
     var panelPresentationRecoveryGeneration = 0
     var panelVisibilityRecoveryState: PanelVisibilityRecoveryState = .idle
     var lastPanelVisibilityRecoveryDiagnostic: PanelVisibilityRecoveryDiagnostic?
-    var delayedWindowLayerTimer: Timer?
-    var delayedWindowLayerTimerGeneration = 0
-    var delayedWindowLayerDeadlineMs: Double?
-    var delayedWindowLayerAppID: String?
-    var lastCommittedTabAdvanceTimestamp: TimeInterval?
-    var ignoreHotkeyPressesUntil: TimeInterval = 0
-    var ignoreActiveSpaceChangesUntil: TimeInterval = 0
-    var initialPresentationVisibilityGeneration = 0
-    var initialPresentationVisibilityDeadline: TimeInterval = 0
-    var initialPresentationVisibilityTrigger: String?
-    var suppressApplicationActivationUntil: TimeInterval = 0
+    var activeSpaceApplicationActivationSuppression:
+        ActiveSpaceApplicationActivationSuppression?
     var windowLayerPresentationDelay: TimeInterval {
         windowLayerPresentationDelayOverride ?? WindowLayerPreferencesStore.loadAutoEnterDelay()
     }
@@ -186,27 +145,80 @@ final class SwitcherPanelController {
     var modifierReleaseConfirmationSampleCount: Int {
         modifierReleaseConfirmationPolicy.requiredReleasedSampleCount
     }
-    var postFinishHotkeyIgnoreWindow: TimeInterval {
-        modifierReleaseConfirmationPolicy.postFinishHotkeyIgnoreWindow
+    var modifierReleaseConfirmationGeneration: Int {
+        modifierReleaseObservationOwner.generation
     }
-    let activeSpaceChangeIgnoreWindow: TimeInterval = 0.35
-    let terminateInterruptionProtectionWindow: TimeInterval = 5.0
-    let postTerminateRefreshInterruptionProtectionWindow: TimeInterval = 0.5
+    var hasPendingModifierReleaseConfirmation: Bool {
+        modifierReleaseObservationOwner.isObserving(.selectionConfirmation)
+    }
     let panelVisibilityRecoveryPolicy: PanelVisibilityRecoveryPolicy = .default
-    let initialWindowOnlyPreviewRevealTimeoutNs: UInt64 = 250_000_000
-    var initialPresentationVisibilityGraceWindow: TimeInterval {
-        panelVisibilityRecoveryPolicy.initialPresentationGraceWindow
+    let activeSpaceTransitionPolicy: ActiveSpaceTransitionPolicy = .default
+    let terminateInterruptionProtectionPolicy:
+        TerminateInterruptionProtectionPolicy = .default
+    var initialPresentationVisibilityRecoveryEscalationInterval: TimeInterval {
+        panelVisibilityRecoveryPolicy
+            .initialPresentationRecoveryEscalationInterval
     }
-    let activeSpaceMigrationActivationSuppressionWindow: TimeInterval = 0.5
-    let manualWindowLayerProjectionApplyDelay: TimeInterval = 0.35
-    var interruptionPresentationRecoveryAttemptDelaysNs: [UInt64] {
-        panelVisibilityRecoveryPolicy.interruptionAttemptDelaysNanoseconds
+    var initialPresentationVisibilityGeneration: Int {
+        initialPanelVisibilityObservationOwner.generation
     }
-    var panelPresentationRecoveryReorderDelayNs: UInt64 {
-        panelVisibilityRecoveryPolicy.hardReorderDelayNanoseconds
+    var initialPresentationVisibilityTrigger: String? {
+        initialPanelVisibilityObservationOwner.currentTrigger
+    }
+    var hasPendingInitialPresentationVisibilityObservation: Bool {
+        initialPanelVisibilityObservationOwner.isObserving
+    }
+    var hasPendingInitialPresentationVisibilityRecoveryEscalation: Bool {
+        initialPanelVisibilityObservationOwner.hasPendingRecoveryEscalation
+    }
+    var lastInitialPresentationVisibilityRecoveryEscalation:
+        InitialPanelVisibilityRecoveryEscalation?
+    {
+        initialPanelVisibilityObservationOwner.lastRecoveryEscalation
+    }
+    var activeSpaceTransitionWatchdogInterval: TimeInterval {
+        activeSpaceTransitionPolicy.topologyReadbackWatchdogInterval
+    }
+    var hasPendingActiveSpaceTransitionObservation: Bool {
+        activeSpaceTransitionObservationOwner.isObserving
+    }
+    var lastActiveSpaceTransitionWatchdogFailure:
+        ActiveSpaceTransitionWatchdogFailure?
+    {
+        activeSpaceTransitionObservationOwner.lastFailure
+    }
+    var terminateInterruptionProtectionWatchdogInterval: TimeInterval {
+        terminateInterruptionProtectionPolicy.completionWatchdogInterval
+    }
+    var hasPendingTerminateInterruptionProtection: Bool {
+        terminateInterruptionProtectionObservationOwner.isObserving
+    }
+    var lastTerminateInterruptionProtectionWatchdogFailure:
+        TerminateInterruptionProtectionWatchdogFailure?
+    {
+        terminateInterruptionProtectionObservationOwner.lastFailure
+    }
+    var interruptionPresentationRecoveryMaximumAttemptCount: Int {
+        panelVisibilityRecoveryPolicy.interruptionMaximumAttemptCount
+    }
+    var interruptionPresentationRecoveryConditionReadbackInterval:
+        TimeInterval
+    {
+        panelVisibilityRecoveryPolicy
+            .interruptionConditionReadbackInterval
+    }
+    var interruptionPresentationRecoveryWatchdogInterval: TimeInterval {
+        panelVisibilityRecoveryPolicy.interruptionWatchdogInterval
+    }
+    var hasPendingPanelVisibilityRecoveryObservation: Bool {
+        panelVisibilityRecoveryObservationOwner.isObserving
+    }
+    var lastPanelVisibilityRecoveryWatchdogFailure:
+        PanelVisibilityRecoveryWatchdogFailure?
+    {
+        panelVisibilityRecoveryObservationOwner.lastFailure
     }
     let autoEnterWindowLayerEnabled = true
-    let tabAdvanceMinimumInterval: TimeInterval = 0.016
     let panelScreenMargin: CGFloat = 80
     let appLayerMinimumWidth: CGFloat = 440
     let appLayerStaticHeight: CGFloat = 56
@@ -222,17 +234,15 @@ final class SwitcherPanelController {
     let minAppTileSize: CGFloat = 1
     var activeHotkeySessionKind: HotkeySessionKind?
     var activePresentationScreen: NSScreen?
-    var terminateSelectedAppTask: Task<Void, Never>?
-    var terminateInterruptionProtectionUntil: TimeInterval = 0
     var suppressModifierReleaseConfirmationForTesting = false
 
     var panelVisibilityOverride: Bool?
     var panelOcclusionStateOverride: NSWindow.OcclusionState?
     var appIsActiveOverride: Bool?
-    var globalPrimaryModifierPressedOverride: Bool?
-    var inAppPrimaryModifierPressedOverride: Bool?
-    var globalMainKeyPressedOverride: Bool?
-    var inAppMainKeyPressedOverride: Bool?
+    var globalHotkeyHoldSetPressedOverride: Bool?
+    var inAppHotkeyHoldSetPressedOverride: Bool?
+    var globalMainKeySetPressedOverride: Bool?
+    var inAppMainKeySetPressedOverride: Bool?
     var panelContainsPointOverride: ((NSPoint) -> Bool)?
     var windowLayerPresentationDelayOverride: TimeInterval?
     var hideNonPanelWindowsOverride: (() -> Void)?
@@ -272,8 +282,79 @@ final class SwitcherPanelController {
         self.init(model: LiveSwitcherModel())
     }
 
-    init(model: LiveSwitcherModel) {
+    init(
+        model: LiveSwitcherModel,
+        modifierReleaseObservationScheduler:
+            (any ModifierReleaseObservationScheduling)? = nil,
+        modifierReleaseEventSource:
+            (any ModifierReleaseEventObserving)? = nil,
+        initialPanelVisibilityObservationScheduler:
+            (any InitialPanelVisibilityObservationScheduling)? = nil,
+        panelVisibilityRecoveryObservationScheduler:
+            (any PanelVisibilityRecoveryObservationScheduling)? = nil,
+        activeSpaceTransitionObservationScheduler:
+            (any ActiveSpaceTransitionObservationScheduling)? = nil,
+        terminateInterruptionProtectionScheduler:
+            (any TerminateInterruptionProtectionScheduling)? = nil,
+        delayedWindowLayerEntryScheduler:
+            (any DelayedWindowLayerEntryScheduling)? = nil,
+        terminatePressFeedbackScheduler:
+            (any TerminatePressFeedbackScheduling)? = nil,
+        initialWindowOnlyPreviewRevealScheduler:
+            (any InitialWindowOnlyPreviewRevealScheduling)? = nil,
+        panelPresentationDiagnosticScheduler:
+            (any PanelPresentationDiagnosticScheduling)? = nil,
+        terminatePressFeedbackPolicy:
+            TerminatePressFeedbackPolicy = .default,
+        terminateTargetProcessStateReader:
+            (any TerminateTargetProcessStateReading)? = nil
+    ) {
         self.model = model
+        runtimeProjectionNotificationObject =
+            model.runtimeProjectionService as AnyObject
+        self.terminateTargetProcessStateReader =
+            terminateTargetProcessStateReader
+            ?? SystemTerminateTargetProcessStateReader()
+        modifierReleaseObservationOwner = ModifierReleaseObservationOwner(
+            scheduler: modifierReleaseObservationScheduler,
+            eventSource: modifierReleaseEventSource
+        )
+        initialPanelVisibilityObservationOwner =
+            InitialPanelVisibilityObservationOwner(
+                scheduler: initialPanelVisibilityObservationScheduler
+            )
+        panelVisibilityRecoveryObservationOwner =
+            PanelVisibilityRecoveryObservationOwner(
+                scheduler: panelVisibilityRecoveryObservationScheduler
+            )
+        activeSpaceTransitionObservationOwner =
+            ActiveSpaceTransitionObservationOwner(
+                scheduler: activeSpaceTransitionObservationScheduler
+            )
+        terminateInterruptionProtectionObservationOwner =
+            TerminateInterruptionProtectionObservationOwner(
+                scheduler: terminateInterruptionProtectionScheduler
+            )
+        delayedWindowLayerEntryObservationOwner =
+            DelayedWindowLayerEntryObservationOwner(
+                scheduler: delayedWindowLayerEntryScheduler
+            )
+        manualWindowLayerEntryObservationOwner =
+            ManualWindowLayerEntryObservationOwner()
+        terminatePressFeedbackCompletionOwner =
+            TerminatePressFeedbackCompletionOwner(
+                scheduler: terminatePressFeedbackScheduler
+            )
+        initialWindowOnlyPreviewRevealObservationOwner =
+            InitialWindowOnlyPreviewRevealObservationOwner(
+                scheduler: initialWindowOnlyPreviewRevealScheduler
+            )
+        panelPresentationDiagnosticProbeOwner =
+            PanelPresentationDiagnosticProbeOwner(
+                scheduler: panelPresentationDiagnosticScheduler
+            )
+        self.terminatePressFeedbackPolicy =
+            terminatePressFeedbackPolicy
         panel = SwitcherOverlayPanel(
             contentRect: NSRect(x: 0, y: 0, width: 880, height: 290),
             styleMask: SwitcherPanelWindowConfiguration.styleMask,
@@ -322,6 +403,10 @@ final class SwitcherPanelController {
         model.onSearchStateChanged = { [weak self] in
             guard let self else { return }
             self.resetPointerSelectionGate()
+            if self.model.isSearchActive {
+                self.clearDelayedWindowLayerEntryState()
+                self.cancelManualWindowLayerEntryObservation()
+            }
             guard self.isPanelPresented else { return }
             self.updatePanelSize()
         }
@@ -338,7 +423,9 @@ final class SwitcherPanelController {
             self.scheduleDelayedWindowLayerEntryIfNeeded(preservingDeadline: true)
         }
         model.onWindowOnlyPreviewPreparationChanged = { [weak self] in
-            self?.revealInitialWindowOnlyPanelIfReady(reason: "preview_batch_completed")
+            self?.observeInitialWindowOnlyPreviewReadiness(
+                source: .previewBatchCompleted
+            )
         }
 
         appDidResignActiveObserver = NotificationCenter.default.addObserver(
@@ -384,7 +471,7 @@ final class SwitcherPanelController {
         }
         appSwitcherProjectionDidUpdateObserver = NotificationCenter.default.addObserver(
             forName: .runtimeAppSwitcherProjectionDidUpdate,
-            object: nil,
+            object: runtimeProjectionNotificationObject,
             queue: nil
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
@@ -397,8 +484,15 @@ final class SwitcherPanelController {
             queue: nil
         ) { [weak self] notification in
             let appID = notification.userInfo?[RuntimeProjectionNotificationUserInfoKey.appID] as? String
+            let evidence = notification.userInfo?[
+                RuntimeProjectionNotificationUserInfoKey
+                    .currentAppWindowProjectionUpdateEvidence
+            ] as? RuntimeCurrentAppWindowProjectionUpdateEvidence
             Task { @MainActor [weak self] in
-                self?.handleCurrentAppWindowProjectionDidUpdate(appID: appID)
+                self?.handleCurrentAppWindowProjectionDidUpdate(
+                    appID: appID,
+                    evidence: evidence
+                )
             }
         }
         committedSearchIndexDidUpdateObserver = NotificationCenter.default.addObserver(
@@ -417,6 +511,24 @@ final class SwitcherPanelController {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.handlePanelOcclusionStateDidChange()
+            }
+        }
+        panelDidBecomeKeyObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: panel,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handlePanelDidBecomeKey()
+            }
+        }
+        panelDidExposeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didExposeNotification,
+            object: panel,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handlePanelDidExpose()
             }
         }
         panelDidResignKeyObserver = NotificationCenter.default.addObserver(
@@ -445,7 +557,6 @@ final class SwitcherPanelController {
     ) -> Bool {
         guard model.startSession(triggerDirection: triggerDirection) else { return false }
         beginPresentationSession(kind: .globalAppSwitcher, trigger: "testing_global_show")
-        lastCommittedTabAdvanceTimestamp = nil
         panelVisibilityOverride = true
         updatePanelPresentationLevel(trigger: "testing_global_show")
         return true
@@ -458,7 +569,6 @@ final class SwitcherPanelController {
         guard model.startFocusedAppWindowSession(triggerDirection: triggerDirection) else { return false }
         _ = model.prewarmWindowOnlySessionPreviews()
         beginPresentationSession(kind: .inAppWindowSwitcher, trigger: "testing_in_app_show")
-        lastCommittedTabAdvanceTimestamp = nil
         panelVisibilityOverride = true
         updatePanelPresentationLevel(trigger: "testing_in_app_show")
         return true
@@ -477,7 +587,9 @@ final class SwitcherPanelController {
         triggerDirection: CycleDirection = .forward
     ) -> Bool {
         showSearch(direction: triggerDirection)
-        return model.isSearchActive || model.pendingSearchActivationAfterFreshnessBarrier
+        return model.isSearchActive
+            && isPanelPresented
+            && panel.isKeyWindow
     }
 
     @discardableResult
@@ -524,6 +636,14 @@ final class SwitcherPanelController {
         handlePanelOcclusionStateDidChange()
     }
 
+    func handlePanelDidBecomeKeyForTesting() {
+        handlePanelDidBecomeKey()
+    }
+
+    func handlePanelDidExposeForTesting() {
+        handlePanelDidExpose()
+    }
+
     func handlePanelDidResignKeyForTesting() {
         handlePanelDidResignKey()
     }
@@ -538,8 +658,14 @@ final class SwitcherPanelController {
     }
 
     @discardableResult
-    func handleCurrentAppWindowProjectionDidUpdateForTesting(appID: String? = nil) -> Bool {
-        handleCurrentAppWindowProjectionDidUpdate(appID: appID)
+    func handleCurrentAppWindowProjectionDidUpdateForTesting(
+        appID: String? = nil,
+        evidence: RuntimeCurrentAppWindowProjectionUpdateEvidence? = nil
+    ) -> Bool {
+        handleCurrentAppWindowProjectionDidUpdate(
+            appID: appID,
+            evidence: evidence
+        )
     }
 
     @discardableResult
@@ -564,19 +690,24 @@ final class SwitcherPanelController {
         scheduleDelayedWindowLayerEntryIfNeeded()
     }
 
+    var delayedWindowLayerEntryGenerationForTesting: Int {
+        delayedWindowLayerEntryObservationOwner.generation
+    }
+
+    var hasPendingDelayedWindowLayerEntryForTesting: Bool {
+        delayedWindowLayerEntryObservationOwner.isObserving
+    }
+
+    var delayedWindowLayerEntryDeadlineForTesting: Double? {
+        delayedWindowLayerEntryObservationOwner
+            .deadlineMilliseconds
+    }
+
     var suppressHotkeyReplayUntilReleaseForTesting: Bool {
         suppressHotkeyReplayUntilRelease
     }
 
     deinit {
-        suppressHotkeyReplayTask?.cancel()
-        suppressHotkeyReplayTask = nil
-        panelPresentationRecoveryTask?.cancel()
-        panelPresentationRecoveryTask = nil
-        initialWindowOnlyPreviewRevealTask?.cancel()
-        initialWindowOnlyPreviewRevealTask = nil
-        terminateSelectedAppTask?.cancel()
-        terminateSelectedAppTask = nil
         if let appDidResignActiveObserver {
             NotificationCenter.default.removeObserver(appDidResignActiveObserver)
         }
@@ -597,6 +728,12 @@ final class SwitcherPanelController {
         }
         if let panelOcclusionObserver {
             NotificationCenter.default.removeObserver(panelOcclusionObserver)
+        }
+        if let panelDidBecomeKeyObserver {
+            NotificationCenter.default.removeObserver(panelDidBecomeKeyObserver)
+        }
+        if let panelDidExposeObserver {
+            NotificationCenter.default.removeObserver(panelDidExposeObserver)
         }
         if let panelDidResignKeyObserver {
             NotificationCenter.default.removeObserver(panelDidResignKeyObserver)

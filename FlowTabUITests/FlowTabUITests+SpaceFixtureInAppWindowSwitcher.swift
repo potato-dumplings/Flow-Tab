@@ -1,5 +1,4 @@
 import AppKit
-import ApplicationServices
 import CoreGraphics
 import XCTest
 
@@ -42,7 +41,12 @@ extension FlowTabUITests {
         )
         let fullscreenTitle = try XCTUnwrap(fullscreenWindowTitle(in: targetApp))
         let standardTitle = try XCTUnwrap(firstStandardWindowTitle(in: targetApp))
-        var runtimeLogSnapshot = makeRuntimeLogFileSnapshot()
+        let runtimeLogSnapshot = makeRuntimeLogFileSnapshot()
+        defer { runtimeLogSnapshot.cancel() }
+        var filteredArtifactObservationOwner:
+            FlowTabUITestInAppFilteredArtifactObservationOwner?
+        defer { filteredArtifactObservationOwner?.cancel() }
+        var targetProcessIdentifier: pid_t?
 
         try runRealSpaceFixtureWorkflow(
             workflow,
@@ -55,11 +59,27 @@ extension FlowTabUITests {
             beforeFlowTabLaunch: { _ in
                 self.logWorkflowSpaceObservation("\(traceLabel).beforeFlowTabLaunch", app: targetApp)
                 if allowsNoisyCGSiblings {
+                    let runningProcessIdentifier = try self
+                        .runningWorkflowApplicationProcessIdentifier(
+                            targetApp
+                        )
+                    targetProcessIdentifier = runningProcessIdentifier
+                    let owner =
+                        FlowTabUITestInAppFilteredArtifactObservationOwner(
+                            expectedAppName: targetApp.appName,
+                            expectedProcessIdentifier:
+                                runningProcessIdentifier,
+                            baseline: runtimeLogSnapshot
+                        )
+                    owner.start()
+                    filteredArtifactObservationOwner = owner
                     XCTAssertTrue(
                         self.waitForWorkflowSpaceContainingCGWindow(
                             title: fullscreenTitle,
                             app: targetApp,
-                            timeout: 12
+                            timeout:
+                                FlowTabUITestInAppWorkflowWindowObservationPolicy
+                                .initialTopologyReadinessWatchdog
                         ),
                         "Control+Tab noisy roundtrip must start on a Space containing the fullscreen sibling."
                     )
@@ -68,7 +88,9 @@ extension FlowTabUITests {
                         self.waitForFrontmostWorkflowSpaceCGWindow(
                             title: fullscreenTitle,
                             app: targetApp,
-                            timeout: 12
+                            timeout:
+                                FlowTabUITestInAppWorkflowWindowObservationPolicy
+                                .initialTopologyReadinessWatchdog
                         ),
                         "Control+Tab roundtrip must start with the fullscreen sibling frontmost."
                     )
@@ -80,24 +102,55 @@ extension FlowTabUITests {
             }
         ) { _, app in
             logWorkflowSpaceObservation("\(traceLabel).beforeTrigger", app: targetApp)
-            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.inApp, traceLabel: traceLabel)
-            var diagnosticsSummary = assertInAppWindowSwitcherReady(
-                for: targetApp,
-                in: app,
-                allowsNoisyCGSiblings: allowsNoisyCGSiblings
+            var diagnosticsSummary =
+                performAndWaitForInAppSwitcherPanelProjection(
+                    for: targetApp,
+                    in: app,
+                    trigger: {
+                        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                            .inApp,
+                            traceLabel: traceLabel
+                        )
+                    }
             )
             logWorkflowSpaceObservation("\(traceLabel).afterPanelReady", app: targetApp)
+            if allowsNoisyCGSiblings {
+                let owner = try XCTUnwrap(
+                    filteredArtifactObservationOwner,
+                    "Noisy Control+Tab filtered-artifact observation must start before the In-App trigger."
+                )
+                let evidence = try XCTUnwrap(
+                    owner.waitForResolution(
+                        timeout:
+                            FlowTabUITestInAppFilteredArtifactObservationPolicy
+                            .watchdog
+                    ),
+                    "Noisy Control+Tab exact filtered-artifact watchdog expired. \(owner.diagnosticSummary)"
+                )
+                XCTAssertEqual(
+                    evidence.value.appName,
+                    targetApp.appName
+                )
+                XCTAssertGreaterThan(
+                    evidence.value.droppedCount,
+                    0
+                )
+            }
             XCTAssertTrue(
                 allowsNoisyCGSiblings
                     ? waitForWorkflowSpaceContainingCGWindow(
                         title: fullscreenTitle,
                         app: targetApp,
-                        timeout: 4
+                        timeout:
+                            FlowTabUITestInAppWorkflowWindowObservationPolicy
+                            .currentTopologyReadinessWatchdog
                     )
                     : waitForActiveSpaceWorkflowCGWindow(
                     title: fullscreenTitle,
                     app: targetApp,
-                    timeout: 4
+                    timeout:
+                        FlowTabUITestInAppWorkflowWindowObservationPolicy
+                        .currentTopologyReadinessWatchdog
                 ),
                 "Control+Tab first phase must open from the fullscreen sibling's Space."
             )
@@ -124,40 +177,41 @@ extension FlowTabUITests {
                     diagnosticsSummary: diagnosticsSummary,
                     primaryFullscreenTitle: fullscreenTitle,
                     traceLabel: traceLabel,
-                    runtimeLogSnapshot: runtimeLogSnapshot
+                    runtimeLogSnapshot: runtimeLogSnapshot,
+                    targetProcessIdentifier: try XCTUnwrap(
+                        targetProcessIdentifier,
+                        "Noisy Control+Tab fixture PID must be captured before FlowTab launch."
+                    )
                 )
                 return
             }
 
-            let firstLogSnapshot = makeRuntimeLogFileSnapshot()
             let standardSelection = try selectInAppWindow(
                 title: standardTitle,
                 in: app,
                 diagnosticsSummary: diagnosticsSummary,
                 requiresControlTab: true
             )
-            waitForRuntimeLogFiles(
-                containing: ["inAppHotkeyPressed dir=forward panelVisible=1", "advance key=tabForward"],
-                since: firstLogSnapshot,
-                timeout: 8
-            )
 
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "\(traceLabel).confirmStandard")
-            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: standardSelection.windowNumber,
+            guard
+                confirmInAppSelectionAndWaitForEvidence(
+                    windowNumber:
+                        standardSelection.windowNumber,
                     title: standardTitle,
                     app: targetApp,
-                    timeout: 12
-                )
-            )
+                    diagnosticsSummary: diagnosticsSummary,
+                    traceLabel:
+                        "\(traceLabel).confirmStandard"
+                ) != nil
+            else {
+                return
+            }
             logWorkflowSpaceObservation("\(traceLabel).afterStandardConfirm", app: targetApp)
 
             diagnosticsSummary = relaunchInAppWindowSwitcher(
                 app,
                 for: targetApp,
-                allowsNoisyCGSiblings: allowsNoisyCGSiblings
+                focusedWindow: standardSelection
             )
             logWorkflowSpaceObservation("\(traceLabel).afterSecondPanelReady", app: targetApp)
             XCTAssertTrue(
@@ -165,7 +219,9 @@ extension FlowTabUITests {
                     windowNumber: standardSelection.windowNumber,
                     title: standardTitle,
                     app: targetApp,
-                    timeout: 4
+                    timeout:
+                        FlowTabUITestInAppWorkflowWindowObservationPolicy
+                        .currentTopologyReadinessWatchdog
                 ),
                 "Control+Tab second phase must open from the focused normal sibling."
             )
@@ -185,29 +241,26 @@ extension FlowTabUITests {
                     """
                 )
                 : fullscreenTitle
-            let secondLogSnapshot = makeRuntimeLogFileSnapshot()
             let fullscreenSelection = try selectInAppWindow(
                 title: targetFullscreenTitle,
                 in: app,
                 diagnosticsSummary: diagnosticsSummary,
                 requiresControlTab: true
             )
-            waitForRuntimeLogFiles(
-                containing: ["inAppHotkeyPressed dir=forward panelVisible=1", "advance key=tabForward"],
-                since: secondLogSnapshot,
-                timeout: 8
-            )
 
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "\(traceLabel).confirmFullscreen")
-            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: fullscreenSelection.windowNumber,
+            guard
+                confirmInAppSelectionAndWaitForEvidence(
+                    windowNumber:
+                        fullscreenSelection.windowNumber,
                     title: targetFullscreenTitle,
                     app: targetApp,
-                    timeout: 12
-                )
-            )
+                    diagnosticsSummary: diagnosticsSummary,
+                    traceLabel:
+                        "\(traceLabel).confirmFullscreen"
+                ) != nil
+            else {
+                return
+            }
             logWorkflowSpaceObservation("\(traceLabel).afterFullscreenConfirm", app: targetApp)
         }
     }
@@ -218,7 +271,9 @@ extension FlowTabUITests {
         diagnosticsSummary initialDiagnosticsSummary: XCUIElement,
         primaryFullscreenTitle: String,
         traceLabel: String,
-        runtimeLogSnapshot: [String: UInt64]
+        runtimeLogSnapshot:
+            FlowTabUITestRuntimeLogObservationBaseline,
+        targetProcessIdentifier: pid_t
     ) throws {
         let standardTitles = standardWindowTitles(in: targetApp)
         let normalOneTitle = try XCTUnwrap(
@@ -234,17 +289,6 @@ extension FlowTabUITests {
             "Noisy Control+Tab workflow must include a second fullscreen window."
         )
 
-        XCTAssertTrue(
-            waitForExactNoisyWorkflowPreviewTitles(
-                initialDiagnosticsSummary,
-                for: targetApp,
-                timeout: 4
-            ),
-            """
-            Noisy Control+Tab must expose exactly the four user windows, without CG-only fullscreen hosts.
-            \(switcherDebugSummary(app, diagnosticsSummary: initialDiagnosticsSummary))
-            """
-        )
         let initialSelection = try assertNoisyInAppWindowSwitcherCurrentSelection(
             primaryFullscreenTitle,
             expectedSelection: nil,
@@ -296,25 +340,16 @@ extension FlowTabUITests {
                 diagnosticsSummary = relaunchInAppWindowSwitcher(
                     app,
                     for: targetApp,
-                    allowsNoisyCGSiblings: true
-                )
-                XCTAssertTrue(
-                    waitForExactNoisyWorkflowPreviewTitles(
-                        diagnosticsSummary,
-                        for: targetApp,
-                        timeout: 4
-                    ),
-                    """
-                    Noisy Control+Tab reopened with unexpected window entries before \(phase.trace).
-                    \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                    """
+                    focusedWindow: currentSelection
                 )
                 XCTAssertTrue(
                     waitForExactFrontmostWorkflowCGWindow(
                         windowNumber: currentSelection.windowNumber,
                         title: currentSelection.title,
                         app: targetApp,
-                        timeout: 4
+                        timeout:
+                            FlowTabUITestInAppWorkflowWindowObservationPolicy
+                            .currentTopologyReadinessWatchdog
                     ),
                     "Noisy Control+Tab \(phase.trace) phase must reopen from \(currentSelection.title)."
                 )
@@ -329,136 +364,164 @@ extension FlowTabUITests {
                 )
             }
 
-            let logSnapshot = makeRuntimeLogFileSnapshot()
-            let selection = try selectNoisyInAppWindow(
+            let selection = try selectNoisyInAppWindowWithLayerEvidence(
                 currentSelection: currentSelection,
                 title: phase.targetTitle,
                 expectedPrefix: phase.expectedPrefix,
                 in: app,
                 diagnosticsSummary: diagnosticsSummary,
-                traceLabel: "\(traceLabel).\(phase.trace)"
-            )
-            assertNoisyInAppFilteredCGOnlyArtifactSource(
-                since: runtimeLogSnapshot
-            )
-            assertNoisyInAppWindowLayerSource(
-                selection,
+                traceLabel: "\(traceLabel).\(phase.trace)",
+                targetApp: targetApp,
+                targetProcessIdentifier:
+                    targetProcessIdentifier,
                 phaseTrace: phase.trace,
-                since: runtimeLogSnapshot
+                runtimeLogSnapshot: runtimeLogSnapshot
             )
-            waitForRuntimeLogFiles(
-                containing: ["inAppHotkeyPressed dir=forward panelVisible=1", "advance key=tabForward"],
-                since: logSnapshot,
-                timeout: 8
-            )
+            do {
+                let activationLogSnapshot = makeRuntimeLogFileSnapshot()
+                defer { activationLogSnapshot.cancel() }
+                let requestOwner =
+                    FlowTabUITestInAppWindowRequestObservationOwner(
+                        expectedAppID:
+                            targetApp.identity.bundleIdentifier,
+                        expectedProcessIdentifier:
+                            targetProcessIdentifier,
+                        expectedWindowID: selection.windowID,
+                        expectedWindowNumber:
+                            selection.windowNumber,
+                        expectedTitle: selection.title,
+                        baseline: activationLogSnapshot
+                    )
+                requestOwner.start()
+                defer { requestOwner.cancel() }
+                let verifiedFocusOwner =
+                    FlowTabUITestInAppVerifiedFocusReadbackObservationOwner(
+                        expectedProcessIdentifier:
+                            targetProcessIdentifier,
+                        expectedWindowID: selection.windowID,
+                        expectedWindowNumber:
+                            selection.windowNumber,
+                        baseline: activationLogSnapshot
+                    )
+                verifiedFocusOwner.start()
+                defer { verifiedFocusOwner.cancel() }
 
-            let activationLogSnapshot = makeRuntimeLogFileSnapshot()
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
-                .confirm,
-                traceLabel: "\(traceLabel).confirm.\(phase.trace)"
-            )
-            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: selection.windowNumber,
-                    title: phase.targetTitle,
-                    app: targetApp,
-                    timeout: 12
-                ),
-                "Noisy Control+Tab must activate the exact \(phase.targetTitle) CG window selected in \(phase.trace)."
-            )
-            assertNoisyInAppWindowRequestSource(
-                selection,
-                appID: targetApp.identity.bundleIdentifier,
-                phaseTrace: phase.trace,
-                since: activationLogSnapshot
-            )
-            assertNoisyInAppVerifiedFocusReadback(
-                selection,
-                phaseTrace: phase.trace,
-                since: activationLogSnapshot
-            )
+                guard
+                    let confirmationEvidence =
+                        confirmInAppSelectionAndWaitForEvidence(
+                            windowNumber: selection.windowNumber,
+                            title: phase.targetTitle,
+                            app: targetApp,
+                            diagnosticsSummary: diagnosticsSummary,
+                            traceLabel:
+                                "\(traceLabel).confirm.\(phase.trace)",
+                            additionalTriggerLifecycle:
+                                verifiedFocusOwner
+                        )
+                else {
+                    return
+                }
+                guard verifiedFocusOwner.baselineIssue == nil else {
+                    XCTFail(
+                        "Noisy Control+Tab verified-focus baseline rejected for \(phase.trace). \(verifiedFocusOwner.diagnosticSummary)"
+                    )
+                    return
+                }
+                let requestEvidence = try XCTUnwrap(
+                    requestOwner.waitForResolution(
+                        timeout:
+                            FlowTabUITestInAppWindowRequestObservationPolicy
+                            .watchdog
+                    ),
+                    "Noisy Control+Tab exact sticky window-request watchdog expired for \(phase.trace). \(requestOwner.diagnosticSummary)"
+                )
+                XCTAssertEqual(
+                    requestEvidence.value.windowID,
+                    selection.windowID
+                )
+                XCTAssertEqual(
+                    requestEvidence.value.processIdentifier,
+                    targetProcessIdentifier
+                )
+                let verifiedFocusEvidence = try XCTUnwrap(
+                    verifiedFocusOwner.waitForResolution(
+                        timeout:
+                            FlowTabUITestInAppVerifiedFocusReadbackObservationPolicy
+                            .watchdog
+                    ),
+                    "Noisy Control+Tab exact verified-focus readback watchdog expired for \(phase.trace). \(verifiedFocusOwner.diagnosticSummary)"
+                )
+                XCTAssertEqual(
+                    verifiedFocusEvidence.value.windowID,
+                    selection.windowID
+                )
+                XCTAssertEqual(
+                    verifiedFocusEvidence.value.processIdentifier,
+                    targetProcessIdentifier
+                )
+                XCTAssertTrue(
+                    confirmationEvidence.activation.value.matches(
+                        bundleIdentifier:
+                            targetApp.identity.bundleIdentifier,
+                        windowNumber: selection.windowNumber
+                    ),
+                    "Noisy Control+Tab exact activation readback must agree with verified-focus evidence for \(phase.trace)."
+                )
+            }
             currentSelection = selection
             logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
         }
     }
 
-    private func assertNoisyInAppFilteredCGOnlyArtifactSource(
-        since snapshot: [String: UInt64]
-    ) {
-        waitForRuntimeLogFiles(
-            matching: #"Chrome Fixture (filtered-fullscreen-((sibling|host)-artifacts stage=(pre-dedupe|presentation|window-record-projection|read-model-current-app-normalization)|duplicate-surfaces stage=(presentation-final|window-record-projection|read-model-current-app-normalization))|filtered-cg-only-covered-by-activation stage=read-model-current-app-normalization) dropped=[1-9][0-9]*"#,
-            since: snapshot,
-            timeout: 8,
-            description: "Noisy Control+Tab filtered CG-only/fullscreen artifact or duplicate surface source"
-        )
-    }
-
-    private func assertNoisyInAppWindowLayerSource(
-        _ selection: InAppWindowSelection,
+    private func selectNoisyInAppWindowWithLayerEvidence(
+        currentSelection: InAppWindowSelection,
+        title: String,
+        expectedPrefix: [String],
+        in app: XCUIApplication,
+        diagnosticsSummary: XCUIElement,
+        traceLabel: String,
+        targetApp: SpaceFixtureResolvedWorkflow.App,
+        targetProcessIdentifier: pid_t,
         phaseTrace: String,
-        since snapshot: [String: UInt64]
-    ) {
-        let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
-        waitForRuntimeLogFiles(
-            matching: #"window-entries app=Chrome Fixture .*id=cg:[0-9]+:\#(selection.windowNumber):title=\#(escapedTitle)[^\n]*source=stickyBinding:spaceEvidence=(observed|inferredFromTopology)"#,
-            since: snapshot,
-            timeout: 8,
-            description: "sticky current-app window-layer source for selected Noisy Control+Tab \(phaseTrace) window"
+        runtimeLogSnapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
+    ) throws -> InAppWindowSelection {
+        let owner = FlowTabUITestInAppWindowLayerObservationOwner(
+            expectedAppName: targetApp.appName,
+            expectedProcessIdentifier:
+                targetProcessIdentifier,
+            expectedTitle: title,
+            baseline: runtimeLogSnapshot
         )
-    }
+        owner.start()
+        defer { owner.cancel() }
 
-    private func assertNoisyInAppWindowRequestSource(
-        _ selection: InAppWindowSelection,
-        appID: String,
-        phaseTrace: String,
-        since snapshot: [String: UInt64]
-    ) {
-        let escapedAppID = NSRegularExpression.escapedPattern(for: appID)
-        let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
-        waitForRuntimeLogFiles(
-            matching: #"window-request appID=\#(escapedAppID) pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) title=\#(escapedTitle)[^\n]* sticky=true source=stickyBinding"#,
-            since: snapshot,
-            timeout: 8,
-            description: "sticky current-app window request source for selected Noisy Control+Tab \(phaseTrace) window"
+        let selection = try selectNoisyInAppWindow(
+            currentSelection: currentSelection,
+            title: title,
+            expectedPrefix: expectedPrefix,
+            in: app,
+            diagnosticsSummary: diagnosticsSummary,
+            traceLabel: traceLabel
         )
-    }
-
-    private func assertNoisyInAppVerifiedFocusReadback(
-        _ selection: InAppWindowSelection,
-        phaseTrace: String,
-        since snapshot: [String: UInt64]
-    ) {
-        waitForRuntimeLogFiles(
-            matching: "binding-confidence-change windowID=cg:[0-9]+:\(selection.windowNumber) cg=\(selection.windowNumber) .* source=.*->verifiedFocusReadback",
-            since: snapshot,
-            timeout: 8,
-            description: "verified-focus exact WindowRecord relearn after Noisy Control+Tab \(phaseTrace) confirm"
+        let evidence = try XCTUnwrap(
+            owner.waitForResolution(
+                timeout:
+                    FlowTabUITestInAppWindowLayerObservationPolicy
+                    .watchdog
+            ),
+            "Noisy Control+Tab exact sticky Window-layer watchdog expired for \(phaseTrace). \(owner.diagnosticSummary)"
         )
-    }
-
-    func waitForApplicationAXWindowsSuppressed(
-        bundleIdentifier: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestCounts: ApplicationAXWindowCounts?
-        repeat {
-            latestCounts = applicationAXWindowCounts(bundleIdentifier: bundleIdentifier)
-            if latestCounts?.isSuppressed == true {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected application-level AX windows to be suppressed for \(bundleIdentifier), \
-            found children=\(latestCounts?.childWindowCount.description ?? "nil"), \
-            windows=\(latestCounts?.windowsAttributeCount.description ?? "nil").
-            """
+        XCTAssertEqual(
+            evidence.value.windowID,
+            selection.windowID
         )
-        return false
+        XCTAssertEqual(
+            evidence.value.windowNumber,
+            selection.windowNumber
+        )
+        XCTAssertEqual(evidence.value.title, selection.title)
+        return selection
     }
 
     private func inAppSwitcherLaunchArguments(
@@ -485,71 +548,6 @@ extension FlowTabUITests {
     ) -> [String] {
         let fullscreenTitles = Set(workflowApp.fullscreenWindowTitles)
         return workflowApp.expectedWindowTitles.filter { !fullscreenTitles.contains($0) }
-    }
-
-    private func waitForExactNoisyWorkflowPreviewTitles(
-        _ diagnosticsSummary: XCUIElement,
-        for workflowApp: SpaceFixtureResolvedWorkflow.App,
-        timeout: TimeInterval
-    ) -> Bool {
-        let expectedTitles = Set(workflowApp.expectedWindowTitles)
-        let expectedCount = workflowApp.expectedWindowTitles.count
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let previewTitles = switcherPreviewTitles(from: diagnosticsSummary)
-            if previewTitles.count == expectedCount && Set(previewTitles) == expectedTitles {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-
-    private func assertInAppWindowSwitcherReady(
-        for workflowApp: SpaceFixtureResolvedWorkflow.App,
-        in app: XCUIApplication,
-        allowsNoisyCGSiblings: Bool = false
-    ) -> XCUIElement {
-        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
-
-        if allowsNoisyCGSiblings {
-            XCTAssertTrue(
-                waitForInAppSwitcherAppEntry(
-                    diagnosticsSummary,
-                    bundleIdentifier: workflowApp.identity.bundleIdentifier,
-                    timeout: 8
-                )
-            )
-        } else {
-            XCTAssertTrue(
-                waitForSwitcherAppsSummary(
-                    diagnosticsSummary,
-                    toContain: switcherAppStripSummary(for: workflowApp),
-                    timeout: 8
-                )
-            )
-        }
-        XCTAssertEqual(
-            switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected"),
-            workflowApp.identity.bundleIdentifier
-        )
-        if allowsNoisyCGSiblings {
-            XCTAssertTrue(
-                waitForExactNoisyWorkflowPreviewTitles(
-                    diagnosticsSummary,
-                    for: workflowApp,
-                    timeout: 8
-                ),
-                """
-                Control+Tab noisy window state did not expose exactly the expected user windows.
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-        } else {
-            XCTAssertEqual(Set(switcherPreviewTitles(from: diagnosticsSummary)), Set(workflowApp.expectedWindowTitles))
-        }
-        return diagnosticsSummary
     }
 
     private func assertNoisyInAppWindowSwitcherCurrentSelection(
@@ -608,10 +606,9 @@ extension FlowTabUITests {
     ) throws -> InAppWindowSelection {
         var observedPrefix = [currentSelection.title]
         let attempts = workflowWindowCycleAttemptCount(diagnosticsSummary)
-        var latestTitle = currentSelection.title
-        var latestWindowID = currentSelection.windowID
+        var latestSelection = currentSelection
 
-        if latestTitle == title {
+        if latestSelection.title == title {
             assertNoisyInAppObservedPrefix(
                 observedPrefix,
                 expectedPrefix: expectedPrefix,
@@ -621,21 +618,30 @@ extension FlowTabUITests {
         }
 
         for attempt in 0..<attempts {
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.inAppForward, traceLabel: "control.select")
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-            latestTitle = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindowTitle")
-            latestWindowID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindow")
-            observedPrefix.append(latestTitle)
-            logFlowTabUITestTrace(
-                "[\(traceLabel).selectAttempt.\(attempt + 1)] target=\(title) selected=\(latestTitle) windowID=\(latestWindowID)"
+            let result =
+                try performAndWaitForInAppForwardSelectionTransition(
+                    fromWindowID:
+                        latestSelection.windowID,
+                    fromWindowNumber:
+                        latestSelection.windowNumber,
+                    in: app,
+                    diagnosticsSummary: diagnosticsSummary,
+                    traceLabel:
+                        "\(traceLabel).selectAttempt.\(attempt + 1)"
+                )
+            latestSelection = InAppWindowSelection(
+                title: result.title,
+                windowID: result.windowID,
+                windowNumber: result.windowNumber
             )
+            observedPrefix.append(latestSelection.title)
             assertNoisyInAppObservedPrefix(
                 observedPrefix,
                 expectedPrefix: expectedPrefix,
                 traceLabel: traceLabel
             )
-            if latestTitle == title {
-                return try inAppWindowSelection(title: latestTitle, windowID: latestWindowID)
+            if latestSelection.title == title {
+                return latestSelection
             }
         }
 
@@ -645,7 +651,7 @@ extension FlowTabUITests {
             \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
             """
         )
-        return try inAppWindowSelection(title: latestTitle, windowID: latestWindowID)
+        return latestSelection
     }
 
     private func assertNoisyInAppObservedPrefix(
@@ -668,23 +674,45 @@ extension FlowTabUITests {
         requiresControlTab: Bool
     ) throws -> InAppWindowSelection {
         let attempts = max(1, workflowWindowCycleAttemptCount(diagnosticsSummary))
-        var latestTitle = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindowTitle")
-        var latestWindowID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindow")
+        var latestSelection =
+            try inAppWindowSelection(
+                title:
+                    switcherPanelDiagnosticsValue(
+                        diagnosticsSummary,
+                        key: "selectedWindowTitle"
+                    ),
+                windowID:
+                    switcherPanelDiagnosticsValue(
+                        diagnosticsSummary,
+                        key: "selectedWindow"
+                    )
+            )
 
-        if !requiresControlTab, latestTitle == title {
-            return try inAppWindowSelection(title: latestTitle, windowID: latestWindowID)
+        if !requiresControlTab,
+           latestSelection.title == title
+        {
+            return latestSelection
         }
 
         for attempt in 0..<attempts {
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.inAppForward, traceLabel: "control.select")
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-            latestTitle = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindowTitle")
-            latestWindowID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindow")
-            logFlowTabUITestTrace(
-                "[control.selectAttempt.\(attempt + 1)] target=\(title) selected=\(latestTitle) windowID=\(latestWindowID)"
+            let result =
+                try performAndWaitForInAppForwardSelectionTransition(
+                    fromWindowID:
+                        latestSelection.windowID,
+                    fromWindowNumber:
+                        latestSelection.windowNumber,
+                    in: app,
+                    diagnosticsSummary: diagnosticsSummary,
+                    traceLabel:
+                        "control.selectAttempt.\(attempt + 1)"
+                )
+            latestSelection = InAppWindowSelection(
+                title: result.title,
+                windowID: result.windowID,
+                windowNumber: result.windowNumber
             )
-            if latestTitle == title {
-                return try inAppWindowSelection(title: latestTitle, windowID: latestWindowID)
+            if latestSelection.title == title {
+                return latestSelection
             }
         }
 
@@ -694,7 +722,7 @@ extension FlowTabUITests {
             \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
             """
         )
-        return try inAppWindowSelection(title: latestTitle, windowID: latestWindowID)
+        return latestSelection
     }
 
     private func workflowWindowCycleAttemptCount(_ diagnosticsSummary: XCUIElement) -> Int {
@@ -719,101 +747,36 @@ extension FlowTabUITests {
     private func relaunchInAppWindowSwitcher(
         _ app: XCUIApplication,
         for workflowApp: SpaceFixtureResolvedWorkflow.App,
-        allowsNoisyCGSiblings: Bool = false
+        focusedWindow: InAppWindowSelection
     ) -> XCUIElement {
         XCTAssertTrue(app.state == .runningForeground || app.state == .runningBackground)
-        XCUIApplication(bundleIdentifier: workflowApp.identity.bundleIdentifier).activate()
-        RunLoop.current.run(until: Date().addingTimeInterval(0.35))
-        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.inApp, traceLabel: "control.reopen")
-        return assertInAppWindowSwitcherReady(
+        let fixtureApplication =
+            makeSpaceFixtureWorkflowApplication(
+                for: workflowApp.identity
+            )
+        XCTAssertTrue(
+            triggerAndWaitForFrontmostWorkflowWindow(
+                windowNumber: focusedWindow.windowNumber,
+                title: focusedWindow.title,
+                app: workflowApp,
+                timeout:
+                    FlowTabUITestInAppWorkflowWindowObservationPolicy
+                    .fixtureReactivationWatchdog,
+                trigger: {
+                    fixtureApplication.activate()
+                }
+            )
+        )
+        return performAndWaitForInAppSwitcherPanelProjection(
             for: workflowApp,
             in: app,
-            allowsNoisyCGSiblings: allowsNoisyCGSiblings
-        )
-    }
-
-    private func waitForInAppSwitcherAppEntry(
-        _ diagnosticsSummary: XCUIElement,
-        bundleIdentifier: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let entries = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "apps")
-                .split(separator: "|")
-                .map(String.init)
-            if entries.contains(where: { entry in
-                entry.split(separator: ":", maxSplits: 1).first.map(String.init) == bundleIdentifier
-            }) {
-                return true
+            trigger: {
+                postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                    .inApp,
+                    traceLabel: "control.reopen"
+                )
             }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-
-    private struct ApplicationAXWindowCounts {
-        let childWindowCount: Int
-        let windowsAttributeCount: Int
-
-        var isSuppressed: Bool {
-            childWindowCount == 0 && windowsAttributeCount == 0
-        }
-    }
-
-    private func applicationAXWindowCounts(bundleIdentifier: String) -> ApplicationAXWindowCounts? {
-        guard let runningApp = NSRunningApplication
-            .runningApplications(withBundleIdentifier: bundleIdentifier)
-            .first(where: { !$0.isTerminated })
-        else {
-            return nil
-        }
-
-        let appElement = AXUIElementCreateApplication(runningApp.processIdentifier)
-        return ApplicationAXWindowCounts(
-            childWindowCount: applicationAXWindowChildCount(in: appElement),
-            windowsAttributeCount: applicationAXWindowsAttributeCount(in: appElement)
         )
     }
 
-    private func applicationAXWindowChildCount(in appElement: AXUIElement) -> Int {
-        var childrenValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            appElement,
-            kAXChildrenAttribute as CFString,
-            &childrenValue
-        ) == .success else {
-            return 0
-        }
-
-        guard let children = childrenValue as? [AXUIElement] else {
-            return 0
-        }
-        return children.filter { axRole(in: $0) == kAXWindowRole as String }.count
-    }
-
-    private func applicationAXWindowsAttributeCount(in appElement: AXUIElement) -> Int {
-        var windowsValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            appElement,
-            kAXWindowsAttribute as CFString,
-            &windowsValue
-        ) == .success else {
-            return 0
-        }
-
-        return (windowsValue as? [AXUIElement])?.count ?? 0
-    }
-
-    private func axRole(in element: AXUIElement) -> String? {
-        var roleValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            element,
-            kAXRoleAttribute as CFString,
-            &roleValue
-        ) == .success else {
-            return nil
-        }
-        return roleValue as? String
-    }
 }

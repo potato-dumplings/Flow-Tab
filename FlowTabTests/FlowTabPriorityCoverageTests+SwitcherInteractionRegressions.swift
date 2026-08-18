@@ -24,10 +24,18 @@ extension FlowTabPriorityCoverageTests {
         )
         controller.panelVisibilityOverride = false
         controller.hideNonPanelWindowsOverride = {}
+        let hotkeyInput = ManualHotkeyInputSource()
+        hotkeyInput.register(on: controller, for: .inAppWindowSwitcher)
 
-        controller.handleInAppWindowHotkey(isBackward: false)
+        hotkeyInput.emit(
+            phase: .pressed,
+            to: controller,
+            for: .inAppWindowSwitcher
+        )
 
         XCTAssertEqual(controller.modelForTesting.session?.selectedWindow?.id, "first-press-next")
+        controller.inAppHotkeyHoldSetPressedOverride = false
+        controller.inAppMainKeySetPressedOverride = false
         controller.cancelSelectionForTesting()
     }
 
@@ -143,8 +151,55 @@ extension FlowTabPriorityCoverageTests {
             )
         )
         let capturedImage = makeColorImage(color: .systemPurple)
+        let previewBatchStarted = expectation(
+            description:
+                "unmetCondition=exactWindowOnlyPreviewBatchStarted"
+        )
+        previewBatchStarted.assertForOverFulfill = true
+        let previewBatchRelease = DispatchSemaphore(value: 0)
+        let previewBatchStateLock = NSLock()
+        var previewBatchCallCount = 0
+        var lastRequestTitles: [String] = []
+        var lastRequestOwnerPIDs: [pid_t] = []
+        var lastRequestPreferredWindowIDs: [CGWindowID?] = []
+        var lastRequestInferenceFlags: [Bool] = []
+        XCTAssertEqual(model.windowOnlyPreviewCaptureInFlightCount, 0)
+        XCTAssertTrue(
+            model
+                .previewCaptureStatesForTesting()
+                .isEmpty
+        )
+        XCTAssertEqual(previewBatchCallCount, 0)
         model.previewCaptureBatchOverride = { requests in
-            Thread.sleep(forTimeInterval: 0.08)
+            let requestTitles =
+                requests.map { $0.preferredTitle ?? "" }
+            let requestOwnerPIDs = requests.map(\.ownerPID)
+            let requestPreferredWindowIDs =
+                requests.map(\.preferredWindowID)
+            let requestInferenceFlags =
+                requests.map(\.inferTitleBarStyle)
+            previewBatchStateLock.withLock {
+                previewBatchCallCount += 1
+                lastRequestTitles = requestTitles
+                lastRequestOwnerPIDs = requestOwnerPIDs
+                lastRequestPreferredWindowIDs =
+                    requestPreferredWindowIDs
+                lastRequestInferenceFlags =
+                    requestInferenceFlags
+            }
+            if requestTitles == windows.map(\.title),
+               requestOwnerPIDs
+                == Array(
+                    repeating: currentApp.processIdentifier,
+                    count: windows.count
+                ),
+               requestPreferredWindowIDs.allSatisfy({ $0 == nil }),
+               requestInferenceFlags
+                == Array(repeating: true, count: windows.count)
+            {
+                previewBatchStarted.fulfill()
+            }
+            previewBatchRelease.wait()
             return requests.enumerated().map { index, _ in
                 RuntimeWindowPreviewProvider.CaptureResult(
                     image: capturedImage,
@@ -157,19 +212,233 @@ extension FlowTabPriorityCoverageTests {
         controller.setModifierReleaseConfirmationSuppressedForTesting(true)
         controller.appIsActiveOverride = true
         controller.hideNonPanelWindowsOverride = {}
+        let previewRevealCompleted = expectation(
+            description:
+                "unmetCondition=exactPreviewReadyEvidenceRevealsPanel"
+        )
+        previewRevealCompleted.assertForOverFulfill =
+            true
+        let controllerPreviewBatchObserver =
+            model
+                .onWindowOnlyPreviewPreparationChanged
+        var expectedObservationGeneration: Int?
+        var expectedPresentationGeneration: Int?
+        var observedPreviewCompletionCount = 0
+        var matchingRevealCount = 0
+        var lastObservedEvidence:
+            InitialWindowOnlyPreviewRevealEvidence?
+        var lastObservedWindowIDs: [String] = []
+        var lastObservedImageFlags: [Bool] = []
+        var lastObservedCaptureStates: [String] = []
+        model.onWindowOnlyPreviewPreparationChanged = {
+            XCTAssertTrue(Thread.isMainThread)
+            observedPreviewCompletionCount += 1
+            controllerPreviewBatchObserver?()
+            let owner =
+                controller
+                    .initialWindowOnlyPreviewRevealObservationOwner
+            let previewSnapshot =
+                model.windowPreviewSnapshotForTesting()
+            let captureStates =
+                model
+                    .previewCaptureStatesForTesting()
+            lastObservedEvidence = owner.lastReadyEvidence
+            lastObservedWindowIDs = previewSnapshot.map(\.id)
+            lastObservedImageFlags =
+                previewSnapshot.map(\.hasImage)
+            lastObservedCaptureStates =
+                captureStates
+                    .values
+                    .map { String(describing: $0) }
+                    .sorted()
+            guard
+                let expectedObservationGeneration,
+                let expectedPresentationGeneration,
+                let evidence = owner.lastReadyEvidence,
+                evidence.source == .previewBatchCompleted,
+                evidence.observationGeneration
+                    == expectedObservationGeneration,
+                evidence.presentationGeneration
+                    == expectedPresentationGeneration,
+                evidence.snapshot.pendingCaptureCount == 0,
+                controller.presentationSessionGeneration
+                    == expectedPresentationGeneration,
+                !owner.isObserving,
+                !owner.hasPendingWatchdog,
+                owner.lastWatchdogFailure == nil,
+                controller.panel.alphaValue == 1,
+                model.windowOnlyPreviewCaptureInFlightCount
+                    == 0,
+                previewSnapshot.map(\.id)
+                    == windows.map(\.id),
+                previewSnapshot.allSatisfy(\.hasImage),
+                !captureStates.isEmpty,
+                captureStates.values.allSatisfy({ state in
+                    if case .succeeded = state {
+                        return true
+                    }
+                    return false
+                })
+            else {
+                return
+            }
+            matchingRevealCount += 1
+            previewRevealCompleted.fulfill()
+        }
+        defer {
+            previewBatchRelease.signal()
+            model
+                .onWindowOnlyPreviewPreparationChanged =
+                    controllerPreviewBatchObserver
+            controller.cancelSelectionForTesting()
+        }
 
         XCTAssertTrue(controller.presentInAppWindowHotkeySessionForTesting())
-        XCTAssertEqual(controller.panel.alphaValue, 0, accuracy: 0.001)
-        let didReveal = await waitUntil(
-            "window-only panel reveals after preview batch",
-            pollIntervalNanoseconds: 5_000_000,
-            predicate: { controller.panel.alphaValue == 1 }
+        await fulfillment(
+            of: [previewBatchStarted],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .windowPreviewEventDelivery
         )
-        XCTAssertTrue(didReveal)
+        let finalPreviewBatchState =
+            previewBatchStateLock.withLock {
+                (
+                    callCount: previewBatchCallCount,
+                    requestTitles: lastRequestTitles,
+                    requestOwnerPIDs: lastRequestOwnerPIDs,
+                    requestPreferredWindowIDs:
+                        lastRequestPreferredWindowIDs,
+                    requestInferenceFlags:
+                        lastRequestInferenceFlags
+                )
+            }
+        XCTAssertEqual(
+            finalPreviewBatchState.callCount,
+            1,
+            "unmetCondition=singleExactWindowOnlyPreviewBatch finalTitles=\(finalPreviewBatchState.requestTitles) finalOwnerPIDs=\(finalPreviewBatchState.requestOwnerPIDs) finalPreferredWindowIDs=\(finalPreviewBatchState.requestPreferredWindowIDs) finalInferenceFlags=\(finalPreviewBatchState.requestInferenceFlags)"
+        )
+        XCTAssertEqual(
+            finalPreviewBatchState.requestTitles,
+            windows.map(\.title)
+        )
+        XCTAssertEqual(
+            finalPreviewBatchState.requestOwnerPIDs,
+            Array(
+                repeating: currentApp.processIdentifier,
+                count: windows.count
+            )
+        )
         XCTAssertTrue(
-            model.windowPreviewSnapshotForTesting().allSatisfy(\.hasImage)
+            finalPreviewBatchState
+                .requestPreferredWindowIDs
+                .allSatisfy({ $0 == nil })
         )
-        controller.cancelSelectionForTesting()
+        XCTAssertEqual(
+            finalPreviewBatchState.requestInferenceFlags,
+            Array(repeating: true, count: windows.count)
+        )
+        XCTAssertEqual(
+            model.windowOnlyPreviewCaptureInFlightCount,
+            windows.count
+        )
+        let startedCaptureStates =
+            model
+                .previewCaptureStatesForTesting()
+        XCTAssertEqual(startedCaptureStates.count, windows.count)
+        XCTAssertTrue(
+            startedCaptureStates
+                .values
+                .allSatisfy({ state in
+                    if case .inFlight = state {
+                        return true
+                    }
+                    return false
+                })
+        )
+        XCTAssertEqual(controller.panel.alphaValue, 0, accuracy: 0.001)
+        XCTAssertTrue(
+            controller
+                .initialWindowOnlyPreviewRevealObservationOwner
+                .isObserving
+        )
+        XCTAssertTrue(
+            controller
+                .initialWindowOnlyPreviewRevealObservationOwner
+                .hasPendingWatchdog
+        )
+        XCTAssertNil(
+            controller
+                .initialWindowOnlyPreviewRevealObservationOwner
+                .lastReadyEvidence
+        )
+        XCTAssertNil(
+            controller
+                .initialWindowOnlyPreviewRevealObservationOwner
+                .lastWatchdogFailure
+        )
+        expectedObservationGeneration =
+            controller
+                .initialWindowOnlyPreviewRevealObservationOwner
+                .generation
+        expectedPresentationGeneration =
+            controller.presentationSessionGeneration
+
+        previewBatchRelease.signal()
+        await fulfillment(
+            of: [previewRevealCompleted],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .windowPreviewEventDelivery
+        )
+
+        let evidence =
+            controller
+                .initialWindowOnlyPreviewRevealObservationOwner
+                .lastReadyEvidence
+        XCTAssertEqual(
+            observedPreviewCompletionCount,
+            1,
+            "unmetCondition=singleExactPreviewReadyPublication matchingCount=\(matchingRevealCount) lastEvidence=\(String(describing: lastObservedEvidence)) finalWindowIDs=\(lastObservedWindowIDs) finalImageFlags=\(lastObservedImageFlags) finalCaptureStates=\(lastObservedCaptureStates)"
+        )
+        XCTAssertEqual(
+            matchingRevealCount,
+            1,
+            "unmetCondition=exactPreviewReadyPublication lastEvidence=\(String(describing: lastObservedEvidence)) finalWindowIDs=\(lastObservedWindowIDs) finalImageFlags=\(lastObservedImageFlags) finalCaptureStates=\(lastObservedCaptureStates)"
+        )
+        XCTAssertEqual(
+            evidence?.source,
+            .previewBatchCompleted
+        )
+        XCTAssertEqual(
+            evidence?.observationGeneration,
+            expectedObservationGeneration
+        )
+        XCTAssertEqual(
+            evidence?.presentationGeneration,
+            expectedPresentationGeneration
+        )
+        XCTAssertEqual(
+            evidence?.snapshot.pendingCaptureCount,
+            0
+        )
+        XCTAssertEqual(
+            controller.panel.alphaValue,
+            1,
+            accuracy: 0.001
+        )
+        let finalPreviewSnapshot =
+            model.windowPreviewSnapshotForTesting()
+        XCTAssertEqual(
+            finalPreviewSnapshot.map(\.id),
+            windows.map(\.id)
+        )
+        XCTAssertTrue(
+            finalPreviewSnapshot.allSatisfy(\.hasImage)
+        )
+        XCTAssertEqual(
+            finalPreviewSnapshot.count,
+            windows.count
+        )
     }
 
     @MainActor
@@ -290,7 +559,9 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testDelayedWindowLayerEntryIgnoresStaleTimerGeneration() {
+    func testDelayedWindowLayerEntryReplacesStaleDeadlineGeneration() {
+        let scheduler =
+            ManualDelayedWindowLayerEntryScheduler()
         let currentApp = NSRunningApplication.current
         let appID = "com.flowtab.tests.auto-enter-generation"
         let windows = [
@@ -316,24 +587,36 @@ extension FlowTabPriorityCoverageTests {
             )
         )
         model.previewCaptureOverride = { _, _, _, _ in nil }
-        let controller = SwitcherPanelController(model: model)
+        let controller = SwitcherPanelController(
+            model: model,
+            delayedWindowLayerEntryScheduler: scheduler
+        )
         controller.windowLayerPresentationDelayOverride = 10
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         controller.scheduleDelayedWindowLayerEntryForTesting()
-        let staleGeneration = controller.delayedWindowLayerTimerGeneration
+        let staleGeneration =
+            controller.delayedWindowLayerEntryGenerationForTesting
 
         controller.scheduleDelayedWindowLayerEntryForTesting()
-        let currentGeneration = controller.delayedWindowLayerTimerGeneration
+        let currentGeneration =
+            controller.delayedWindowLayerEntryGenerationForTesting
         XCTAssertGreaterThan(currentGeneration, staleGeneration)
+        XCTAssertEqual(scheduler.pendingCount, 1)
+        XCTAssertEqual(scheduler.scheduledIntervals, [10, 10])
 
-        controller.enterDelayedWindowLayerIfReady(
-            reason: "testing_stale_timer",
-            generation: staleGeneration
+        XCTAssertTrue(
+            scheduler.fireNextDeadline()
         )
 
-        XCTAssertEqual(model.session?.mode, .appCycle)
-        XCTAssertTrue(controller.delayedWindowLayerTimer?.isValid == true)
+        XCTAssertEqual(
+            model.session?.mode,
+            .windowCycle(appID: appID)
+        )
+        XCTAssertFalse(
+            controller.hasPendingDelayedWindowLayerEntryForTesting
+        )
+        XCTAssertEqual(scheduler.pendingCount, 0)
         controller.cancelSelectionForTesting()
     }
 
@@ -420,7 +703,7 @@ extension FlowTabPriorityCoverageTests {
 
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
         activator.focusCGWindowOverride = { _, windowID in
             XCTAssertEqual(windowID, targetCGWindowID)
             return true

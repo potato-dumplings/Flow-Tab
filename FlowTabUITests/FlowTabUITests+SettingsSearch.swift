@@ -1,7 +1,73 @@
 import AppKit
 import XCTest
 
+private enum FlowTabUITestSettingsSearchWatchdogPolicy {
+    static let committedResultProjection: TimeInterval = 8
+    static let userTriggeredAppProjection: TimeInterval = 8
+    static let applicationForeground: TimeInterval = 10
+    static let searchEnabledToggleProjection: TimeInterval = 5
+}
+
 extension FlowTabUITests {
+    func testSettingsSearchWatchdogPolicyCompatibility() {
+        XCTAssertEqual(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .committedResultProjection,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .committedResultProjection.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .committedResultProjection,
+            0
+        )
+        XCTAssertEqual(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .userTriggeredAppProjection,
+            8
+        )
+        XCTAssertTrue(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .userTriggeredAppProjection.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .userTriggeredAppProjection,
+            0
+        )
+        XCTAssertEqual(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .applicationForeground,
+            10
+        )
+        XCTAssertTrue(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .applicationForeground.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .applicationForeground,
+            0
+        )
+        XCTAssertEqual(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .searchEnabledToggleProjection,
+            5
+        )
+        XCTAssertTrue(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .searchEnabledToggleProjection.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSettingsSearchWatchdogPolicy
+                .searchEnabledToggleProjection,
+            0
+        )
+    }
+
     func testSettingsSearchDisabledPreventsAutoSearchLaunchEntry() throws {
         let firstLaunchApp = makeApp(
             additionalArguments: [
@@ -20,27 +86,88 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(firstLaunchApp)
         openSettingsTab(in: firstLaunchApp)
 
-        let searchEnabledToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsSearchEnabled)
-        XCTAssertTrue(searchEnabledToggle.waitForExistence(timeout: 5))
+        let searchEnabledToggle = requireSettingsSearchEnabledToggle(
+            in: firstLaunchApp,
+            scenario: "disabled initial launch"
+        )
         setToggle(searchEnabledToggle, to: false)
         XCTAssertFalse(toggleIsOn(searchEnabledToggle))
-        firstLaunchApp.terminate()
+        let firstTermination = terminateFlowTabUITestApplication(
+            firstLaunchApp,
+            targetDescription: "disabled-Search settings process"
+        )
+        XCTAssertTrue(
+            firstTermination.isSatisfied,
+            "Disabled-Search settings process did not terminate. "
+                + firstTermination.diagnosticSummary
+        )
+
+        let resolutionRoute =
+            FlowTabUITestInitialPresentationResolutionRoute()
+        try resolutionRoute.prepareReadback()
+        let resolutionOwner =
+            FlowTabUITestInitialPresentationResolutionObservationOwner(
+                route: resolutionRoute,
+                expectation:
+                    FlowTabUITestInitialPresentationResolutionExpectation(
+                        requiredItemIDs: [
+                            "com.flowtab.mock.mail"
+                        ],
+                        excludedItemIDs: [],
+                        searchFeatureEnabled: false,
+                        searchIsActive: false,
+                        searchActivationIsPending: false
+                    )
+            )
+        resolutionOwner.start()
+        defer {
+            resolutionOwner.cancel()
+            resolutionRoute.removeReadback()
+        }
 
         let relaunchApp = makeApp(
             additionalArguments: [
                 "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-mock-window-previews",
                 "--flowtab-ui-open-switcher-search",
                 "--flowtab-ui-ax-trusted",
                 "YES",
                 "--flowtab-ui-screen-trusted",
                 "YES"
-            ]
+            ] + resolutionRoute.launchArguments
         )
         launchFlowTabUITestApplication(relaunchApp)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(relaunchApp, timeout: 10))
-
-        XCTAssertTrue(element(in: relaunchApp, identifier: Identifier.switcherAppMockMail).waitForExistence(timeout: 8))
-        XCTAssertFalse(element(in: relaunchApp, identifier: Identifier.switcherSearchInput).exists)
+        guard let resolution =
+                resolutionOwner.waitForResolution(
+                    timeout:
+                        FlowTabUITestInitialPresentationResolutionPolicy
+                            .watchdog
+                )
+        else {
+            XCTFail(
+                "Disabled-Search initial presentation watchdog "
+                    + "expired. "
+                    + resolutionOwner.diagnosticSummary
+            )
+            return
+        }
+        XCTAssertEqual(resolution.sessionMode, "appCycle")
+        XCTAssertFalse(resolution.searchFeatureEnabled)
+        XCTAssertFalse(resolution.searchIsActive)
+        XCTAssertFalse(resolution.searchActivationIsPending)
+        XCTAssertEqual(
+            resolution.postPresentationItemIDs,
+            resolution.candidateItemIDs
+        )
+        let relaunchTermination = terminateFlowTabUITestApplication(
+            relaunchApp,
+            targetDescription: "disabled-Search command process"
+        )
+        XCTAssertTrue(
+            relaunchTermination.isSatisfied,
+            "Disabled-Search command process did not terminate. "
+                + relaunchTermination.diagnosticSummary
+        )
     }
 
     func testSettingsSearchDefaultScopePersistsAndShowsWindowThenAppResults() throws {
@@ -56,8 +183,10 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(firstLaunchApp)
         openSettingsTab(in: firstLaunchApp)
 
-        let searchEnabledToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsSearchEnabled)
-        XCTAssertTrue(searchEnabledToggle.waitForExistence(timeout: 5))
+        let searchEnabledToggle = requireSettingsSearchEnabledToggle(
+            in: firstLaunchApp,
+            scenario: "persisted default scope initial launch"
+        )
         setToggle(searchEnabledToggle, to: true)
 
         selectOption(in: firstLaunchApp, controlIdentifier: Identifier.settingsSearchDefaultScope, optionIdentifier: "window")
@@ -65,10 +194,24 @@ extension FlowTabUITests {
         firstLaunchApp.terminate()
 
         let windowSearchApp = launchMockSwitcherSearchFromUserPath()
-        windowSearchApp.typeText("Inbox")
         XCTAssertTrue(
-            element(in: windowSearchApp, identifier: Identifier.switcherSearchWindowMockMailInbox)
-                .waitForExistence(timeout: 8)
+            performAndWaitForCommittedSearchResultRow(
+                in: windowSearchApp,
+                scope: "window",
+                query: "Inbox",
+                resultID:
+                    "window:com.flowtab.mock.mail#mock-mail-inbox",
+                rowIdentifier:
+                    Identifier.switcherSearchWindowMockMailInbox,
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .committedResultProjection,
+                trigger: {
+                    windowSearchApp.typeText("Inbox")
+                }
+            ),
+            "Window-scope Search did not publish the exact "
+                + "committed Inbox result row."
         )
         windowSearchApp.terminate()
 
@@ -89,10 +232,23 @@ extension FlowTabUITests {
         settingsRelaunchApp.terminate()
 
         let appSearchApp = launchMockSwitcherSearchFromUserPath()
-        appSearchApp.typeText("Mail")
         XCTAssertTrue(
-            element(in: appSearchApp, identifier: Identifier.switcherSearchAppMockMail)
-                .waitForExistence(timeout: 8)
+            performAndWaitForCommittedSearchResultRow(
+                in: appSearchApp,
+                scope: "app",
+                query: "Mail",
+                resultID: "app:com.flowtab.mock.mail",
+                rowIdentifier:
+                    Identifier.switcherSearchAppMockMail,
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .committedResultProjection,
+                trigger: {
+                    appSearchApp.typeText("Mail")
+                }
+            ),
+            "App-scope Search did not publish the exact "
+                + "committed Mail result row."
         )
     }
 
@@ -109,8 +265,10 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(firstLaunchApp)
         openSettingsTab(in: firstLaunchApp)
 
-        let searchEnabledToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsSearchEnabled)
-        XCTAssertTrue(searchEnabledToggle.waitForExistence(timeout: 5))
+        let searchEnabledToggle = requireSettingsSearchEnabledToggle(
+            in: firstLaunchApp,
+            scenario: "scope switching initial launch"
+        )
         setToggle(searchEnabledToggle, to: true)
 
         selectOption(in: firstLaunchApp, controlIdentifier: Identifier.settingsSearchDefaultScope, optionIdentifier: "app")
@@ -131,19 +289,48 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        let becameForeground =
+            waitForFlowTabUITestApplicationToBecomeReady(
+                app,
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .applicationForeground,
+                traceLabel:
+                    "settings-search-permission-scope-readiness"
+            )
+        XCTAssertTrue(
+            becameForeground,
+            "Settings Search permission-scope application readiness "
+                + "watchdog expired. expectedState=runningForeground "
+                + "finalState=\(String(describing: app.state))"
+        )
+        assertSettingsSearchWindowScopeUnavailable(in: app) {
+            openSettingsTab(in: app)
+        }
+    }
+
+    func testSettingsAppVisibilityNavigationConvergesFromVisibleState() throws {
+        let app = makeApp(
+            additionalArguments: appVisibilityRuntimeArguments(
+                resetDefaults: true
+            )
+        )
+        launchFlowTabUITestApplication(app)
         openSettingsTab(in: app)
 
-        let scopeControl = element(in: app, identifier: Identifier.settingsSearchDefaultScope)
-        XCTAssertTrue(scopeControl.waitForExistence(timeout: 5))
-        assertValue(of: scopeControl, equals: "app")
-        tapElement(scopeControl)
+        guard assertSettingsAppVisibilityManagerProjectionAfterNavigation(
+            in: app,
+            targetDescription: "visible-state App Visibility manager"
+        ) else {
+            return
+        }
 
-        let windowOption = app.descendants(matching: .any)
-            .matching(identifier: "\(Identifier.settingsSearchDefaultScope).option.window")
-            .firstMatch
-        XCTAssertFalse(windowOption.waitForExistence(timeout: 1))
-        assertValue(of: scopeControl, equals: "app")
+        guard assertSettingsAppVisibilityRootProjectionAfterBackNavigation(
+            in: app,
+            targetDescription: "visible-state Settings root"
+        ) else {
+            return
+        }
     }
 
     func testSettingsAppVisibilityHidesMockAppFromSwitcherAndSearch() throws {
@@ -153,49 +340,164 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(settingsApp)
         openSettingsTab(in: settingsApp)
 
-        let manageButton = element(in: settingsApp, identifier: Identifier.settingsAppVisibilityManage)
-        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
-        tapElement(manageButton)
-        XCTAssertTrue(element(in: settingsApp, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+        guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
+            in: settingsApp,
+            targetDescription: "hidden-App configuration inventory"
+        ) else {
+            return
+        }
 
-        let managerSearch = settingsApp.textFields.firstMatch
-        XCTAssertTrue(managerSearch.waitForExistence(timeout: 6))
-        tapElement(managerSearch)
-        settingsApp.typeText("Mail")
+        guard assertSettingsAppVisibilityQueryProjection(
+            "Mail",
+            targetRowIdentifier: Identifier.settingsAppVisibilityMockMail,
+            in: settingsApp,
+            targetDescription: "hidden-App configuration Search projection"
+        ) else {
+            return
+        }
 
-        let mockMailRow = element(in: settingsApp, identifier: Identifier.settingsAppVisibilityMockMail)
-        XCTAssertTrue(mockMailRow.waitForExistence(timeout: 6))
-        tapElement(mockMailRow)
-
-        let showToggle = appVisibilityShowToggle(in: settingsApp)
+        guard let showToggle = settingsAppVisibilityShowToggleAfterSelecting(
+            rowIdentifier: Identifier.settingsAppVisibilityMockMail,
+            in: settingsApp,
+            targetDescription: "hidden-App configuration detail"
+        ) else {
+            return
+        }
         setToggle(showToggle, to: false)
         XCTAssertFalse(toggleIsOn(showToggle))
-        settingsApp.terminate()
+        let settingsTermination = terminateFlowTabUITestApplication(
+            settingsApp,
+            targetDescription: "settings app visibility configuration"
+        )
+        XCTAssertTrue(
+            settingsTermination.isSatisfied,
+            "Settings app termination failed. "
+                + settingsTermination.diagnosticSummary
+        )
 
         let switcherApp = makeApp(
             additionalArguments: appVisibilityRuntimeArguments(opensSwitcher: true)
         )
-        launchFlowTabUITestApplication(switcherApp)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(switcherApp, timeout: 10))
-        XCTAssertTrue(element(in: switcherApp, identifier: Identifier.switcherAppMockBrowser).waitForExistence(timeout: 8))
-        XCTAssertTrue(
-            waitForNonExistence(
-                element(in: switcherApp, identifier: Identifier.switcherAppMockMail),
-                timeout: 2
-            )
+        guard assertInitialSwitcherAppProjectionAfterLaunch(
+            in: switcherApp,
+            requiredBundleIdentifiers: ["com.flowtab.mock.browser"],
+            excludedBundleIdentifiers: ["com.flowtab.mock.mail"],
+            targetDescription: "hidden-App Switcher relaunch projection",
+            trigger: {
+                launchFlowTabUITestApplication(switcherApp)
+            }
+        ) else {
+            return
+        }
+        let switcherTermination = terminateFlowTabUITestApplication(
+            switcherApp,
+            targetDescription: "app visibility switcher verification"
         )
-        switcherApp.terminate()
+        XCTAssertTrue(
+            switcherTermination.isSatisfied,
+            "Switcher app termination failed. "
+                + switcherTermination.diagnosticSummary
+        )
 
         let searchApp = makeApp(
             additionalArguments: appVisibilityRuntimeArguments(opensSearch: true)
         )
+        let searchReadiness =
+            prepareInitialFlowTabSearchInputReadiness()
         launchFlowTabUITestApplication(searchApp)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(searchApp, timeout: 10))
-        XCTAssertTrue(element(in: searchApp, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 6))
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        searchApp.typeText("Mail")
-        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
-        XCTAssertFalse(element(in: searchApp, identifier: Identifier.switcherSearchAppMockMail).exists)
+        let becameForeground =
+            waitForFlowTabUITestApplicationToBecomeReady(
+                searchApp,
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .applicationForeground,
+                traceLabel:
+                    "settings-app-visibility-hidden-search-readiness"
+            )
+        guard becameForeground else {
+            XCTFail(
+                "Hidden-App Search application readiness watchdog "
+                    + "expired. expectedState=runningForeground "
+                    + "finalState=\(String(describing: searchApp.state))"
+            )
+            return
+        }
+        _ = requireInitialFlowTabSearchInput(
+            in: searchApp,
+            observedBy: searchReadiness
+        )
+        let diagnosticsSummary = element(
+            in: searchApp,
+            identifier: Identifier.switcherSummary
+        )
+        guard
+            performAndWaitForSwitcherDiagnostics(
+                [
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "searchResultsScope",
+                        expectedValue: "app"
+                    ),
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "searchResultsQuery",
+                        expectedValue: "Mail",
+                        decodesPercentEncoding: true
+                    ),
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "searchResults",
+                        expectedValue: ""
+                    )
+                ],
+                in: diagnosticsSummary,
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .committedResultProjection,
+                trigger: {
+                    searchApp.typeText("Mail")
+                }
+            )
+        else {
+            return
+        }
+        XCTAssertFalse(
+            element(
+                in: searchApp,
+                identifier: Identifier.switcherSearchAppMockMail
+            ).exists
+        )
+    }
+
+    func testSettingsAppVisibilitySelectionPublishesExactDetailToggle() throws {
+        let app = makeApp(
+            additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)
+        )
+        launchFlowTabUITestApplication(app)
+        openSettingsTab(in: app)
+
+        guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
+            in: app,
+            targetDescription: "selected-detail regression inventory"
+        ) else {
+            return
+        }
+        guard assertSettingsAppVisibilityQueryProjection(
+            "Mail",
+            targetRowIdentifier: Identifier.settingsAppVisibilityMockMail,
+            in: app,
+            targetDescription: "selected-detail regression Search projection"
+        ) else {
+            return
+        }
+        guard let showToggle = settingsAppVisibilityShowToggleAfterSelecting(
+            rowIdentifier: Identifier.settingsAppVisibilityMockMail,
+            in: app,
+            targetDescription: "selected-detail regression target"
+        ) else {
+            return
+        }
+
+        XCTAssertTrue(toggleIsOn(showToggle))
+        setToggle(showToggle, to: false)
+        XCTAssertFalse(toggleIsOn(showToggle))
     }
 
     func testSettingsAppVisibilitySearchUsesSharedPinyinMatching() throws {
@@ -205,21 +507,21 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         openSettingsTab(in: app)
 
-        let manageButton = element(in: app, identifier: Identifier.settingsAppVisibilityManage)
-        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
-        tapElement(manageButton)
-        XCTAssertTrue(element(in: app, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
-
-        let managerSearch = app.textFields.firstMatch
-        XCTAssertTrue(managerSearch.waitForExistence(timeout: 6))
-        tapElement(managerSearch)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString("ceshi", forType: .string)
-        app.typeKey("v", modifierFlags: .command)
+        guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
+            in: app,
+            targetDescription: "pinyin Search inventory"
+        ) else {
+            return
+        }
 
         XCTAssertTrue(
-            element(in: app, identifier: Identifier.settingsAppVisibilityChineseTest)
-                .waitForExistence(timeout: 6)
+            assertSettingsAppVisibilityQueryProjection(
+                "ceshi",
+                targetRowIdentifier:
+                    Identifier.settingsAppVisibilityChineseTest,
+                in: app,
+                targetDescription: "pinyin Search projection"
+            )
         )
     }
 
@@ -228,27 +530,39 @@ extension FlowTabUITests {
             additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)
         )
         launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
-
-        let showInCommandTabToggle = toggleElement(
+        guard assertSettingsCurrentAppActivationProjectionAfterNavigation(
             in: app,
-            identifier: Identifier.settingsAppearanceShowInCommandTab
-        )
-        XCTAssertTrue(showInCommandTabToggle.waitForExistence(timeout: 6))
-        XCTAssertFalse(toggleIsOn(showInCommandTabToggle))
-        XCTAssertTrue(app.staticTexts["已隐藏 1 个应用"].waitForExistence(timeout: 6))
+            targetDescription: "current-App activation-policy Settings",
+            trigger: {
+                openSettingsTab(in: app)
+            }
+        ) else {
+            return
+        }
 
-        let manageButton = element(in: app, identifier: Identifier.settingsAppVisibilityManage)
-        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
-        tapElement(manageButton)
-        XCTAssertTrue(element(in: app, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+        guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
+            in: app,
+            targetDescription: "current-App inventory"
+        ) else {
+            return
+        }
 
-        tapAppVisibilityHiddenFilter(in: app)
+        guard assertSettingsAppVisibilityHiddenFilterProjection(
+            targetRowIdentifier: Identifier.settingsAppVisibilityCurrentApp,
+            in: app,
+            targetDescription: "current-App Hidden filter projection"
+        ) else {
+            return
+        }
 
-        let currentAppRow = element(in: app, identifier: Identifier.settingsAppVisibilityCurrentApp)
-        XCTAssertTrue(currentAppRow.waitForExistence(timeout: 6))
-        tapElement(currentAppRow)
-        XCTAssertFalse(toggleIsOn(appVisibilityShowToggle(in: app)))
+        guard let showToggle = settingsAppVisibilityShowToggleAfterSelecting(
+            rowIdentifier: Identifier.settingsAppVisibilityCurrentApp,
+            in: app,
+            targetDescription: "current-App Hidden detail"
+        ) else {
+            return
+        }
+        XCTAssertFalse(toggleIsOn(showToggle))
     }
 
     func testSettingsAppVisibilityHiddenFilterShowsStoredHiddenAppMissingFromInventory() throws {
@@ -258,21 +572,29 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(firstLaunchApp)
         openSettingsTab(in: firstLaunchApp)
 
-        let manageButton = element(in: firstLaunchApp, identifier: Identifier.settingsAppVisibilityManage)
-        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
-        tapElement(manageButton)
-        XCTAssertTrue(element(in: firstLaunchApp, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+        guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
+            in: firstLaunchApp,
+            targetDescription: "stored hidden-App source inventory"
+        ) else {
+            return
+        }
 
-        let managerSearch = firstLaunchApp.textFields.firstMatch
-        XCTAssertTrue(managerSearch.waitForExistence(timeout: 6))
-        tapElement(managerSearch)
-        firstLaunchApp.typeText("Mail")
+        guard assertSettingsAppVisibilityQueryProjection(
+            "Mail",
+            targetRowIdentifier: Identifier.settingsAppVisibilityMockMail,
+            in: firstLaunchApp,
+            targetDescription: "stored hidden-App source Search projection"
+        ) else {
+            return
+        }
 
-        let mockMailRow = element(in: firstLaunchApp, identifier: Identifier.settingsAppVisibilityMockMail)
-        XCTAssertTrue(mockMailRow.waitForExistence(timeout: 6))
-        tapElement(mockMailRow)
-
-        let showToggle = appVisibilityShowToggle(in: firstLaunchApp)
+        guard let showToggle = settingsAppVisibilityShowToggleAfterSelecting(
+            rowIdentifier: Identifier.settingsAppVisibilityMockMail,
+            in: firstLaunchApp,
+            targetDescription: "stored hidden-App source detail"
+        ) else {
+            return
+        }
         setToggle(showToggle, to: false)
         XCTAssertFalse(toggleIsOn(showToggle))
         firstLaunchApp.terminate()
@@ -285,40 +607,135 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(staleInventoryApp)
         openSettingsTab(in: staleInventoryApp)
 
-        let staleManageButton = element(in: staleInventoryApp, identifier: Identifier.settingsAppVisibilityManage)
-        XCTAssertTrue(staleManageButton.waitForExistence(timeout: 6))
-        tapElement(staleManageButton)
-        XCTAssertTrue(element(in: staleInventoryApp, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+        guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
+            in: staleInventoryApp,
+            targetDescription: "stale hidden-App inventory"
+        ) else {
+            return
+        }
 
-        tapAppVisibilityHiddenFilter(in: staleInventoryApp)
+        guard assertSettingsAppVisibilityHiddenFilterProjection(
+            targetRowIdentifier: Identifier.settingsAppVisibilityMockMail,
+            in: staleInventoryApp,
+            targetDescription: "stale hidden-App filter projection"
+        ) else {
+            return
+        }
 
-        let staleHiddenRow = element(in: staleInventoryApp, identifier: Identifier.settingsAppVisibilityMockMail)
-        XCTAssertTrue(staleHiddenRow.waitForExistence(timeout: 6))
-        tapElement(staleHiddenRow)
-        XCTAssertFalse(toggleIsOn(appVisibilityShowToggle(in: staleInventoryApp)))
+        guard let staleShowToggle =
+            settingsAppVisibilityShowToggleAfterSelecting(
+                rowIdentifier: Identifier.settingsAppVisibilityMockMail,
+                in: staleInventoryApp,
+                targetDescription: "stale hidden-App detail"
+            )
+        else {
+            return
+        }
+        XCTAssertFalse(toggleIsOn(staleShowToggle))
     }
 
     private func launchMockSwitcherSearchFromUserPath() -> XCUIApplication {
         let app = makeApp(
             additionalArguments: [
                 "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-open-switcher",
+                "--flowtab-ui-listen-switcher-trigger",
                 "--flowtab-ui-ax-trusted",
                 "YES",
                 "--flowtab-ui-screen-trusted",
                 "YES"
             ]
+                + FlowTabUITestSearchInputReadinessPolicy
+                    .applicationEvidenceLaunchArguments
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherAppMockMail).waitForExistence(timeout: 8))
+        let becameForeground =
+            waitForFlowTabUITestApplicationToBecomeReady(
+                app,
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .applicationForeground,
+                traceLabel:
+                    "settings-search-user-path-readiness"
+            )
+        XCTAssertTrue(
+            becameForeground,
+            "Settings Search user-path application readiness "
+                + "watchdog expired. expectedState=runningForeground "
+                + "finalState=\(String(describing: app.state))"
+        )
+        XCTAssertTrue(
+            assertInitialSwitcherAppProjectionAfterLaunch(
+                in: app,
+                requiredBundleIdentifiers: [
+                    "com.flowtab.mock.mail"
+                ],
+                excludedBundleIdentifiers: [],
+                targetDescription:
+                    "Settings Search user-path Switcher",
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .userTriggeredAppProjection,
+                trigger: {
+                    postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                        .global,
+                        traceLabel: "settings-search-user-path"
+                    )
+                }
+            ),
+            "Settings Search user path did not present the exact "
+                + "Mail App projection."
+        )
 
-        app.activate()
+        let searchReadiness =
+            prepareInitialFlowTabSearchInputReadiness()
         app.typeText("\r")
 
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: searchReadiness
+        )
         return app
+    }
+
+    private func requireSettingsSearchEnabledToggle(
+        in app: XCUIApplication,
+        scenario: String
+    ) -> XCUIElement {
+        let toggle = element(
+            in: app,
+            identifier: Identifier.settingsSearchEnabled
+        )
+        let wasInitiallyPresent = toggle.exists
+        let waiterSatisfied = wasInitiallyPresent
+            || toggle.waitForExistence(
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .searchEnabledToggleProjection
+            )
+        let finalExists = toggle.exists
+        let finalElementType = finalExists
+            ? String(describing: toggle.elementType)
+            : "unavailable"
+        let finalHittable = finalExists
+            ? String(toggle.isHittable)
+            : "unavailable"
+        let finalValue = finalExists
+            ? String(describing: toggle.value)
+            : "unavailable"
+        XCTAssertTrue(
+            waiterSatisfied && finalExists,
+            "Settings Search enabled-toggle projection watchdog expired. "
+                + "scenario=\(scenario) "
+                + "expectedIdentifier=\(Identifier.settingsSearchEnabled) "
+                + "appState=\(String(describing: app.state)) "
+                + "initialExists=\(wasInitiallyPresent) "
+                + "waiterSatisfied=\(waiterSatisfied) "
+                + "finalExists=\(finalExists) "
+                + "finalElementType=\(finalElementType) "
+                + "finalHittable=\(finalHittable) "
+                + "finalValue=\(finalValue)"
+        )
+        return toggle
     }
 
     private func appVisibilityRuntimeArguments(
@@ -342,6 +759,9 @@ extension FlowTabUITests {
         ]
         if opensSearch {
             arguments.append("--flowtab-ui-open-switcher-search")
+            arguments +=
+                FlowTabUITestSearchInputReadinessPolicy
+                    .applicationEvidenceLaunchArguments
         } else if opensSwitcher {
             arguments.append("--flowtab-ui-open-switcher")
         }
@@ -354,31 +774,4 @@ extension FlowTabUITests {
         return arguments
     }
 
-    private func appVisibilityShowToggle(in app: XCUIApplication) -> XCUIElement {
-        let switchElement = app.switches.firstMatch
-        if switchElement.waitForExistence(timeout: 3) {
-            return switchElement
-        }
-        let checkBox = app.checkBoxes.firstMatch
-        XCTAssertTrue(checkBox.waitForExistence(timeout: 3))
-        return checkBox
-    }
-
-    private func tapAppVisibilityHiddenFilter(in app: XCUIApplication) {
-        let hiddenSegment = element(in: app, identifier: Identifier.settingsAppVisibilityFilterHidden)
-        if hiddenSegment.waitForExistence(timeout: 3) {
-            tapElement(hiddenSegment)
-            return
-        }
-
-        let hiddenChinese = app.buttons["已隐藏"].firstMatch
-        if hiddenChinese.waitForExistence(timeout: 2) {
-            tapElement(hiddenChinese)
-            return
-        }
-
-        let hiddenEnglish = app.buttons["Hidden"].firstMatch
-        XCTAssertTrue(hiddenEnglish.waitForExistence(timeout: 4))
-        tapElement(hiddenEnglish)
-    }
 }

@@ -1,39 +1,11 @@
 import XCTest
 
 extension FlowTabUITests {
-    private var optionTabPointerHoverArguments: [String] {
-        [
-            "--flowtab-ui-reset-defaults",
-            "--flowtab-ui-mock-runtime",
-            "--flowtab-ui-open-switcher",
-            "-showPermissionReminder",
-            "NO"
-        ]
-    }
-
-    private var controlTabPointerHoverArguments: [String] {
-        [
-            "--flowtab-ui-reset-defaults",
-            "--flowtab-ui-mock-runtime",
-            "--flowtab-ui-mock-window-previews",
-            "--flowtab-ui-mock-runtime-variant",
-            "focused-current-app",
-            "--flowtab-ui-frontmost-bundle-id",
-            FlowTabUITestAppIdentity.configured().bundleIdentifier,
-            "--flowtab-ui-listen-switcher-trigger",
-            "--flowtab-ui-runtime-log-level",
-            "DEBUG",
-            "--flowtab-ui-enable-verbose-logs",
-            "-showPermissionReminder",
-            "NO"
-        ]
-    }
-
     private var searchPointerHoverArguments: [String] {
         searchMockRuntimeArguments()
     }
 
-    private var searchPointerHoverTriggerArguments: [String] {
+    var searchPointerHoverTriggerArguments: [String] {
         searchMockRuntimeArguments(opensSearchOnLaunch: false, listensForTrigger: true)
     }
 
@@ -70,40 +42,201 @@ extension FlowTabUITests {
         return arguments
     }
 
-    func testSearchPanelEntryAndResultActivation() throws {
-        runRealSpaceFixtureWorkflow(
-            flowTabAdditionalArguments: ["--flowtab-ui-open-switcher-search"]
-        ) { identity, app in
-            let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-            XCTAssertTrue(searchInput.waitForExistence(timeout: 5))
+    private func assertCommittedMockSearchResults(
+        in app: XCUIApplication,
+        query: String,
+        bundleIdentifiers: [String],
+        timeout: TimeInterval,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let rows = bundleIdentifiers.map { bundleIdentifier in
+            FlowTabUITestSwitcherSearchExpectedResultRow(
+                resultID: "app:\(bundleIdentifier)",
+                rowIdentifier:
+                    "flowtab.switcher.search.app."
+                    + bundleIdentifier
+                        .flowTabUITestAccessibilityIdentifierComponent
+            )
+        }
+        XCTAssertTrue(
+            performAndWaitForCommittedSearchResultRows(
+                in: app,
+                scope: "app",
+                query: query,
+                rows: rows,
+                timeout: timeout,
+                trigger: {
+                    app.typeText(query)
+                }
+            ),
+            "Search did not publish the exact committed mock "
+                + "App result rows for query \(String(reflecting: query)).",
+            file: file,
+            line: line
+        )
+    }
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-            app.typeText(identity.switcherSearchQuery)
+    func launchSearchMockApplication(
+        mockRuntimeVariant: String? = nil
+    ) -> (
+        app: XCUIApplication,
+        readiness:
+            FlowTabUITestSearchInputReadinessObservationOwner
+    ) {
+        let app = makeApp(
+            additionalArguments:
+                searchMockRuntimeArguments(
+                    mockRuntimeVariant:
+                        mockRuntimeVariant
+                )
+        )
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
+        launchFlowTabUITestApplication(app)
+        assertSearchMockApplicationIsForegroundReady(app)
+        return (app, readiness)
+    }
 
-            let fixtureResult = app.descendants(matching: .any)
-                .matching(identifier: identity.switcherSearchAppAccessibilityIdentifier)
-                .firstMatch
-            XCTAssertTrue(fixtureResult.waitForExistence(timeout: 5))
+    private func assertSearchMockApplicationIsForegroundReady(
+        _ app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let becameReady = waitForFlowTabUITestApplicationToBecomeReady(
+            app,
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                .searchMockForegroundReadiness
+        )
+        XCTAssertTrue(
+            becameReady,
+            "Search mock application foreground-readiness watchdog expired. "
+                + "unmetCondition=runningForeground "
+                + "finalState=\(String(describing: app.state))",
+            file: file,
+            line: line
+        )
+    }
 
-            app.typeText("\r")
-            if !waitForNonExistence(searchInput, timeout: 1.2) {
-                // XCUI keyboard input may leave the hidden NSTextView in a marked-text
-                // composition state, so the first Return only commits composition.
-                app.typeText("\r")
+    func assertSwitcherAndSearchApplicationIsForegroundReady(
+        _ app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let becameReady = waitForFlowTabUITestApplicationToBecomeReady(
+            app,
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                .switcherAndSearchForegroundReadiness
+        )
+        XCTAssertTrue(
+            becameReady,
+            "Switcher/Search application foreground-readiness "
+                + "watchdog expired. unmetCondition=runningForeground "
+                + "finalState=\(String(describing: app.state))",
+            file: file,
+            line: line
+        )
+    }
+
+    private func waitForOptionTabPointerAppRows(
+        in app: XCUIApplication,
+        diagnosticsSummary: XCUIElement,
+        identifiers: [String],
+        watchdog: TimeInterval,
+        traceLabel: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> [XCUIElement]? {
+        waitForExactElementCollection(
+            in: app,
+            identifiers: identifiers,
+            watchdog: watchdog,
+            targetDescription:
+                "Option+Tab pointer App-row presentation",
+            file: file,
+            line: line,
+            trigger: {
+                XCTAssertTrue(
+                    openGlobalSwitcherForPointerHover(
+                        diagnosticsSummary,
+                        traceLabel: traceLabel
+                    ),
+                    "Option+Tab pointer presentation did not "
+                        + "publish its exact diagnostics summary.",
+                    file: file,
+                    line: line
+                )
             }
-            XCTAssertTrue(waitForNonExistence(searchInput, timeout: 3))
+        )
+    }
+
+    func testSearchPanelEntryAndResultActivation() throws {
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
+        runRealSpaceFixtureWorkflow(
+            flowTabAdditionalArguments:
+                ["--flowtab-ui-open-switcher-search"]
+                + FlowTabUITestSwitcherSearchConfirmationPolicy
+                    .applicationEvidenceLaunchArguments
+        ) { identity, app in
+            let searchInput =
+                requireInitialFlowTabSearchInput(
+                    in: app,
+                    observedBy: readiness
+                )
+            XCTAssertTrue(
+                performAndWaitForCommittedSearchResultRow(
+                    in: app,
+                    scope: "app",
+                    query: identity.switcherSearchQuery,
+                    resultID: "app:\(identity.bundleIdentifier)",
+                    rowIdentifier:
+                        identity
+                            .switcherSearchAppAccessibilityIdentifier,
+                    timeout:
+                        FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                            .spaceFixtureSearchResultPublication,
+                    trigger: {
+                        app.typeText(
+                            identity.switcherSearchQuery
+                        )
+                    }
+                ),
+                "Search did not publish the exact committed "
+                    + "Space fixture App result row."
+            )
+
+            confirmSwitcherSearchSelection(
+                in: app,
+                searchInput: searchInput,
+                expectedQuery: identity.switcherSearchQuery
+            )
         }
     }
 
     func testSearchHeaderHighlightedAppChipStaysContentSizedForShortTitle() throws {
         let app = makeApp(additionalArguments: searchPointerHoverArguments)
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        let searchHeader = element(in: app, identifier: Identifier.switcherSearchHeader)
-        let highlightedChip = element(in: app, identifier: Identifier.switcherSearchHighlight)
-        XCTAssertTrue(searchHeader.waitForExistence(timeout: 5))
-        XCTAssertTrue(highlightedChip.waitForExistence(timeout: 5))
+        guard
+            let searchElements = waitForExactElementCollection(
+                in: app,
+                identifiers: [
+                    Identifier.switcherSearchHeader,
+                    Identifier.switcherSearchHighlight
+                ],
+                watchdog:
+                    FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                        .searchHeaderProjection,
+                targetDescription:
+                    "Search header and highlighted App chip",
+                trigger: {
+                    launchFlowTabUITestApplication(app)
+                    assertSearchMockApplicationIsForegroundReady(app)
+                }
+            )
+        else {
+            return
+        }
+        let highlightedChip = searchElements[1]
         XCTAssertGreaterThan(highlightedChip.frame.width, 40)
         XCTAssertLessThan(
             highlightedChip.frame.width,
@@ -113,373 +246,363 @@ extension FlowTabUITests {
     }
 
     func testSearchPanelChineseQueryShowsChineseMockResult() throws {
-        let app = makeApp(
-            additionalArguments: searchMockRuntimeArguments()
+        let launch = launchSearchMockApplication()
+        let app = launch.app
+
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: launch.readiness
         )
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
-
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        app.typeText("测")
-
-        let chineseResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.\("com.xxx.test".flowTabUITestAccessibilityIdentifierComponent)")
-            .firstMatch
-        XCTAssertTrue(chineseResult.waitForExistence(timeout: 5))
+        assertCommittedMockSearchResults(
+            in: app,
+            query: "测",
+            bundleIdentifiers: ["com.xxx.test"],
+            timeout:
+                FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                    .searchMockSingleResultProjection
+        )
     }
 
     func testSearchPanelPinyinInitialsShowChineseMockResult() throws {
-        let app = makeApp(
-            additionalArguments: searchMockRuntimeArguments()
+        let launch = launchSearchMockApplication()
+        let app = launch.app
+
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: launch.readiness
         )
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
-
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        app.typeText("cs")
-
-        let chineseResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.\("com.xxx.test".flowTabUITestAccessibilityIdentifierComponent)")
-            .firstMatch
-        XCTAssertTrue(chineseResult.waitForExistence(timeout: 5))
+        assertCommittedMockSearchResults(
+            in: app,
+            query: "cs",
+            bundleIdentifiers: ["com.xxx.test"],
+            timeout:
+                FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                    .searchMockSingleResultProjection
+        )
     }
 
     func testSearchPanelSharedCsQueryShowsCSGOAndChineseMockResults() throws {
-        let app = makeApp(
-            additionalArguments: searchMockRuntimeArguments()
+        let launch = launchSearchMockApplication()
+        let app = launch.app
+
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: launch.readiness
         )
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
-
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        app.typeText("cs")
-
-        let csgoResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.\("com.xxx.csgo".flowTabUITestAccessibilityIdentifierComponent)")
-            .firstMatch
-        XCTAssertTrue(csgoResult.waitForExistence(timeout: 5))
-
-        let chineseResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.\("com.xxx.test".flowTabUITestAccessibilityIdentifierComponent)")
-            .firstMatch
-        XCTAssertTrue(chineseResult.waitForExistence(timeout: 5))
+        assertCommittedMockSearchResults(
+            in: app,
+            query: "cs",
+            bundleIdentifiers: [
+                "com.xxx.csgo",
+                "com.xxx.test"
+            ],
+            timeout:
+                FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                    .searchMockMultipleResultProjection
+        )
     }
 
     func testSearchPanelCodeLikeSubsequenceShowsMockResult() throws {
-        let app = makeApp(
-            additionalArguments: searchMockRuntimeArguments()
+        let launch = launchSearchMockApplication()
+        let app = launch.app
+
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: launch.readiness
         )
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
-
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        app.typeText("cgo")
-
-        let csgoResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.\("com.xxx.csgo".flowTabUITestAccessibilityIdentifierComponent)")
-            .firstMatch
-        XCTAssertTrue(csgoResult.waitForExistence(timeout: 5))
+        assertCommittedMockSearchResults(
+            in: app,
+            query: "cgo",
+            bundleIdentifiers: ["com.xxx.csgo"],
+            timeout:
+                FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                    .searchMockSingleResultProjection
+        )
     }
 
     func testSearchPanelSegmentedChineseQueryShowsCompoundMockResult() throws {
-        let app = makeApp(
-            additionalArguments: searchMockRuntimeArguments()
+        let launch = launchSearchMockApplication()
+        let app = launch.app
+
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: launch.readiness
         )
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
-
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        app.typeText("文件助手")
-
-        let segmentedResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.\("com.flowtab.mock.file-transfer-assistant".flowTabUITestAccessibilityIdentifierComponent)")
-            .firstMatch
-        XCTAssertTrue(segmentedResult.waitForExistence(timeout: 5))
+        assertCommittedMockSearchResults(
+            in: app,
+            query: "文件助手",
+            bundleIdentifiers: [
+                "com.flowtab.mock.file-transfer-assistant"
+            ],
+            timeout:
+                FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                    .searchMockSingleResultProjection
+        )
     }
 
     func testOptionTabSwitcherPointerHoverSelectsMockAppAfterMovement() throws {
         let app = makeApp(additionalArguments: optionTabPointerHoverArguments)
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertSwitcherAndSearchApplicationIsForegroundReady(app)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        let browserTile = element(in: app, identifier: Identifier.switcherAppMockBrowser)
-        let mailTile = element(in: app, identifier: Identifier.switcherAppMockMail)
-        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 5))
-        XCTAssertTrue(browserTile.waitForExistence(timeout: 5))
-        XCTAssertTrue(mailTile.waitForExistence(timeout: 5))
+        guard
+            let appTiles = waitForOptionTabPointerAppRows(
+                in: app,
+                diagnosticsSummary: diagnosticsSummary,
+                identifiers: [
+                    Identifier.switcherAppMockBrowser,
+                    Identifier.switcherAppMockMail
+                ],
+                watchdog:
+                    FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                        .optionTabAppRowCollectionProjection,
+                traceLabel: "pointer.app.hover"
+            )
+        else {
+            return
+        }
+        let browserTile = appTiles[0]
+        let mailTile = appTiles[1]
         XCTAssertTrue(
-            waitForSwitcherDiagnosticsValue(
+            waitForSwitcherDiagnostics(
                 diagnosticsSummary,
                 key: "selected",
                 equals: "com.flowtab.mock.browser",
-                timeout: 3
+                timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.optionTabSelectedAppProjection
             )
         )
 
-        browserTile.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
-        mailTile.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
-
         XCTAssertTrue(
-            waitForSwitcherDiagnosticsValue(
+            performAndWaitForSwitcherDiagnostics(
                 diagnosticsSummary,
                 key: "selected",
                 equals: "com.flowtab.mock.mail",
-                timeout: 3
+                timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.optionTabSelectedAppProjection,
+                trigger: {
+                    browserTile.coordinate(
+                        withNormalizedOffset:
+                            CGVector(dx: 0.5, dy: 0.5)
+                    ).hover()
+                    mailTile.coordinate(
+                        withNormalizedOffset:
+                            CGVector(dx: 0.5, dy: 0.5)
+                    ).hover()
+                }
             ),
             "Hovering a switcher app tile after pointer movement should update the selected app. browserFrame=\(browserTile.frame) mailFrame=\(mailTile.frame) summary=\(diagnosticsSummary.value ?? "")"
-        )
-    }
-
-    func testOptionTabSwitcherStationaryPointerOverAppTileDoesNotSelectOnPresentation() throws {
-        let placementApp = makeApp(additionalArguments: optionTabPointerHoverArguments)
-        launchFlowTabUITestApplication(placementApp)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(placementApp, timeout: 10))
-
-        let placementMailTile = element(in: placementApp, identifier: Identifier.switcherAppMockMail)
-        XCTAssertTrue(placementMailTile.waitForExistence(timeout: 5))
-        let stationaryPoint = CGPoint(x: placementMailTile.frame.midX, y: placementMailTile.frame.midY)
-        placementMailTile.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
-        terminateAndWaitForNotRunning(placementApp)
-
-        let app = makeApp(additionalArguments: optionTabPointerHoverArguments)
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        let mailTile = element(in: app, identifier: Identifier.switcherAppMockMail)
-        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 5))
-        XCTAssertTrue(mailTile.waitForExistence(timeout: 5))
-        assertFrame(mailTile.frame, contains: stationaryPoint)
-        assertSwitcherDiagnosticsValueRemains(
-            diagnosticsSummary,
-            key: "selected",
-            equals: "com.flowtab.mock.browser",
-            duration: 1,
-            message: "A stationary pointer already over the mail app tile must not select it on presentation."
         )
     }
 
     func testOptionTabSwitcherClickCommitsAppAndClosesPanel() throws {
         let app = makeApp(additionalArguments: optionTabPointerHoverArguments)
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertSwitcherAndSearchApplicationIsForegroundReady(app)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        let mailTile = element(in: app, identifier: Identifier.switcherAppMockMail)
-        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 5))
-        XCTAssertTrue(mailTile.waitForExistence(timeout: 5))
+        guard
+            let mailTile = waitForOptionTabPointerAppRows(
+                in: app,
+                diagnosticsSummary: diagnosticsSummary,
+                identifiers: [
+                    Identifier.switcherAppMockMail
+                ],
+                watchdog:
+                    FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                        .optionTabSingleAppRowProjection,
+                traceLabel: "pointer.app.click"
+            )?.first
+        else {
+            return
+        }
 
-        mailTile.tap()
-
-        XCTAssertTrue(
-            waitForNonExistence(diagnosticsSummary, timeout: 2),
-            "Clicking an Option+Tab app tile should commit the app and close the panel immediately."
+        assertElementDoesNotExistAfterTrigger(
+            diagnosticsSummary,
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.optionTabAppClickDismissal,
+            description: "Option+Tab App-card click presentation dismissal",
+            trigger: { mailTile.tap() }
         )
     }
 
     func testControlTabSwitcherPointerHoverSelectsWindowAfterMovement() throws {
         let app = makeApp(additionalArguments: controlTabPointerHoverArguments)
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertSwitcherAndSearchApplicationIsForegroundReady(app)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let primaryWindowID = "flowtab.switcher.window.\("mock-current-primary".flowTabUITestAccessibilityIdentifierComponent)"
         let secondaryWindowID = "flowtab.switcher.window.\("mock-current-secondary".flowTabUITestAccessibilityIdentifierComponent)"
-        let primaryWindow = element(in: app, identifier: primaryWindowID)
-        let secondaryWindow = element(in: app, identifier: secondaryWindowID)
-        XCTAssertTrue(openInAppSwitcherForPointerHover(diagnosticsSummary))
-        XCTAssertTrue(primaryWindow.waitForExistence(timeout: 5))
-        XCTAssertTrue(secondaryWindow.waitForExistence(timeout: 5))
-
-        primaryWindow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
-        secondaryWindow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
+        guard
+            let windows = waitForExactElementCollection(
+                in: app,
+                identifiers: [
+                    primaryWindowID,
+                    secondaryWindowID
+                ],
+                watchdog:
+                    FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                        .controlTabWindowCollectionProjection,
+                targetDescription:
+                    "Control+Tab pointer Window-card presentation",
+                trigger: {
+                    XCTAssertTrue(
+                        openInAppSwitcherForPointerHover(
+                            diagnosticsSummary,
+                            traceLabel: "pointer.window.hover"
+                        ),
+                        "Control+Tab pointer presentation did not "
+                            + "publish its exact diagnostics summary."
+                    )
+                }
+            )
+        else {
+            return
+        }
+        let primaryWindow = windows[0]
+        let secondaryWindow = windows[1]
 
         XCTAssertTrue(
-            waitForSwitcherDiagnosticsValue(
+            performAndWaitForSwitcherDiagnostics(
                 diagnosticsSummary,
                 key: "selectedWindow",
                 equals: "mock-current-secondary",
-                timeout: 3
+                timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.controlTabSelectedWindowProjection,
+                trigger: {
+                    primaryWindow.coordinate(
+                        withNormalizedOffset:
+                            CGVector(dx: 0.5, dy: 0.5)
+                    ).hover()
+                    secondaryWindow.coordinate(
+                        withNormalizedOffset:
+                            CGVector(dx: 0.5, dy: 0.5)
+                    ).hover()
+                }
             ),
             "Hovering a Control+Tab window card after pointer movement should update the selected window."
-        )
-    }
-
-    func testControlTabSwitcherStationaryPointerOverWindowCardDoesNotSelectOnPresentation() throws {
-        let placementApp = makeApp(additionalArguments: controlTabPointerHoverArguments)
-        launchFlowTabUITestApplication(placementApp)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(placementApp, timeout: 10))
-
-        let placementSummary = element(in: placementApp, identifier: Identifier.switcherSummary)
-        XCTAssertTrue(openInAppSwitcherForPointerHover(placementSummary))
-        let secondaryWindowID = "flowtab.switcher.window.\("mock-current-secondary".flowTabUITestAccessibilityIdentifierComponent)"
-        let placementSecondaryWindow = element(in: placementApp, identifier: secondaryWindowID)
-        XCTAssertTrue(placementSecondaryWindow.waitForExistence(timeout: 5))
-        let stationaryPoint = CGPoint(
-            x: placementSecondaryWindow.frame.midX,
-            y: placementSecondaryWindow.frame.midY
-        )
-        placementSecondaryWindow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
-        terminateAndWaitForNotRunning(placementApp)
-
-        let app = makeApp(additionalArguments: controlTabPointerHoverArguments)
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        XCTAssertTrue(openInAppSwitcherForPointerHover(diagnosticsSummary))
-        let secondaryWindow = element(in: app, identifier: secondaryWindowID)
-        XCTAssertTrue(secondaryWindow.waitForExistence(timeout: 5))
-        assertFrame(secondaryWindow.frame, contains: stationaryPoint)
-        assertSwitcherDiagnosticsValueRemains(
-            diagnosticsSummary,
-            key: "selectedWindow",
-            equals: "mock-current-primary",
-            duration: 1,
-            message: "A stationary pointer already over the secondary window card must not select it on presentation."
         )
     }
 
     func testControlTabSwitcherClickCommitsWindowAndClosesPanel() throws {
         let app = makeApp(additionalArguments: controlTabPointerHoverArguments)
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertSwitcherAndSearchApplicationIsForegroundReady(app)
 
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let secondaryWindowID = "flowtab.switcher.window.\("mock-current-secondary".flowTabUITestAccessibilityIdentifierComponent)"
-        let secondaryWindow = element(in: app, identifier: secondaryWindowID)
-        XCTAssertTrue(openInAppSwitcherForPointerHover(diagnosticsSummary))
-        XCTAssertTrue(secondaryWindow.waitForExistence(timeout: 5))
+        guard
+            let secondaryWindow = waitForExactElementCollection(
+                in: app,
+                identifiers: [secondaryWindowID],
+                watchdog:
+                    FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                        .controlTabSingleWindowProjection,
+                targetDescription:
+                    "Control+Tab pointer Window-card presentation",
+                trigger: {
+                    XCTAssertTrue(
+                        openInAppSwitcherForPointerHover(
+                            diagnosticsSummary,
+                            traceLabel: "pointer.window.click"
+                        ),
+                        "Control+Tab pointer presentation did not "
+                            + "publish its exact diagnostics summary."
+                    )
+                }
+            )?.first
+        else {
+            return
+        }
 
-        secondaryWindow.tap()
-
-        XCTAssertTrue(
-            waitForNonExistence(diagnosticsSummary, timeout: 2),
-            "Clicking a Control+Tab window card should commit the window and close the panel immediately."
+        assertElementDoesNotExistAfterTrigger(
+            diagnosticsSummary,
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.controlTabWindowClickDismissal,
+            description: "Control+Tab window-card click presentation dismissal",
+            trigger: { secondaryWindow.tap() }
         )
     }
 
     func testSearchPanelPointerHoverSelectsResultAfterMovement() throws {
         let app = makeApp(additionalArguments: searchPointerHoverArguments)
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        let mailResultID = "flowtab.switcher.search.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
-        let browserResultID = "flowtab.switcher.search.app.\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
-        let mailResult = app.descendants(matching: .any)
-            .matching(identifier: mailResultID)
-            .firstMatch
-        let browserResult = app.descendants(matching: .any)
-            .matching(identifier: browserResultID)
-            .firstMatch
-        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 5))
-        XCTAssertTrue(mailResult.waitForExistence(timeout: 5))
-        XCTAssertTrue(browserResult.waitForExistence(timeout: 5))
+        guard
+            let resultRows = launchAndWaitForPointerSearchResultRows(
+                in: app,
+                bundleIdentifiers: [
+                    "com.flowtab.mock.mail",
+                    "com.flowtab.mock.browser"
+                ],
+                timeout:
+                    FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                        .searchPointerResultCollectionProjection
+            )
+        else {
+            return
+        }
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        let mailResult = resultRows[0]
+        let browserResult = resultRows[1]
         assertSearchResultUsesRowSizedFrame(mailResult)
         assertSearchResultUsesRowSizedFrame(browserResult)
 
-        mailResult.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
-        browserResult.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
-
         XCTAssertTrue(
-            waitForSwitcherDiagnosticsValue(
+            performAndWaitForSwitcherDiagnostics(
                 diagnosticsSummary,
                 key: "searchSelectedResult",
                 equals: "app:com.flowtab.mock.browser",
                 decodesPercentEncoding: true,
-                timeout: 3
+                timeout:
+                    FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                        .searchSelectedResultProjection,
+                trigger: {
+                    mailResult.coordinate(
+                        withNormalizedOffset:
+                            CGVector(dx: 0.5, dy: 0.5)
+                    ).hover()
+                    browserResult.coordinate(
+                        withNormalizedOffset:
+                            CGVector(dx: 0.5, dy: 0.5)
+                    ).hover()
+                }
             ),
             "Hovering a search result after pointer movement should update the selected search result."
         )
     }
 
-    func testSearchPanelStationaryPointerOverResultDoesNotSelectOnPresentation() throws {
-        let browserResultID = "flowtab.switcher.search.app.\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
-        let app = makeApp(additionalArguments: searchPointerHoverTriggerArguments)
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        XCTAssertTrue(openSearchSwitcherForPointerHover(diagnosticsSummary))
-
-        let primingBrowserResult = app.descendants(matching: .any)
-            .matching(identifier: browserResultID)
-            .firstMatch
-        XCTAssertTrue(primingBrowserResult.waitForExistence(timeout: 5))
-        app.typeKey(.escape, modifierFlags: [])
-        app.typeKey(.escape, modifierFlags: [])
-        XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 3))
-        XCTAssertTrue(openSearchSwitcherForPointerHover(diagnosticsSummary))
-
-        let placementBrowserResult = app.descendants(matching: .any)
-            .matching(identifier: browserResultID)
-            .firstMatch
-        XCTAssertTrue(placementBrowserResult.waitForExistence(timeout: 5))
-        assertSearchResultUsesRowSizedFrame(placementBrowserResult)
-        let stationaryPoint = CGPoint(
-            x: placementBrowserResult.frame.midX,
-            y: placementBrowserResult.frame.midY
-        )
-        app.typeKey(.escape, modifierFlags: [])
-        app.typeKey(.escape, modifierFlags: [])
-        XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 3))
-        let homeContent = element(in: app, identifier: Identifier.homeTabContent)
-        XCTAssertTrue(homeContent.waitForExistence(timeout: 3))
-        hoverScreenPoint(stationaryPoint, relativeTo: homeContent)
-        XCTAssertTrue(openSearchSwitcherForPointerHover(diagnosticsSummary))
-
-        let browserResult = app.descendants(matching: .any)
-            .matching(identifier: browserResultID)
-            .firstMatch
-        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 5))
-        XCTAssertTrue(browserResult.waitForExistence(timeout: 5))
-        assertSearchResultUsesRowSizedFrame(browserResult)
-        assertFrame(browserResult.frame, contains: stationaryPoint)
-        assertSwitcherDiagnosticsValueRemains(
-            diagnosticsSummary,
-            key: "searchSelectedResult",
-            equals: "app%3Acom.flowtab.mock.mail",
-            duration: 1,
-            message: "A stationary pointer already over the browser search result must not select it on presentation."
-        )
-    }
-
     func testSearchPanelClickCommitsResultAndClosesPanel() throws {
         let app = makeApp(additionalArguments: searchPointerHoverArguments)
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        let browserResultID = "flowtab.switcher.search.app.\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
-        let browserResult = app.descendants(matching: .any)
-            .matching(identifier: browserResultID)
-            .firstMatch
-        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 5))
-        XCTAssertTrue(browserResult.waitForExistence(timeout: 5))
+        guard
+            let browserResult =
+                launchAndWaitForPointerSearchResultRows(
+                    in: app,
+                    bundleIdentifiers: [
+                        "com.flowtab.mock.browser"
+                    ],
+                    timeout:
+                        FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                            .searchPointerSingleResultProjection
+                )?.first
+        else {
+            return
+        }
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
         assertSearchResultUsesRowSizedFrame(browserResult)
 
-        browserResult.tap()
-
-        XCTAssertTrue(
-            waitForNonExistence(diagnosticsSummary, timeout: 2),
-            "Clicking a search result row should commit the result and close the panel immediately."
+        assertElementDoesNotExistAfterTrigger(
+            diagnosticsSummary,
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.searchResultClickDismissal,
+            description: "Search result-row click presentation dismissal",
+            trigger: { browserResult.tap() }
         )
     }
 
     func testSwitcherInitialPresentationStaleOcclusionDoesNotHardRecover() throws {
         let logSnapshot = makeRuntimeLogFileSnapshot()
+        defer { logSnapshot.cancel() }
         let app = makeApp(
             additionalArguments: [
                 "--flowtab-ui-reset-defaults",
@@ -496,21 +619,27 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertSwitcherAndSearchApplicationIsForegroundReady(app)
 
-        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
-            .global,
-            traceLabel: "initial-stale-occlusion"
-        )
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherAppMockBrowser).waitForExistence(timeout: 5))
+        _ = waitForExactElementCollection(
+            in: app,
+            identifiers: [Identifier.switcherAppMockBrowser],
+            watchdog: FlowTabUITestSwitcherAndSearchWatchdogPolicy.initialStaleOcclusionBrowserRowProjection,
+            targetDescription: "Initial stale-occlusion Browser-row presentation"
+        ) {
+            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                .global, traceLabel: "initial-stale-occlusion"
+            )
+        }
 
         waitForRuntimeLogFiles(
             containing: [
+                "phase=installed staleMs=260",
+                "phase=released staleMs=260",
                 "initial panel occlusion stale released",
                 "presentationRecovery trigger=global_show action=complete"
             ],
-            since: logSnapshot,
-            timeout: 8
+            since: logSnapshot
         )
         let logContents = runtimeLogContentsSinceSnapshot(logSnapshot)
         XCTAssertTrue(
@@ -552,24 +681,25 @@ extension FlowTabUITests {
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        assertSwitcherAndSearchApplicationIsForegroundReady(app)
 
-        let hostWeChatRow = element(in: app, identifier: Identifier.switcherAppWeChat)
-        let topLevelZeroWindowRow = element(in: app, identifier: Identifier.switcherAppTopLevelZeroWindow)
         let logSnapshot = makeRuntimeLogFileSnapshot()
+        defer { logSnapshot.cancel() }
         try FlowTabUITestSwitcherCommandPayload.write("com.tencent.xinWeChat")
 
         app.activate()
         XCUIElement.perform(withKeyModifiers: .option) {
-            app.typeKey(.tab, modifierFlags: .option)
-
             XCTAssertTrue(
-                hostWeChatRow.waitForExistence(timeout: 8),
-                "Option+Tab should open the switcher with the outer WeChat app row."
-            )
-            XCTAssertTrue(
-                topLevelZeroWindowRow.waitForExistence(timeout: 8),
-                "The nested-app filter must not hide ordinary top-level 0w apps."
+                assertInitialSwitcherAppProjectionAfterLaunch(
+                    in: app,
+                    requiredBundleIdentifiers: ["com.tencent.xinWeChat", "com.flowtab.mock.top-level-zero-window"],
+                    excludedBundleIdentifiers: ["com.tencent.flue.WeChatAppEx", "com.tencent.flue.WeApp"],
+                    targetDescription: "Option+Tab nested-topology App rows",
+                    timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.nestedTopologyAppProjection,
+                    trigger: { app.typeKey(.tab, modifierFlags: .option) }
+                ),
+                "Option+Tab should publish the exact nested-topology "
+                    + "App-row projection."
             )
             let switcherAppIdentifiers = Set(
                 app.descendants(matching: .any)
@@ -592,34 +722,32 @@ extension FlowTabUITests {
                 """
             )
 
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.selectApp, traceLabel: "nestedTopology.selectWeChat")
-            app.typeKey(.downArrow, modifierFlags: [])
-            _ = waitForSwitcherWindowCards(
+            _ = performAndWaitForSwitcherWindowCards(
                 in: app,
-                expectedTitles: [
-                    "微信",
-                    "微信（窗口）",
-                    "Mock Mini Program Window"
-                ],
-                timeout: 6
-            )
+                expectedTitles: ["微信", "微信（窗口）", "Mock Mini Program Window"],
+                requiresEmptyInitialSnapshot: true,
+                timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.nestedTopologyWindowProjection
+            ) {
+                postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                    .selectApp, traceLabel: "nestedTopology.selectWeChat"
+                )
+                app.typeKey(.downArrow, modifierFlags: [])
+            }
 
             let screenshot = XCTAttachment(screenshot: app.screenshot())
             screenshot.name = "Option Tab switcher nested zero-window topology"
             screenshot.lifetime = .keepAlways
             add(screenshot)
         }
-
         waitForRuntimeLogFiles(
             containing: [
                 "hotkeyPressed dir=forward panelVisible=0 action=show",
                 "HotKey Forward"
             ],
             since: logSnapshot,
-            timeout: 10
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.nestedTopologyHotkeyLog
         )
     }
-
     func testSwitcherWindowLayerPaginatesLargeMockWindowSet() throws {
         let app = makeApp(
             additionalArguments: [
@@ -627,235 +755,45 @@ extension FlowTabUITests {
                 "--flowtab-ui-mock-runtime",
                 "--flowtab-ui-mock-window-previews",
                 "--flowtab-ui-enable-mock-hotkey-effects",
-                "--flowtab-ui-mock-runtime-variant",
-                "single-app-many-windows",
+                "--flowtab-ui-mock-runtime-variant", "single-app-many-windows",
                 "--flowtab-ui-open-switcher",
                 "--flowtab-ui-listen-switcher-trigger",
-                "--flowtab-ui-runtime-log-level",
-                "DEBUG",
-                "--flowtab-ui-enable-verbose-logs",
-                "-showPermissionReminder",
-                "NO"
+                "--flowtab-ui-runtime-log-level", "DEBUG",
+                "--flowtab-ui-enable-verbose-logs", "-showPermissionReminder", "NO"
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         )
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherAppMockManyWindows).waitForExistence(timeout: 5))
-
-        postFlowTabUITestSwitcherCommandAndWaitForDelivery(.advanceDown, traceLabel: "many-window-page")
-
-        let firstWindowID = "flowtab.switcher.window.\("mock-many-window-00".flowTabUITestAccessibilityIdentifierComponent)"
-        XCTAssertTrue(element(in: app, identifier: firstWindowID).waitForExistence(timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherNextWindowPage).waitForExistence(timeout: 2))
-
-        let windowCards = switcherWindowCardObservations(in: app)
-        XCTAssertGreaterThan(windowCards.count, 0)
-        XCTAssertLessThan(windowCards.count, 20)
-        XCTAssertTrue(
-            windowCards.allSatisfy { $0.frame.width >= 100 },
-            "Expected current visible window cards to keep preview width, found \(windowCards.map { "\($0.identifier)=\($0.frame)" })"
-        )
-        XCTAssertTrue(
-            windowCards.allSatisfy(\.hasImage),
-            "Expected current visible window cards to expose mock screenshots, found \(windowCards.map { "\($0.identifier)=\($0.value)" })"
-        )
-        XCTAssertFalse(
-            app.descendants(matching: .any)
-                .matching(identifier: "flowtab.switcher.window.\("mock-many-window-25".flowTabUITestAccessibilityIdentifierComponent)")
-                .firstMatch
-                .exists
-        )
-    }
-
-    func testSearchPanelWrapFromLastResultScrollsBackToFirstResult() throws {
-        let app = makeApp(
-            additionalArguments: searchMockRuntimeArguments(mockRuntimeVariant: "search-wrap")
-        )
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
-
-        let firstResultIdentifier = "flowtab.switcher.search.app.\("com.flowtab.mock.wrap.01".flowTabUITestAccessibilityIdentifierComponent)"
-        let lastResultIdentifier = "flowtab.switcher.search.app.\("com.flowtab.mock.wrap.10".flowTabUITestAccessibilityIdentifierComponent)"
-
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        app.typeKey(.downArrow, modifierFlags: [])
-        RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-
-        for _ in 0..<9 {
-            app.typeKey(.downArrow, modifierFlags: [])
-            RunLoop.current.run(until: Date().addingTimeInterval(0.08))
-        }
-
-        XCTAssertTrue(
-            hasHittableElement(
-                in: app.descendants(matching: .any).matching(identifier: lastResultIdentifier),
-                timeout: 2
-            )
-        )
-
-        app.typeKey(.downArrow, modifierFlags: [])
-
-        XCTAssertTrue(
-            hasHittableElement(
-                in: app.descendants(matching: .any).matching(identifier: firstResultIdentifier),
-                timeout: 5
-            )
-        )
-    }
-
-    func testTabSwitchStressCPUAndMemory() throws {
-        let options = XCTMeasureOptions()
-        options.iterationCount = 3
-
-        measure(metrics: [XCTClockMetric(), XCTCPUMetric(), XCTMemoryMetric()], options: options) {
-            let app = makeApp(
-                additionalArguments: [
-                    "--flowtab-ui-reset-defaults",
-                    "--flowtab-ui-mock-runtime",
-                    "--flowtab-tab-stress",
-                    "--flowtab-tab-stress-duration",
-                    "2",
-                    "--flowtab-tab-stress-interval-ms",
-                    "16",
-                    "-showPermissionReminder",
-                    "NO"
-                ]
-            )
+        XCTAssertTrue(assertInitialSwitcherAppProjectionAfterLaunch(
+            in: app, requiredBundleIdentifiers: ["com.flowtab.mock.many-windows"],
+            excludedBundleIdentifiers: [], projectionExpectation: .exactEntry("com.flowtab.mock.many-windows:100"),
+            targetDescription: "many-window pagination initial App projection", timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.manyWindowInitialAppProjection
+        ) {
             launchFlowTabUITestApplication(app)
-            XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 5))
-            XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
-        }
+            assertSwitcherAndSearchApplicationIsForegroundReady(app)
+        })
+        let firstWindowObservation = startElementExistenceObservation(in: app, identifier: "flowtab.switcher.window.\("mock-many-window-00".flowTabUITestAccessibilityIdentifierComponent)", requiresInitialAbsence: true)
+        defer { firstWindowObservation.cancel() }
+        let nextPageObservation = startElementExistenceObservation(in: app, identifier: Identifier.switcherNextWindowPage, requiresInitialAbsence: true)
+        defer { nextPageObservation.cancel() }
+        let pageObservation = startSwitcherWindowPageProjectionObservation(in: app,
+            expectation: FlowTabUITestSwitcherWindowPageExpectation(
+                expectedWindows: (0..<16).map { (id: String(format: "mock-many-window-%02d", $0), title: String(format: "Many Window %02d", $0)) },
+                excludedWindowIDs: ["mock-many-window-25"],
+                minimumCardCount: FlowTabUITestSwitcherWindowPageProjectionPolicy.minimumCardCount,
+                maximumCardCount: FlowTabUITestSwitcherWindowPageProjectionPolicy.maximumCardCount,
+                minimumCardWidth: FlowTabUITestSwitcherWindowPageProjectionPolicy.minimumCardWidth,
+                maximumCardGap: FlowTabUITestSwitcherWindowPageProjectionPolicy.maximumCardGap),
+            nextPageIdentifier: Identifier.switcherNextWindowPage, requiresEmptyInitialSnapshot: true)
+        defer { pageObservation.cancel() }
+        postFlowTabUITestSwitcherCommandAndWaitForDelivery(.advanceDown, traceLabel: "many-window-page")
+        firstWindowObservation.markTriggerCompleted()
+        nextPageObservation.markTriggerCompleted()
+        pageObservation.markTriggerCompleted()
+        assertElementExistsAfterTrigger(firstWindowObservation,
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.manyWindowFirstWindowProjection, description: "many-window first Window-card projection")
+        assertElementExistsAfterTrigger(nextPageObservation,
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.manyWindowNextPageControlProjection, description: "many-window next-page control projection")
+        _ = assertSwitcherWindowPageProjectionAfterTrigger(pageObservation,
+            timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.manyWindowFirstPageProjection,
+            description: "many-window complete first-page projection")
     }
-
-    private func waitForSwitcherDiagnosticsValue(
-        _ diagnosticsSummary: XCUIElement,
-        key: String,
-        equals expectedValue: String,
-        decodesPercentEncoding: Bool = false,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            var value = switcherPanelDiagnosticsValue(diagnosticsSummary, key: key)
-            if decodesPercentEncoding {
-                value = value.removingPercentEncoding ?? value
-            }
-            if value == expectedValue {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-
-    private func assertSwitcherDiagnosticsValueRemains(
-        _ diagnosticsSummary: XCUIElement,
-        key: String,
-        equals expectedValue: String,
-        duration: TimeInterval,
-        message: String,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        let deadline = Date().addingTimeInterval(duration)
-        repeat {
-            let value = switcherPanelDiagnosticsValue(diagnosticsSummary, key: key)
-            if value != expectedValue {
-                XCTFail(
-                    "\(message) Expected \(key)=\(expectedValue), found \(value). summary=\(diagnosticsSummary.value ?? "")",
-                    file: file,
-                    line: line
-                )
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-    }
-
-    private func openInAppSwitcherForPointerHover(_ diagnosticsSummary: XCUIElement) -> Bool {
-        let deadline = Date().addingTimeInterval(8)
-        var attempt = 1
-        repeat {
-            postFlowTabUITestSwitcherTrigger(
-                .inApp,
-                traceLabel: "pointer.window.open.\(attempt)"
-            )
-            if diagnosticsSummary.waitForExistence(timeout: 1.2) {
-                return true
-            }
-            attempt += 1
-        } while Date() < deadline
-
-        return diagnosticsSummary.exists
-    }
-
-    private func openSearchSwitcherForPointerHover(_ diagnosticsSummary: XCUIElement) -> Bool {
-        let deadline = Date().addingTimeInterval(8)
-        var attempt = 1
-        repeat {
-            postFlowTabUITestSwitcherTrigger(
-                .search,
-                traceLabel: "pointer.search.open.\(attempt)"
-            )
-            if diagnosticsSummary.waitForExistence(timeout: 1.2) {
-                return true
-            }
-            attempt += 1
-        } while Date() < deadline
-
-        return diagnosticsSummary.exists
-    }
-
-    private func assertFrame(
-        _ frame: CGRect,
-        contains point: CGPoint,
-        tolerance: CGFloat = 2,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        let expandedFrame = frame.insetBy(dx: -tolerance, dy: -tolerance)
-        XCTAssertTrue(
-            expandedFrame.contains(point),
-            "Expected stationary pointer point \(point) to remain inside target frame \(frame).",
-            file: file,
-            line: line
-        )
-    }
-
-    private func assertSearchResultUsesRowSizedFrame(
-        _ result: XCUIElement,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        XCTAssertGreaterThan(
-            result.frame.width,
-            200,
-            "Search result hover tests must target the full result row, not only its label. frame=\(result.frame)",
-            file: file,
-            line: line
-        )
-    }
-
-    private func hoverScreenPoint(_ point: CGPoint, relativeTo element: XCUIElement) {
-        element.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-            .withOffset(
-                CGVector(
-                    dx: point.x - element.frame.minX,
-                    dy: point.y - element.frame.minY
-                )
-            )
-            .hover()
-    }
-
-    private func terminateAndWaitForNotRunning(
-        _ app: XCUIApplication,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        app.terminate()
-        XCTAssertTrue(app.wait(for: .notRunning, timeout: 5), file: file, line: line)
-    }
-
 }

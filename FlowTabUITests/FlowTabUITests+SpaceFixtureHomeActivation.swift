@@ -1,7 +1,74 @@
 import AppKit
 import XCTest
 
+enum FlowTabUITestHomeActivationPolicy {
+    static let homeTabNavigationWatchdog: TimeInterval = 10
+    static let appRowPublicationWatchdog: TimeInterval = 20
+    static let homeWindowProjectionWatchdog: TimeInterval = 12
+    static let exactWindowActivationWatchdog: TimeInterval = 10
+}
+
 extension FlowTabUITests {
+    func testHomeActivationWatchdogPolicyCompatibility() {
+        XCTAssertEqual(
+            FlowTabUITestHomeActivationPolicy
+                .homeTabNavigationWatchdog,
+            10
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeActivationPolicy
+                .homeTabNavigationWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestHomeActivationPolicy
+                .homeTabNavigationWatchdog,
+            0
+        )
+        XCTAssertEqual(
+            FlowTabUITestHomeActivationPolicy
+                .appRowPublicationWatchdog,
+            20
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeActivationPolicy
+                .appRowPublicationWatchdog.isFinite
+        )
+        XCTAssertGreaterThanOrEqual(
+            FlowTabUITestHomeActivationPolicy
+                .appRowPublicationWatchdog,
+            FlowTabUITestHomeActivationPolicy
+                .homeTabNavigationWatchdog
+        )
+        XCTAssertEqual(
+            FlowTabUITestHomeActivationPolicy
+                .homeWindowProjectionWatchdog,
+            12
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeActivationPolicy
+                .homeWindowProjectionWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestHomeActivationPolicy
+                .homeWindowProjectionWatchdog,
+            0
+        )
+        XCTAssertEqual(
+            FlowTabUITestHomeActivationPolicy
+                .exactWindowActivationWatchdog,
+            10
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeActivationPolicy
+                .exactWindowActivationWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestHomeActivationPolicy
+                .exactWindowActivationWatchdog,
+            0
+        )
+    }
+
     func testHomePageClickingRealWorkflowWindowActivatesExactFixtureWindow() throws {
         try runRealSpaceFixtureMultiAppWorkflow(
             waitsForFullscreenMarkers: false
@@ -15,8 +82,22 @@ extension FlowTabUITests {
                 "Home activation workflow must expose a non-initial target window title."
             )
 
+            let homeTabButtons =
+                app.buttons.matching(
+                    identifier: Identifier.homeTabButton
+                )
+            let homeTab = homeTabButtons.firstMatch
             XCTAssertTrue(
-                tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10)
+                tapFirstHittable(
+                    in: homeTabButtons,
+                    timeout:
+                        FlowTabUITestHomeActivationPolicy
+                            .homeTabNavigationWatchdog
+                ),
+                "Home activation Home-tab watchdog expired. "
+                    + "candidateCount=\(homeTabButtons.count) "
+                    + "firstExists=\(homeTab.exists) "
+                    + "firstHittable=\(homeTab.isHittable)"
             )
             XCTAssertNotEqual(
                 NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
@@ -27,28 +108,52 @@ extension FlowTabUITests {
             let homeAppRow = app.buttons
                 .matching(identifier: targetApp.identity.homeAppAccessibilityIdentifier)
                 .firstMatch
+            let appRowPublished =
+                homeAppRow.waitForExistence(
+                    timeout:
+                        FlowTabUITestHomeActivationPolicy
+                            .appRowPublicationWatchdog
+                )
             XCTAssertTrue(
-                homeAppRow.waitForExistence(timeout: 20),
-                "FlowTab did not surface \(targetApp.appName) on the home page."
+                appRowPublished,
+                "Home activation App-row publication watchdog expired. "
+                    + "app=\(targetApp.appName) "
+                    + "expectedIdentifier="
+                    + "\(targetApp.identity.homeAppAccessibilityIdentifier) "
+                    + "finalExists=\(homeAppRow.exists) "
+                    + "finalHittable=\(homeAppRow.isHittable)"
             )
-            tapElement(homeAppRow)
-
             let targetWindowRow = try XCTUnwrap(
-                waitForHomeWindowRow(in: app, title: targetWindowTitle, timeout: 12),
+                performAndWaitForHomeWindowRow(
+                    in: app,
+                    title: targetWindowTitle,
+                    timeout:
+                        FlowTabUITestHomeActivationPolicy
+                            .homeWindowProjectionWatchdog,
+                    trigger: {
+                        tapElement(homeAppRow)
+                    }
+                ),
                 "FlowTab did not expose a Home window row for \(targetApp.appName) / \(targetWindowTitle)."
             )
             let targetWindowNumber = try XCTUnwrap(
                 cgWindowNumber(fromHomeWindowRowIdentifier: targetWindowRow.identifier),
                 "Home window row did not expose a CG window identifier: \(targetWindowRow.identifier)"
             )
-            targetWindowRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-
             XCTAssertTrue(
-                waitForFrontmostWorkflowWindow(
+                triggerAndWaitForFrontmostWorkflowWindow(
                     windowNumber: targetWindowNumber,
                     title: targetWindowTitle,
                     app: targetApp,
-                    timeout: 10
+                    timeout:
+                        FlowTabUITestHomeActivationPolicy
+                            .exactWindowActivationWatchdog,
+                    trigger: {
+                        targetWindowRow.coordinate(
+                            withNormalizedOffset:
+                                CGVector(dx: 0.5, dy: 0.5)
+                        ).tap()
+                    }
                 ),
                 "Clicking the Home window row did not activate the exact \(targetWindowTitle) fixture window."
             )
@@ -78,39 +183,73 @@ extension FlowTabUITests {
         in app: XCUIApplication,
         timeout: TimeInterval
     ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
+        let watchdogBudget =
+            FlowTabUITestHomeAppSelectionWatchdogBudget(
+                timeout: timeout
+            )
         let rowIdentifier = workflowApp.identity.homeAppAccessibilityIdentifier
         let expectedTitle = workflowApp.expectedHomeWindowTitles.first
+        let homeRow = app.buttons
+            .matching(identifier: rowIdentifier)
+            .firstMatch
+        let appList = app.scrollViews
+            .matching(identifier: Identifier.homeAppList)
+            .firstMatch
+        let fallbackScrollContainers =
+            app.scrollViews.allElementsBoundByIndex
 
-        repeat {
-            if let expectedTitle,
-               waitForHomeWindowTitle(expectedTitle, in: app, timeout: 0.1) {
-                return true
-            }
-
-            let remainingTime = deadline.timeIntervalSinceNow
-            guard remainingTime > 0 else { break }
-            let homeRow = app.buttons.matching(identifier: rowIdentifier).firstMatch
-            let appList = app.scrollViews.matching(identifier: Identifier.homeAppList).firstMatch
-            guard tapElementAfterScrollingIntoView(
+        guard let expectedTitle else {
+            return tapElementAfterScrollingIntoView(
                 homeRow,
                 in: appList,
-                fallbackScrollContainers: app.scrollViews.allElementsBoundByIndex,
-                timeout: min(2, remainingTime)
-            ) else {
-                continue
-            }
+                fallbackScrollContainers:
+                    fallbackScrollContainers,
+                timeout: watchdogBudget.remaining
+            )
+        }
 
-            guard let expectedTitle else { return true }
-            if waitForHomeWindowTitle(
-                expectedTitle,
-                in: app,
-                timeout: min(1.5, max(0.1, deadline.timeIntervalSinceNow))
-            ) {
-                return true
-            }
-        } while Date() < deadline
+        let owner =
+            FlowTabUITestHomeAppSelectionObservationOwner(
+                expectedTitle: expectedTitle,
+                readback: {
+                    self.homeWindowProjectionSnapshot(
+                        in: app,
+                        expectation: .titleVisible(expectedTitle)
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+        if owner.resolvedEvidence != nil {
+            return true
+        }
 
-        return false
+        guard tapElementAfterScrollingIntoView(
+            homeRow,
+            in: appList,
+            fallbackScrollContainers:
+                fallbackScrollContainers,
+            timeout: watchdogBudget.remaining
+        ) else {
+            logFlowTabUITestTrace(
+                "Home app-row trigger failed for \(workflowApp.appName). "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+
+        owner.markTriggerCompleted()
+        guard owner.waitForResolution(
+            timeout: watchdogBudget.remaining
+        ) != nil else {
+            logFlowTabUITestTrace(
+                "Home app selection watchdog expired for "
+                    + "\(workflowApp.appName). "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+
+        return true
     }
 }

@@ -19,7 +19,6 @@ enum RuntimeAXRemoteWindowResolver {
     enum RemoteScanCompleteness: Equatable {
         case unavailable
         case complete(scanned: Int)
-        case partialTimedOut(scanned: Int, maximum: Int)
     }
 
     enum RemoteAXResolveFailureReason: Equatable {
@@ -66,24 +65,24 @@ enum RuntimeAXRemoteWindowResolver {
     struct RuntimeAXRemoteScanPolicy: Equatable {
         let useCase: RuntimeAXRemoteScanUseCase
         let maximumElementID: UInt64
-        let timeoutSeconds: TimeInterval
+
+        var elementIDs: Range<AXUIElementID> {
+            AXUIElementID(0)..<maximumElementID
+        }
 
         static let interactive = RuntimeAXRemoteScanPolicy(
             useCase: .interactive,
-            maximumElementID: 750,
-            timeoutSeconds: 0.080
+            maximumElementID: 750
         )
 
         static let hotPath = RuntimeAXRemoteScanPolicy(
             useCase: .hotPath,
-            maximumElementID: 1_000,
-            timeoutSeconds: 0.100
+            maximumElementID: 1_000
         )
 
         static let background = RuntimeAXRemoteScanPolicy(
             useCase: .background,
-            maximumElementID: 2_000,
-            timeoutSeconds: 0.250
+            maximumElementID: 2_000
         )
 
         static func policy(for useCase: RuntimeAXRemoteScanUseCase) -> RuntimeAXRemoteScanPolicy {
@@ -147,48 +146,32 @@ enum RuntimeAXRemoteWindowResolver {
         }
 
         var token = remoteToken(pid: pid, elementID: 0)
-        var windows: [AXUIElement] = []
-        let startedAt = Date.timeIntervalSinceReferenceDate
-        for elementID in AXUIElementID(0)..<policy.maximumElementID {
-            let scannedCount = Int(elementID) + 1
+        return scanElementIDs(policy: policy) { elementID in
             token.replaceSubrange(
                 RemoteTokenLayout.elementIDRange,
                 with: withUnsafeBytes(of: elementID) { Data($0) }
             )
             let element = createWithRemoteToken(token as CFData)?.takeRetainedValue()
-            let resolveResult = remoteAXResolveResult(
+            return remoteAXResolveResult(
                 element: element,
                 elementID: elementID,
                 expectedPID: pid
-            )
-            guard let resolvedElement = resolveResult.element else {
-                if Date.timeIntervalSinceReferenceDate - startedAt >= policy.timeoutSeconds {
-                    return timedOutScanResult(
-                        pid: pid,
-                        windows: windows,
-                        scannedCount: scannedCount,
-                        policy: policy
-                    )
-                }
-                continue
-            }
+            ).element
+        }
+    }
+
+    static func scanElementIDs(
+        policy: RuntimeAXRemoteScanPolicy,
+        resolveElement: (AXUIElementID) -> AXUIElement?
+    ) -> WindowScanResult {
+        var windows: [AXUIElement] = []
+        for elementID in policy.elementIDs {
+            guard let resolvedElement = resolveElement(elementID) else { continue }
             windows.append(resolvedElement)
-            if Date.timeIntervalSinceReferenceDate - startedAt >= policy.timeoutSeconds {
-                return timedOutScanResult(
-                    pid: pid,
-                    windows: windows,
-                    scannedCount: scannedCount,
-                    policy: policy
-                )
-            }
         }
         return WindowScanResult(
             windows: windows,
-            completeness: scanCompleteness(
-                scannedCount: Int(policy.maximumElementID),
-                timedOut: false,
-                policy: policy
-            )
+            completeness: .complete(scanned: policy.elementIDs.count)
         )
     }
 
@@ -218,35 +201,6 @@ enum RuntimeAXRemoteWindowResolver {
         token.replaceSubrange(RemoteTokenLayout.markerRange, with: withUnsafeBytes(of: marker) { Data($0) })
         token.replaceSubrange(RemoteTokenLayout.elementIDRange, with: withUnsafeBytes(of: remoteElementID) { Data($0) })
         return token
-    }
-
-    private static func timedOutScanResult(
-        pid: pid_t,
-        windows: [AXUIElement],
-        scannedCount: Int,
-        policy: RuntimeAXRemoteScanPolicy
-    ) -> WindowScanResult {
-        let completeness = scanCompleteness(
-            scannedCount: scannedCount,
-            timedOut: true,
-            policy: policy
-        )
-        RuntimeLog.debug(
-            .ax,
-            "remote scan partial pid=\(pid) useCase=\(policy.useCase) scanned=\(scannedCount) maximum=\(policy.maximumElementID) budgetMs=\(Int(policy.timeoutSeconds * 1_000)) windows=\(windows.count)"
-        )
-        return WindowScanResult(windows: windows, completeness: completeness)
-    }
-
-    static func scanCompleteness(
-        scannedCount: Int,
-        timedOut: Bool,
-        policy: RuntimeAXRemoteScanPolicy = defaultScanPolicy
-    ) -> RemoteScanCompleteness {
-        if timedOut {
-            return .partialTimedOut(scanned: scannedCount, maximum: Int(policy.maximumElementID))
-        }
-        return .complete(scanned: scannedCount)
     }
 
     static func scanPolicy(

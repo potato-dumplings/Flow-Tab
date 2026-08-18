@@ -1,6 +1,54 @@
 import AppKit
 import Foundation
 
+struct PanelVisibilitySnapshot: Equatable {
+    let panelPresented: Bool
+    let userVisible: Bool
+    let occlusionVisible: Bool
+    let panelKey: Bool
+    let appActive: Bool
+    let searchActive: Bool
+    let inputFocused: Bool
+    let firstResponder: String
+
+    var logFields: String {
+        "panelVisible=\(panelPresented ? 1 : 0) "
+            + "userVisible=\(userVisible ? 1 : 0) "
+            + "occlusionVisible=\(occlusionVisible ? 1 : 0) "
+            + "panelKey=\(panelKey ? 1 : 0) "
+            + "appActive=\(appActive ? 1 : 0) "
+            + "searchActive=\(searchActive ? 1 : 0) "
+            + "inputFocused=\(inputFocused ? 1 : 0) "
+            + "firstResponder=\(firstResponder)"
+    }
+}
+
+struct PanelVisibilityRecoveryDiagnostic: Equatable {
+    let trigger: String
+    let generation: Int?
+    let attempt: Int?
+    let totalAttempts: Int?
+    let mode: SwitcherPanelController.PanelVisibilityRecoveryMode
+    let before: PanelVisibilitySnapshot
+    let after: PanelVisibilitySnapshot
+
+    var logMessage: String {
+        var fields = [
+            "presentationRecovery",
+            "trigger=\(trigger)",
+            "action=visibilityReadback",
+            "mode=\(mode.debugName)",
+            "generation=\(generation.map(String.init) ?? "nil")"
+        ]
+        if let attempt, let totalAttempts {
+            fields.append("attempt=\(attempt)/\(totalAttempts)")
+        }
+        fields.append("before{\(before.logFields)}")
+        fields.append("after{\(after.logFields)}")
+        return fields.joined(separator: " ")
+    }
+}
+
 extension SwitcherPanelController {
     func logPanelPresentationBreakdown(
         kind: String,
@@ -14,7 +62,6 @@ extension SwitcherPanelController {
         firstOrderReadyMs: Double,
         hideReadyMs: Double,
         secondOrderReadyMs: Double,
-        ignoreReadyMs: Double,
         recoveryReadyMs: Double,
         monitorReadyMs: Double,
         autoEnterReadyMs: Double
@@ -30,8 +77,7 @@ extension SwitcherPanelController {
                 + "order1Ms=\(formatMilliseconds(firstOrderReadyMs - levelReadyMs)) "
                 + "hideMs=\(formatMilliseconds(hideReadyMs - firstOrderReadyMs)) "
                 + "order2Ms=\(formatMilliseconds(secondOrderReadyMs - hideReadyMs)) "
-                + "ignoreMs=\(formatMilliseconds(ignoreReadyMs - secondOrderReadyMs)) "
-                + "recoveryScheduleMs=\(formatMilliseconds(recoveryReadyMs - ignoreReadyMs)) "
+                + "recoveryScheduleMs=\(formatMilliseconds(recoveryReadyMs - secondOrderReadyMs)) "
                 + "monitorMs=\(formatMilliseconds(monitorReadyMs - recoveryReadyMs)) "
                 + "autoEnterMs=\(formatMilliseconds(autoEnterReadyMs - monitorReadyMs)) "
                 + "totalMs=\(formatMilliseconds(autoEnterReadyMs - showStartMs))"
@@ -43,44 +89,51 @@ extension SwitcherPanelController {
         showStartMs: Double,
         presentedMs: Double
     ) {
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            await Task.yield()
-            let nextTurnMs = self.monotonicMilliseconds()
-            self.logPanelVisibilityProbe(
-                kind: kind,
-                probe: "nextTurn",
-                showStartMs: showStartMs,
-                presentedMs: presentedMs,
-                probeMs: nextTurnMs
-            )
-
-            try? await Task.sleep(nanoseconds: 16_000_000)
-            guard !Task.isCancelled else { return }
-            let frameDelayMs = self.monotonicMilliseconds()
-            self.logPanelVisibilityProbe(
-                kind: kind,
-                probe: "frameDelay",
-                showStartMs: showStartMs,
-                presentedMs: presentedMs,
-                probeMs: frameDelayMs
-            )
-        }
+        let presentationGeneration = presentationSessionGeneration
+        panelPresentationDiagnosticProbeOwner.start(
+            presentationGeneration: presentationGeneration,
+            kind: kind,
+            showStartMs: showStartMs,
+            presentedMs: presentedMs,
+            now: { [weak self] in
+                self?.monotonicMilliseconds() ?? presentedMs
+            },
+            onProbe: { [weak self] probe in
+                guard let self,
+                      self.isPresentationSessionGenerationCurrent(
+                        probe.presentationGeneration
+                      )
+                else {
+                    return
+                }
+                self.logPanelVisibilityProbe(probe)
+            }
+        )
     }
 
     private func logPanelVisibilityProbe(
-        kind: String,
-        probe: String,
-        showStartMs: Double,
-        presentedMs: Double,
-        probeMs: Double
+        _ probe: PanelPresentationDiagnosticProbe
     ) {
         logInputTrace(
-            "show kind=\(kind) phase=visibleProbe probe=\(probe) "
-                + "elapsedMs=\(formatMilliseconds(probeMs - showStartMs)) "
-                + "sincePresentedMs=\(formatMilliseconds(probeMs - presentedMs)) "
+            "show kind=\(probe.kind) phase=visibleProbe probe=\(probe.source.rawValue) "
+                + "elapsedMs=\(formatMilliseconds(probe.elapsedMs)) "
+                + "sincePresentedMs=\(formatMilliseconds(probe.sincePresentedMs)) "
                 + panelVisibilityProbeSummary()
         )
+    }
+
+    func cancelPanelVisibilityProbe() {
+        panelPresentationDiagnosticProbeOwner.cancel()
+    }
+
+    var lastPanelPresentationDiagnosticProbe:
+        PanelPresentationDiagnosticProbe?
+    {
+        panelPresentationDiagnosticProbeOwner.lastProbe
+    }
+
+    var hasPendingPanelPresentationDiagnosticProbe: Bool {
+        panelPresentationDiagnosticProbeOwner.isPending
     }
 
     private func panelVisibilityProbeSummary() -> String {

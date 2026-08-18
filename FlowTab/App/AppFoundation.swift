@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import FlowTabCore
 
+@MainActor
 protocol AppWindowOpeningWindow: AnyObject {
     var isPanelWindow: Bool { get }
     var isMiniaturized: Bool { get }
@@ -16,6 +17,7 @@ protocol AppWindowOpeningWindow: AnyObject {
     func orderFrontRegardless()
 }
 
+@MainActor
 protocol AppWindowOpeningApplication: AnyObject {
     var isHidden: Bool { get }
     var appWindows: [any AppWindowOpeningWindow] { get }
@@ -25,6 +27,7 @@ protocol AppWindowOpeningApplication: AnyObject {
     func sendShowSettingsWindowAction() -> Bool
 }
 
+@MainActor
 protocol AppActivationPolicyApplying: AnyObject {
     var flowTabActivationPolicy: NSApplication.ActivationPolicy { get }
 
@@ -105,31 +108,39 @@ enum AppWindowLayout {
 }
 
 enum AppWindowCoordinator {
+    typealias OpenOperation = Task<Void, Never>
+
     static let switcherPanelWindowIdentifier = "flowtab.window.switcher-panel"
     static let homeWindowIdentifier = "flowtab.window.home"
-    private static let temporaryRegularActivationPollIntervalNanoseconds: UInt64 = 20_000_000
-    private static let temporaryRegularActivationMaximumPolls = 250
 
     @MainActor
     static var activateMainWindowOrOpenHomeSceneOverride: (() -> Void)?
     @MainActor
     private static var appKitHomeWindow: NSWindow?
     @MainActor
-    private static var temporaryRegularActivationRestoreTask: Task<Void, Never>?
+    private static var temporaryRegularActivationRestorationOwner:
+        TemporaryRegularActivationRestorationOwner?
+    @MainActor
+    private static var temporaryRegularActivationGeneration: UInt64 = 0
 
-    static func openHome() {
+    @discardableResult
+    static func openHome() -> OpenOperation {
         open(.home)
     }
 
-    static func openLogs() {
+    @discardableResult
+    static func openLogs() -> OpenOperation {
         open(.logs)
     }
 
-    static func openSettings() {
+    @discardableResult
+    static func openSettings() -> OpenOperation {
         open(.settings)
     }
 
-    private static func open(_ tab: HomeTab) {
+    private static func open(
+        _ tab: HomeTab
+    ) -> OpenOperation {
         Task { @MainActor in
             openInCurrentProcess(tab)
         }
@@ -181,15 +192,6 @@ enum AppWindowCoordinator {
             activationPolicyApplication: activationPolicyApplication,
             temporarilyUseRegularActivation: temporarilyUseRegularActivation
         )
-        var openedWindow: (any AppWindowOpeningWindow)?
-        defer {
-            finishTemporaryRegularActivationIfNeeded(
-                didTemporarilyUseRegularActivation,
-                application: application,
-                window: openedWindow,
-                activationPolicyApplication: activationPolicyApplication
-            )
-        }
 
         if let window = application.appWindows.first(where: {
             !$0.isPanelWindow
@@ -198,30 +200,44 @@ enum AppWindowCoordinator {
                 && ($0.isVisible || $0.isMiniaturized)
                 && $0.flowTabWindowLevel == .normal
         }) {
-            presentWindow(application: application, window: window)
-            openedWindow = window
-            return openedWindow
+            prepareAndPresentWindow(
+                application: application,
+                window: window,
+                didTemporarilyUseRegularActivation:
+                    didTemporarilyUseRegularActivation,
+                activationPolicyApplication: activationPolicyApplication
+            )
+            return window
         }
         if let nsApplication = application as? NSApplication {
-            openedWindow = openAppKitHomeWindow(application: nsApplication)
-        } else {
-            application.activate(ignoringOtherApps: true)
-            if application.isHidden {
-                application.unhide(nil)
-            }
-            _ = application.sendShowSettingsWindowAction()
-            openedWindow = nil
+            let window = appKitHomeWindowForPresentation()
+            prepareAndPresentWindow(
+                application: nsApplication,
+                window: window,
+                didTemporarilyUseRegularActivation:
+                    didTemporarilyUseRegularActivation,
+                activationPolicyApplication: activationPolicyApplication
+            )
+            return window
         }
-        return openedWindow
+
+        application.activate(ignoringOtherApps: true)
+        if application.isHidden {
+            application.unhide(nil)
+        }
+        _ = application.sendShowSettingsWindowAction()
+        finishWindowlessTemporaryRegularActivationIfNeeded(
+            didTemporarilyUseRegularActivation,
+            activationPolicyApplication: activationPolicyApplication
+        )
+        return nil
     }
 
     @discardableResult
     @MainActor
-    private static func openAppKitHomeWindow(application: NSApplication) -> NSWindow {
+    private static func appKitHomeWindowForPresentation() -> NSWindow {
         let window = appKitHomeWindow ?? makeAppKitHomeWindow()
         appKitHomeWindow = window
-
-        presentWindow(application: application, window: window)
         return window
     }
 
@@ -230,11 +246,11 @@ enum AppWindowCoordinator {
         activationPolicyApplication: (any AppActivationPolicyApplying)?,
         temporarilyUseRegularActivation: Bool
     ) -> Bool {
+        temporaryRegularActivationRestorationOwner?.cancel()
+        temporaryRegularActivationRestorationOwner = nil
         guard temporarilyUseRegularActivation else { return false }
         guard let activationPolicyApplication else { return false }
 
-        temporaryRegularActivationRestoreTask?.cancel()
-        temporaryRegularActivationRestoreTask = nil
         guard activationPolicyApplication.flowTabActivationPolicy != .regular else { return true }
         guard activationPolicyApplication.flowTabActivationPolicy == .accessory else { return false }
 
@@ -244,22 +260,33 @@ enum AppWindowCoordinator {
     }
 
     @MainActor
-    private static func finishTemporaryRegularActivationIfNeeded(
+    private static func finishWindowlessTemporaryRegularActivationIfNeeded(
         _ didTemporarilyUseRegularActivation: Bool,
-        application: any AppWindowOpeningApplication,
-        window: (any AppWindowOpeningWindow)?,
         activationPolicyApplication: (any AppActivationPolicyApplying)?
     ) {
         guard didTemporarilyUseRegularActivation else { return }
         guard let activationPolicyApplication else { return }
-        guard let window else {
-            restoreAccessoryActivationPolicy(
-                activationPolicyApplication,
-                reason: "status_item_no_regular_window"
-            )
+        restoreAccessoryActivationPolicy(
+            activationPolicyApplication,
+            reason: "status_item_no_regular_window"
+        )
+    }
+
+    @MainActor
+    private static func prepareAndPresentWindow(
+        application: any AppWindowOpeningApplication,
+        window: any AppWindowOpeningWindow,
+        didTemporarilyUseRegularActivation: Bool,
+        activationPolicyApplication:
+            (any AppActivationPolicyApplying)?
+    ) {
+        guard
+            didTemporarilyUseRegularActivation,
+            let activationPolicyApplication
+        else {
+            presentWindow(application: application, window: window)
             return
         }
-
         scheduleAccessoryPolicyRestoration(
             application: application,
             window: window,
@@ -273,54 +300,74 @@ enum AppWindowCoordinator {
         window: any AppWindowOpeningWindow,
         activationPolicyApplication: any AppActivationPolicyApplying
     ) {
-        temporaryRegularActivationRestoreTask?.cancel()
-        temporaryRegularActivationRestoreTask = Task { @MainActor in
-            var remainingPolls = temporaryRegularActivationMaximumPolls
-            var hasObservedVisibleWindow = window.isVisible
-            while !Task.isCancelled {
-                guard activationPolicyApplication.flowTabActivationPolicy == .regular else { return }
-                if regularWindowActivationIsStable(application: application, window: window) {
-                    restoreAccessoryActivationPolicy(
-                        activationPolicyApplication,
-                        application: application,
-                        window: window,
-                        reactivatesWindow: true,
-                        reason: "status_item_window_stable"
-                    )
-                    return
-                }
-                if window.isVisible {
-                    hasObservedVisibleWindow = true
-                    presentWindow(application: application, window: window)
-                } else if hasObservedVisibleWindow && !window.isMiniaturized {
-                    restoreAccessoryActivationPolicy(
-                        activationPolicyApplication,
-                        reason: "status_item_window_unavailable"
-                    )
-                    return
-                } else {
-                    presentWindow(application: application, window: window)
-                }
-                guard remainingPolls > 0 else {
-                    restoreAccessoryActivationPolicy(
-                        activationPolicyApplication,
-                        reason: "status_item_window_stability_timeout"
-                    )
-                    return
-                }
-                remainingPolls -= 1
-                try? await Task.sleep(nanoseconds: temporaryRegularActivationPollIntervalNanoseconds)
+        temporaryRegularActivationRestorationOwner?.cancel()
+        temporaryRegularActivationGeneration &+= 1
+        let generation = temporaryRegularActivationGeneration
+        let owner = TemporaryRegularActivationRestorationOwner(
+            generation: generation,
+            application: application,
+            window: window,
+            activationPolicyApplication: activationPolicyApplication
+        )
+        temporaryRegularActivationRestorationOwner = owner
+        owner.start(
+            requestPresentation: {
+                presentWindow(application: application, window: window)
+            },
+            onOutcome: { outcome in
+                handleTemporaryRegularActivationOutcome(
+                    outcome,
+                    generation: generation,
+                    application: application,
+                    window: window,
+                    activationPolicyApplication:
+                        activationPolicyApplication
+                )
             }
-        }
+        )
     }
 
     @MainActor
-    private static func regularWindowActivationIsStable(
+    private static func handleTemporaryRegularActivationOutcome(
+        _ outcome: TemporaryRegularActivationRestorationOutcome,
+        generation: UInt64,
         application: any AppWindowOpeningApplication,
-        window: any AppWindowOpeningWindow
-    ) -> Bool {
-        let applicationIsActive = (application as? NSApplication)?.isActive ?? true
-        return applicationIsActive && window.isVisible
+        window: any AppWindowOpeningWindow,
+        activationPolicyApplication: any AppActivationPolicyApplying
+    ) {
+        guard
+            temporaryRegularActivationRestorationOwner?.generation
+                == generation
+        else {
+            return
+        }
+        temporaryRegularActivationRestorationOwner = nil
+
+        switch outcome {
+        case let .stable(evidence):
+            restoreAccessoryActivationPolicy(
+                activationPolicyApplication,
+                application: application,
+                window: window,
+                reactivatesWindow: true,
+                reason: "status_item_window_stable",
+                evidence: evidence
+            )
+        case let .windowUnavailable(evidence):
+            restoreAccessoryActivationPolicy(
+                activationPolicyApplication,
+                reason: "status_item_window_unavailable",
+                evidence: evidence
+            )
+        case let .watchdogExpired(evidence):
+            restoreAccessoryActivationPolicy(
+                activationPolicyApplication,
+                reason: "status_item_window_stability_timeout",
+                evidence: evidence
+            )
+        case .activationPolicyChanged:
+            return
+        }
     }
 
     @MainActor
@@ -329,11 +376,16 @@ enum AppWindowCoordinator {
         application: (any AppWindowOpeningApplication)? = nil,
         window: (any AppWindowOpeningWindow)? = nil,
         reactivatesWindow: Bool = false,
-        reason: String
+        reason: String,
+        evidence: TemporaryRegularActivationEvidence? = nil
     ) {
         guard activationPolicyApplication.flowTabActivationPolicy == .regular else { return }
         activationPolicyApplication.setFlowTabActivationPolicy(.accessory)
-        RuntimeLog.info(.app, "activationPolicy=accessory source=\(reason)")
+        let evidenceFields = evidence.map { " \($0.logFields)" } ?? ""
+        RuntimeLog.info(
+            .app,
+            "activationPolicy=accessory source=\(reason)\(evidenceFields)"
+        )
         guard reactivatesWindow, let application, let window else { return }
         presentWindow(application: application, window: window)
     }

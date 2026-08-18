@@ -11,12 +11,16 @@ struct AppDelegateTestHooks {
         UInt32,
         UInt32
     ) -> any HotkeyMonitoring)? = nil
+    var hotkeyChordEventAccessSnapshotProvider:
+        (() -> HotkeyChordEventAccessSnapshot)? = nil
     var commandTabTakeoverController: (any CommandTabTakeoverControlling)? = nil
     var stressRunner: (any TabSwitchStressRunning)? = nil
     var launchAtLoginManager: (any LaunchAtLoginManaging)? = nil
     var activationPolicyApplication: (any AppActivationPolicyApplying)? = nil
     var runtimeProjectionService: (any RuntimeProjectionServing)? = nil
     var workspaceNotificationCenter: NotificationCenter? = nil
+    var appLaunchWindowEvidenceCoordinator:
+        (any RuntimeAppLaunchWindowEvidenceCoordinating)? = nil
 }
 
 @MainActor
@@ -55,6 +59,13 @@ extension AppDelegate {
         Self.testHooks.workspaceNotificationCenter ?? NSWorkspace.shared.notificationCenter
     }
 
+    func makeAppLaunchWindowEvidenceCoordinator()
+        -> any RuntimeAppLaunchWindowEvidenceCoordinating
+    {
+        Self.testHooks.appLaunchWindowEvidenceCoordinator
+            ?? makeDefaultAppLaunchWindowEvidenceCoordinator()
+    }
+
     func makePanelController() -> SwitcherPanelController {
         Self.testHooks.makePanelController?() ?? SwitcherPanelController(
             model: LiveSwitcherModel(runtimeProjectionService: resolvedRuntimeProjectionService)
@@ -79,8 +90,16 @@ extension AppDelegate {
             configuration: configuration,
             signature: signature,
             forwardHotkeyID: forwardHotkeyID,
-            backwardHotkeyID: backwardHotkeyID
+            backwardHotkeyID: backwardHotkeyID,
+            startsMonitoring: false
         )
+    }
+
+    func currentHotkeyChordEventAccessSnapshot()
+        -> HotkeyChordEventAccessSnapshot
+    {
+        Self.testHooks.hotkeyChordEventAccessSnapshotProvider?()
+            ?? .current()
     }
 
     var hasPanelControllerForTesting: Bool {

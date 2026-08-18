@@ -1,13 +1,40 @@
 import XCTest
 
+private enum FlowTabUITestNoisyOptionTabPolicy {
+    static let exactPreviewProjectionWatchdog: TimeInterval = 8
+    static let switcherDismissalWatchdog: TimeInterval = 4
+    static let exactSelectedWindowActivationWatchdog: TimeInterval = 12
+    static let postConfirmReconciliationWatchdog: TimeInterval = 12
+    static let preConfirmEvidenceWatchdog: TimeInterval = 8
+}
+
 extension FlowTabUITests {
+    func testNoisyOptionTabPolicyUsesNamedWatchdogs() {
+        let watchdogs = [
+            FlowTabUITestNoisyOptionTabPolicy.exactPreviewProjectionWatchdog,
+            FlowTabUITestNoisyOptionTabPolicy.switcherDismissalWatchdog,
+            FlowTabUITestNoisyOptionTabPolicy.exactSelectedWindowActivationWatchdog,
+            FlowTabUITestNoisyOptionTabPolicy.postConfirmReconciliationWatchdog,
+            FlowTabUITestNoisyOptionTabPolicy.preConfirmEvidenceWatchdog
+        ]
+        XCTAssertEqual(watchdogs[0], 8)
+        XCTAssertEqual(watchdogs[1], 4)
+        XCTAssertEqual(watchdogs[2], 12)
+        XCTAssertEqual(watchdogs[3], 12)
+        XCTAssertEqual(watchdogs[4], 8)
+        XCTAssertTrue(
+            watchdogs.allSatisfy { $0.isFinite && $0 > 0 }
+        )
+    }
+
     func runNoisyOptionTabWindowStateRoundTrip(
         app: XCUIApplication,
         targetApp: SpaceFixtureResolvedWorkflow.App,
         initialDiagnosticsSummary: XCUIElement,
         primaryFullscreenTitle: String,
         traceLabel: String,
-        runtimeLogSnapshot: [String: UInt64]
+        runtimeLogSnapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) throws {
         let standardTitles = standardWorkflowWindowTitles(in: targetApp)
         let normalOneTitle = try XCTUnwrap(
@@ -73,10 +100,12 @@ extension FlowTabUITests {
                 since: runtimeLogSnapshot
             )
             XCTAssertTrue(
-                waitForExactNoisyOptionTabPreviewTitles(
+                waitForSwitcherPreviewTitles(
                     diagnosticsSummary,
-                    for: targetApp,
-                    timeout: 8
+                    toExactlyMatch: targetApp.expectedWindowTitles,
+                    timeout:
+                        FlowTabUITestNoisyOptionTabPolicy
+                            .exactPreviewProjectionWatchdog
                 ),
                 """
                 Noisy Option+Tab \(phase.trace) phase must expose exactly the four user windows.
@@ -109,17 +138,19 @@ extension FlowTabUITests {
             )
 
             let topologyLogSnapshot = makeRuntimeLogFileSnapshot()
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
-                .confirm,
-                traceLabel: "\(traceLabel).confirm.\(phase.trace)"
+            confirmNoisyOptionTabSelectionAndWaitForDismissal(
+                diagnosticsSummary,
+                traceLabel: "\(traceLabel).confirm.\(phase.trace)",
+                phaseTrace: phase.trace
             )
-            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
             XCTAssertTrue(
                 waitForExactFrontmostWorkflowCGWindow(
                     windowNumber: selection.windowNumber,
                     title: phase.targetTitle,
                     app: targetApp,
-                    timeout: 12
+                    timeout:
+                        FlowTabUITestNoisyOptionTabPolicy
+                            .exactSelectedWindowActivationWatchdog
                 ),
                 "Noisy Option+Tab must activate the exact \(phase.targetTitle) CG window selected in \(phase.trace)."
             )
@@ -132,27 +163,73 @@ extension FlowTabUITests {
             waitForRuntimeLogFiles(
                 matching: #"collectCGWindows result=ready .* affected=[1-9][0-9]* signatureChanged=1 signatureDisplays=[1-9][0-9]* signatureSpaces=[1-9][0-9]* signatureWindows=[1-9][0-9]* signatureFullscreen=[0-9]+ signature=d=.*spaces=[1-9][0-9]*,windows=[1-9][0-9]*,fullscreen=[0-9]+"#,
                 since: topologyLogSnapshot,
-                timeout: 8,
+                timeout:
+                    FlowTabUITestNoisyOptionTabPolicy
+                        .postConfirmReconciliationWatchdog,
                 description: "nonzero Space topology affected-window diff and signature diagnostics after \(phase.trace) confirm"
             )
             waitForRuntimeLogFiles(
                 matching: "binding-confidence-change windowID=cg:[0-9]+:\(selection.windowNumber) cg=\(selection.windowNumber) .* source=.*->verifiedFocusReadback",
                 since: topologyLogSnapshot,
-                timeout: 8,
+                timeout:
+                    FlowTabUITestNoisyOptionTabPolicy
+                        .postConfirmReconciliationWatchdog,
                 description: "verified-focus exact WindowRecord relearn after \(phase.trace) confirm"
             )
+            topologyLogSnapshot.cancel()
             expectedCurrentSelection = selection
             logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
         }
     }
 
+    private func confirmNoisyOptionTabSelectionAndWaitForDismissal(
+        _ diagnosticsSummary: XCUIElement,
+        traceLabel: String,
+        phaseTrace: String
+    ) {
+        let dismissalOwner =
+            FlowTabUITestElementNonExistenceObservationOwner(
+                elementIdentifier: diagnosticsSummary.identifier,
+                readback: { diagnosticsSummary.exists }
+            )
+        dismissalOwner.start()
+        defer { dismissalOwner.cancel() }
+
+        postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+            .confirm,
+            traceLabel: traceLabel
+        )
+        dismissalOwner.markTriggerCompleted()
+
+        guard
+            let dismissalEvidence =
+                dismissalOwner.waitForResolution(
+                    timeout:
+                        FlowTabUITestNoisyOptionTabPolicy
+                            .switcherDismissalWatchdog
+                )
+        else {
+            XCTFail(
+                "Noisy Option+Tab \(phaseTrace) switcher dismissal "
+                    + "watchdog expired. "
+                    + dismissalOwner.diagnosticSummary
+            )
+            return
+        }
+        XCTAssertFalse(
+            dismissalEvidence.value.exists,
+            "Noisy Option+Tab \(phaseTrace) must dismiss the exact switcher diagnostics element."
+        )
+    }
+
     private func assertNoisyOptionTabFilteredCGOnlyArtifactSource(
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         waitForRuntimeLogFiles(
             matching: #"Chrome Fixture filtered-fullscreen-((sibling|host)-artifacts stage=(pre-dedupe|presentation)|duplicate-surfaces stage=presentation-final) dropped=[1-9][0-9]*"#,
             since: snapshot,
-            timeout: 8,
+            timeout: FlowTabUITestNoisyOptionTabPolicy.preConfirmEvidenceWatchdog,
             description: "Noisy Chrome Fixture filtered CG-only/fullscreen artifact or duplicate surface source"
         )
     }
@@ -160,13 +237,14 @@ extension FlowTabUITests {
     private func assertNoisyOptionTabWindowLayerSource(
         _ selection: RuntimeTruthWindowSelection,
         phaseTrace: String,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
         waitForRuntimeLogFiles(
             matching: #"window-entries app=Chrome Fixture .*id=cg:[0-9]+:\#(selection.windowNumber):title=\#(escapedTitle)[^\n]*source=stickyBinding:spaceEvidence=(observed|inferredFromTopology)"#,
             since: snapshot,
-            timeout: 8,
+            timeout: FlowTabUITestNoisyOptionTabPolicy.preConfirmEvidenceWatchdog,
             description: "sticky window-layer source for selected Noisy Option+Tab \(phaseTrace) window"
         )
     }
@@ -175,14 +253,17 @@ extension FlowTabUITests {
         _ selection: RuntimeTruthWindowSelection,
         appID: String,
         phaseTrace: String,
-        since snapshot: [String: UInt64]
+        since snapshot:
+            FlowTabUITestRuntimeLogObservationBaseline
     ) {
         let escapedAppID = NSRegularExpression.escapedPattern(for: appID)
         let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
         waitForRuntimeLogFiles(
             matching: #"window-request appID=\#(escapedAppID) pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) title=\#(escapedTitle)[^\n]* sticky=true source=stickyBinding"#,
             since: snapshot,
-            timeout: 8,
+            timeout:
+                FlowTabUITestNoisyOptionTabPolicy
+                    .postConfirmReconciliationWatchdog,
             description: "sticky window request source for selected Noisy Option+Tab \(phaseTrace) window"
         )
     }
@@ -242,11 +323,15 @@ extension FlowTabUITests {
         traceLabel: String
     ) throws -> RuntimeTruthWindowSelection {
         var observedPrefix = [currentSelection.title]
-        let attempts = max(1, switcherPreviewTitles(from: diagnosticsSummary).count + 3)
-        var latestTitle = currentSelection.title
-        var latestWindowID = "cg:\(currentSelection.windowNumber)"
+        let maximumSelectionAdvances = max(
+            1,
+            switcherPreviewTitles(
+                from: diagnosticsSummary
+            ).count + 3
+        )
+        var latestSelection = currentSelection
 
-        if latestTitle == title {
+        if latestSelection.title == title {
             assertNoisyOptionTabObservedPrefix(
                 observedPrefix,
                 expectedPrefix: expectedPrefix,
@@ -255,31 +340,37 @@ extension FlowTabUITests {
             return currentSelection
         }
 
-        for attempt in 0..<attempts {
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
-                .advanceRight,
-                traceLabel: "\(traceLabel).selectWindow"
-            )
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-            latestTitle = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "selectedWindowTitle"
-            )
-            latestWindowID = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "selectedWindow"
-            )
-            observedPrefix.append(latestTitle)
+        for attempt in 0..<maximumSelectionAdvances {
+            latestSelection =
+                try performAndWaitForSwitcherWindowSelectionTransition(
+                    from: latestSelection,
+                    in: app,
+                    diagnosticsSummary: diagnosticsSummary,
+                    traceLabel:
+                        "\(traceLabel).selectAttempt.\(attempt + 1)",
+                    trigger: {
+                        postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                            .advanceRight,
+                            traceLabel:
+                                "\(traceLabel).selectWindow"
+                        )
+                    }
+                )
+            observedPrefix.append(latestSelection.title)
             logFlowTabUITestTrace(
-                "[\(traceLabel).selectAttempt.\(attempt + 1)] target=\(title) selected=\(latestTitle) windowID=\(latestWindowID)"
+                "[\(traceLabel).selectAttempt.\(attempt + 1)] "
+                    + "target=\(title) "
+                    + "selected=\(latestSelection.title) "
+                    + "windowNumber="
+                    + "\(latestSelection.windowNumber)"
             )
             assertNoisyOptionTabObservedPrefix(
                 observedPrefix,
                 expectedPrefix: expectedPrefix,
                 traceLabel: traceLabel
             )
-            if latestTitle == title {
-                return try runtimeTruthWindowSelection(title: latestTitle, windowID: latestWindowID)
+            if latestSelection.title == title {
+                return latestSelection
             }
         }
 
@@ -290,7 +381,7 @@ extension FlowTabUITests {
             \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
             """
         )
-        return try runtimeTruthWindowSelection(title: latestTitle, windowID: latestWindowID)
+        return latestSelection
     }
 
     private func assertNoisyOptionTabObservedPrefix(
@@ -306,21 +397,4 @@ extension FlowTabUITests {
         )
     }
 
-    private func waitForExactNoisyOptionTabPreviewTitles(
-        _ diagnosticsSummary: XCUIElement,
-        for workflowApp: SpaceFixtureResolvedWorkflow.App,
-        timeout: TimeInterval
-    ) -> Bool {
-        let expectedTitles = Set(workflowApp.expectedWindowTitles)
-        let expectedCount = workflowApp.expectedWindowTitles.count
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let previewTitles = switcherPreviewTitles(from: diagnosticsSummary)
-            if previewTitles.count == expectedCount && Set(previewTitles) == expectedTitles {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
 }

@@ -1,0 +1,141 @@
+import XCTest
+
+extension FlowTabUITests {
+    func testAXSuppressionUsesAuthorizedFlowTabReadbackForRealFixtureTopology() throws {
+        let workflow =
+            try configuredSwitcherRuntimeTruthWorkflow(
+                sourceWorkflowURL:
+                    SpaceFixtureMultiAppWorkflowDefaults
+                    .controlTabNoisyRuntimeTruthWorkflowSourceURL
+            )
+        let workflowApp = try XCTUnwrap(workflow.apps.first)
+        let route =
+            try XCTUnwrap(
+                makeSpaceFixtureAXSuppressionRoutes(
+                    for: workflow
+                ).first
+            )
+        let observationOwner =
+            SpaceFixtureAXSuppressionObservationOwner(
+                routes: [route]
+            )
+        observationOwner.start()
+        defer { observationOwner.cancel() }
+
+        let flowTabApp =
+            makeRealRuntimeFlowTabApp(
+                additionalArguments:
+                    route.flowTabLaunchArguments
+            )
+        launchFlowTabUITestApplication(
+            flowTabApp,
+            traceLabel:
+                "ax-suppression.authorized-readback"
+        )
+        defer {
+            terminateIfRunning(
+                flowTabApp,
+                targetDescription:
+                    "AX-suppression FlowTab"
+            )
+        }
+        let flowTabReadinessSatisfied =
+            waitForFlowTabUITestApplicationToBecomeReady(
+                flowTabApp,
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .foregroundActivation,
+                traceLabel:
+                    "ax-suppression.authorized-readback"
+            )
+        XCTAssertTrue(
+            flowTabReadinessSatisfied,
+            "AX-suppression FlowTab readiness watchdog expired. "
+                + "finalState=\(String(describing: flowTabApp.state))"
+        )
+        guard
+            assertSpaceFixtureWorkflowPermissionsAvailable(
+                in: flowTabApp
+            )
+        else {
+            return
+        }
+
+        let fixtureApp =
+            makeAXSuppressionFixtureApplication(
+                workflowApp
+            )
+        let fixtureTargetDescription =
+            "AX-suppression fixture \(workflowApp.appID)"
+        terminateIfRunning(
+            fixtureApp,
+            targetDescription: fixtureTargetDescription
+        )
+        fixtureApp.launchArguments += [
+            "--workflow-config",
+            workflow.workflowURL.path,
+            "--workflow-app-id",
+            workflowApp.appID,
+            "--staggered-layout",
+            "--enter-fullscreen-delay-ms",
+            String(
+                SpaceFixtureMultiAppWorkflowDefaults
+                    .enterFullscreenDelayMilliseconds
+            ),
+            "--suppress-app-accessibility-children",
+        ]
+        fixtureApp.launchArguments +=
+            route.fixtureLaunchArguments
+        launchSpaceFixtureApplicationAndWaitForForeground(
+            fixtureApp
+        )
+        defer {
+            terminateIfRunning(
+                fixtureApp,
+                targetDescription: fixtureTargetDescription
+            )
+        }
+
+        XCTAssertTrue(
+            observationOwner.waitForSuppression(
+                route: route
+            )
+        )
+        XCTAssertTrue(
+            flowTabApp.state == .runningForeground
+                || flowTabApp.state == .runningBackground
+        )
+    }
+
+    private func makeAXSuppressionFixtureApplication(
+        _ workflowApp: SpaceFixtureResolvedWorkflow.App
+    ) -> XCUIApplication {
+        if let appURL = workflowApp.identity.appURL {
+            return XCUIApplication(url: appURL)
+        }
+        return XCUIApplication(
+            bundleIdentifier:
+                workflowApp.identity.bundleIdentifier
+        )
+    }
+
+    private func terminateIfRunning(
+        _ app: XCUIApplication,
+        targetDescription: String
+    ) {
+        guard app.state == .runningForeground
+            || app.state == .runningBackground
+        else {
+            return
+        }
+        let evidence = terminateFlowTabUITestApplication(
+            app,
+            targetDescription: targetDescription
+        )
+        XCTAssertTrue(
+            evidence.isSatisfied,
+            "Application termination failed. "
+                + evidence.diagnosticSummary
+        )
+    }
+}

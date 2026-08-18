@@ -1,0 +1,408 @@
+import AppKit
+import Foundation
+import XCTest
+
+enum FlowTabUITestConditionObservationSource: String {
+    case initialReadback
+    case notificationReadback
+    case triggerReadback
+    case scheduledReadback
+    case watchdogReadback
+}
+
+struct FlowTabUITestConditionEvidence<Value> {
+    let generation: UInt64
+    let source: FlowTabUITestConditionObservationSource
+    let value: Value
+}
+
+final class FlowTabUITestObservationCancellation {
+    private var cancellation: (() -> Void)?
+
+    init(_ cancellation: @escaping () -> Void) {
+        self.cancellation = cancellation
+    }
+
+    func cancel() {
+        guard let cancellation else { return }
+        self.cancellation = nil
+        cancellation()
+    }
+
+    deinit {
+        cancel()
+    }
+}
+
+typealias FlowTabUITestConditionObservationRegistration =
+    (
+        @escaping (FlowTabUITestConditionObservationSource) -> Void
+    ) -> FlowTabUITestObservationCancellation?
+
+final class FlowTabUITestDeferredConditionReadbackRegistration {
+    private let downstreamRegistration:
+        FlowTabUITestConditionObservationRegistration
+
+    private var readback:
+        ((FlowTabUITestConditionObservationSource) -> Void)?
+    private var downstreamCancellation:
+        FlowTabUITestObservationCancellation?
+    private var isActivated = false
+    private var isCancelled = true
+
+    init(
+        downstreamRegistration:
+            @escaping FlowTabUITestConditionObservationRegistration
+    ) {
+        self.downstreamRegistration = downstreamRegistration
+    }
+
+    func register(
+        _ readback: @escaping (
+            FlowTabUITestConditionObservationSource
+        ) -> Void
+    ) -> FlowTabUITestObservationCancellation? {
+        cancel()
+        isCancelled = false
+        self.readback = readback
+        return FlowTabUITestObservationCancellation {
+            [weak self] in
+            self?.cancel()
+        }
+    }
+
+    func activate() {
+        guard
+            !isCancelled,
+            !isActivated,
+            let readback
+        else {
+            return
+        }
+        isActivated = true
+        downstreamCancellation =
+            downstreamRegistration(readback)
+    }
+
+    func cancel() {
+        isCancelled = true
+        isActivated = false
+        downstreamCancellation?.cancel()
+        downstreamCancellation = nil
+        readback = nil
+    }
+
+    deinit {
+        cancel()
+    }
+}
+
+final class FlowTabUITestConditionObservationOwner<Value> {
+    private let readback: () -> Value
+    private let isSatisfied: (Value) -> Bool
+    private let describe: (Value) -> String
+    private let observationRegistration:
+        FlowTabUITestConditionObservationRegistration?
+
+    private var nextGeneration: UInt64 = 1
+    private var currentGeneration: UInt64?
+    private var activeReadbackGeneration: UInt64?
+    private var eventCancellation: FlowTabUITestObservationCancellation?
+    private var resolvedExpectation: XCTestExpectation?
+    private var lastWaitResult: XCTWaiter.Result?
+
+    private(set) var latestEvidence:
+        FlowTabUITestConditionEvidence<Value>?
+    private(set) var resolvedEvidence:
+        FlowTabUITestConditionEvidence<Value>?
+
+    init(
+        observationRegistration:
+            FlowTabUITestConditionObservationRegistration? = nil,
+        readback: @escaping () -> Value,
+        isSatisfied: @escaping (Value) -> Bool,
+        describe: @escaping (Value) -> String
+    ) {
+        self.observationRegistration = observationRegistration
+        self.readback = readback
+        self.isSatisfied = isSatisfied
+        self.describe = describe
+    }
+
+    func start() {
+        cancel()
+        latestEvidence = nil
+        resolvedEvidence = nil
+        lastWaitResult = nil
+
+        let generation = nextGeneration
+        nextGeneration &+= 1
+        currentGeneration = generation
+        let resolvedExpectation = XCTestExpectation(
+            description: "UI condition observation generation \(generation)"
+        )
+        resolvedExpectation.assertForOverFulfill = true
+        self.resolvedExpectation = resolvedExpectation
+
+        let registrationCancellation = observationRegistration? {
+            [weak self] source in
+            self?.observe(
+                source: source,
+                generation: generation
+            )
+        }
+        eventCancellation = registrationCancellation
+        if resolvedEvidence != nil {
+            stopObservationInputs()
+            return
+        }
+        observe(source: .initialReadback, generation: generation)
+    }
+
+    func waitForResolution(
+        timeout: TimeInterval
+    ) -> FlowTabUITestConditionEvidence<Value>? {
+        if let resolvedEvidence {
+            return resolvedEvidence
+        }
+        guard let currentGeneration, let resolvedExpectation else {
+            return nil
+        }
+
+        let result = XCTWaiter.wait(
+            for: [resolvedExpectation],
+            timeout: timeout
+        )
+        lastWaitResult = result
+        if result != .completed {
+            observe(
+                source: .watchdogReadback,
+                generation: currentGeneration,
+                allowsResolution: false
+            )
+            stopObservationInputs()
+            self.currentGeneration = nil
+            self.resolvedExpectation = nil
+        }
+        return resolvedEvidence
+    }
+
+    var diagnosticSummary: String {
+        guard let latestEvidence else {
+            return "unobserved"
+        }
+        let waitResult = lastWaitResult.map {
+            " waitResult=\($0.flowTabDiagnosticName)"
+        } ?? ""
+        return "generation=\(latestEvidence.generation) "
+            + "source=\(latestEvidence.source.rawValue) "
+            + "last{\(describe(latestEvidence.value))}"
+            + waitResult
+    }
+
+    func requestReadback(
+        source: FlowTabUITestConditionObservationSource
+    ) {
+        guard let currentGeneration else { return }
+        observe(
+            source: source,
+            generation: currentGeneration
+        )
+    }
+
+    func cancel() {
+        currentGeneration = nil
+        stopObservationInputs()
+        resolvedExpectation = nil
+    }
+
+    deinit {
+        stopObservationInputs()
+    }
+
+    private func observe(
+        source: FlowTabUITestConditionObservationSource,
+        generation: UInt64,
+        allowsResolution: Bool = true
+    ) {
+        guard currentGeneration == generation,
+              resolvedEvidence == nil
+        else {
+            return
+        }
+        // XCUI readbacks can pump the RunLoop. Timer callbacks wait for the
+        // active readback, while notifications may still close synchronous races.
+        if source == .scheduledReadback,
+           activeReadbackGeneration == generation
+        {
+            return
+        }
+        let previousReadbackGeneration =
+            activeReadbackGeneration
+        activeReadbackGeneration = generation
+        defer {
+            if activeReadbackGeneration == generation {
+                activeReadbackGeneration =
+                    previousReadbackGeneration
+            }
+        }
+        let value = readback()
+        // Client closures can pump the RunLoop and reenter this owner.
+        guard currentGeneration == generation,
+              resolvedEvidence == nil
+        else {
+            return
+        }
+        let satisfiesCondition =
+            allowsResolution && isSatisfied(value)
+        guard currentGeneration == generation,
+              resolvedEvidence == nil
+        else {
+            return
+        }
+        let evidence = FlowTabUITestConditionEvidence(
+            generation: generation,
+            source: source,
+            value: value
+        )
+        latestEvidence = evidence
+        guard satisfiesCondition else {
+            return
+        }
+        resolvedEvidence = evidence
+        stopObservationInputs()
+        resolvedExpectation?.fulfill()
+    }
+
+    private func stopObservationInputs() {
+        eventCancellation?.cancel()
+        eventCancellation = nil
+    }
+}
+
+private extension XCTWaiter.Result {
+    var flowTabDiagnosticName: String {
+        switch self {
+        case .completed:
+            "completed"
+        case .timedOut:
+            "timedOut"
+        case .incorrectOrder:
+            "incorrectOrder"
+        case .invertedFulfillment:
+            "invertedFulfillment"
+        case .interrupted:
+            "interrupted"
+        @unknown default:
+            "unknown(rawValue=\(rawValue))"
+        }
+    }
+}
+
+enum FlowTabUITestConditionObservationPolicy {
+    static let xcuiReadbackCadence: TimeInterval = 0.1
+}
+
+struct FlowTabUITestFrontmostApplicationSnapshot: Equatable {
+    let bundleIdentifier: String?
+
+    var diagnosticSummary: String {
+        "frontmostBundleIdentifier=\(bundleIdentifier ?? "nil")"
+    }
+}
+
+enum FlowTabUITestFrontmostApplicationObservationPolicy {
+    static let multiAppAppSearchActivationWatchdog: TimeInterval = 10
+}
+
+final class FlowTabUITestFrontmostApplicationObservationOwner {
+    private let expectedBundleIdentifier: String
+    private let conditionOwner:
+        FlowTabUITestConditionObservationOwner<
+            FlowTabUITestFrontmostApplicationSnapshot
+        >
+
+    init(
+        expectedBundleIdentifier: String,
+        notificationCenter: NotificationCenter =
+            NSWorkspace.shared.notificationCenter,
+        activationNotificationName: Notification.Name =
+            NSWorkspace.didActivateApplicationNotification,
+        readback: @escaping () -> String? = {
+            NSWorkspace.shared.frontmostApplication?
+                .bundleIdentifier
+        }
+    ) {
+        self.expectedBundleIdentifier = expectedBundleIdentifier
+        conditionOwner = FlowTabUITestConditionObservationOwner(
+            observationRegistration: { callback in
+                let token = notificationCenter.addObserver(
+                    forName: activationNotificationName,
+                    object: nil,
+                    queue: .main
+                ) { _ in
+                    callback(.notificationReadback)
+                }
+                return FlowTabUITestObservationCancellation {
+                    notificationCenter.removeObserver(token)
+                }
+            },
+            readback: {
+                FlowTabUITestFrontmostApplicationSnapshot(
+                    bundleIdentifier: readback()
+                )
+            },
+            isSatisfied: {
+                $0.bundleIdentifier == expectedBundleIdentifier
+            },
+            describe: \.diagnosticSummary
+        )
+    }
+
+    func start() {
+        conditionOwner.start()
+    }
+
+    func waitForResolution(
+        timeout: TimeInterval
+    ) -> FlowTabUITestConditionEvidence<
+        FlowTabUITestFrontmostApplicationSnapshot
+    >? {
+        conditionOwner.waitForResolution(timeout: timeout)
+    }
+
+    var resolvedEvidence: FlowTabUITestConditionEvidence<
+        FlowTabUITestFrontmostApplicationSnapshot
+    >? {
+        conditionOwner.resolvedEvidence
+    }
+
+    var diagnosticSummary: String {
+        "expected=\(expectedBundleIdentifier) "
+            + conditionOwner.diagnosticSummary
+    }
+
+    func cancel() {
+        conditionOwner.cancel()
+    }
+}
+
+func assertTriggerMakesApplicationFrontmost(
+    _ bundleIdentifier: String,
+    timeout: TimeInterval,
+    message: String,
+    trigger: () -> Void
+) {
+    let owner = FlowTabUITestFrontmostApplicationObservationOwner(
+        expectedBundleIdentifier: bundleIdentifier
+    )
+    owner.start()
+    defer { owner.cancel() }
+
+    trigger()
+
+    guard owner.waitForResolution(timeout: timeout) != nil else {
+        XCTFail("\(message) \(owner.diagnosticSummary)")
+        return
+    }
+}

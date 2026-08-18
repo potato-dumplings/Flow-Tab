@@ -8,8 +8,8 @@ extension LiveSwitcherModel {
         return windowPreviewItems().count
     }
 
-    var isWindowOnlyPreviewPreparationComplete: Bool {
-        previewCaptureInFlightKeys.isEmpty
+    var windowOnlyPreviewCaptureInFlightCount: Int {
+        previewCaptureInFlightKeys.count
     }
 
     func handleSessionPreviewSnapshotLifecycle(_ session: SwitcherSession) {

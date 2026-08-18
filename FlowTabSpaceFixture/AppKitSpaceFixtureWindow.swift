@@ -7,7 +7,11 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
     private let contentView: SpaceFixtureWindowContentView
     private let window: NSWindow & FixtureAccessibilitySuppressing
     private let noisyCGSiblings: NoisyCGSiblingWindowSet?
-    private var fullScreenObservationToken: NSObjectProtocol?
+    private var fullScreenObservation:
+        SpaceFixtureFullScreenObservation?
+    private var desktopPresentationObservation:
+        SpaceFixtureDesktopPresentationObservation?
+    private var closeIdentityWindowNumber: CGWindowID = 0
 
     var applicationAccessibilityElement: Any {
         window
@@ -71,14 +75,102 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
     }
 
     func close() {
+        fullScreenObservation?.cancel()
+        fullScreenObservation = nil
+        desktopPresentationObservation?.cancel()
+        desktopPresentationObservation = nil
         noisyCGSiblings?.close()
         window.close()
     }
 
-    func enterFullScreen(completion: @escaping @MainActor () -> Void) {
+    func windowCloseTopologySnapshot(
+        remainingWindowPlanIndices: [Int]
+    ) -> SpaceFixtureWindowCloseTopologySnapshot {
+        let currentWindowNumber = CGWindowID(
+            max(0, window.windowNumber)
+        )
+        if currentWindowNumber > 0 {
+            closeIdentityWindowNumber =
+                currentWindowNumber
+        }
+        let windowNumber = closeIdentityWindowNumber
+        return SpaceFixtureWindowCloseTopologySnapshot(
+            targetWindowPlanIndex: plan.index,
+            targetWindowNumber: windowNumber,
+            targetWindowIsVisible: window.isVisible,
+            targetCGWindowIsOnScreen:
+                Self.isExactCGWindowOnScreen(
+                    windowNumber,
+                    ownerProcessIdentifier:
+                        ProcessInfo.processInfo
+                            .processIdentifier
+                ),
+            remainingWindowPlanIndices:
+                remainingWindowPlanIndices.sorted()
+        )
+    }
+
+    func enterFullScreen(
+        completion: @escaping @MainActor () -> Void
+    ) -> any SpaceFixtureCancellable {
         suppressNoisyFullScreenContentAccessibilityIfNeeded()
-        installFullScreenCompletionObserver(completion: completion)
+        fullScreenObservation?.cancel()
+        let observation = SpaceFixtureFullScreenObservation(
+            window: window
+        ) { [weak self] in
+            guard let self else { return }
+            self.fullScreenObservation = nil
+            self.showNoisyCGSiblingsIfNeeded()
+            completion()
+        }
+        fullScreenObservation = observation
+        if window.styleMask.contains(.fullScreen) {
+            observation.completeFromInitialReadback()
+            return observation
+        }
         window.toggleFullScreen(nil)
+        return observation
+    }
+
+    func desktopPresentationSnapshot()
+        -> SpaceFixtureDesktopPresentationSnapshot
+    {
+        let windowNumber = CGWindowID(window.windowNumber)
+        return SpaceFixtureDesktopPresentationSnapshot(
+            windowPlanIndex: plan.index,
+            windowNumber: windowNumber,
+            applicationIsActive:
+                NSApplication.shared.isActive,
+            isKeyWindow: window.isKeyWindow,
+            isMainWindow: window.isMainWindow,
+            isVisible: window.isVisible,
+            isMiniaturized: window.isMiniaturized,
+            isOnActiveSpace: window.isOnActiveSpace,
+            isOcclusionVisible:
+                window.occlusionState.contains(.visible),
+            isCGWindowOnScreen:
+                Self.isExactCGWindowOnScreen(
+                    windowNumber,
+                    ownerProcessIdentifier:
+                        ProcessInfo.processInfo.processIdentifier
+                )
+        )
+    }
+
+    func observeDesktopPresentationChanges(
+        _ onChange:
+            @escaping @MainActor (
+                SpaceFixtureDesktopPresentationEvidenceSource
+            ) -> Void
+    ) -> any SpaceFixtureCancellable {
+        desktopPresentationObservation?.cancel()
+        let observation =
+            SpaceFixtureDesktopPresentationObservation(
+                window: window,
+                onChange: onChange
+            )
+        desktopPresentationObservation = observation
+        return observation
     }
 
     func updateWorkflowReadiness(windowTitles: [String]) {
@@ -101,31 +193,96 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         window.suppressAccessibilityExposure()
     }
 
-    private func installFullScreenCompletionObserver(completion: @escaping @MainActor () -> Void) {
-        if let fullScreenObservationToken {
-            NotificationCenter.default.removeObserver(fullScreenObservationToken)
-            self.fullScreenObservationToken = nil
+    private static func isExactCGWindowOnScreen(
+        _ windowNumber: CGWindowID,
+        ownerProcessIdentifier: pid_t
+    ) -> Bool {
+        guard windowNumber != 0,
+              let windowInfo = CGWindowListCopyWindowInfo(
+                [.optionIncludingWindow, .optionOnScreenOnly],
+                windowNumber
+              ) as? [[String: Any]]
+        else {
+            return false
         }
+        return windowInfo.contains { entry in
+            guard
+                let observedWindowNumber =
+                    entry[kCGWindowNumber as String]
+                        as? NSNumber,
+                let observedOwnerProcessIdentifier =
+                    entry[kCGWindowOwnerPID as String]
+                        as? NSNumber,
+                let isOnScreen =
+                    entry[kCGWindowIsOnscreen as String]
+                        as? NSNumber
+            else {
+                return false
+            }
+            return observedWindowNumber.uint32Value
+                    == windowNumber
+                && observedOwnerProcessIdentifier.int32Value
+                    == ownerProcessIdentifier
+                && isOnScreen.boolValue
+        }
+    }
 
-        var token: NSObjectProtocol?
-        token = NotificationCenter.default.addObserver(
+}
+
+@MainActor
+private final class SpaceFixtureFullScreenObservation:
+    SpaceFixtureCancellable
+{
+    private var notificationToken: NSObjectProtocol?
+    private var completion: (@MainActor () -> Void)?
+
+    init(
+        window: NSWindow,
+        completion: @escaping @MainActor () -> Void
+    ) {
+        self.completion = completion
+        notificationToken = NotificationCenter.default.addObserver(
             forName: NSWindow.didEnterFullScreenNotification,
             object: window,
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self else { return }
-                if let token {
-                    NotificationCenter.default.removeObserver(token)
-                }
-                self.fullScreenObservationToken = nil
-                self.showNoisyCGSiblingsIfNeeded()
-                completion()
+                self?.finish()
             }
         }
-        fullScreenObservationToken = token
     }
 
+    func cancel() {
+        removeObserver()
+        completion = nil
+    }
+
+    func completeFromInitialReadback() {
+        finish()
+    }
+
+    private func finish() {
+        guard let completion else { return }
+        removeObserver()
+        self.completion = nil
+        completion()
+    }
+
+    private func removeObserver() {
+        guard let notificationToken else { return }
+        NotificationCenter.default.removeObserver(
+            notificationToken
+        )
+        self.notificationToken = nil
+    }
+
+    deinit {
+        if let notificationToken {
+            NotificationCenter.default.removeObserver(
+                notificationToken
+            )
+        }
+    }
 }
 
 @MainActor

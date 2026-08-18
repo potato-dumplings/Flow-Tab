@@ -22,7 +22,7 @@ extension FlowTabTests {
         XCTAssertEqual(resolved, .simplifiedChinese)
         XCTAssertEqual(
             userDefaults.string(forKey: AppPreferenceKeys.appLanguage),
-            AppLanguagePreferencesStore.defaultLanguage.rawValue
+            AppLanguagePreferencesStore.invalidValueFallbackLanguage.rawValue
         )
     }
 
@@ -172,131 +172,6 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testSettingsLanguageChangeRebuildsSettingsBridgeWithLocalizedText() throws {
-        let previousLanguageRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.appLanguage)
-        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppPreferenceKeys.appLanguage)
-        defer {
-            if let previousLanguageRaw {
-                UserDefaults.standard.set(previousLanguageRaw, forKey: AppPreferenceKeys.appLanguage)
-            } else {
-                UserDefaults.standard.removeObject(forKey: AppPreferenceKeys.appLanguage)
-            }
-        }
-
-        let hostedView = NSHostingView(
-            rootView: AppSettingsView(isActive: true)
-                .frame(width: 1_440, height: 900, alignment: .topLeading)
-        )
-        hostedView.frame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
-        hostedView.layoutSubtreeIfNeeded()
-
-        _ = try XCTUnwrap(
-            descendant(in: hostedView, as: AppKitSettingsPageContainerView.self)
-        )
-
-        UserDefaults.standard.set(
-            AppLanguage.simplifiedChinese.rawValue,
-            forKey: AppPreferenceKeys.appLanguage
-        )
-
-        XCTAssertTrue(
-            waitForRunLoopCondition(timeout: 1.0) {
-                hostedView.layoutSubtreeIfNeeded()
-                let containers = descendantViews(in: hostedView)
-                    .compactMap { $0 as? AppKitSettingsPageContainerView }
-                guard containers.count == 1, let container = containers.first else { return false }
-                return localizedTextValues(in: container.pageView).contains("基础显示设置、快捷键与权限")
-            },
-            "Language changes should rebuild or refresh Settings with localized text."
-        )
-    }
-
-    @MainActor
-    func testSettingsRootLanguageChangeRebuildsSettingsBridgeWithLocalizedText() throws {
-        let previousSelectedTab = HomeTabState.shared.selectedTab
-        let previousLanguageRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.appLanguage)
-        let previousThemeRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.themeMode)
-        HomeTabState.shared.selectedTab = .settings
-        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppPreferenceKeys.appLanguage)
-        UserDefaults.standard.set(ThemeMode.light.rawValue, forKey: AppPreferenceKeys.themeMode)
-        defer {
-            HomeTabState.shared.selectedTab = previousSelectedTab
-            restoreUserDefaultsValue(previousLanguageRaw, forKey: AppPreferenceKeys.appLanguage)
-            restoreUserDefaultsValue(previousThemeRaw, forKey: AppPreferenceKeys.themeMode)
-        }
-
-        let hostedView = NSHostingView(
-            rootView: HomeRootView()
-                .frame(width: 1_440, height: 900, alignment: .topLeading)
-        )
-        hostedView.frame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
-        hostedView.layoutSubtreeIfNeeded()
-
-        _ = try XCTUnwrap(
-            descendant(in: hostedView, as: AppKitSettingsPageContainerView.self)
-        )
-
-        UserDefaults.standard.set(
-            AppLanguage.simplifiedChinese.rawValue,
-            forKey: AppPreferenceKeys.appLanguage
-        )
-
-        XCTAssertTrue(
-            waitForRunLoopCondition(timeout: 1.0) {
-                hostedView.layoutSubtreeIfNeeded()
-                let containers = descendantViews(in: hostedView)
-                    .compactMap { $0 as? AppKitSettingsPageContainerView }
-                guard containers.count == 1, let container = containers.first else { return false }
-                return localizedTextValues(in: container.pageView).contains("基础显示设置、快捷键与权限")
-            },
-            "Root language changes should rebuild or refresh Settings with localized text."
-        )
-    }
-
-    @MainActor
-    func testSettingsRootThemeChangeRebuildsSettingsBridgeWithTargetAppearance() throws {
-        let previousSelectedTab = HomeTabState.shared.selectedTab
-        let previousLanguageRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.appLanguage)
-        let previousThemeRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.themeMode)
-        let previousPresentationContext = FlowPresentationState.shared.context
-        HomeTabState.shared.selectedTab = .settings
-        FlowPresentationState.shared.setAppLanguage(rawValue: AppLanguage.simplifiedChinese.rawValue)
-        FlowPresentationState.shared.setThemeMode(rawValue: ThemeMode.light.rawValue)
-        defer {
-            HomeTabState.shared.selectedTab = previousSelectedTab
-            FlowPresentationState.shared.setAppLanguage(rawValue: previousPresentationContext.appLanguage.rawValue)
-            FlowPresentationState.shared.setThemeMode(rawValue: previousPresentationContext.themeMode.rawValue)
-            restoreUserDefaultsValue(previousLanguageRaw, forKey: AppPreferenceKeys.appLanguage)
-            restoreUserDefaultsValue(previousThemeRaw, forKey: AppPreferenceKeys.themeMode)
-        }
-
-        let hostedView = NSHostingView(
-            rootView: HomeRootView()
-                .frame(width: 1_440, height: 900, alignment: .topLeading)
-        )
-        hostedView.frame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
-        hostedView.layoutSubtreeIfNeeded()
-
-        _ = try XCTUnwrap(
-            descendant(in: hostedView, as: AppKitSettingsPageContainerView.self)
-        )
-
-        FlowPresentationState.shared.setThemeMode(rawValue: ThemeMode.dark.rawValue)
-
-        XCTAssertTrue(
-            waitForRunLoopCondition(timeout: 1.0) {
-                hostedView.layoutSubtreeIfNeeded()
-                let containers = descendantViews(in: hostedView)
-                    .compactMap { $0 as? AppKitSettingsPageContainerView }
-                guard containers.count == 1, let container = containers.first else { return false }
-                return container.appearance?.isFlowTabDarkInterface == true
-                    && settingsCardBackgroundIsDark(in: container.pageView)
-            },
-            "Root theme changes should rebuild or refresh Settings with the target app appearance."
-        )
-    }
-
-    @MainActor
     func testHomePermissionStatusColorsFollowResolvedThemeAndSettingsStatusTone() throws {
         let lightLabel = try hostedHomePermissionStatusTitleLabel(colorScheme: .light)
         let darkLabel = try hostedHomePermissionStatusTitleLabel(colorScheme: .dark)
@@ -428,87 +303,45 @@ extension FlowTabTests {
         XCTAssertEqual(detailLabel.preferredMaxLayoutWidth, expectedTextWidth, accuracy: 2.5)
     }
 
-    func testPermissionPollingPolicyBuildsTimeoutDescriptionFromCurrentLimits() {
-        let policy = PermissionPollingPolicy.default
-
-        XCTAssertEqual(policy.intervalNanoseconds, 500_000_000)
-        XCTAssertEqual(policy.attemptLimit, 40)
-        XCTAssertEqual(policy.timeoutSeconds, 20)
-        XCTAssertEqual(policy.timeoutDescription, "20s")
-    }
-
-    func testPermissionPollingTaskRegistryTracksMultipleTargets() {
-        var registry = PermissionPollingTaskRegistry()
-
-        registry.markStarted(.accessibility)
-        registry.markStarted(.screenCapture)
-        registry.markStarted(.accessibility)
-
-        XCTAssertTrue(registry.isActive(.accessibility))
-        XCTAssertTrue(registry.isActive(.screenCapture))
-        XCTAssertEqual(registry.activeTargets, [.accessibility, .screenCapture])
-
-        registry.markStopped(.accessibility)
-
-        XCTAssertFalse(registry.isActive(.accessibility))
-        XCTAssertTrue(registry.isActive(.screenCapture))
-
-        registry.markAllStopped()
-
-        XCTAssertTrue(registry.activeTargets.isEmpty)
-    }
-
-    func testPermissionPollingDiagnosticIncludesAttemptElapsedAndFinalState() {
-        let diagnostic = PermissionPollingDiagnostic(
-            target: .screenCapture,
-            attempt: 40,
-            attemptLimit: 40,
-            elapsedMs: 20_000,
-            finalPermissionGranted: false,
-            timeoutDescription: "20s",
-            bundleIdentifier: "io.github.flowtab.tests",
-            bundlePath: "/Applications/FlowTab.app",
-            action: .timeout
-        )
-
-        XCTAssertTrue(diagnostic.logMessage.contains("target=screenCapture"))
-        XCTAssertTrue(diagnostic.logMessage.contains("action=timeout"))
-        XCTAssertTrue(diagnostic.logMessage.contains("attempt=40/40"))
-        XCTAssertTrue(diagnostic.logMessage.contains("elapsedMs=20000.000"))
-        XCTAssertTrue(diagnostic.logMessage.contains("finalPermissionGranted=false"))
-        XCTAssertTrue(diagnostic.logMessage.contains("timeout=20s"))
-    }
-
     @MainActor
-    func testHotkeyTakeoverInactiveStatusShowsAfterConfirmationDelay() {
-        let view = HotkeySettingsCardAppKitView(takeoverInactiveDisplayDelay: 0.01)
+    func testHotkeyTakeoverInactiveStatusUsesRegistrationEvidence() {
+        let view = HotkeySettingsCardAppKitView()
         let statusLabel: NSTextField? = descendant(
             in: view,
             identifier: "flowtab.settings.hotkey.main-takeover-status"
         )
 
-        view.update(with: makeHotkeySettingsState(commandTabTakeoverActive: false))
+        view.update(
+            with: makeHotkeySettingsState(
+                commandTabTakeoverRegistrationState: .inactive
+            )
+        )
 
-        XCTAssertTrue(waitForRunLoopCondition(timeout: 0.5) {
-            statusLabel?.isHidden == false
-        })
+        XCTAssertFalse(statusLabel?.isHidden ?? true)
         XCTAssertEqual(statusLabel?.stringValue, AppStrings.text(.hotkeyCommandTabTakeoverInactive))
     }
 
     @MainActor
-    func testHotkeyTakeoverInactiveDelayDoesNotShowStaleStatusAfterRecovery() {
-        let view = HotkeySettingsCardAppKitView(takeoverInactiveDisplayDelay: 0.01)
+    func testHotkeyTakeoverPendingStateHidesUntilRegistrationEvidenceArrives() {
+        let view = HotkeySettingsCardAppKitView()
         let statusLabel: NSTextField? = descendant(
             in: view,
             identifier: "flowtab.settings.hotkey.main-takeover-status"
         )
 
-        view.update(with: makeHotkeySettingsState(commandTabTakeoverActive: false))
-        view.update(with: makeHotkeySettingsState(commandTabTakeoverActive: true))
+        view.update(
+            with: makeHotkeySettingsState(
+                commandTabTakeoverRegistrationState: .pending
+            )
+        )
+        XCTAssertTrue(statusLabel?.isHidden ?? false)
 
-        XCTAssertTrue(waitForRunLoopCondition(timeout: 0.5) {
-            statusLabel?.stringValue == AppStrings.text(.hotkeyCommandTabTakeoverActive)
-        })
+        view.update(
+            with: makeHotkeySettingsState(
+                commandTabTakeoverRegistrationState: .active
+            )
+        )
+
         XCTAssertEqual(statusLabel?.stringValue, AppStrings.text(.hotkeyCommandTabTakeoverActive))
         XCTAssertFalse(statusLabel?.isHidden ?? true)
     }
@@ -519,10 +352,9 @@ extension FlowTabTests {
         XCTAssertLessThan(RuntimeLogLevel.warning, .error)
     }
 
-    func testDiagnosticsRefreshPolicyOwnsRuntimeLogsRefreshCadence() {
+    func testDiagnosticsRefreshPolicyOwnsRuntimeLogsLineLimit() {
         let policy = DiagnosticsRefreshPolicy.runtimeLogs
 
-        XCTAssertEqual(policy.intervalNanoseconds, 1_000_000_000)
         XCTAssertEqual(policy.lineLimit, 300)
     }
 
@@ -541,44 +373,17 @@ extension FlowTabTests {
         )
     }
 
-    @MainActor
-    func testRuntimeLogsDropdownUpdatesRuntimeLogLevelBinding() throws {
-        let appearance = try XCTUnwrap(NSAppearance(named: .aqua))
-        var diagnosticSessionExpiration = 0.0
-        var runtimeLogLevelRaw = RuntimeLogLevel.info.rawValue
-        let hostedView = NSHostingView(
-            rootView: RuntimeLogsSection(
-                diagnosticSessionExpiration: Binding(
-                    get: { diagnosticSessionExpiration },
-                    set: { diagnosticSessionExpiration = $0 }
-                ),
-                runtimeLogLevelRaw: Binding(
-                    get: { runtimeLogLevelRaw },
-                    set: { runtimeLogLevelRaw = $0 }
-                ),
-                hotkeyShortcutText: "Option + Tab",
-                appLanguage: .english,
-                targetAppearance: appearance
-            )
-        )
-        hostedView.frame = NSRect(x: 0, y: 0, width: 620, height: 620)
-        hostedView.layoutSubtreeIfNeeded()
+    func testAppPreferenceMaintenanceRemovesRetiredDiagnosticValues() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
 
-        var locatedDropdown: FlowDropdownControl?
-        XCTAssertTrue(
-            waitForRunLoopCondition(timeout: 1.0) {
-                hostedView.layoutSubtreeIfNeeded()
-                locatedDropdown = descendant(in: hostedView, identifier: "flowtab.logs.level")
-                return locatedDropdown != nil
-            }
-        )
-        let dropdown = try XCTUnwrap(locatedDropdown)
-        XCTAssertNil(descendant(in: hostedView, as: NSPopUpButton.self))
+        userDefaults.set(true, forKey: "enableVerboseDiagnostics")
+        userDefaults.set(1_800_000_000.0, forKey: "diagnosticSessionExpiration")
 
-        dropdown.selectOptionForTesting(RuntimeLogLevel.warning.rawValue)
+        AppPreferenceMaintenance.removeRetiredValues(userDefaults: userDefaults)
 
-        XCTAssertEqual(runtimeLogLevelRaw, RuntimeLogLevel.warning.rawValue)
-        XCTAssertEqual(dropdown.selectedIdentifierForTesting, RuntimeLogLevel.warning.rawValue)
+        XCTAssertNil(userDefaults.object(forKey: "enableVerboseDiagnostics"))
+        XCTAssertNil(userDefaults.object(forKey: "diagnosticSessionExpiration"))
     }
 
     func testThemePreferencesResolveFallsBackToFollowSystem() {
@@ -622,34 +427,6 @@ extension FlowTabTests {
         )
         XCTAssertEqual(explicitDark.context.resolvedColorScheme, .dark)
         XCTAssertEqual(explicitDark.context.targetNSAppearanceName, .darkAqua)
-    }
-
-    @MainActor
-    func testSystemThemeStateMatchesCurrentSystemAppearanceWhenAppDefaultsContainAppleInterfaceStyle() {
-        let systemAppearanceKey = "AppleInterfaceStyle"
-        let previousAppearance = NSApp.appearance
-        let previousAppAppearanceRaw = currentAppScopedDefaultString(forKey: systemAppearanceKey)
-        NSApp.appearance = nil
-        SystemThemeState.shared.refreshColorScheme()
-        let expectedSystemColorScheme = SystemThemeState.colorScheme(for: NSApp.effectiveAppearance)
-        let appScopedContamination = expectedSystemColorScheme == .dark ? "Light" : "Dark"
-        UserDefaults.standard.set(appScopedContamination, forKey: systemAppearanceKey)
-        postSystemAppearanceChangedNotification()
-        defer {
-            NSApp.appearance = previousAppearance
-            restoreUserDefaultsValue(previousAppAppearanceRaw, forKey: systemAppearanceKey)
-            postSystemAppearanceChangedNotification()
-        }
-
-        let state = SystemThemeState.shared
-
-        XCTAssertTrue(
-            waitForRunLoopCondition(timeout: 1.0) {
-                state.colorScheme == expectedSystemColorScheme
-                    && SystemThemeState.colorScheme(for: NSApp.effectiveAppearance) == expectedSystemColorScheme
-            },
-            "Follow-system theme should match the current system appearance, not app-scoped AppleInterfaceStyle defaults."
-        )
     }
 
     @MainActor
@@ -830,6 +607,7 @@ extension FlowTabTests {
     @MainActor
     func testUITestBootstrapResetRefreshesSharedPresentationState() {
         let previousContext = FlowPresentationState.shared.context
+        let expectedLanguage = AppLanguagePreferencesStore.firstLaunchLanguage()
         let standardDefaults = UserDefaults.standard
         let previousValues = AppPreferenceKeys.allKeys.reduce(into: [String: Any]()) { values, key in
             values[key] = standardDefaults.object(forKey: key)
@@ -865,14 +643,14 @@ extension FlowTabTests {
         }
 
         XCTAssertEqual(FlowPresentationState.shared.context.themeMode, .followSystem)
-        XCTAssertEqual(FlowPresentationState.shared.context.appLanguage, .simplifiedChinese)
+        XCTAssertEqual(FlowPresentationState.shared.context.appLanguage, expectedLanguage)
         XCTAssertEqual(
             standardDefaults.string(forKey: AppPreferenceKeys.themeMode),
             ThemeMode.followSystem.rawValue
         )
         XCTAssertEqual(
             standardDefaults.string(forKey: AppPreferenceKeys.appLanguage),
-            AppLanguage.simplifiedChinese.rawValue
+            expectedLanguage.rawValue
         )
     }
 
@@ -979,61 +757,71 @@ extension FlowTabTests {
 
     func testInAppWindowHotkeyResolveAndLoadNormalizeInvalidValues() {
         let resolved = InAppWindowHotkeyPreferencesStore.resolve(
-            primaryModifierRaw: "invalid",
-            mainKeyRaw: "invalid"
+            shortcutKeysRaw: "invalid"
         )
-        XCTAssertEqual(resolved.primaryModifier, .control)
-        XCTAssertEqual(resolved.mainKey, .tab)
+        XCTAssertEqual(resolved.shortcutKeys, [.control, .tab])
 
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
         defer { clearIsolatedUserDefaults(userDefaults) }
-        userDefaults.set("invalid", forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier)
-        userDefaults.set("invalid", forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey)
+        userDefaults.set(
+            "invalid",
+            forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+        )
 
         let configuration = InAppWindowHotkeyPreferencesStore.load(userDefaults: userDefaults)
-        XCTAssertEqual(configuration.primaryModifier, .control)
-        XCTAssertEqual(configuration.mainKey, .tab)
-        XCTAssertEqual(configuration.quitKey, .q)
+        XCTAssertEqual(configuration.baseKeys, [.control, .tab])
+        XCTAssertEqual(configuration.quitKeys, [.q])
         XCTAssertEqual(
-            userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier),
-            InAppWindowHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
-        )
-        XCTAssertEqual(
-            userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey),
-            InAppWindowHotkeyPreferencesStore.defaultMainKey.rawValue
+            userDefaults.string(
+                forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+            ),
+            InAppWindowHotkeyPreferencesStore.defaultShortcutKeys.rawValue
         )
     }
 
     func testInAppWindowHotkeyResolveAvoidingMainConflictFallsBackToNonConflictingModifier() {
         let mainConfiguration = SwitcherHotkeyConfiguration(
-            primaryModifier: .control,
-            mainKey: .tab,
-            quitKey: .q
+            baseKeys: [.control],
+            reverseKeys: [.shift],
+            mainKeys: [.tab],
+            quitKeys: [.q]
         )
 
-        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
-            primaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
-            mainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
-            mainHotkeyConfiguration: mainConfiguration
+        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
+            shortcutKeysRaw: "control+tab",
+            switcherConfiguration: mainConfiguration
         )
-        XCTAssertEqual(resolved.primaryModifier, .option)
-        XCTAssertEqual(resolved.mainKey, .tab)
+        XCTAssertEqual(resolved.shortcutKeys, [.option, .tab])
     }
 
     func testInAppWindowHotkeyResolveAvoidingMainConflictKeepsNonConflictingShortcut() {
         let mainConfiguration = SwitcherHotkeyConfiguration(
-            primaryModifier: .option,
-            mainKey: .tab,
-            quitKey: .q
+            baseKeys: [.option],
+            reverseKeys: [.shift],
+            mainKeys: [.tab],
+            quitKeys: [.q]
         )
 
-        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
-            primaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
-            mainKeyRaw: SwitcherHotkeyKey.space.rawValue,
-            mainHotkeyConfiguration: mainConfiguration
+        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
+            shortcutKeysRaw: "option+space",
+            switcherConfiguration: mainConfiguration
         )
-        XCTAssertEqual(resolved.primaryModifier, .option)
-        XCTAssertEqual(resolved.mainKey, .space)
+        XCTAssertEqual(resolved.shortcutKeys, [.option, .space])
+    }
+
+    func testInAppWindowHotkeyResolveAvoidingQuitConflictFallsBackToNonConflictingModifier() {
+        let mainConfiguration = SwitcherHotkeyConfiguration(
+            baseKeys: [.option],
+            reverseKeys: [.shift],
+            mainKeys: [.tab],
+            quitKeys: [.q]
+        )
+
+        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
+            shortcutKeysRaw: "option+q",
+            switcherConfiguration: mainConfiguration
+        )
+        XCTAssertEqual(resolved.shortcutKeys, [.control, .q])
     }
 
     func testSwitcherBehaviorAndVisibilityPreferenceDefaults() {
@@ -1081,60 +869,6 @@ extension FlowTabTests {
         XCTAssertFalse(AppVisibilityPreferencesStore.loadShowInCommandTab(userDefaults: userDefaults))
         XCTAssertTrue(hiddenModel.hiddenAppIDs.contains(currentAppID))
         XCTAssertEqual(hiddenModel.hiddenCount, 1)
-    }
-
-    @MainActor
-    func testAppVisibilityManagerShowsStoredHiddenAppIDsMissingFromInventory() async {
-        guard let userDefaults = makeIsolatedUserDefaults() else { return }
-        defer { clearIsolatedUserDefaults(userDefaults) }
-
-        let missingAppID = "com.flowtab.hidden.missing"
-        userDefaults.set(true, forKey: AppPreferenceKeys.showInCommandTab)
-        AppVisibilityPreferencesStore.saveHiddenAppIDs([missingAppID], userDefaults: userDefaults)
-
-        await withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
-            let model = AppVisibilityManagerModel(userDefaults: userDefaults)
-            model.filter = .hidden
-            model.reload()
-
-            let didFinishLoading = await waitUntil(
-                "app visibility manager finishes loading hidden missing app ids",
-                timeout: 5.0,
-                pollIntervalNanoseconds: 20_000_000
-            ) {
-                !model.isLoading
-            }
-            XCTAssertTrue(didFinishLoading)
-
-            XCTAssertFalse(model.isLoading)
-            XCTAssertEqual(model.hiddenCount, 1)
-            XCTAssertEqual(model.visibleApps.map(\.id), [missingAppID])
-            XCTAssertEqual(model.selectedApp?.id, missingAppID)
-        }
-    }
-
-    @MainActor
-    func testAppVisibilityManagerSearchUsesSharedPinyinMatching() async {
-        guard let userDefaults = makeIsolatedUserDefaults() else { return }
-        defer { clearIsolatedUserDefaults(userDefaults) }
-
-        await withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
-            let model = AppVisibilityManagerModel(userDefaults: userDefaults)
-            model.query = "ceshi"
-            model.reload()
-
-            let didFinishLoading = await waitUntil(
-                "app visibility manager finishes loading searchable mock apps",
-                timeout: 5.0,
-                pollIntervalNanoseconds: 20_000_000
-            ) {
-                !model.isLoading
-            }
-            XCTAssertTrue(didFinishLoading)
-
-            XCTAssertEqual(model.visibleApps.map(\.id), ["com.xxx.test"])
-            XCTAssertEqual(model.selectedApp?.id, "com.xxx.test")
-        }
     }
 
     func testAppVisibilityIconStateRefreshesWhenAppSourceChanges() {
@@ -1346,16 +1080,35 @@ extension FlowTabTests {
         XCTAssertTrue(scopedLines[1].contains("[\(marker)5]"))
     }
 
-    func testRuntimeLogSuppressesDebugAndInfoOutsideDiagnosticSession() async {
+    func testRuntimeLogRecordingPolicyUsesSelectedMinimumLevel() {
+        let expectations: [(
+            minimumLevel: RuntimeLogLevel,
+            recordedLevels: [RuntimeLogLevel]
+        )] = [
+            (.debug, [.debug, .info, .warning, .error]),
+            (.info, [.info, .warning, .error]),
+            (.warning, [.warning, .error]),
+            (.error, [.error])
+        ]
+
+        for expectation in expectations {
+            for level in RuntimeLogLevel.allCases {
+                XCTAssertEqual(
+                    RuntimeLogRecordingPolicy.shouldRecord(
+                        level: level,
+                        minimumLevel: expectation.minimumLevel
+                    ),
+                    expectation.recordedLevels.contains(level),
+                    "level=\(level.rawValue) minimum=\(expectation.minimumLevel.rawValue)"
+                )
+            }
+        }
+    }
+
+    func testRuntimeLogRecordsEveryLevelWhenMinimumIsDebug() async {
         let defaults = UserDefaults.standard
-        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
         defer {
-            restoreUserDefaultsValue(
-                previousExpiration,
-                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
-                userDefaults: defaults
-            )
             restoreUserDefaultsValue(
                 previousLevel,
                 forKey: AppPreferenceKeys.runtimeLogLevel,
@@ -1363,32 +1116,28 @@ extension FlowTabTests {
             )
         }
 
-        RuntimeDiagnosticSessionStore.stop(userDefaults: defaults)
         defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         await resetRuntimeLogsForTest()
 
-        RuntimeLog.debug(.inputTrace, "debug")
-        RuntimeLog.info(.inputTrace, "info")
-        RuntimeLog.warning(.inputTrace, "warning")
+        let category = "UnitTestAllLevels\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
+        RuntimeLog.debug(category, "debug")
+        RuntimeLog.info(category, "info")
+        RuntimeLog.warning(category, "warning")
+        RuntimeLog.error(category, "error")
 
         let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 50, minimumLevel: .debug)
-        let scopedLines = lines.filter { $0.contains("[InputTrace]") }
+        let scopedLines = lines.filter { $0.contains("[\(category)]") }
 
-        XCTAssertFalse(scopedLines.contains(where: { $0.contains("[DEBUG]") }))
-        XCTAssertFalse(scopedLines.contains(where: { $0.contains("[INFO]") }))
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[DEBUG]") }))
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[INFO]") }))
         XCTAssertTrue(scopedLines.contains(where: { $0.contains("[WARN]") }))
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[ERROR]") }))
     }
 
-    func testRuntimeLogTypedCategoryKeepsWarningsAndErrorsOutsideDiagnosticSession() async {
+    func testRuntimeLogFiltersEntriesBelowSelectedMinimumLevel() async {
         let defaults = UserDefaults.standard
-        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
         defer {
-            restoreUserDefaultsValue(
-                previousExpiration,
-                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
-                userDefaults: defaults
-            )
             restoreUserDefaultsValue(
                 previousLevel,
                 forKey: AppPreferenceKeys.runtimeLogLevel,
@@ -1396,8 +1145,7 @@ extension FlowTabTests {
             )
         }
 
-        RuntimeDiagnosticSessionStore.stop(userDefaults: defaults)
-        defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
+        defaults.set(RuntimeLogLevel.warning.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         await resetRuntimeLogsForTest()
 
         RuntimeLog.debug(.activation, "debug")
@@ -1414,16 +1162,10 @@ extension FlowTabTests {
         XCTAssertTrue(scopedLines.contains(where: { $0.contains("[ERROR]") }))
     }
 
-    func testRuntimeLogDiagnosticSessionAllowsDebugAndInfoWhenMinimumLevelAllows() async {
+    func testRuntimeLogPermissionWarningRecordsWhenMinimumLevelAllows() async {
         let defaults = UserDefaults.standard
-        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
         defer {
-            restoreUserDefaultsValue(
-                previousExpiration,
-                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
-                userDefaults: defaults
-            )
             restoreUserDefaultsValue(
                 previousLevel,
                 forKey: AppPreferenceKeys.runtimeLogLevel,
@@ -1431,40 +1173,7 @@ extension FlowTabTests {
             )
         }
 
-        RuntimeDiagnosticSessionStore.start(userDefaults: defaults)
-        defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
-        await resetRuntimeLogsForTest()
-
-        let category = "UnitTestSession\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
-        RuntimeLog.debug(category, "debug")
-        RuntimeLog.info(category, "info")
-
-        let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 50, minimumLevel: .debug)
-        let scopedLines = lines.filter { $0.contains("[\(category)]") }
-
-        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[DEBUG]") }))
-        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[INFO]") }))
-    }
-
-    func testRuntimeLogPermissionWarningRecordsOutsideDiagnosticSession() async {
-        let defaults = UserDefaults.standard
-        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
-        let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
-        defer {
-            restoreUserDefaultsValue(
-                previousExpiration,
-                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
-                userDefaults: defaults
-            )
-            restoreUserDefaultsValue(
-                previousLevel,
-                forKey: AppPreferenceKeys.runtimeLogLevel,
-                userDefaults: defaults
-            )
-        }
-
-        RuntimeDiagnosticSessionStore.stop(userDefaults: defaults)
-        defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
+        defaults.set(RuntimeLogLevel.warning.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         await resetRuntimeLogsForTest()
 
         RuntimeLog.warning(.permission, "permission-missing")
@@ -1475,14 +1184,15 @@ extension FlowTabTests {
         XCTAssertEqual(scopedLines.count, 1)
     }
 
-    private func makeHotkeySettingsState(commandTabTakeoverActive: Bool) -> HotkeySettingsCardState {
+    private func makeHotkeySettingsState(
+        commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
+    ) -> HotkeySettingsCardState {
         HotkeySettingsCardState(
-            hotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.command.rawValue,
+            hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.command.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
-            inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
-            inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
-            commandTabTakeoverActive: commandTabTakeoverActive,
+            inAppWindowHotkeyShortcutKeysRaw: "option+tab",
+            commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
             accessibilityTrusted: true,
             appLanguageRaw: AppLanguage.simplifiedChinese.rawValue
         )
@@ -1504,12 +1214,11 @@ extension FlowTabTests {
             searchEnabled: true,
             searchDefaultScopeRaw: SwitcherSearchScope.app.rawValue,
             hiddenAppCount: 2,
-            hotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
+            hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.option.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
-            inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
-            inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
-            commandTabTakeoverActive: false,
+            inAppWindowHotkeyShortcutKeysRaw: "control+tab",
+            commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: false,
             screenCaptureTrusted: false,
             targetNSAppearanceName: .aqua
@@ -1623,50 +1332,12 @@ extension FlowTabTests {
         XCTAssertEqual(actualColor.alphaComponent, expectedColor.alphaComponent, accuracy: 0.001, file: file, line: line)
     }
 
-    private func waitForRunLoopCondition(
-        timeout: TimeInterval,
-        predicate: () -> Bool
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if predicate() {
-                return true
-            }
-            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.005))
-        }
-        return predicate()
-    }
-
     private func restoreUserDefaultsValue(_ value: String?, forKey key: String) {
         if let value {
             UserDefaults.standard.set(value, forKey: key)
         } else {
             UserDefaults.standard.removeObject(forKey: key)
         }
-    }
-
-    private func currentAppScopedDefaultString(forKey key: String) -> String? {
-        guard let domainName = Bundle.main.bundleIdentifier else { return nil }
-        return UserDefaults.standard.persistentDomain(forName: domainName)?[key] as? String
-    }
-
-    private func postSystemAppearanceChangedNotification() {
-        DistributedNotificationCenter.default().postNotificationName(
-            Notification.Name("AppleInterfaceThemeChangedNotification"),
-            object: nil,
-            userInfo: nil,
-            deliverImmediately: true
-        )
-    }
-
-    private func settingsCardBackgroundIsDark(in view: NSView) -> Bool {
-        guard let card = descendantViews(in: view).compactMap({ $0 as? FlowSettingsCardView }).first,
-            let cgColor = card.layer?.backgroundColor,
-            let color = NSColor(cgColor: cgColor)?.usingColorSpace(.sRGB)
-        else {
-            return false
-        }
-        return color.redComponent < 0.3 && color.greenComponent < 0.3 && color.blueComponent < 0.3
     }
 
 }

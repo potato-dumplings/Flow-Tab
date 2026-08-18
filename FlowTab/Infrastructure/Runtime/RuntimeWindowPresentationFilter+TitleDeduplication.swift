@@ -30,7 +30,7 @@ extension RuntimeWindowPresentationFilter {
         guard !activationTitleKeys.isEmpty else { return entries }
 
         let uniqueCGWindowIDs = uniquelyRepresentedCGWindowIDs(in: entries)
-        var droppedCount = 0
+        var droppedEntries: [RuntimeWindowListEntry] = []
         let filteredEntries = entries.filter { entry in
             guard entry.activationHandleID == nil, entry.axWindow == nil else { return true }
 
@@ -50,17 +50,17 @@ extension RuntimeWindowPresentationFilter {
             let shouldDrop = (isCoveredByActivationTitle || isFullscreenFallbackArtifact)
                 && !hasDistinctUserWindowEvidence
             if shouldDrop {
-                droppedCount += 1
+                droppedEntries.append(entry)
             }
             return !shouldDrop
         }
 
-        if droppedCount > 0 {
-            RuntimeLog.debug(
-                .axMatch,
-                "\(appName) filtered-cg-only-covered-by-activation stage=\(stage) dropped=\(droppedCount)"
-            )
-        }
+        RuntimeWindowFilteredArtifactLogRecord.publish(
+            appName: appName,
+            kind: .cgOnlyCoveredByActivation,
+            stage: stage,
+            droppedEntries: droppedEntries
+        )
         return filteredEntries
     }
 

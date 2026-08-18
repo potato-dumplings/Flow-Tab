@@ -16,22 +16,31 @@ struct AppKitSettingsPageState: Equatable {
     let searchDefaultScopeRaw: String
     let hiddenAppCount: Int
     let hotkeyPrimaryModifierRaw: String
+    var hotkeyReverseModifiersRaw =
+        SwitcherHotkeyPreferencesStore.defaultReverseKeys.rawValue
     let hotkeyMainKeyRaw: String
     let hotkeyQuitKeyRaw: String
-    let inAppWindowHotkeyPrimaryModifierRaw: String
-    let inAppWindowHotkeyMainKeyRaw: String
-    let commandTabTakeoverActive: Bool
+    let inAppWindowHotkeyShortcutKeysRaw: String
+    var inAppWindowHotkeyReverseKeysRaw =
+        InAppWindowHotkeyPreferencesStore.defaultReverseKeys.rawValue
+    let commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
     let accessibilityTrusted: Bool
     let screenCaptureTrusted: Bool
     let targetNSAppearanceName: NSAppearance.Name
+    var hotkeyConflict: HotkeySettingsConflictPresentation? = nil
+    var hotkeyPermissionRequirement:
+        HotkeySettingsPermissionPresentation? = nil
 }
 
 struct AppKitSettingsHotkeyRawValues: Equatable {
     let hotkeyPrimaryModifierRaw: String
+    var hotkeyReverseModifiersRaw =
+        SwitcherHotkeyPreferencesStore.defaultReverseKeys.rawValue
     let hotkeyMainKeyRaw: String
     let hotkeyQuitKeyRaw: String
-    let inAppWindowHotkeyPrimaryModifierRaw: String
-    let inAppWindowHotkeyMainKeyRaw: String
+    let inAppWindowHotkeyShortcutKeysRaw: String
+    var inAppWindowHotkeyReverseKeysRaw =
+        InAppWindowHotkeyPreferencesStore.defaultReverseKeys.rawValue
 }
 
 final class AppKitFlippedDocumentView: NSView {
@@ -244,11 +253,13 @@ final class AppKitSettingsPageView: NSView {
     var onSearchEnabledChanged: ((Bool) -> Void)?
     var onSearchDefaultScopeChanged: ((String) -> Void)?
     var onManageAppVisibility: (() -> Void)?
-    var onHotkeyPrimaryModifierChanged: ((String) -> Void)?
-    var onHotkeyMainKeyChanged: ((String) -> Void)?
-    var onHotkeyQuitKeyChanged: ((String) -> Void)?
-    var onInAppWindowPrimaryModifierChanged: ((String) -> Void)?
-    var onInAppWindowMainKeyChanged: ((String) -> Void)?
+    var onMainModifiersChanged: ((SwitcherHotkeyKeySet) -> Void)?
+    var onMainReverseModifiersChanged: ((SwitcherHotkeyKeySet) -> Void)?
+    var onMainKeyChanged: ((SwitcherHotkeyKeySet) -> Void)?
+    var onQuitKeyChanged: ((SwitcherHotkeyKeySet) -> Void)?
+    var onInAppShortcutChanged: ((SwitcherHotkeyKeySet) -> Void)?
+    var onInAppReverseModifiersChanged: ((SwitcherHotkeyKeySet) -> Void)?
+    var onDismissHotkeyConflict: (() -> Void)?
     var onShowPermissionReminderChanged: ((Bool) -> Void)?
     var onAllowLaunchAtLoginChanged: ((Bool) -> Void)?
     var onAccessibilityAction: (() -> Void)?
@@ -413,18 +424,7 @@ final class AppKitSettingsPageView: NSView {
         appVisibilityCard.updateTitleAccessory(
             appVisibilityState.statusText
         )
-        hotkeyContent.update(
-            with: HotkeySettingsCardState(
-                hotkeyPrimaryModifierRaw: state.hotkeyPrimaryModifierRaw,
-                hotkeyMainKeyRaw: state.hotkeyMainKeyRaw,
-                hotkeyQuitKeyRaw: state.hotkeyQuitKeyRaw,
-                inAppWindowHotkeyPrimaryModifierRaw: state.inAppWindowHotkeyPrimaryModifierRaw,
-                inAppWindowHotkeyMainKeyRaw: state.inAppWindowHotkeyMainKeyRaw,
-                commandTabTakeoverActive: state.commandTabTakeoverActive,
-                accessibilityTrusted: state.accessibilityTrusted,
-                appLanguageRaw: state.appLanguageRaw
-            )
-        )
+        hotkeyContent.update(with: hotkeyCardState(from: state))
         permissionContent.update(
             with: PermissionSettingsCardState(
                 showPermissionReminder: state.showPermissionReminder,
@@ -443,9 +443,44 @@ final class AppKitSettingsPageView: NSView {
         invalidateIntrinsicContentSize()
     }
 
+    func updateHotkeyContent(with values: AppKitSettingsHotkeyRawValues) {
+        guard let currentState else { return }
+        hotkeyContent.update(
+            with: hotkeyCardState(from: currentState, overridingRawValuesWith: values)
+        )
+    }
+
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         applySettingsAppearance(targetSettingsAppearance)
+    }
+
+    private func hotkeyCardState(
+        from state: AppKitSettingsPageState,
+        overridingRawValuesWith values: AppKitSettingsHotkeyRawValues? = nil
+    ) -> HotkeySettingsCardState {
+        HotkeySettingsCardState(
+            hotkeyPrimaryModifierRaw: values?.hotkeyPrimaryModifierRaw
+                ?? state.hotkeyPrimaryModifierRaw,
+            hotkeyReverseModifiersRaw: values?.hotkeyReverseModifiersRaw
+                ?? state.hotkeyReverseModifiersRaw,
+            hotkeyMainKeyRaw: values?.hotkeyMainKeyRaw
+                ?? state.hotkeyMainKeyRaw,
+            hotkeyQuitKeyRaw: values?.hotkeyQuitKeyRaw
+                ?? state.hotkeyQuitKeyRaw,
+            inAppWindowHotkeyShortcutKeysRaw:
+                values?.inAppWindowHotkeyShortcutKeysRaw
+                ?? state.inAppWindowHotkeyShortcutKeysRaw,
+            inAppWindowHotkeyReverseKeysRaw:
+                values?.inAppWindowHotkeyReverseKeysRaw
+                ?? state.inAppWindowHotkeyReverseKeysRaw,
+            commandTabTakeoverRegistrationState: state.commandTabTakeoverRegistrationState,
+            accessibilityTrusted: state.accessibilityTrusted,
+            appLanguageRaw: state.appLanguageRaw,
+            hotkeyConflict: state.hotkeyConflict,
+            hotkeyPermissionRequirement:
+                state.hotkeyPermissionRequirement
+        )
     }
 
     func applySettingsAppearance(_ appearance: NSAppearance) {
@@ -573,76 +608,106 @@ final class AppKitSettingsPageView: NSView {
 
     private func wireCallbacks() {
         appearanceContent.onShowShortcutHintChanged = { [weak self] in
+            self?.notifyPageInteraction()
             self?.onShowShortcutHintChanged?($0)
         }
         appearanceContent.onShowInCommandTabChanged = { [weak self] in
+            self?.notifyPageInteraction()
             self?.onShowInCommandTabChanged?($0)
         }
         appearanceContent.onThemeModeChanged = { [weak self] in
+            self?.notifyPageInteraction()
             self?.onThemeModeChanged?($0)
         }
         appearanceContent.onAppLanguageChanged = { [weak self] in
+            self?.notifyPageInteraction()
             self?.onAppLanguageChanged?($0)
         }
 
         windowBehaviorContent.onWindowLayerAutoEnterDelayTextChanged = { [weak self] in
+            self?.notifyPageInteraction()
             self?.onWindowLayerAutoEnterDelayTextChanged?($0)
         }
         windowBehaviorContent.onWindowLayerAutoEnterDelayTextCommitted = { [weak self] in
+            self?.notifyPageInteraction()
             self?.onWindowLayerAutoEnterDelayTextCommitted?()
         }
         windowBehaviorContent.onWindowLayerAutoEnterDelayEditingChanged = { [weak self] in
+            self?.notifyPageInteraction()
             self?.onWindowLayerAutoEnterDelayEditingChanged?($0)
         }
         windowBehaviorContent.onAutoRestoreMinimizedWindowOnSwitchChanged = { [weak self] in
+            self?.notifyPageInteraction()
             self?.onAutoRestoreMinimizedWindowOnSwitchChanged?($0)
         }
         windowBehaviorContent.onHideMinimizedAppsFromAppLayerChanged = { [weak self] in
+            self?.notifyPageInteraction()
             self?.onHideMinimizedAppsFromAppLayerChanged?($0)
         }
 
         searchContent.onSearchEnabledChanged = { [weak self] in
+            self?.notifyPageInteraction()
             self?.onSearchEnabledChanged?($0)
         }
         searchContent.onSearchDefaultScopeChanged = { [weak self] in
+            self?.notifyPageInteraction()
             self?.onSearchDefaultScopeChanged?($0)
         }
         appVisibilityContent.onManageAppVisibility = { [weak self] in
+            self?.notifyPageInteraction()
             self?.onManageAppVisibility?()
         }
 
-        hotkeyContent.onHotkeyPrimaryModifierChanged = { [weak self] in
-            self?.onHotkeyPrimaryModifierChanged?($0)
+        hotkeyContent.onInteraction = { [weak self] in
+            self?.notifyPageInteraction()
         }
-        hotkeyContent.onHotkeyMainKeyChanged = { [weak self] in
-            self?.onHotkeyMainKeyChanged?($0)
+        hotkeyContent.onMainModifiersChanged = { [weak self] in
+            self?.notifyPageInteraction()
+            self?.onMainModifiersChanged?($0)
         }
-        hotkeyContent.onHotkeyQuitKeyChanged = { [weak self] in
-            self?.onHotkeyQuitKeyChanged?($0)
+        hotkeyContent.onMainReverseModifiersChanged = { [weak self] in
+            self?.notifyPageInteraction()
+            self?.onMainReverseModifiersChanged?($0)
         }
-        hotkeyContent.onInAppWindowPrimaryModifierChanged = { [weak self] in
-            self?.onInAppWindowPrimaryModifierChanged?($0)
+        hotkeyContent.onMainKeyChanged = { [weak self] in
+            self?.notifyPageInteraction()
+            self?.onMainKeyChanged?($0)
         }
-        hotkeyContent.onInAppWindowMainKeyChanged = { [weak self] in
-            self?.onInAppWindowMainKeyChanged?($0)
+        hotkeyContent.onQuitKeyChanged = { [weak self] in
+            self?.notifyPageInteraction()
+            self?.onQuitKeyChanged?($0)
+        }
+        hotkeyContent.onInAppShortcutChanged = { [weak self] in
+            self?.notifyPageInteraction()
+            self?.onInAppShortcutChanged?($0)
+        }
+        hotkeyContent.onInAppReverseModifiersChanged = { [weak self] in
+            self?.notifyPageInteraction()
+            self?.onInAppReverseModifiersChanged?($0)
         }
 
         permissionContent.onShowPermissionReminderChanged = { [weak self] in
+            self?.notifyPageInteraction()
             self?.onShowPermissionReminderChanged?($0)
         }
         permissionContent.onAllowLaunchAtLoginChanged = { [weak self] in
+            self?.notifyPageInteraction()
             self?.onAllowLaunchAtLoginChanged?($0)
         }
         permissionContent.onAccessibilityAction = { [weak self] in
+            self?.notifyPageInteraction()
             self?.onAccessibilityAction?()
         }
         permissionContent.onScreenCaptureAction = { [weak self] in
+            self?.notifyPageInteraction()
             self?.onScreenCaptureAction?()
         }
     }
 
     @objc private func handlePageClickToDismissEditing(_ recognizer: NSClickGestureRecognizer) {
         guard recognizer.state == .ended else { return }
+
+        notifyPageInteraction()
 
         let location = recognizer.location(in: self)
         let hitView = hitTest(location)
@@ -652,6 +717,10 @@ final class AppKitSettingsPageView: NSView {
         DispatchQueue.main.async { [weak self] in
             self?.window?.makeFirstResponder(nil)
         }
+    }
+
+    private func notifyPageInteraction() {
+        onDismissHotkeyConflict?()
     }
 
     private func addCard(_ card: NSView, to column: NSStackView) {

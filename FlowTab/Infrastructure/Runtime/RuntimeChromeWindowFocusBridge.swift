@@ -2,7 +2,6 @@ import AppKit
 import Foundation
 
 struct RuntimeChromeWindowFocusBridge {
-    private static let scriptStatePropagationDelaySeconds: TimeInterval = 0.05
     private static let candidateGeometryMatchThreshold: Double = 220
     private static let strongCandidateGeometryMatchThreshold: Double = 80
     private static let candidateScoreTieTolerance = 0.001
@@ -105,6 +104,13 @@ struct RuntimeChromeWindowFocusBridge {
         let error: String?
     }
 
+    struct ScriptExecutionResult: Equatable {
+        let value: String?
+        let error: String?
+    }
+
+    typealias ScriptExecutor = (String) -> ScriptExecutionResult
+
     private struct ChromeWindow {
         let windowID: Int64
         let name: String
@@ -202,20 +208,43 @@ struct RuntimeChromeWindowFocusBridge {
         windowID: Int64,
         browser: ScriptableBrowserSpec
     ) -> FocusResult {
-        let result = execute(focusWindowScript(windowID: windowID, browser: browser))
+        focusWindow(
+            windowID: windowID,
+            browser: browser,
+            scriptExecutor: execute
+        )
+    }
+
+    static func focusWindow(
+        windowID: Int64,
+        browser: ScriptableBrowserSpec,
+        scriptExecutor: ScriptExecutor
+    ) -> FocusResult {
+        let result = scriptExecutor(
+            focusWindowScript(windowID: windowID, browser: browser)
+        )
         if let error = result.error {
             return FocusResult(accepted: false, frontWindowID: nil, error: error)
         }
-        let frontWindowID = parseInteger(result.value ?? "")
+        guard let rawValue = result.value else {
+            return FocusResult(
+                accepted: false,
+                frontWindowID: nil,
+                error: "front-window-readback-empty"
+            )
+        }
+        guard let frontWindowID = parseInteger(rawValue) else {
+            return FocusResult(
+                accepted: false,
+                frontWindowID: nil,
+                error: "front-window-readback-invalid:\(chromeActivationLogValue(rawValue))"
+            )
+        }
         return FocusResult(
             accepted: frontWindowID == windowID,
             frontWindowID: frontWindowID,
             error: nil
         )
-    }
-
-    static var scriptStatePropagationDelaySecondsForTesting: TimeInterval {
-        scriptStatePropagationDelaySeconds
     }
 
     static func focusWindowScriptForTesting(windowID: Int64) -> String {
@@ -243,15 +272,12 @@ struct RuntimeChromeWindowFocusBridge {
         windowID: Int64,
         browser: ScriptableBrowserSpec
     ) -> String {
-        let propagationDelay = chromeScriptDelayLiteral(scriptStatePropagationDelaySeconds)
         let script = """
         tell application id "\(browser.appleScriptApplicationID)"
             set targetWindowID to \(windowID)
             set index of window id targetWindowID to 1
             activate
-            delay \(propagationDelay)
             set index of window id targetWindowID to 1
-            delay \(propagationDelay)
             return id of front window as text
         end tell
         """
@@ -410,20 +436,19 @@ struct RuntimeChromeWindowFocusBridge {
         return script
     }
 
-    private static func execute(_ source: String) -> (value: String?, error: String?) {
+    private static func execute(_ source: String) -> ScriptExecutionResult {
         guard let script = NSAppleScript(source: source) else {
-            return (nil, "compile-failed")
+            return ScriptExecutionResult(value: nil, error: "compile-failed")
         }
         var errorInfo: NSDictionary?
         let descriptor = script.executeAndReturnError(&errorInfo)
         if let errorInfo {
-            return (nil, String(describing: errorInfo))
+            return ScriptExecutionResult(
+                value: nil,
+                error: String(describing: errorInfo)
+            )
         }
-        return (descriptor.stringValue, nil)
-    }
-
-    private static func chromeScriptDelayLiteral(_ value: TimeInterval) -> String {
-        String(format: "%.2f", value)
+        return ScriptExecutionResult(value: descriptor.stringValue, error: nil)
     }
 
     private static func chromeTitleAffinity(

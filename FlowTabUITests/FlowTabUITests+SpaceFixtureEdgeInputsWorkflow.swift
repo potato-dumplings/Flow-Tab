@@ -23,65 +23,24 @@ private enum SpaceFixtureEdgeInputsWorkflowDefaults {
 extension FlowTabUITests {
     func testSwitcherPanelPreviewKeepsIdenticalRealWorkflowWindowsDistinct() throws {
         let workflow = try configuredSwitcherEdgeInputsWorkflow()
-        let logSnapshot = makeRuntimeLogFileSnapshot()
         let targetApp = try XCTUnwrap(
             workflow.apps.first {
                 $0.expectedWindowTitles.filter { $0 == SpaceFixtureEdgeInputsWorkflowDefaults.sharedWindowTitle }.count == 2
             },
             "Edge workflow must include one app with duplicate same-title windows."
         )
-
-        try runRealSpaceFixtureEdgeInputsWorkflow(
-            workflow,
-            flowTabAdditionalArguments: [
-                "--flowtab-ui-runtime-log-level",
-                "DEBUG",
-                "--flowtab-ui-enable-verbose-logs",
-                "--flowtab-ui-open-switcher",
-                "--flowtab-ui-listen-switcher-trigger"
-            ] + FlowTabUITestSwitcherCommandPayload.launchArguments
-        ) { workflow, app in
-            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
-            XCTAssertTrue(
-                selectEdgeWorkflowAppInSwitcherAppLayer(
-                    targetApp,
-                    app: app,
-                    diagnosticsSummary: diagnosticsSummary,
-                    timeout: 10
-                ),
-                "Switcher did not select the duplicate-window workflow app before preview assertions."
+        let logBaseline = makeRuntimeLogFileSnapshot()
+        let focusedPublicState =
+            SpaceFixtureFocusedPublicStateObservationOwner(
+                bundleIdentifier:
+                    targetApp.identity.bundleIdentifier,
+                baseline: logBaseline
             )
-
-            app.typeKey(.downArrow, modifierFlags: [])
-            let cards = waitForEdgeSwitcherWindowCards(
-                in: app,
-                expectedTitles: targetApp.expectedWindowTitles,
-                timeout: 8
-            )
-
-            XCTAssertEqual(cards.count, targetApp.expectedWindowTitles.count)
-            XCTAssertEqual(Set(cards.map(\.identifier)).count, cards.count)
-            XCTAssertEqual(edgeTitleCounts(cards.map(\.title)), edgeTitleCounts(targetApp.expectedWindowTitles))
-            let targetPID = try targetProcessIdentifier(for: targetApp)
-            waitForRuntimeLogFiles(
-                matching: #"binding-assignment public-state-tiebreak state=focused ax=ax:\#(targetPID):[0-9]+ cg=[0-9]+ axCandidates=[2-9][0-9]* cgCandidates=[2-9][0-9]*"#,
-                since: logSnapshot,
-                timeout: 8,
-                description: "real edge workflow resolves identical AX/CG candidates through the target app's focused public AX state"
-            )
+        focusedPublicState.start()
+        defer {
+            focusedPublicState.cancel()
+            logBaseline.cancel()
         }
-    }
-
-    func testSwitcherPanelPreviewCapturesRealMinimizedPublicAXState() throws {
-        let workflow = try configuredSwitcherEdgeInputsWorkflow()
-        let logSnapshot = makeRuntimeLogFileSnapshot()
-        let targetApp = try XCTUnwrap(
-            workflow.apps.first {
-                $0.expectedWindowTitles.filter { $0 == SpaceFixtureEdgeInputsWorkflowDefaults.sharedWindowTitle }.count == 2
-            },
-            "Edge workflow must include one app with duplicate same-title windows."
-        )
 
         try runRealSpaceFixtureEdgeInputsWorkflow(
             workflow,
@@ -93,37 +52,124 @@ extension FlowTabUITests {
                 "--flowtab-ui-listen-switcher-trigger"
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         ) { _, app in
-            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+            let targetPID = try targetProcessIdentifier(
+                for: targetApp
+            )
+            focusedPublicState.bindTarget(
+                processIdentifier: targetPID
+            )
+            guard assertCurrentSwitcherAppProjection(
+                in: app,
+                exactEntry: "\(targetApp.identity.bundleIdentifier):2",
+                timeout: FlowTabUITestSwitcherAppProjectionPolicy.edgeInputsInitialProjectionWatchdog
+            ) else { return }
             XCTAssertTrue(
                 selectEdgeWorkflowAppInSwitcherAppLayer(
                     targetApp,
-                    app: app,
-                    diagnosticsSummary: diagnosticsSummary,
-                    timeout: 10
+                    app: app
+                ),
+                "Switcher did not select the duplicate-window workflow app before preview assertions."
+            )
+
+            let cards = performAndWaitForSwitcherWindowCards(
+                in: app,
+                expectedTitles: targetApp.expectedWindowTitles,
+                timeout:
+                    FlowTabUITestSwitcherWindowCardPolicy
+                        .edgeInputsProjectionWatchdog
+            ) {
+                app.typeKey(.downArrow, modifierFlags: [])
+            }
+
+            XCTAssertEqual(cards.count, targetApp.expectedWindowTitles.count)
+            XCTAssertEqual(Set(cards.map(\.identifier)).count, cards.count)
+            XCTAssertEqual(edgeTitleCounts(cards.map(\.title)), edgeTitleCounts(targetApp.expectedWindowTitles))
+            guard focusedPublicState.waitForResolution(
+                timeout:
+                    SpaceFixtureFocusedPublicStateObservationPolicy
+                        .evidenceWatchdog
+            ) != nil else {
+                XCTFail(
+                    "Focused public-state evidence watchdog expired. "
+                        + focusedPublicState.diagnosticSummary
+                )
+                return
+            }
+        }
+    }
+
+    func testSwitcherPanelPreviewCapturesRealMinimizedPublicAXState() throws {
+        let workflow = try configuredSwitcherEdgeInputsWorkflow()
+        let targetApp = try XCTUnwrap(
+            workflow.apps.first {
+                $0.expectedWindowTitles.filter { $0 == SpaceFixtureEdgeInputsWorkflowDefaults.sharedWindowTitle }.count == 2
+            },
+            "Edge workflow must include one app with duplicate same-title windows."
+        )
+        let logBaseline = makeRuntimeLogFileSnapshot()
+        let minimizedAXPropagation =
+            SpaceFixtureMinimizedAXPropagationObservationOwner(
+                appName: targetApp.appName,
+                expectedWindowTitle:
+                    SpaceFixtureEdgeInputsWorkflowDefaults
+                    .sharedWindowTitle,
+                baseline: logBaseline
+            )
+        minimizedAXPropagation.start()
+        defer {
+            minimizedAXPropagation.cancel()
+            logBaseline.cancel()
+        }
+
+        try runRealSpaceFixtureEdgeInputsWorkflow(
+            workflow,
+            flowTabAdditionalArguments: [
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs",
+                "--flowtab-ui-open-switcher",
+                "--flowtab-ui-listen-switcher-trigger"
+            ] + FlowTabUITestSwitcherCommandPayload.launchArguments
+        ) { _, app in
+            let targetPID = try targetProcessIdentifier(for: targetApp)
+            minimizedAXPropagation.bindTarget(
+                processIdentifier: targetPID
+            )
+            guard assertCurrentSwitcherAppProjection(
+                in: app,
+                exactEntry: "\(targetApp.identity.bundleIdentifier):2",
+                timeout: FlowTabUITestSwitcherAppProjectionPolicy.edgeInputsInitialProjectionWatchdog
+            ) else { return }
+            XCTAssertTrue(
+                selectEdgeWorkflowAppInSwitcherAppLayer(
+                    targetApp,
+                    app: app
                 ),
                 "Switcher did not select the duplicate-window workflow app before minimized-state assertions."
             )
 
-            app.typeKey(.downArrow, modifierFlags: [])
-            _ = waitForEdgeSwitcherWindowCards(
+            _ = performAndWaitForSwitcherWindowCards(
                 in: app,
                 expectedTitles: targetApp.expectedWindowTitles,
-                timeout: 8
-            )
-            let targetPID = try targetProcessIdentifier(for: targetApp)
-            waitForRuntimeLogFiles(
-                matching: #"chrome-topology app=Chrome Fixture pid=\#(targetPID) .* ax=\[.*min=1.*\] cg=\[.*Shared Docs:off:spaces=\[[0-9,]*\]:frame="#,
-                since: logSnapshot,
-                timeout: 8,
-                description: "real edge workflow exposes a minimized AX window with an offscreen CG counterpart"
-            )
-            waitForRuntimeLogFiles(
-                matching: #"window-entries app=Chrome Fixture pid=\#(targetPID) .*off:minimized=1"#,
-                since: logSnapshot,
-                timeout: 8,
-                description: "real edge workflow carries minimized public AX state into window-layer output"
-            )
+                timeout:
+                    FlowTabUITestSwitcherWindowCardPolicy
+                        .edgeInputsProjectionWatchdog
+            ) {
+                minimizedAXPropagation.performPreviewTrigger {
+                    app.typeKey(.downArrow, modifierFlags: [])
+                }
+            }
+            guard minimizedAXPropagation.waitForResolution(
+                timeout:
+                    SpaceFixtureMinimizedAXPropagationObservationPolicy
+                    .evidenceWatchdog
+            ) != nil else {
+                XCTFail(
+                    "Minimized AX propagation evidence watchdog expired. "
+                        + minimizedAXPropagation.diagnosticSummary
+                )
+                return
+            }
         }
     }
 
@@ -152,14 +198,18 @@ extension FlowTabUITests {
                 traceLabel: "edgeInputs.search.duplicates"
             )
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-            app.typeText(sharedTitle)
-
-            let results = waitForEdgeSearchWindowResultIdentifiers(
-                in: app,
-                expectedCount: expectedSharedCount,
-                timeout: 8
-            )
+            let results =
+                performAndWaitForSwitcherSearchWindowIdentifiers(
+                    in: app,
+                    scope: "window",
+                    query: sharedTitle,
+                    expectedCount: expectedSharedCount,
+                    timeout:
+                        FlowTabUITestSwitcherSearchResultObservationPolicy
+                        .edgeInputsCommittedResultWatchdog
+                ) {
+                    app.typeText(sharedTitle)
+                }
             let finderIdentifierFragment = edgeWorkflowSearchWindowIdentifierAppFragment(for: finderApp)
             let chromeIdentifierFragment = edgeWorkflowSearchWindowIdentifierAppFragment(for: chromeApp)
 
@@ -198,28 +248,51 @@ extension FlowTabUITests {
                 traceLabel: "edgeInputs.search.edgeTitle"
             )
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-            app.typeText("punctuation")
-
-            let results = waitForEdgeSearchWindowResultIdentifiers(
-                in: app,
-                identifierFragment: edgeWorkflowSearchWindowIdentifierAppFragment(for: targetApp),
-                expectedCount: 1,
-                timeout: 8
-            )
+            let query = "punctuation"
+            let results =
+                performAndWaitForSwitcherSearchWindowIdentifiers(
+                    in: app,
+                    scope: "window",
+                    query: query,
+                    identifierFragment:
+                        edgeWorkflowSearchWindowIdentifierAppFragment(
+                            for: targetApp
+                        ),
+                    expectedCount: 1,
+                    timeout:
+                        FlowTabUITestSwitcherSearchResultObservationPolicy
+                        .edgeInputsCommittedResultWatchdog
+                ) {
+                    app.typeText(query)
+                }
             XCTAssertEqual(results.count, 1)
+            let resultIdentifier = try XCTUnwrap(
+                results.first,
+                "Edge-title Search result evidence was unavailable."
+            )
             let targetWindowNumber = try XCTUnwrap(
-                edgeWorkflowCGWindowID(fromSearchResultIdentifier: results[0]),
+                edgeWorkflowCGWindowID(
+                    fromSearchResultIdentifier:
+                        resultIdentifier
+                ),
                 "Edge-title search result did not include a recoverable CG window id."
             )
 
-            confirmEdgeSwitcherSearchSelection(in: app, searchInput: searchInput)
             XCTAssertTrue(
-                waitForFrontmostWorkflowWindow(
+                triggerAndWaitForFrontmostWorkflowWindow(
                     windowNumber: targetWindowNumber,
                     title: edgeTitle,
                     app: targetApp,
-                    timeout: 10
+                    timeout:
+                        FlowTabUITestWorkflowWindowActivationObservationPolicy
+                        .edgeInputsExactWindowWatchdog,
+                    trigger: {
+                        confirmEdgeSwitcherSearchSelection(
+                            in: app,
+                            searchInput: searchInput,
+                            expectedQuery: query
+                        )
+                    }
                 ),
                 "Search confirmation did not activate the edge-title fixture window id."
             )
@@ -230,22 +303,16 @@ extension FlowTabUITests {
         in app: XCUIApplication,
         traceLabel: String
     ) -> XCUIElement {
-        let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-        let deadline = Date().addingTimeInterval(10)
-        var attempt = 1
-        repeat {
-            postFlowTabUITestSwitcherTrigger(
-                .search,
-                traceLabel: "\(traceLabel).attempt\(attempt)"
-            )
-            if searchInput.waitForExistence(timeout: 1.2) {
-                return searchInput
-            }
-            attempt += 1
-        } while Date() < deadline
-
-        XCTFail("Edge workflow window Search did not present from committed runtime index.")
-        return searchInput
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
+        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+            .search,
+            traceLabel: traceLabel
+        )
+        return requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: readiness
+        )
     }
 
     private func configuredSwitcherEdgeInputsWorkflow(
@@ -322,7 +389,11 @@ extension FlowTabUITests {
             }
         }
 
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
+        assertRealSpaceFixtureFlowTabIsForegroundReady(
+            app,
+            traceLabel: nil,
+            targetDescription: "edge-inputs-post-fixture-launch"
+        )
         try assertions(workflow, app)
     }
 
@@ -330,6 +401,12 @@ extension FlowTabUITests {
         _ workflow: SpaceFixtureResolvedWorkflow
     ) -> [XCUIApplication] {
         var launchedApps: [XCUIApplication] = []
+        let readinessOwner =
+            makeSpaceFixtureWorkflowReadinessAggregateOwner(
+                for: workflow
+            )
+        readinessOwner.start()
+        defer { readinessOwner.cancel() }
 
         for workflowApp in workflow.apps {
             let app = makeEdgeWorkflowApplication(for: workflowApp.identity)
@@ -337,20 +414,61 @@ extension FlowTabUITests {
                 "--workflow-config", workflow.workflowURL.path,
                 "--workflow-app-id", workflowApp.appID
             ]
+            app.launchArguments +=
+                readinessOwner.fixtureLaunchArguments(
+                    for: workflowApp.appID
+                )
             launchSpaceFixtureApplicationAndWaitForForeground(app)
-            waitForSpaceFixtureWorkflowToStabilize(
-                in: app,
-                expectedWindowTitles: workflowApp.expectedWindowTitles,
-                fullscreenWindowIndex: nil,
-                settleTimeout: 0
-            )
             launchedApps.append(app)
         }
 
-        RunLoop.current.run(until: Date().addingTimeInterval(workflow.settleTimeout))
-        if let desktopAnchorApp = launchedApps.first {
-            desktopAnchorApp.activate()
-            _ = desktopAnchorApp.wait(for: .runningForeground, timeout: 5)
+        guard let readinessSnapshot =
+                readinessOwner.waitForReady(
+                    timeout: workflow.readinessWatchdog
+                )
+        else {
+            XCTFail(
+                "Edge fixture workflow readiness watchdog expired: "
+                    + readinessOwner.diagnosticSummary
+            )
+            return launchedApps
+        }
+        assertSpaceFixtureWorkflowReadinessAggregate(
+            readinessSnapshot,
+            workflow: workflow,
+            launchedApps: launchedApps
+        )
+        validateResolvedSpaceFixtureWorkflowMetadata(
+            after: readinessSnapshot,
+            workflow: workflow,
+            applications: launchedApps,
+            waitsForFullscreenMarkers: false,
+            suppressesApplicationAccessibilityChildren:
+                false
+        )
+        if let desktopAnchorWorkflowApp =
+                workflow.apps.first,
+           let desktopAnchorApp = launchedApps.first
+        {
+            guard let readinessEvidence =
+                    readinessSnapshot
+                        .readyEvidenceByWorkflowAppID[
+                            desktopAnchorWorkflowApp.appID
+                        ]
+            else {
+                XCTFail(
+                    "Missing edge desktop-anchor readiness identity for "
+                        + desktopAnchorWorkflowApp.appID
+                        + ": "
+                        + readinessSnapshot.logFields
+                )
+                return launchedApps
+            }
+            _ = activateSpaceFixtureWorkflowDesktopAnchor(
+                workflowApp: desktopAnchorWorkflowApp,
+                application: desktopAnchorApp,
+                readinessEvidence: readinessEvidence
+            )
         }
         return launchedApps
     }
@@ -368,8 +486,7 @@ extension FlowTabUITests {
 
     private func terminateEdgeWorkflowApps(_ apps: [XCUIApplication]) {
         for app in apps.reversed() where app.state == .runningForeground || app.state == .runningBackground {
-            app.terminate()
-            waitForSpaceFixtureApplicationToTerminate(app)
+            terminateSpaceFixtureApplicationAndWait(app)
         }
     }
 

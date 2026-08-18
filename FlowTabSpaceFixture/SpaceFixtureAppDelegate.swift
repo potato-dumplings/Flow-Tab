@@ -4,9 +4,11 @@ import Darwin
 @MainActor
 final class SpaceFixtureAppDelegate: NSObject, NSApplicationDelegate {
     private var windowCoordinator: SpaceFixtureWindowCoordinator?
-    private var terminationDelayMilliseconds = 0
-    private var isTerminationReplyPending = false
+    private var terminationFaultOwner:
+        SpaceFixtureTerminationFaultOwner?
     private var terminationSignalSource: DispatchSourceSignal?
+    private var allowsImmediateTerminationAfterSignalFault =
+        false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
@@ -24,40 +26,103 @@ final class SpaceFixtureAppDelegate: NSObject, NSApplicationDelegate {
         let coordinator = SpaceFixtureWindowCoordinator(configuration: configuration)
         coordinator.launch()
         windowCoordinator = coordinator
-        terminationDelayMilliseconds = configuration.terminationDelayMilliseconds
-        installDelayedTerminationSignalHandlerIfNeeded()
+        configureTerminationFaultIfNeeded(
+            configuration: configuration
+        )
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard terminationDelayMilliseconds > 0 else { return .terminateNow }
-        guard !isTerminationReplyPending else { return .terminateNow }
-
-        isTerminationReplyPending = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(terminationDelayMilliseconds)) {
-            sender.reply(toApplicationShouldTerminate: true)
+        guard let terminationFaultOwner else {
+            return .terminateNow
+        }
+        if allowsImmediateTerminationAfterSignalFault {
+            allowsImmediateTerminationAfterSignalFault = false
+            return .terminateNow
+        }
+        terminationFaultOwner.request(
+            source: .applicationShouldTerminate
+        ) { [weak sender] in
+            sender?.reply(
+                toApplicationShouldTerminate: true
+            )
         }
         return .terminateLater
     }
 
-    private func installDelayedTerminationSignalHandlerIfNeeded() {
-        guard terminationDelayMilliseconds > 0 else { return }
+    private func configureTerminationFaultIfNeeded(
+        configuration: SpaceFixtureLaunchConfiguration
+    ) {
+        guard let policy = SpaceFixtureTerminationFaultPolicy(
+            delayMilliseconds:
+                configuration.terminationDelayMilliseconds
+        ) else {
+            return
+        }
+        guard let bundleIdentifier =
+                Bundle.main.bundleIdentifier,
+              !bundleIdentifier.isEmpty
+        else {
+            fatalError(
+                "FlowTabSpaceFixture requires a bundle identifier."
+            )
+        }
+        let identity = SpaceFixtureTerminationFaultIdentity(
+            bundleIdentifier: bundleIdentifier,
+            processIdentifier:
+                ProcessInfo.processInfo.processIdentifier
+        )
+        let route =
+            configuration.terminationFaultEvidenceRoute
+        terminationFaultOwner =
+            SpaceFixtureTerminationFaultOwner(
+                policy: policy,
+                identity: identity,
+                evidencePublisher: { evidence in
+                    SpaceFixtureTerminationFaultEvidenceTransport
+                        .publish(
+                            evidence,
+                            route: route
+                        )
+                }
+            )
+        installTerminationSignalHandler()
+    }
 
+    private func installTerminationSignalHandler() {
         signal(SIGTERM, SIG_IGN)
         let source = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
         source.setEventHandler { [weak self] in
-            guard let self else { return }
-            guard !self.isTerminationReplyPending else { return }
-            self.isTerminationReplyPending = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(self.terminationDelayMilliseconds)) {
-                NSApp.terminate(nil)
-            }
+            self?.requestTerminationFromSignal()
         }
         source.resume()
         terminationSignalSource = source
     }
 
+    private func requestTerminationFromSignal() {
+        terminationFaultOwner?.request(
+            source: .terminationSignal
+        ) { [weak self] in
+            guard let self else { return }
+            allowsImmediateTerminationAfterSignalFault = true
+            NSApp.terminate(nil)
+        }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
+    }
+
+    func applicationWillTerminate(
+        _ notification: Notification
+    ) {
+        terminationFaultOwner?.cancel()
+        terminationFaultOwner = nil
+        terminationSignalSource?.setEventHandler {}
+        terminationSignalSource?.cancel()
+        terminationSignalSource = nil
+        signal(SIGTERM, SIG_DFL)
+        windowCoordinator?.cancel()
+        windowCoordinator = nil
     }
 
     func application(_ app: NSApplication, shouldSaveApplicationState coder: NSCoder) -> Bool {

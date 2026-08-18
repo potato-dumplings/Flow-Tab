@@ -8,6 +8,17 @@ struct RuntimeReadModelGeneration: Equatable {
     var space: UInt64 = 0
     var axDirty: UInt64 = 0
     var projection: UInt64 = 0
+
+    func isStrictlyLater(
+        than other: RuntimeReadModelGeneration
+    ) -> Bool {
+        appLifecycle >= other.appLifecycle
+            && cg >= other.cg
+            && space >= other.space
+            && axDirty >= other.axDirty
+            && projection >= other.projection
+            && self != other
+    }
 }
 
 struct RuntimeProjectionFreshness: Equatable {

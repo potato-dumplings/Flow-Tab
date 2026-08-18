@@ -1,6 +1,28 @@
+import Foundation
 import XCTest
 
+enum FlowTabUITestLaunchAtLoginSettingsPolicy {
+    static let togglePublicationWatchdog: TimeInterval = 5
+}
+
 extension FlowTabUITests {
+    func testLaunchAtLoginSettingsWatchdogRemainsTerminalBound() {
+        XCTAssertEqual(
+            FlowTabUITestLaunchAtLoginSettingsPolicy
+                .togglePublicationWatchdog,
+            5
+        )
+        XCTAssertTrue(
+            FlowTabUITestLaunchAtLoginSettingsPolicy
+                .togglePublicationWatchdog.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestLaunchAtLoginSettingsPolicy
+                .togglePublicationWatchdog,
+            0
+        )
+    }
+
     func testSettingsLaunchAtLoginToggleDefaultsOffAndPersistsAcrossRelaunch() throws {
         let firstLaunchApp = makeApp(
             additionalArguments: [
@@ -19,11 +41,22 @@ extension FlowTabUITests {
             in: firstLaunchApp,
             identifier: Identifier.settingsPermissionLaunchAtLogin
         )
-        XCTAssertTrue(launchAtLoginToggle.waitForExistence(timeout: 5))
-        XCTAssertFalse(toggleIsOn(launchAtLoginToggle))
+        assertLaunchAtLoginToggleExists(
+            launchAtLoginToggle,
+            phase: "firstLaunch"
+        )
+        XCTAssertFalse(
+            toggleIsOn(launchAtLoginToggle),
+            "expectedState=off phase=firstLaunch "
+                + "finalValue=\(String(describing: launchAtLoginToggle.value))"
+        )
 
         setToggle(launchAtLoginToggle, to: true)
-        XCTAssertTrue(toggleIsOn(launchAtLoginToggle))
+        XCTAssertTrue(
+            toggleIsOn(launchAtLoginToggle),
+            "expectedState=on phase=postToggle "
+                + "finalValue=\(String(describing: launchAtLoginToggle.value))"
+        )
 
         firstLaunchApp.terminate()
 
@@ -43,7 +76,35 @@ extension FlowTabUITests {
             in: relaunchApp,
             identifier: Identifier.settingsPermissionLaunchAtLogin
         )
-        XCTAssertTrue(relaunchToggle.waitForExistence(timeout: 5))
-        XCTAssertTrue(toggleIsOn(relaunchToggle))
+        assertLaunchAtLoginToggleExists(
+            relaunchToggle,
+            phase: "relaunch"
+        )
+        XCTAssertTrue(
+            toggleIsOn(relaunchToggle),
+            "expectedState=on phase=relaunch "
+                + "finalValue=\(String(describing: relaunchToggle.value))"
+        )
+    }
+
+    private func assertLaunchAtLoginToggleExists(
+        _ toggle: XCUIElement,
+        phase: String
+    ) {
+        let didExist = toggle.waitForExistence(
+            timeout:
+                FlowTabUITestLaunchAtLoginSettingsPolicy
+                    .togglePublicationWatchdog
+        )
+        let finalExists = toggle.exists
+        let finalValue = finalExists
+            ? String(describing: toggle.value)
+            : "unavailable"
+        XCTAssertTrue(
+            didExist,
+            "unmetCondition=launchAtLoginToggle.exists "
+                + "phase=\(phase) finalExists=\(finalExists) "
+                + "finalValue=\(finalValue)"
+        )
     }
 }

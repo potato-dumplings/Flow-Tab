@@ -49,8 +49,7 @@ extension SwitcherPanelController {
     }
 
     func removeEventMonitors() {
-        terminateSelectedAppTask?.cancel()
-        terminateSelectedAppTask = nil
+        terminatePressFeedbackCompletionOwner.cancel()
         model.clearTerminateSelectedAppAnimation()
         cancelPendingModifierReleaseConfirmation()
         if let keyDownMonitor {
@@ -82,6 +81,7 @@ extension SwitcherPanelController {
             self.globalMouseMovedMonitor = nil
         }
         clearDelayedWindowLayerEntryState()
+        cancelManualWindowLayerEntryObservation()
     }
 
     func handleKeyDown(_ event: NSEvent) -> Bool {
@@ -101,7 +101,7 @@ extension SwitcherPanelController {
             if activeHotkeySessionKind == .inAppWindowSwitcher {
                 return true
             }
-            if SwitcherHotkeyPreferencesStore.load().mainKey == .tab {
+            if SwitcherHotkeyPreferencesStore.load().mainKeys.contains(.tab) {
                 return true
             }
             advance(event.modifierFlags.contains(.shift) ? .tabBackward : .tabForward)
@@ -147,25 +147,69 @@ extension SwitcherPanelController {
     }
 
     func selectSwitcherAppByPointer(appID: String, currentLocation: CGPoint? = nil) {
-        pointerSelectionGate.recordPointerMoved(to: currentLocation ?? NSEvent.mouseLocation)
-        guard pointerSelectionGate.isArmed else { return }
+        guard allowsPointerSelection(
+            of: .application(appID: appID),
+            currentLocation: currentLocation
+        ) else { return }
+        cancelManualWindowLayerEntryObservation()
         guard model.selectAppFromPointer(appID: appID) else { return }
         updatePanelSize()
         scheduleDelayedWindowLayerEntryIfNeeded()
     }
 
     func selectSwitcherWindowByPointer(appID: String, windowID: String, currentLocation: CGPoint? = nil) {
-        pointerSelectionGate.recordPointerMoved(to: currentLocation ?? NSEvent.mouseLocation)
-        guard pointerSelectionGate.isArmed else { return }
+        guard allowsPointerSelection(
+            of: .window(appID: appID, windowID: windowID),
+            currentLocation: currentLocation
+        ) else { return }
+        cancelManualWindowLayerEntryObservation()
         guard model.selectWindowFromPointer(appID: appID, windowID: windowID) else { return }
         updatePanelSize()
     }
 
     func selectSwitcherSearchResultByPointer(resultID: String, currentLocation: CGPoint? = nil) {
-        pointerSelectionGate.recordPointerMoved(to: currentLocation ?? NSEvent.mouseLocation)
-        guard pointerSelectionGate.isArmed else { return }
+        guard allowsPointerSelection(
+            of: .searchResult(resultID: resultID),
+            currentLocation: currentLocation
+        ) else { return }
         guard model.selectSearchResult(withID: resultID) else { return }
         updatePanelSize()
+    }
+
+    private func allowsPointerSelection(
+        of target: SwitcherPointerSelectionTarget,
+        currentLocation: CGPoint?
+    ) -> Bool {
+        let decision = pointerSelectionGate.evaluateSelection(
+            of: target,
+            at: currentLocation ?? NSEvent.mouseLocation
+        )
+        guard !decision.allowsSelection else {
+            return true
+        }
+        if let evidence = decision.newBlockedEvidence {
+            logInputTrace(
+                "pointerSelectionGate outcome=blocked "
+                    + "\(evidence.target.diagnosticSummary) "
+                    + "preservedSelection="
+                    + "\(SwitcherPointerSelectionTarget.escaped(pointerSelectionIdentity(for: target))) "
+                    + "generation=\(evidence.generation)"
+            )
+        }
+        return false
+    }
+
+    private func pointerSelectionIdentity(
+        for target: SwitcherPointerSelectionTarget
+    ) -> String {
+        switch target {
+        case .application:
+            return model.session?.selectedApp.id ?? "none"
+        case .window:
+            return model.session?.selectedWindow?.id ?? "none"
+        case .searchResult:
+            return model.searchViewState.selectedResult?.id ?? "none"
+        }
     }
 
     func commitSwitcherAppByPointerClick(appID: String) {
@@ -305,8 +349,13 @@ extension SwitcherPanelController {
     }
 
     func handleFlagsChanged(_ event: NSEvent) {
-        let isPrimaryEvent = isPrimaryModifierFlagsEvent(event)
-        guard isPrimaryEvent else { return }
+        if isTerminateSelectedAppShortcut(event) {
+            terminateSelectedApp()
+            return
+        }
+        let isHotkeyHoldModifierEvent =
+            isHotkeyHoldModifierFlagsEvent(event)
+        guard isHotkeyHoldModifierEvent else { return }
         guard isPanelPresented else { return }
         guard !model.isSearchActive else { return }
         logInputTrace(
@@ -342,52 +391,40 @@ extension SwitcherPanelController {
 
     func handleApplicationDidResignActive() {
         guard isPanelPresented else { return }
+        guard !shouldDeferPanelVisibilityRecoveryInterruption(
+            trigger: "applicationDidResignActive"
+        ) else { return }
         logSearchTrace("systemInterruption trigger=applicationDidResignActive \(searchTraceStateSummary())")
         handleRecoverableSystemInterruption(trigger: "applicationDidResignActive")
     }
 
     func handleActiveSpaceDidChange() {
-        model.signalSpaceTopologyChanged()
-        guard isPanelPresented else { return }
-        if shouldIgnoreActiveSpaceDidChange() {
-            logSearchTrace("systemInterruption trigger=activeSpaceDidChange action=ignored reason=graceWindow \(searchTraceStateSummary())")
+        guard hasActivePresentationSession else {
+            model.signalSpaceTopologyChanged()
             return
         }
-        if handleProtectedTerminateSystemInterruption(trigger: "activeSpaceDidChange") {
-            return
-        }
-        guard let sessionKind = activeHotkeySessionKind else {
-            cancelSelectionForSystemInterruption(trigger: "activeSpaceDidChange")
-            return
-        }
-        let shouldKeepSessionVisible = model.isSearchActive
-            || isPrimaryModifierPressedInHardwareState(for: sessionKind)
-        guard shouldKeepSessionVisible else {
-            logSearchTrace(
-                "systemInterruption trigger=activeSpaceDidChange action=cancel reason=modifierReleased \(searchTraceStateSummary())"
-            )
-            cancelSelectionForSystemInterruption(trigger: "activeSpaceDidChange")
-            return
-        }
-        logSearchTrace(
-            "systemInterruption trigger=activeSpaceDidChange action=migrate reason=spaceChanged \(searchTraceStateSummary())"
-        )
-        suppressApplicationActivationUntil = ProcessInfo.processInfo.systemUptime
-            + activeSpaceMigrationActivationSuppressionWindow
-        schedulePanelVisibilityRecovery(
-            trigger: "activeSpaceDidChange",
-            attemptDelaysNanoseconds: interruptionPresentationRecoveryAttemptDelaysNs,
-            cancelSessionOnFailure: true,
-            activateApplicationIfNeeded: false
+        beginActiveSpaceTransitionObservation(
+            trigger: "activeSpaceDidChange"
         )
     }
 
     func handlePanelOcclusionStateDidChange() {
         guard isPanelPresented else { return }
+        _ = observeInitialPresentationVisibility(
+            source: .panelOcclusionChanged
+        )
+        observePanelVisibilityRecovery(
+            source: .panelOcclusionChanged
+        )
+        observeTerminateInterruptionProtectionPresentationUpdate(
+            source: .panelVisibilityReadback
+        )
         if resolvedPanelOcclusionState.contains(.visible) {
-            _ = completeInitialPresentationVisibilityIfVisible(
-                reason: "occlusionVisible",
-                cancelRecoveryTask: true
+            return
+        }
+        if hasPendingPanelVisibilityRecoveryObservation {
+            logSearchTrace(
+                "systemInterruption trigger=panelOccluded action=deferred reason=visibilityRecoveryObserved \(searchTraceStateSummary())"
             )
             return
         }
@@ -398,28 +435,67 @@ extension SwitcherPanelController {
         handleRecoverableSystemInterruption(trigger: "panelOccluded")
     }
 
+    func handlePanelDidBecomeKey() {
+        guard isPanelPresented else { return }
+        _ = observeInitialPresentationVisibility(
+            source: .panelBecameKey
+        )
+        observePanelVisibilityRecovery(
+            source: .panelBecameKey
+        )
+        observeTerminateInterruptionProtectionPresentationUpdate(
+            source: .panelVisibilityReadback
+        )
+    }
+
+    func handlePanelDidExpose() {
+        guard isPanelPresented else { return }
+        _ = observeInitialPresentationVisibility(
+            source: .panelExposed
+        )
+        observePanelVisibilityRecovery(
+            source: .panelExposed
+        )
+        observeTerminateInterruptionProtectionPresentationUpdate(
+            source: .panelVisibilityReadback
+        )
+    }
+
     func handlePanelDidResignKey() {
         guard isPanelPresented else { return }
         guard !isAppCurrentlyActive else { return }
+        guard !shouldDeferPanelVisibilityRecoveryInterruption(
+            trigger: "panelDidResignKey"
+        ) else { return }
         logSearchTrace("systemInterruption trigger=panelDidResignKey \(searchTraceStateSummary())")
         handleRecoverableSystemInterruption(trigger: "panelDidResignKey")
     }
 
     func handleWorkspaceApplicationTerminated(appID: String, pid: pid_t) {
+        let protectionBaseline =
+            captureTerminateInterruptionProtectionBaseline(appID: appID)
         let refreshed = model.handleApplicationTerminated(appID: appID, pid: pid)
-        guard refreshed else { return }
-        beginTerminateInterruptionProtection(
-            trigger: "terminate_refresh",
-            duration: postTerminateRefreshInterruptionProtectionWindow,
-            extendExisting: true
+        observeWorkspaceTerminationForInterruptionProtection(
+            appID: appID,
+            pid: pid,
+            baseline: protectionBaseline,
+            refreshedSession: refreshed
         )
-        beginIgnoringActiveSpaceChanges(trigger: "terminate_refresh")
     }
 
     @discardableResult
     func handleAppSwitcherProjectionDidUpdate() -> Bool {
-        guard isPanelPresented else { return false }
-        guard model.handleAppSwitcherProjectionDidUpdate() else { return false }
+        observeActiveSpaceTransitionProjectionUpdate()
+        guard isPanelPresented else {
+            observeTerminateInterruptionProtectionProjectionUpdate()
+            return false
+        }
+        let updated = model.handleAppSwitcherProjectionDidUpdate()
+        observeTerminateInterruptionProtectionProjectionUpdate()
+        guard updated else { return false }
+        observeDelayedWindowLayerProjectionUpdate(
+            source: .appSwitcherProjectionUpdated
+        )
         resetPointerSelectionGate()
         updatePanelSize()
         scheduleDelayedWindowLayerEntryIfNeeded(preservingDeadline: true)
@@ -427,9 +503,27 @@ extension SwitcherPanelController {
     }
 
     @discardableResult
-    func handleCurrentAppWindowProjectionDidUpdate(appID: String?) -> Bool {
+    func handleCurrentAppWindowProjectionDidUpdate(
+        appID: String?,
+        evidence: RuntimeCurrentAppWindowProjectionUpdateEvidence? = nil
+    ) -> Bool {
         guard isPanelPresented else { return false }
-        guard model.handleCurrentAppWindowProjectionDidUpdate(appID: appID) else { return false }
+        let manualEntrySettled =
+            observeManualWindowLayerProjectionUpdate(
+                appID: appID,
+                evidence: evidence
+            )
+        let projectionApplied =
+            model.handleCurrentAppWindowProjectionDidUpdate(
+                appID: appID
+            )
+        guard manualEntrySettled || projectionApplied else {
+            return false
+        }
+        observeDelayedWindowLayerProjectionUpdate(
+            source: .currentAppWindowProjectionUpdated,
+            appID: appID
+        )
         resetPointerSelectionGate()
         updatePanelSize()
         scheduleDelayedWindowLayerEntryIfNeeded(preservingDeadline: true)
@@ -445,7 +539,7 @@ extension SwitcherPanelController {
             return
         }
         let shouldKeepSessionVisible = model.isSearchActive
-            || isPrimaryModifierPressedInHardwareState(for: sessionKind)
+            || isHotkeyHoldSetPressedInHardwareState(for: sessionKind)
         guard shouldKeepSessionVisible else {
             logSearchTrace(
                 "systemInterruption trigger=\(trigger) action=cancel reason=modifierReleased \(searchTraceStateSummary())"
@@ -458,7 +552,6 @@ extension SwitcherPanelController {
         )
         schedulePanelVisibilityRecovery(
             trigger: trigger,
-            attemptDelaysNanoseconds: interruptionPresentationRecoveryAttemptDelaysNs,
             cancelSessionOnFailure: true
         )
     }
@@ -468,322 +561,26 @@ extension SwitcherPanelController {
         logSearchTrace(
             "systemInterruption trigger=\(trigger) action=recover reason=terminateInFlight \(searchTraceStateSummary())"
         )
+        if trigger != "activeSpaceDidChange" {
+            activateApplicationForPanelPresentationIfNeeded()
+        }
         schedulePanelVisibilityRecovery(
             trigger: "\(trigger)_terminate",
-            attemptDelaysNanoseconds: interruptionPresentationRecoveryAttemptDelaysNs,
             cancelSessionOnFailure: false,
             activateApplicationIfNeeded: trigger != "activeSpaceDidChange"
         )
+        observeProtectedTerminateSystemInterruption()
         return true
     }
 
     func cancelSelectionForSystemInterruption(trigger: String) {
         guard isPanelPresented || hasActivePresentationSession else { return }
-        let sessionKind = activeHotkeySessionKind
         logSearchTrace("cancelSelectionForSystemInterruption trigger=\(trigger) action=begin \(searchTraceStateSummary())")
         logInputTrace(
             "\(trigger) action=cancelSelection nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
         cancelSelection(trigger: "system_interruption:\(trigger)")
         logSearchTrace("cancelSelectionForSystemInterruption trigger=\(trigger) action=finished \(searchTraceStateSummary())")
-        if let sessionKind {
-            beginHotkeyReplaySuppressionUntilRelease(for: sessionKind, trigger: trigger)
-        } else {
-            beginHotkeyReplaySuppressionUntilReleaseForKnownSessionKinds(trigger: trigger)
-        }
-    }
-
-    func beginHotkeyReplaySuppressionUntilRelease(
-        for sessionKind: HotkeySessionKind,
-        trigger: String
-    ) {
-        beginHotkeyReplaySuppressionUntilRelease(
-            monitoring: [sessionKind],
-            trigger: trigger
-        )
-    }
-
-    func beginHotkeyReplaySuppressionUntilReleaseForKnownSessionKinds(trigger: String) {
-        beginHotkeyReplaySuppressionUntilRelease(
-            monitoring: [.globalAppSwitcher, .inAppWindowSwitcher],
-            trigger: trigger
-        )
-    }
-
-    func beginHotkeyReplaySuppressionUntilRelease(
-        monitoring sessionKinds: [HotkeySessionKind],
-        trigger: String
-    ) {
-        suppressHotkeyReplayTask?.cancel()
-        modifierReleaseConfirmationGeneration += 1
-        let generation = modifierReleaseConfirmationGeneration
-        suppressHotkeyReplayUntilRelease = true
-        modifierReleaseState = .replaySuppression(
-            trigger: trigger,
-            generation: generation,
-            releasedSamples: 0
-        )
-        logInputTrace(
-            "hotkeyReplaySuppression start trigger=\(trigger) generation=\(generation) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
-        )
-        suppressHotkeyReplayTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            guard self.isModifierReleaseConfirmationGenerationCurrent(generation) else { return }
-            var releasedSampleCount = 0
-            while true {
-                try? await Task.sleep(nanoseconds: self.modifierReleaseConfirmationSampleIntervalNs)
-                guard !Task.isCancelled else { return }
-                guard self.isModifierReleaseConfirmationGenerationCurrent(generation) else { return }
-                let hasPressedHotkeyInputs = sessionKinds.contains { sessionKind in
-                    self.isPrimaryModifierPressedInHardwareState(for: sessionKind)
-                        || self.isSessionMainKeyPressedInHardwareState(for: sessionKind)
-                }
-                if hasPressedHotkeyInputs {
-                    releasedSampleCount = 0
-                    self.modifierReleaseState = .replaySuppression(
-                        trigger: trigger,
-                        generation: generation,
-                        releasedSamples: 0
-                    )
-                    continue
-                }
-                releasedSampleCount += 1
-                self.modifierReleaseState = .replaySuppression(
-                    trigger: trigger,
-                    generation: generation,
-                    releasedSamples: releasedSampleCount
-                )
-                if releasedSampleCount < self.modifierReleaseConfirmationSampleCount {
-                    continue
-                }
-                guard self.isModifierReleaseConfirmationGenerationCurrent(generation) else { return }
-                self.suppressHotkeyReplayUntilRelease = false
-                self.clearHotkeyReplaySuppressionTaskIfCurrent(generation)
-                self.modifierReleaseState = .replaySuppressionEnded(
-                    trigger: trigger,
-                    generation: generation
-                )
-                self.logInputTrace(
-                    "hotkeyReplaySuppression end trigger=\(trigger) generation=\(generation) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
-                )
-                return
-            }
-        }
-    }
-
-    func scheduleModifierReleaseConfirmation(trigger: String) {
-        guard !suppressModifierReleaseConfirmationForTesting else {
-            modifierReleaseState = .canceled(
-                reason: .suppressedForTesting,
-                generation: modifierReleaseConfirmationGeneration
-            )
-            logInputTrace(
-                "releaseConfirm suppressed trigger=\(trigger) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
-            )
-            return
-        }
-        if pendingModifierReleaseConfirmationTask != nil {
-            logInputTrace(
-                "releaseConfirm alreadyRunning trigger=\(trigger) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
-            )
-            return
-        }
-        logInputTrace(
-            "releaseConfirm start trigger=\(trigger) nowMs=\(formatMilliseconds(monotonicMilliseconds())) intervalMs=\(formatMilliseconds(Double(modifierReleaseConfirmationSampleIntervalNs) / 1_000_000)) samples=\(modifierReleaseConfirmationSampleCount)"
-        )
-
-        modifierReleaseConfirmationGeneration += 1
-        let generation = modifierReleaseConfirmationGeneration
-        let sessionGeneration = presentationSessionGeneration
-        modifierReleaseState = .releaseObserved(trigger: trigger, generation: generation)
-        pendingModifierReleaseConfirmationTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            guard self.isModifierReleaseConfirmationGenerationCurrent(generation) else { return }
-            guard self.isPresentationSessionGenerationCurrent(sessionGeneration) else {
-                self.modifierReleaseState = .canceled(reason: .sessionChanged, generation: generation)
-                self.logInputTrace(
-                    "releaseConfirm stop trigger=\(trigger) reason=sessionChanged generation=\(generation) sessionGeneration=\(sessionGeneration) currentSessionGeneration=\(self.presentationSessionGeneration) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
-                )
-                self.clearPendingModifierReleaseConfirmationTaskIfCurrent(generation)
-                return
-            }
-            var releasedSampleCount = 0
-
-            while true {
-                try? await Task.sleep(nanoseconds: self.modifierReleaseConfirmationSampleIntervalNs)
-                guard !Task.isCancelled else { return }
-                guard self.isModifierReleaseConfirmationGenerationCurrent(generation) else { return }
-                guard self.isPresentationSessionGenerationCurrent(sessionGeneration) else {
-                    self.modifierReleaseState = .canceled(reason: .sessionChanged, generation: generation)
-                    self.logInputTrace(
-                        "releaseConfirm stop trigger=\(trigger) reason=sessionChanged generation=\(generation) sessionGeneration=\(sessionGeneration) currentSessionGeneration=\(self.presentationSessionGeneration) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
-                    )
-                    self.clearPendingModifierReleaseConfirmationTaskIfCurrent(generation)
-                    return
-                }
-                guard self.isPanelPresented else {
-                    self.modifierReleaseState = .canceled(reason: .panelHidden, generation: generation)
-                    self.logInputTrace(
-                        "releaseConfirm stop trigger=\(trigger) reason=panelHidden generation=\(generation) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
-                    )
-                    self.clearPendingModifierReleaseConfirmationTaskIfCurrent(generation)
-                    return
-                }
-                guard !self.model.isSearchActive else {
-                    self.modifierReleaseState = .canceled(reason: .searchActive, generation: generation)
-                    self.logInputTrace(
-                        "releaseConfirm stop trigger=\(trigger) reason=searchActive generation=\(generation) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
-                    )
-                    self.logSearchTrace(
-                        "releaseConfirm trigger=\(trigger) action=stop reason=searchActive generation=\(generation) \(self.searchTraceStateSummary())"
-                    )
-                    self.clearPendingModifierReleaseConfirmationTaskIfCurrent(generation)
-                    return
-                }
-
-                if self.isPrimaryModifierLikelyPressed() {
-                    if releasedSampleCount > 0 {
-                        self.logInputTrace(
-                            "releaseConfirm reset trigger=\(trigger) generation=\(generation) releasedSamples=\(releasedSampleCount) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
-                        )
-                    }
-                    releasedSampleCount = 0
-                    self.modifierReleaseState = .pressed(generation: generation)
-                    continue
-                }
-                releasedSampleCount += 1
-                self.modifierReleaseState = .confirming(
-                    trigger: trigger,
-                    generation: generation,
-                    releasedSamples: releasedSampleCount
-                )
-                self.logInputTrace(
-                    "releaseConfirm sample trigger=\(trigger) generation=\(generation) releasedSamples=\(releasedSampleCount)/\(self.modifierReleaseConfirmationSampleCount) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
-                )
-                if releasedSampleCount < self.modifierReleaseConfirmationSampleCount {
-                    continue
-                }
-
-                guard self.isModifierReleaseConfirmationGenerationCurrent(generation) else { return }
-                guard self.isPresentationSessionGenerationCurrent(sessionGeneration) else {
-                    self.modifierReleaseState = .canceled(reason: .sessionChanged, generation: generation)
-                    self.logInputTrace(
-                        "releaseConfirm stop trigger=\(trigger) reason=sessionChanged generation=\(generation) sessionGeneration=\(sessionGeneration) currentSessionGeneration=\(self.presentationSessionGeneration) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
-                    )
-                    self.clearPendingModifierReleaseConfirmationTaskIfCurrent(generation)
-                    return
-                }
-                self.clearPendingModifierReleaseConfirmationTaskIfCurrent(generation)
-                self.modifierReleaseState = .confirmed(trigger: trigger, generation: generation)
-                self.logInputTrace(
-                    "releaseConfirm confirmed trigger=\(trigger) action=finishSelection generation=\(generation) sessionGeneration=\(sessionGeneration) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
-                )
-                self.logSearchTrace(
-                    "releaseConfirm trigger=\(trigger) action=confirmed generation=\(generation) sessionGeneration=\(sessionGeneration) \(self.searchTraceStateSummary())"
-                )
-                self.finishSelection()
-                return
-            }
-        }
-    }
-
-    func cancelPendingModifierReleaseConfirmation() {
-        guard let pendingModifierReleaseConfirmationTask else { return }
-        logInputTrace(
-            "releaseConfirm canceled generation=\(modifierReleaseConfirmationGeneration) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
-        )
-        pendingModifierReleaseConfirmationTask.cancel()
-        modifierReleaseState = .canceled(
-            reason: .explicitCancel,
-            generation: modifierReleaseConfirmationGeneration
-        )
-        modifierReleaseConfirmationGeneration += 1
-        self.pendingModifierReleaseConfirmationTask = nil
-    }
-
-    func clearPendingModifierReleaseConfirmationTaskIfCurrent(_ generation: Int) {
-        guard isModifierReleaseConfirmationGenerationCurrent(generation) else { return }
-        pendingModifierReleaseConfirmationTask = nil
-    }
-
-    func clearHotkeyReplaySuppressionTaskIfCurrent(_ generation: Int) {
-        guard isModifierReleaseConfirmationGenerationCurrent(generation) else { return }
-        suppressHotkeyReplayTask = nil
-    }
-
-    func isModifierReleaseConfirmationGenerationCurrent(_ generation: Int) -> Bool {
-        generation == modifierReleaseConfirmationGeneration
-    }
-
-    func isPrimaryModifierFlagsEvent(_ event: NSEvent) -> Bool {
-        switch activePrimaryModifier() {
-        case .option:
-            return event.keyCode == UInt16(kVK_Option) || event.keyCode == UInt16(kVK_RightOption)
-        case .control:
-            return event.keyCode == UInt16(kVK_Control) || event.keyCode == UInt16(kVK_RightControl)
-        case .command:
-            return event.keyCode == UInt16(kVK_Command) || event.keyCode == UInt16(kVK_RightCommand)
-        }
-    }
-
-    func isPrimaryModifierPressedInHardwareState() -> Bool {
-        isPrimaryModifierPressedInHardwareState(for: activeHotkeySessionKind ?? .globalAppSwitcher)
-    }
-
-    func isPrimaryModifierPressedInHardwareState(for sessionKind: HotkeySessionKind) -> Bool {
-        switch sessionKind {
-        case .globalAppSwitcher:
-            if let globalPrimaryModifierPressedOverride {
-                return globalPrimaryModifierPressedOverride
-            }
-        case .inAppWindowSwitcher:
-            if let inAppPrimaryModifierPressedOverride {
-                return inAppPrimaryModifierPressedOverride
-            }
-        }
-
-        switch primaryModifier(for: sessionKind) {
-        case .option:
-            return CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_Option))
-                || CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_RightOption))
-        case .control:
-            return CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_Control))
-                || CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_RightControl))
-        case .command:
-            return CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_Command))
-                || CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_RightCommand))
-        }
-    }
-
-    func isSessionMainKeyPressedInHardwareState(for sessionKind: HotkeySessionKind) -> Bool {
-        switch sessionKind {
-        case .globalAppSwitcher:
-            if let globalMainKeyPressedOverride {
-                return globalMainKeyPressedOverride
-            }
-        case .inAppWindowSwitcher:
-            if let inAppMainKeyPressedOverride {
-                return inAppMainKeyPressedOverride
-            }
-        }
-
-        let keyCode: CGKeyCode
-        switch sessionKind {
-        case .globalAppSwitcher:
-            keyCode = CGKeyCode(SwitcherHotkeyPreferencesStore.load().mainKey.keyCode)
-        case .inAppWindowSwitcher:
-            keyCode = CGKeyCode(InAppWindowHotkeyPreferencesStore.load().mainKey.keyCode)
-        }
-        return CGEventSource.keyState(.combinedSessionState, key: keyCode)
-    }
-
-    func isPrimaryModifierLikelyPressed(event: NSEvent? = nil) -> Bool {
-        if isPrimaryModifierPressedInHardwareState() {
-            return true
-        }
-        guard let event else { return false }
-        let eventFlags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        return eventFlags.contains(activePrimaryModifierFlag())
     }
 
 }

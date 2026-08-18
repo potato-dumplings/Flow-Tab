@@ -2,83 +2,133 @@ import Foundation
 
 extension SwitcherPanelController {
     func prepareInitialWindowOnlyPanelReveal(kind: HotkeySessionKind) {
-        initialWindowOnlyPreviewRevealTask?.cancel()
-        initialWindowOnlyPreviewRevealTask = nil
-        guard
-            kind == .inAppWindowSwitcher,
-            !model.isWindowOnlyPreviewPreparationComplete
-        else {
+        initialWindowOnlyPreviewRevealObservationOwner.cancel()
+        guard kind == .inAppWindowSwitcher else {
             panel.alphaValue = 1
             return
         }
 
         panel.alphaValue = 0
-        let generation = presentationSessionGeneration
-        initialWindowOnlyPreviewRevealTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            try? await Task.sleep(nanoseconds: self.initialWindowOnlyPreviewRevealTimeoutNs)
-            guard !Task.isCancelled else { return }
-            self.revealInitialWindowOnlyPanel(
-                generation: generation,
-                force: true,
-                reason: "preview_timeout"
-            )
-        }
+        initialWindowOnlyPreviewRevealObservationOwner.start(
+            presentationGeneration: presentationSessionGeneration,
+            readback: { [unowned self] in
+                initialWindowOnlyPreviewReadinessSnapshot()
+            },
+            onReady: { [weak self] evidence in
+                self?.revealInitialWindowOnlyPanel(evidence: evidence)
+            },
+            onWatchdog: { [weak self] failure in
+                self?.revealInitialWindowOnlyPanelAfterWatchdog(failure)
+            }
+        )
     }
 
-    func revealInitialWindowOnlyPanelIfReady(reason: String) {
-        revealInitialWindowOnlyPanel(
-            generation: presentationSessionGeneration,
-            force: false,
-            reason: reason
+    func observeInitialWindowOnlyPreviewReadiness(
+        source: InitialWindowOnlyPreviewRevealEvidenceSource
+    ) {
+        _ = initialWindowOnlyPreviewRevealObservationOwner.observe(
+            source: source,
+            observationGeneration:
+                initialWindowOnlyPreviewRevealObservationOwner.generation,
+            presentationGeneration: presentationSessionGeneration
         )
     }
 
     private func revealInitialWindowOnlyPanel(
-        generation: Int,
-        force: Bool,
-        reason: String
+        evidence: InitialWindowOnlyPreviewRevealEvidence
     ) {
-        guard generation == presentationSessionGeneration else { return }
+        guard
+            evidence.presentationGeneration
+                == presentationSessionGeneration
+        else {
+            return
+        }
         guard activeHotkeySessionKind == .inAppWindowSwitcher else { return }
         guard panel.alphaValue < 1 else { return }
-        guard force || model.isWindowOnlyPreviewPreparationComplete else { return }
+        guard evidence.snapshot.previewsReady else { return }
 
-        initialWindowOnlyPreviewRevealTask?.cancel()
-        initialWindowOnlyPreviewRevealTask = nil
         panel.alphaValue = 1
         RuntimeLog.debug(
             .preview,
-            "initial window-only panel revealed reason=\(reason) previewsReady=\(model.isWindowOnlyPreviewPreparationComplete ? 1 : 0)"
+            "initial window-only panel revealed reason=\(evidence.source.rawValue) \(evidence.snapshot.logFields)"
+        )
+    }
+
+    private func revealInitialWindowOnlyPanelAfterWatchdog(
+        _ failure: InitialWindowOnlyPreviewRevealWatchdogFailure
+    ) {
+        guard
+            failure.presentationGeneration
+                == presentationSessionGeneration
+        else {
+            return
+        }
+        guard activeHotkeySessionKind == .inAppWindowSwitcher else { return }
+        guard panel.alphaValue < 1 else { return }
+
+        panel.alphaValue = 1
+        RuntimeLog.warning(
+            .preview,
+            "initial window-only panel degraded reveal reason=preview_watchdog \(failure.logFields)"
         )
     }
 
     func cancelInitialWindowOnlyPanelReveal() {
-        initialWindowOnlyPreviewRevealTask?.cancel()
-        initialWindowOnlyPreviewRevealTask = nil
+        initialWindowOnlyPreviewRevealObservationOwner.cancel()
         panel.alphaValue = 1
+    }
+
+    private func initialWindowOnlyPreviewReadinessSnapshot()
+        -> InitialWindowOnlyPreviewReadinessSnapshot
+    {
+        InitialWindowOnlyPreviewReadinessSnapshot(
+            pendingCaptureCount:
+                model.windowOnlyPreviewCaptureInFlightCount
+        )
     }
 
     @discardableResult
     func beginInitialPresentationVisibilityTracking(trigger: String) -> Int {
-        initialPresentationVisibilityGeneration += 1
-        let generation = initialPresentationVisibilityGeneration
-        initialPresentationVisibilityDeadline = ProcessInfo.processInfo.systemUptime
-            + initialPresentationVisibilityGraceWindow
-        initialPresentationVisibilityTrigger = trigger
-        panelVisibilityRecoveryState = .presenting(trigger: trigger, generation: generation)
+        let presentationGeneration = presentationSessionGeneration
+        let generation = initialPanelVisibilityObservationOwner.start(
+            trigger: trigger,
+            presentationGeneration: presentationGeneration,
+            recoveryEscalationInterval:
+                initialPresentationVisibilityRecoveryEscalationInterval,
+            readback: { [unowned self] in
+                self.panelVisibilitySnapshot()
+            },
+            onVisible: { [weak self] evidence in
+                self?.completeInitialPresentationVisibility(
+                    trigger: trigger,
+                    evidence: evidence
+                )
+            },
+            onRecoveryEscalation: { [weak self] escalation in
+                self?.handleInitialPresentationVisibilityRecoveryEscalation(
+                    escalation
+                )
+            }
+        )
+        if initialPanelVisibilityObservationOwner.isObserving(
+            observationGeneration: generation,
+            presentationGeneration: presentationGeneration
+        ) {
+            panelVisibilityRecoveryState = .presenting(
+                trigger: trigger,
+                generation: generation
+            )
+        }
         logSearchTrace(
-            "presentationRecovery trigger=\(trigger) action=trackInitialVisibility generation=\(generation) graceMs=\(formatMilliseconds(initialPresentationVisibilityGraceWindow * 1_000)) \(searchTraceStateSummary())"
+            "presentationRecovery trigger=\(trigger) action=trackInitialVisibility generation=\(generation) presentationGeneration=\(presentationGeneration) recoveryEscalationMs=\(formatMilliseconds(initialPresentationVisibilityRecoveryEscalationInterval * 1_000)) \(searchTraceStateSummary())"
         )
         return generation
     }
 
     func clearInitialPresentationVisibilityTracking(invalidate: Bool = false) {
-        if invalidate {
-            initialPresentationVisibilityGeneration += 1
-        }
-        initialPresentationVisibilityDeadline = 0
-        initialPresentationVisibilityTrigger = nil
+        initialPanelVisibilityObservationOwner.cancel(
+            invalidate: invalidate
+        )
     }
 
     func isInitialPresentationVisibilityGenerationCurrent(_ generation: Int) -> Bool {
@@ -87,154 +137,135 @@ extension SwitcherPanelController {
 
     func shouldDeferInitialPanelOcclusionInterruption(trigger: String) -> Bool {
         guard hasActivePresentationSession else { return false }
-        guard initialPresentationVisibilityDeadline > 0 else { return false }
-        guard ProcessInfo.processInfo.systemUptime < initialPresentationVisibilityDeadline else {
-            return false
-        }
+        guard initialPanelVisibilityObservationOwner.isObserving(
+            observationGeneration: initialPresentationVisibilityGeneration,
+            presentationGeneration: presentationSessionGeneration
+        ) else { return false }
+        let lastEvidence =
+            initialPanelVisibilityObservationOwner.lastEvidence
         logSearchTrace(
-            "systemInterruption trigger=\(trigger) action=ignored reason=initialPresentationPending generation=\(initialPresentationVisibilityGeneration) \(searchTraceStateSummary())"
+            "systemInterruption trigger=\(trigger) action=deferred reason=initialVisibilityObserved generation=\(initialPresentationVisibilityGeneration) lastEvidence=\(lastEvidence?.source.rawValue ?? "none") lastSnapshot{\(lastEvidence?.snapshot.logFields ?? "none")} \(searchTraceStateSummary())"
         )
         return true
     }
 
     @discardableResult
-    func completeInitialPresentationVisibilityIfVisible(
-        trigger: String? = nil,
+    func observeInitialPresentationVisibility(
+        source: InitialPanelVisibilityEvidenceSource,
         generation: Int? = nil,
-        reason: String,
-        cancelRecoveryTask: Bool
+        presentationGeneration: Int? = nil
     ) -> Bool {
-        guard hasActivePresentationSession else { return false }
-        guard initialPresentationVisibilityDeadline > 0 else { return false }
-        if let generation {
-            guard isInitialPresentationVisibilityGenerationCurrent(generation) else { return false }
-        }
-        guard isPanelVisibleToUser else { return false }
+        initialPanelVisibilityObservationOwner.observe(
+            source: source,
+            observationGeneration:
+                generation ?? initialPresentationVisibilityGeneration,
+            presentationGeneration:
+                presentationGeneration ?? presentationSessionGeneration
+        )
+    }
 
-        let resolvedTrigger = trigger ?? initialPresentationVisibilityTrigger ?? "panel_visible"
-        let completedGeneration = generation ?? initialPresentationVisibilityGeneration
-        clearInitialPresentationVisibilityTracking()
-        panelVisibilityRecoveryState = .visibleConfirmed(
-            trigger: resolvedTrigger,
-            generation: completedGeneration,
-            reason: reason
-        )
-        if cancelRecoveryTask {
-            cancelPanelPresentationRecoveryTask()
+    private func completeInitialPresentationVisibility(
+        trigger: String,
+        evidence: InitialPanelVisibilityEvidence
+    ) {
+        guard hasActivePresentationSession else { return }
+        guard isPresentationSessionGenerationCurrent(
+            evidence.presentationGeneration
+        ) else { return }
+        if hasPendingPanelVisibilityRecoveryObservation {
+            cancelPanelPresentationRecovery()
         }
-        logSearchTrace(
-            "presentationRecovery trigger=\(resolvedTrigger) action=complete reason=\(reason) \(searchTraceStateSummary())"
+        panelVisibilityRecoveryState = .visibleConfirmed(
+            trigger: trigger,
+            generation: evidence.observationGeneration,
+            reason: evidence.source.rawValue
         )
-        beginIgnoringActiveSpaceChanges(trigger: "\(resolvedTrigger)_visible")
-        scheduleModifierReleaseConfirmationAfterRecoveredPresentationIfNeeded(trigger: resolvedTrigger)
-        return true
+        logSearchTrace(
+            "presentationRecovery trigger=\(trigger) action=complete reason=\(evidence.source.rawValue) generation=\(evidence.observationGeneration) presentationGeneration=\(evidence.presentationGeneration) snapshot{\(evidence.snapshot.logFields)} \(searchTraceStateSummary())"
+        )
+        scheduleModifierReleaseConfirmationAfterRecoveredPresentationIfNeeded(
+            trigger: trigger
+        )
+    }
+
+    private func handleInitialPresentationVisibilityRecoveryEscalation(
+        _ escalation: InitialPanelVisibilityRecoveryEscalation
+    ) {
+        guard hasActivePresentationSession else { return }
+        guard isPresentationSessionGenerationCurrent(
+            escalation.presentationGeneration
+        ) else { return }
+        guard initialPanelVisibilityObservationOwner.isObserving(
+            observationGeneration: escalation.observationGeneration,
+            presentationGeneration: escalation.presentationGeneration
+        ) else { return }
+        logSearchTrace(
+            "presentationRecovery trigger=\(escalation.trigger) action=recoveryEscalated generation=\(escalation.observationGeneration) presentationGeneration=\(escalation.presentationGeneration) \(escalation.logFields) \(searchTraceStateSummary())"
+        )
+        schedulePanelVisibilityRecovery(
+            trigger: "\(escalation.trigger)_initialVisibilityEscalation",
+            cancelSessionOnFailure: false
+        )
     }
 
     func scheduleInitialPanelVisibilityRecovery(
         trigger: String,
-        activateApplicationIfNeeded: Bool = false
+        initialVisibilityGeneration: Int? = nil
     ) {
-        let recoveryGeneration = beginPanelPresentationRecoveryTask()
-        let generation = beginInitialPresentationVisibilityTracking(trigger: trigger)
-        panelPresentationRecoveryTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
-            guard self.isInitialPresentationVisibilityGenerationCurrent(generation) else { return }
-
-            if self.completeInitialPresentationVisibilityIfVisible(
-                trigger: trigger,
-                generation: generation,
-                reason: "alreadyVisible",
-                cancelRecoveryTask: false
-            ) {
-                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                return
-            }
-
-            self.panelVisibilityRecoveryState = .suspectedHidden(
-                trigger: trigger,
-                generation: generation
-            )
-            self.logSearchTrace(
-                "presentationRecovery trigger=\(trigger) action=softAttempt generation=\(generation) recoveryGeneration=\(recoveryGeneration) \(self.searchTraceStateSummary())"
-            )
-            self.panelVisibilityRecoveryState = .recovering(
-                trigger: trigger,
-                generation: generation,
-                attempt: 1,
-                totalAttempts: 1,
-                mode: .softReorder
-            )
-            await self.performPanelVisibilityRecoveryAttempt(
-                trigger: trigger,
-                activateApplicationIfNeeded: activateApplicationIfNeeded,
-                recoveryMode: .softReorder,
-                generation: recoveryGeneration,
-                attempt: 1,
-                totalAttempts: 1
-            )
-
-            guard !Task.isCancelled else { return }
-            guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
-            guard self.hasActivePresentationSession else {
-                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                return
-            }
-            guard self.isInitialPresentationVisibilityGenerationCurrent(generation) else {
-                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                return
-            }
-
-            if self.completeInitialPresentationVisibilityIfVisible(
-                trigger: trigger,
-                generation: generation,
-                reason: "recovered",
-                cancelRecoveryTask: false
-            ) {
-                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                return
-            }
-
-            let remainingSeconds = max(
-                0,
-                self.initialPresentationVisibilityDeadline - ProcessInfo.processInfo.systemUptime
-            )
-            if remainingSeconds > 0 {
-                try? await Task.sleep(nanoseconds: UInt64(remainingSeconds * 1_000_000_000))
-            }
-
-            guard !Task.isCancelled else { return }
-            guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
-            guard self.hasActivePresentationSession else {
-                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                return
-            }
-            guard self.isInitialPresentationVisibilityGenerationCurrent(generation) else {
-                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                return
-            }
-
-            if self.completeInitialPresentationVisibilityIfVisible(
-                trigger: trigger,
-                generation: generation,
-                reason: "deadlineVisible",
-                cancelRecoveryTask: false
-            ) {
-                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                return
-            }
-
-            self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-            self.clearInitialPresentationVisibilityTracking()
-            self.panelVisibilityRecoveryState = .failed(
-                trigger: trigger,
-                generation: generation,
-                reason: "visibilityDeadline"
-            )
-            self.logSearchTrace(
-                "presentationRecovery trigger=\(trigger) action=failed reason=visibilityDeadline generation=\(generation) recoveryGeneration=\(recoveryGeneration) \(self.searchTraceStateSummary())"
-            )
-            self.handleRecoverableSystemInterruption(trigger: "\(trigger)_visibilityDeadline")
+        let generation =
+            initialVisibilityGeneration
+            ?? initialPresentationVisibilityGeneration
+        let presentationGeneration = presentationSessionGeneration
+        guard initialPanelVisibilityObservationOwner.isObserving(
+            observationGeneration: generation,
+            presentationGeneration: presentationGeneration
+        ) else { return }
+        if observeInitialPresentationVisibility(
+            source: .presentationActionReadback,
+            generation: generation,
+            presentationGeneration: presentationGeneration
+        ) {
+            return
         }
+
+        let recoveryGeneration = beginPanelPresentationRecovery()
+        panelVisibilityRecoveryState = .suspectedHidden(
+            trigger: trigger,
+            generation: generation
+        )
+        guard isPanelPresentationRecoveryGenerationCurrent(
+            recoveryGeneration
+        ) else { return }
+        guard isInitialPresentationVisibilityGenerationCurrent(
+            generation
+        ) else { return }
+        guard isPresentationSessionGenerationCurrent(
+            presentationGeneration
+        ) else { return }
+        logSearchTrace(
+            "presentationRecovery trigger=\(trigger) action=softAttempt generation=\(generation) presentationGeneration=\(presentationGeneration) recoveryGeneration=\(recoveryGeneration) \(searchTraceStateSummary())"
+        )
+        panelVisibilityRecoveryState = .recovering(
+            trigger: trigger,
+            generation: generation,
+            attempt: 1,
+            totalAttempts: 1,
+            mode: .softReorder
+        )
+        performSoftPanelVisibilityRecoveryAction(
+            trigger: trigger,
+            recoveryGeneration: recoveryGeneration,
+            attempt: 1,
+            totalAttempts: 1
+        )
+        guard hasActivePresentationSession else { return }
+        guard isInitialPresentationVisibilityGenerationCurrent(
+            generation
+        ) else { return }
+        _ = observeInitialPresentationVisibility(
+            source: .recoveryReadback,
+            generation: generation,
+            presentationGeneration: presentationGeneration
+        )
     }
 }

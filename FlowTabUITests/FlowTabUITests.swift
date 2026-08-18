@@ -40,6 +40,10 @@ final class FlowTabUITests: XCTestCase {
         static let sidebarPermissionStatus = "flowtab.sidebar.permission-status"
         static let sidebarPermissionAccessibility = "flowtab.sidebar.permission.accessibility"
         static let sidebarPermissionScreenCapture = "flowtab.sidebar.permission.screen-capture"
+        static let sidebarPermissionAccessibilityStatus =
+            "\(sidebarPermissionAccessibility).status"
+        static let sidebarPermissionScreenCaptureStatus =
+            "\(sidebarPermissionScreenCapture).status"
         static let permissionBanner = "flowtab.home.permission.banner"
         static let permissionOpenSettings = "flowtab.home.permission.open-settings"
         static let permissionDismiss = "flowtab.home.permission.dismiss"
@@ -49,8 +53,6 @@ final class FlowTabUITests: XCTestCase {
         static let logsLevel = "flowtab.logs.level"
         static let logsLines = "flowtab.logs.lines"
         static let logsEmptyHint = "flowtab.logs.empty-hint"
-        static let logsDiagnosticSession = "flowtab.logs.diagnostic-session"
-        static let logsDiagnosticSessionStatus = "flowtab.logs.diagnostic-session-status"
         static let logsPrivacyNotice = "flowtab.logs.privacy-notice"
         static let logsSeededDebugLine = "flowtab.logs.line.seeded.debug"
         static let logsSeededInfoLine = "flowtab.logs.line.seeded.info"
@@ -66,10 +68,24 @@ final class FlowTabUITests: XCTestCase {
         static let settingsWindowHideMinimizedApps = "flowtab.settings.window.hide-minimized-apps"
         static let settingsSearchEnabled = "flowtab.settings.search.enabled"
         static let settingsSearchDefaultScope = "flowtab.settings.search.default-scope"
+        static let settingsSearchSummary = "flowtab.settings.search.summary"
         static let settingsAppVisibilityManage = "flowtab.settings.app-visibility.manage"
         static let settingsAppVisibilityManager = "flowtab.settings.app-visibility.manager"
+        static let settingsAppVisibilityBack = "flowtab.settings.app-visibility.back"
         static let settingsAppVisibilitySearch = "flowtab.settings.app-visibility.search"
+        static let settingsAppVisibilityInventoryReadyMarker =
+            "flowtab.settings.app-visibility.inventory.ready"
+        static let settingsAppVisibilityQueryProjectionPrefix =
+            "flowtab.settings.app-visibility.list.query-generation."
         static let settingsAppVisibilityFilterHidden = "flowtab.settings.app-visibility.filter.hidden"
+        static let settingsAppVisibilityFilterProjectionPrefix =
+            "flowtab.settings.app-visibility.filter-projection."
+        static let settingsAppVisibilityHiddenFilterProjectionPrefix =
+            "flowtab.settings.app-visibility.filter-projection.hidden.generation."
+        static let settingsAppVisibilityAppRowPrefix =
+            "flowtab.settings.app-visibility.app."
+        static let settingsAppVisibilityDetailProjectionPrefix =
+            "flowtab.settings.app-visibility.detail."
         static let settingsAppVisibilityShowToggle = "flowtab.settings.app-visibility.show-toggle"
         static let settingsAppVisibilityCurrentApp =
             "flowtab.settings.app-visibility.app.\(FlowTabUITestAppIdentity.configured().bundleIdentifier.flowTabUITestAccessibilityIdentifierComponent)"
@@ -80,17 +96,28 @@ final class FlowTabUITests: XCTestCase {
         static let settingsPermissionLaunchAtLogin = "flowtab.settings.permission.launch-at-login"
         static let settingsPermissionTerminalContentPreviews =
             "flowtab.settings.permission.terminal-content-previews"
-        static let settingsHotkeyMainModifier = "flowtab.settings.hotkey.main-modifier"
+        static let settingsHotkeyMainModifiers = "flowtab.settings.hotkey.main-modifiers"
+        static let settingsHotkeyMainReverseModifiers =
+            "flowtab.settings.hotkey.main-reverse-modifiers"
         static let settingsHotkeyMainKey = "flowtab.settings.hotkey.main-key"
         static let settingsHotkeyQuitKey = "flowtab.settings.hotkey.quit-key"
-        static let settingsHotkeyInAppModifier = "flowtab.settings.hotkey.in-app-modifier"
-        static let settingsHotkeyInAppKey = "flowtab.settings.hotkey.in-app-key"
+        static let settingsHotkeyInAppShortcut = "flowtab.settings.hotkey.in-app-shortcut"
+        static let settingsHotkeyInAppReverseModifiers =
+            "flowtab.settings.hotkey.in-app-reverse-modifiers"
         static let settingsHotkeyMainTakeoverStatus = "flowtab.settings.hotkey.main-takeover-status"
+        static func settingsHotkeyConflictStatus(
+            for controlIdentifier: String
+        ) -> String {
+            "\(controlIdentifier).conflict-status"
+        }
         static let statusItem = "flowtab.status-item"
         static let statusItemQuit = "flowtab.status-item.quit"
         static let switcherSummary = "flowtab.testing.switcher.summary"
-        static let switcherAppMockBrowser = "flowtab.switcher.app.\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
-        static let switcherAppMockMail = "flowtab.switcher.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
+        static let switcherAppPrefix = "flowtab.switcher.app."
+        static let switcherAppMockBrowser =
+            "\(switcherAppPrefix)\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
+        static let switcherAppMockMail =
+            "\(switcherAppPrefix)\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherAppMockManyWindows = "flowtab.switcher.app.\("com.flowtab.mock.many-windows".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherAppMockMinimizedNotes = "flowtab.switcher.app.\("com.flowtab.mock.minimized-notes".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherAppWeChat = "flowtab.switcher.app.\("com.tencent.xinWeChat".flowTabUITestAccessibilityIdentifierComponent)"

@@ -1,7 +1,46 @@
 import AppKit
 import XCTest
 
+enum FlowTabUITestSettingsQuitHotkeyWatchdogPolicy {
+    static let runtimeCompletion: TimeInterval = 10
+    static let selectedRowDisappearance: TimeInterval = 6
+}
+
 extension FlowTabUITests {
+    func testSettingsQuitHotkeyWatchdogPolicyPreservesCompatibleRuntimeCompletionBound() {
+        XCTAssertEqual(
+            FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                .runtimeCompletion,
+            10
+        )
+        XCTAssertTrue(
+            FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                .runtimeCompletion.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                .runtimeCompletion,
+            0
+        )
+    }
+
+    func testSettingsQuitHotkeyWatchdogPolicyPreservesCompatibleSelectedRowDisappearanceBound() {
+        XCTAssertEqual(
+            FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                .selectedRowDisappearance,
+            6
+        )
+        XCTAssertTrue(
+            FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                .selectedRowDisappearance.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                .selectedRowDisappearance,
+            0
+        )
+    }
+
     func testSettingsAppearanceTogglesCanBeChanged() throws {
         let app = makeApp(
             additionalArguments: [
@@ -18,15 +57,21 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
+        guard let controls =
+            assertSettingsAppearanceControlsProjectionAfterNavigation(
+                in: app,
+                targetDescription: "Appearance toggle mutation",
+                trigger: {
+                    openSettingsTab(in: app)
+                }
+            )
+        else {
+            return
+        }
 
-        let showShortcutHintToggle = toggleElement(in: app, identifier: Identifier.settingsAppearanceShowShortcutHint)
-        let showInCommandTabToggle = toggleElement(in: app, identifier: Identifier.settingsAppearanceShowInCommandTab)
-        XCTAssertTrue(showShortcutHintToggle.waitForExistence(timeout: 5))
-        XCTAssertTrue(showInCommandTabToggle.waitForExistence(timeout: 5))
+        let showShortcutHintToggle = controls.shortcutHintToggle
+        let showInCommandTabToggle = controls.currentAppToggle
         XCTAssertFalse(toggleIsOn(showInCommandTabToggle))
-        XCTAssertTrue(app.staticTexts["像普通应用一样显示"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["关闭后，当前应用将仅作为菜单栏辅助应用运行。"].waitForExistence(timeout: 5))
 
         let targetShortcutHint = !toggleIsOn(showShortcutHintToggle)
         let targetShowInCommandTab = !toggleIsOn(showInCommandTabToggle)
@@ -89,136 +134,154 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
+        guard
+            assertSettingsInitialAppearanceProjectionAfterNavigation(
+                in: app,
+                targetDescription: "theme and language visible UI",
+                trigger: {
+                    openSettingsTab(in: app)
+                }
+            )
+        else {
+            return
+        }
 
         let settingsContent = element(in: app, identifier: Identifier.settingsTabContent)
-        XCTAssertTrue(settingsContent.waitForExistence(timeout: 6))
-        XCTAssertTrue(app.staticTexts["外观"].waitForExistence(timeout: 5))
+        let themeTransitionWatchdog =
+            FlowTabUITestAverageLuminanceObservationPolicy
+                .settingsThemeTransitionWatchdog
 
-        selectOption(in: app, controlIdentifier: Identifier.settingsAppearanceThemeMode, optionIdentifier: "light")
-        assertValue(of: element(in: app, identifier: Identifier.settingsAppearanceThemeMode), equals: "light")
         let lightLuminance = try XCTUnwrap(
-            waitForAverageLuminance(of: settingsContent, timeout: 5) { $0 > 0.45 },
+            performAndWaitForAverageLuminance(
+                of: settingsContent,
+                expectedDescription: "greater than 0.45",
+                watchdog: themeTransitionWatchdog,
+                trigger: {
+                    self.selectOption(
+                        in: app,
+                        controlIdentifier:
+                            Identifier.settingsAppearanceThemeMode,
+                        optionIdentifier: "light"
+                    )
+                },
+                matching: { $0 > 0.45 }
+            ),
             "Settings content did not become visibly light"
         )
+        assertValue(
+            of: element(
+                in: app,
+                identifier:
+                    Identifier.settingsAppearanceThemeMode
+            ),
+            equals: "light"
+        )
 
-        selectOption(in: app, controlIdentifier: Identifier.settingsAppearanceThemeMode, optionIdentifier: "dark")
-        assertValue(of: element(in: app, identifier: Identifier.settingsAppearanceThemeMode), equals: "dark")
+        let maximumDarkLuminance =
+            lightLuminance - 0.18
         let darkLuminance = try XCTUnwrap(
-            waitForAverageLuminance(of: settingsContent, timeout: 5) { $0 < lightLuminance - 0.18 },
+            performAndWaitForAverageLuminance(
+                of: settingsContent,
+                expectedDescription:
+                    "less than \(maximumDarkLuminance)",
+                watchdog: themeTransitionWatchdog,
+                trigger: {
+                    self.selectOption(
+                        in: app,
+                        controlIdentifier:
+                            Identifier.settingsAppearanceThemeMode,
+                        optionIdentifier: "dark"
+                    )
+                },
+                matching: {
+                    $0 < maximumDarkLuminance
+                }
+            ),
             "Settings content did not become visibly darker after selecting dark theme"
         )
-        XCTAssertLessThan(darkLuminance, lightLuminance - 0.18)
+        assertValue(
+            of: element(
+                in: app,
+                identifier:
+                    Identifier.settingsAppearanceThemeMode
+            ),
+            equals: "dark"
+        )
+        XCTAssertLessThan(
+            darkLuminance,
+            maximumDarkLuminance
+        )
 
-        selectOption(in: app, controlIdentifier: Identifier.settingsAppearanceAppLanguage, optionIdentifier: "en")
-        assertValue(of: element(in: app, identifier: Identifier.settingsAppearanceAppLanguage), equals: "en")
-        let pageSubtitle = app.staticTexts["Display, hotkeys, and permissions"]
-        XCTAssertTrue(pageSubtitle.waitForExistence(timeout: 5))
-        assertSettingsPageSubtitleIsVisible(pageSubtitle, below: app.staticTexts["Settings"])
-        XCTAssertTrue(app.staticTexts["Appearance"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Theme mode"].waitForExistence(timeout: 5))
-        XCTAssertTrue(
-            waitForNonExistence(app.staticTexts["基础显示设置、快捷键与权限"], timeout: 2)
+        guard let englishAppearance =
+            assertSettingsEnglishAppearanceProjectionAfterSelectingEnglish(
+                in: app,
+                targetDescription: "theme and language visible UI"
+            )
+        else {
+            return
+        }
+        assertSettingsPageSubtitleIsVisible(
+            englishAppearance.pageSubtitle,
+            below: englishAppearance.pageTitle
         )
     }
 
-    func testSettingsWindowBehaviorDelayAndTogglesPersistAcrossRelaunch() throws {
-        let firstLaunchApp = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-runtime-log-level",
-                "debug",
-                "--flowtab-ui-record-hotkey-reload-diagnostics",
-                "--flowtab-ui-ax-trusted",
-                "YES",
-                "--flowtab-ui-screen-trusted",
-                "YES"
-            ]
-        )
-        launchFlowTabUITestApplication(firstLaunchApp)
-        openSettingsTab(in: firstLaunchApp)
-
-        let delayInput = element(in: firstLaunchApp, identifier: Identifier.settingsWindowAutoEnterDelayInput)
-        XCTAssertTrue(delayInput.waitForExistence(timeout: 5))
-        replaceText(in: delayInput, with: "1.2345", app: firstLaunchApp)
-        commitEditing(in: firstLaunchApp)
-        assertValuePrefix(of: delayInput, expectedPrefix: "1.23")
-
-        let autoRestoreToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsWindowAutoRestoreMinimized)
-        let hideMinimizedToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsWindowHideMinimizedApps)
-        XCTAssertTrue(autoRestoreToggle.waitForExistence(timeout: 5))
-        XCTAssertTrue(hideMinimizedToggle.waitForExistence(timeout: 5))
-
-        let expectedAutoRestore = !toggleIsOn(autoRestoreToggle)
-        let expectedHideMinimized = !toggleIsOn(hideMinimizedToggle)
-        setToggle(autoRestoreToggle, to: expectedAutoRestore)
-        setToggle(hideMinimizedToggle, to: expectedHideMinimized)
-
-        firstLaunchApp.terminate()
-
-        let relaunchApp = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-ax-trusted",
-                "YES",
-                "--flowtab-ui-screen-trusted",
-                "YES"
-            ]
-        )
-        launchFlowTabUITestApplication(relaunchApp)
-        openSettingsTab(in: relaunchApp)
-
-        let relaunchDelayInput = element(in: relaunchApp, identifier: Identifier.settingsWindowAutoEnterDelayInput)
-        assertValuePrefix(of: relaunchDelayInput, expectedPrefix: "1.23")
-        XCTAssertEqual(
-            toggleIsOn(toggleElement(in: relaunchApp, identifier: Identifier.settingsWindowAutoRestoreMinimized)),
-            expectedAutoRestore
-        )
-        XCTAssertEqual(
-            toggleIsOn(toggleElement(in: relaunchApp, identifier: Identifier.settingsWindowHideMinimizedApps)),
-            expectedHideMinimized
+    func testSettingsWindowBehaviorDefaultIncludesMinimizedAppsInInitialSwitcher()
+        throws
+    {
+        try assertInitialSwitcherPresentationResolution(
+            additionalArguments: windowBehaviorRuntimeArguments(
+                resetDefaults: true,
+                opensSwitcher: true
+            ),
+            expectation:
+                FlowTabUITestInitialPresentationResolutionExpectation(
+                    requiredItemIDs: [
+                        "com.flowtab.mock.mail",
+                        "com.flowtab.mock.minimized-notes"
+                    ],
+                    excludedItemIDs: [],
+                    searchFeatureEnabled: true,
+                    searchIsActive: false,
+                    searchActivationIsPending: false
+                ),
+            targetDescription: "hide-minimized baseline"
         )
     }
 
     func testSettingsWindowBehaviorHideMinimizedAppsAffectsSwitcherAppLayer() throws {
-        let baselineApp = makeApp(
+        let settingsApp = makeApp(
             additionalArguments: windowBehaviorRuntimeArguments(
-                resetDefaults: true,
-                opensSwitcher: true
+                resetDefaults: true
             )
         )
-        launchFlowTabUITestApplication(baselineApp)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(baselineApp, timeout: 10))
-        XCTAssertTrue(element(in: baselineApp, identifier: Identifier.switcherAppMockMail).waitForExistence(timeout: 8))
-        XCTAssertTrue(
-            element(
-                in: baselineApp,
-                identifier: Identifier.switcherAppMockMinimizedNotes
-            ).waitForExistence(timeout: 8)
-        )
-        baselineApp.terminate()
-
-        let settingsApp = makeApp(additionalArguments: windowBehaviorRuntimeArguments())
+        defer { settingsApp.terminate() }
         launchFlowTabUITestApplication(settingsApp)
-        openSettingsTab(in: settingsApp)
-
-        let hideMinimizedToggle = toggleElement(in: settingsApp, identifier: Identifier.settingsWindowHideMinimizedApps)
-        XCTAssertTrue(hideMinimizedToggle.waitForExistence(timeout: 5))
-        setToggle(hideMinimizedToggle, to: true)
-        XCTAssertTrue(toggleIsOn(hideMinimizedToggle))
+        guard
+            assertSettingsWindowBehaviorHideMinimizedAppsCanBeSet(
+                in: settingsApp,
+                to: true,
+                targetDescription: "filtered Switcher setup"
+            )
+        else {
+            return
+        }
         settingsApp.terminate()
 
-        let filteredApp = makeApp(
-            additionalArguments: windowBehaviorRuntimeArguments(opensSwitcher: true)
-        )
-        launchFlowTabUITestApplication(filteredApp)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(filteredApp, timeout: 10))
-        XCTAssertTrue(element(in: filteredApp, identifier: Identifier.switcherAppMockMail).waitForExistence(timeout: 8))
-        XCTAssertTrue(
-            waitForNonExistence(
-                element(in: filteredApp, identifier: Identifier.switcherAppMockMinimizedNotes),
-                timeout: 2
-            )
+        try assertInitialSwitcherPresentationResolution(
+            additionalArguments:
+                windowBehaviorRuntimeArguments(opensSwitcher: true),
+            expectation:
+                FlowTabUITestInitialPresentationResolutionExpectation(
+                    requiredItemIDs: ["com.flowtab.mock.mail"],
+                    excludedItemIDs: [
+                        "com.flowtab.mock.minimized-notes"
+                    ],
+                    searchFeatureEnabled: true,
+                    searchIsActive: false,
+                    searchActivationIsPending: false
+                ),
+            targetDescription: "hide-minimized filtered projection"
         )
     }
 
@@ -233,14 +296,9 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
-
-        XCTAssertTrue(
-            element(in: app, identifier: Identifier.settingsPermissionAccessibilityAction).waitForExistence(timeout: 5)
-        )
-        XCTAssertTrue(
-            element(in: app, identifier: Identifier.settingsPermissionScreenCaptureAction).waitForExistence(timeout: 5)
-        )
+        assertInitialDeniedSettingsPermissionProjection(in: app) {
+            openSettingsTab(in: app)
+        }
     }
 
     func testSettingsSimplifiedChinesePermissionStatusesAreVisible() throws {
@@ -254,177 +312,83 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-        openSettingsTab(in: app)
-
-        XCTAssertTrue(app.staticTexts["辅助功能权限：未授权"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["屏幕录制权限：未授权"].waitForExistence(timeout: 5))
-    }
-
-    func testSettingsHotkeySelectionsPersistAcrossRelaunch() throws {
-        let firstLaunchApp = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-runtime-log-level",
-                "DEBUG",
-                "--flowtab-ui-enable-verbose-logs",
-                "--flowtab-ui-record-hotkey-reload-diagnostics",
-                "--flowtab-ui-ax-trusted",
-                "YES",
-                "--flowtab-ui-screen-trusted",
-                "YES"
-            ]
-        )
-        launchFlowTabUITestApplication(firstLaunchApp)
-        openSettingsTab(in: firstLaunchApp)
-
-        let expectedSelections: [(control: String, option: String)] = [
-            (Identifier.settingsHotkeyMainModifier, "option"),
-            (Identifier.settingsHotkeyMainKey, "space"),
-            (Identifier.settingsHotkeyQuitKey, "z"),
-            (Identifier.settingsHotkeyInAppModifier, "command"),
-            (Identifier.settingsHotkeyInAppKey, "a")
-        ]
-        let baselineSelections: [(control: String, option: String)] = [
-            (Identifier.settingsHotkeyMainModifier, "control"),
-            (Identifier.settingsHotkeyMainKey, "x"),
-            (Identifier.settingsHotkeyQuitKey, "y"),
-            (Identifier.settingsHotkeyInAppModifier, "option"),
-            (Identifier.settingsHotkeyInAppKey, "b")
-        ]
-        for selection in baselineSelections {
-            selectOption(in: firstLaunchApp, controlIdentifier: selection.control, optionIdentifier: selection.option)
+        assertInitialDeniedSettingsPermissionProjection(in: app) {
+            openSettingsTab(in: app)
         }
-        let hotkeyReloadLogSnapshot = makeRuntimeLogFileSnapshot()
-        for selection in expectedSelections {
-            selectOption(in: firstLaunchApp, controlIdentifier: selection.control, optionIdentifier: selection.option)
-            assertValue(of: element(in: firstLaunchApp, identifier: selection.control), equals: selection.option)
-        }
-
-        waitForRuntimeLogFiles(
-            containing: [
-                "updated main=Option + Space",
-                "quit=Option + Z",
-                "inApp=Command + A",
-                "hotkeyReloadNotification sender=AppDelegate main=Option + Space inApp=Command + A"
-            ],
-            since: hotkeyReloadLogSnapshot
-        )
-        let hotkeyTriggerLogSnapshot = makeRuntimeLogFileSnapshot()
-        firstLaunchApp.activate()
-        firstLaunchApp.typeKey(.space, modifierFlags: .option)
-        waitForRuntimeLogFiles(
-            containing: ["activeSpaceIgnore trigger=global_show"],
-            since: hotkeyTriggerLogSnapshot
-        )
-        waitForRuntimeLogFiles(
-            matching: #"releaseConfirm (start|alreadyRunning) trigger=flags_changed"#,
-            since: hotkeyTriggerLogSnapshot,
-            description: "flags-changed release delivery reaches the confirmation state machine"
-        )
-        waitForRuntimeLogFiles(
-            matching: #"releaseConfirm confirmed trigger=(flags_changed|presentation_recovered) action=finishSelection"#,
-            since: hotkeyTriggerLogSnapshot,
-            description: "the first valid release confirmation commits the selection"
-        )
-
-        firstLaunchApp.terminate()
-
-        let relaunchApp = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-ax-trusted",
-                "YES",
-                "--flowtab-ui-screen-trusted",
-                "YES"
-            ]
-        )
-        launchFlowTabUITestApplication(relaunchApp)
-        openSettingsTab(in: relaunchApp)
-
-        for selection in expectedSelections {
-            assertValue(of: element(in: relaunchApp, identifier: selection.control), equals: selection.option)
-        }
-    }
-
-    func testSettingsHotkeyKeyDropdownOpensAsRightSideMenuWhenSpaceAllows() throws {
-        let app = makeApp(additionalArguments: hotkeyEffectArguments(resetDefaults: true))
-        launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
-
-        let control = element(in: app, identifier: Identifier.settingsHotkeyMainKey)
-        XCTAssertTrue(control.waitForExistence(timeout: 6))
-        let controlFrame = control.frame
-        let visibleMaxX = NSScreen.main?.visibleFrame.maxX ?? controlFrame.maxX
-        guard visibleMaxX - controlFrame.maxX >= 190 else {
-            throw XCTSkip("Current screen does not leave enough right-side room for the side-menu UI assertion.")
-        }
-
-        tapElement(control)
-        let scopedOption = app.descendants(matching: .any)
-            .matching(identifier: "\(Identifier.settingsHotkeyMainKey).option.space")
-            .firstMatch
-        let rawOption = app.descendants(matching: .any).matching(identifier: "space").firstMatch
-        let option = scopedOption.waitForExistence(timeout: 2) ? scopedOption : rawOption
-        XCTAssertTrue(option.waitForExistence(timeout: 3))
-        XCTAssertGreaterThanOrEqual(option.frame.minX, controlFrame.maxX - 1)
-
-        tapElement(option)
-        assertValue(of: control, equals: "space")
     }
 
     func testSettingsLanguageDropdownUsesLiveIntrinsicWidth() throws {
         let app = makeApp(additionalArguments: hotkeyEffectArguments(resetDefaults: true))
         launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
-
-        let language = element(in: app, identifier: Identifier.settingsAppearanceAppLanguage)
-        XCTAssertTrue(language.waitForExistence(timeout: 6))
+        guard let language = waitForSettingsControl(
+            in: app, identifier: Identifier.settingsAppearanceAppLanguage,
+            trigger: { openSettingsTab(in: app) }
+        ) else { return }
         XCTAssertGreaterThanOrEqual(language.frame.width, 100)
         XCTAssertLessThan(language.frame.width, 120)
     }
 
     func testSettingsMainHotkeyRepresentativeMatrixTriggersSwitcher() throws {
-        let cases: [(modifier: String, key: String, shortcutText: String)] = [
-            ("option", "space", "Option + Space"),
-            ("control", "grave", "Control + `"),
-            ("command", "b", "Command + B")
+        let cases: [(
+            modifierFlags: XCUIElement.KeyModifierFlags,
+            modifier: String,
+            modifierText: String,
+            key: String,
+            shortcutText: String
+        )] = [
+            (.option, "option", "Option", "space", "Option + Space"),
+            (.control, "control", "Control", "c", "Control + C"),
+            (.command, "command", "Command", "b", "Command + B")
         ]
 
         for item in cases {
-            configureHotkeysThroughSettings(
-                rawSelections: [
-                    (Identifier.settingsHotkeyMainModifier, item.modifier),
-                    (Identifier.settingsHotkeyMainKey, item.key),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
-                    (Identifier.settingsHotkeyInAppKey, "c")
-                ],
-                expectedValues: [
-                    (Identifier.settingsHotkeyMainModifier, item.modifier),
-                    (Identifier.settingsHotkeyMainKey, item.key),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
-                    (Identifier.settingsHotkeyInAppKey, "c")
-                ],
+            configureShortcutsThroughSettings(
+                recordings: hotkeyRecordings(
+                    mainModifiers: item.modifierFlags,
+                    mainModifiersText: item.modifierText,
+                    mainKey: item.key,
+                    quitKey: "z",
+                    inAppModifiers: .option,
+                    inAppShortcutText: "Option + C",
+                    inAppKey: "c"
+                ),
                 expectedLogMarkers: [
                     "updated main=\(item.shortcutText)",
                     "hotkeyReloadNotification sender=AppDelegate main=\(item.shortcutText)"
                 ]
             )
 
+            let logSnapshot = makeRuntimeLogFileSnapshot()
             let app = makeApp(additionalArguments: hotkeyEffectArguments())
             launchFlowTabUITestApplication(app)
-            XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+            waitForRuntimeLogFiles(
+                containing: [
+                    "register ok signature=1179926850 id=1",
+                    "register ok signature=1179926850 id=2",
+                    "register main=\(item.shortcutText) backward=",
+                    "registration evidence generation=1"
+                ],
+                since: logSnapshot
+            )
+            XCTAssertTrue(
+                waitForFlowTabUITestApplicationToBecomeReady(
+                    app,
+                    timeout:
+                        FlowTabUITestSupportWatchdogPolicy
+                            .foregroundActivation,
+                    traceLabel:
+                        "settings.mainHotkey.\(item.modifier).\(item.key).inputReadiness"
+                ),
+                "Expected foreground input readiness for \(item.shortcutText); "
+                    + "finalState=\(String(describing: app.state))"
+            )
 
-            let logSnapshot = makeRuntimeLogFileSnapshot()
             app.activate()
             typeHotkey(in: app, key: item.key, modifier: item.modifier)
             waitForRuntimeLogFiles(
                 containing: [
                     "hotkeyPressed dir=forward panelVisible=0 action=show",
-                    "activeSpaceIgnore trigger=global_show",
+                    "presentationRecovery trigger=global_show action=trackInitialVisibility",
                     "HotKey Forward"
                 ],
                 since: logSnapshot
@@ -433,138 +397,97 @@ extension FlowTabUITests {
         }
     }
 
-    func testSettingsCommandTabTakeoverTriggersSwitcherAndRestoresSystemShortcut() throws {
-        let app = makeApp(additionalArguments: hotkeyEffectArguments(resetDefaults: true))
-        launchFlowTabUITestApplication(app)
-        defer {
-            if app.state != .notRunning {
-                app.activate()
-                app.typeKey("q", modifierFlags: .command)
-                if !app.wait(for: .notRunning, timeout: 6) {
-                    app.terminate()
-                    _ = app.wait(for: .notRunning, timeout: 6)
-                }
-            }
-        }
-        openSettingsTab(in: app)
-
-        selectOption(in: app, controlIdentifier: Identifier.settingsHotkeyMainKey, optionIdentifier: "space")
-        assertValue(of: element(in: app, identifier: Identifier.settingsHotkeyMainKey), equals: "space")
-
-        let takeoverLogSnapshot = makeRuntimeLogFileSnapshot()
-        selectOption(in: app, controlIdentifier: Identifier.settingsHotkeyMainModifier, optionIdentifier: "command")
-        selectOption(in: app, controlIdentifier: Identifier.settingsHotkeyMainKey, optionIdentifier: "tab")
-        assertValue(of: element(in: app, identifier: Identifier.settingsHotkeyMainModifier), equals: "command")
-        assertValue(of: element(in: app, identifier: Identifier.settingsHotkeyMainKey), equals: "tab")
-
-        waitForRuntimeLogFiles(
-            containing: [
-                "updated main=Command + Tab",
-                "system Command+Tab shortcuts disabled for FlowTab takeover",
-                "hotkeyReloadNotification sender=AppDelegate main=Command + Tab"
-            ],
-            since: takeoverLogSnapshot,
-            timeout: 10
-        )
-        XCTAssertTrue(waitForCommandTabTakeoverMarker(true, timeout: 5))
-        XCTAssertTrue(
-            element(in: app, identifier: Identifier.settingsHotkeyMainTakeoverStatus)
-                .waitForExistence(timeout: 5)
-        )
-
-        let triggerLogSnapshot = makeRuntimeLogFileSnapshot()
-        app.activate()
-        app.typeKey(.tab, modifierFlags: .command)
-        waitForRuntimeLogFiles(
-            containing: [
-                "hotkeyPressed dir=forward panelVisible=0 action=show",
-                "HotKey Forward"
-            ],
-            since: triggerLogSnapshot,
-            timeout: 10
-        )
-
-        app.activate()
-        app.typeKey("q", modifierFlags: .command)
-        XCTAssertTrue(app.wait(for: .notRunning, timeout: 8))
-        XCTAssertTrue(waitForCommandTabTakeoverMarker(false, timeout: 5))
-
-        resetHotkeyDefaultsAfterCommandTabTakeoverTest()
-    }
-
-    func testSettingsQuitHotkeyExplicitAndFallbackMatrixTerminatesSelectedApp() throws {
+    func testSettingsQuitHotkeyExplicitMatrixTerminatesSelectedApp() throws {
         let cases: [(
-            rawSelections: [(control: String, option: String)],
-            expectedValues: [(control: String, value: String)],
+            recordings: [FlowTabUITestShortcutRecording],
             triggerKey: String,
             expectedQuitShortcut: String
         )] = [
             (
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "space"),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "space"),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
+                hotkeyRecordings(
+                    mainModifiers: .option,
+                    mainModifiersText: "Option",
+                    mainKey: "space",
+                    quitKey: "z",
+                    inAppModifiers: .option,
+                    inAppShortcutText: "Option + B",
+                    inAppKey: "b"
+                ),
                 "z",
                 "Option + Z"
             ),
             (
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "q"),
-                    (Identifier.settingsHotkeyQuitKey, "q"),
-                    (Identifier.settingsHotkeyInAppModifier, "control"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "q"),
-                    (Identifier.settingsHotkeyQuitKey, "w"),
-                    (Identifier.settingsHotkeyInAppModifier, "control"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
+                hotkeyRecordings(
+                    mainModifiers: .option,
+                    mainModifiersText: "Option",
+                    mainKey: "q",
+                    quitKey: "w",
+                    inAppModifiers: .control,
+                    inAppShortcutText: "Control + B",
+                    inAppKey: "b"
+                ),
                 "w",
                 "Option + W"
             )
         ]
 
         for item in cases {
-            configureHotkeysThroughSettings(
-                rawSelections: item.rawSelections,
-                expectedValues: item.expectedValues,
+            configureShortcutsThroughSettings(
+                recordings: item.recordings,
                 expectedLogMarkers: [
                     "quit=\(item.expectedQuitShortcut)",
                     "hotkeyReloadNotification sender=AppDelegate"
                 ]
             )
 
-            let app = makeApp(additionalArguments: hotkeyEffectArguments() + ["--flowtab-ui-open-switcher"])
-            launchFlowTabUITestApplication(app)
-            XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
-            let browserTile = element(in: app, identifier: Identifier.switcherAppMockBrowser)
-            XCTAssertTrue(browserTile.waitForExistence(timeout: 8))
-            let selectedAppID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected")
-            XCTAssertFalse(selectedAppID.isEmpty)
+            guard let launch = try
+                launchFlowTabUITestApplicationResolvingInitialPresentation(
+                    additionalArguments:
+                        hotkeyEffectArguments() + [
+                            "--flowtab-ui-open-switcher"
+                        ],
+                    expectation:
+                        FlowTabUITestInitialPresentationResolutionExpectation(
+                            requiredItemIDs: [
+                                "com.flowtab.mock.browser"
+                            ],
+                            excludedItemIDs: [],
+                            searchFeatureEnabled: true,
+                            searchIsActive: false,
+                            searchActivationIsPending: false
+                        ),
+                    targetDescription:
+                        "settings quit hotkey "
+                            + item.expectedQuitShortcut
+                )
+            else {
+                continue
+            }
+            let app = launch.application
+            defer { app.terminate() }
+            let selectedAppID = launch.resolution.selectedAppID
+            let selectedRowIdentifier =
+                switcherAppRowIdentifier(selectedAppID)
             let selectedTile = element(
                 in: app,
-                identifier: "flowtab.switcher.app.\(selectedAppID.flowTabUITestAccessibilityIdentifierComponent)"
+                identifier: selectedRowIdentifier
             )
-            XCTAssertTrue(selectedTile.waitForExistence(timeout: 8))
+            let disappearanceOwner =
+                FlowTabUITestElementNonExistenceObservationOwner(
+                    elementIdentifier: selectedRowIdentifier,
+                    readback: { selectedTile.exists }
+                )
+            disappearanceOwner.start()
+            defer { disappearanceOwner.cancel() }
 
-            let logSnapshot = makeRuntimeLogFileSnapshot()
-            typeHotkey(in: app, key: item.triggerKey, modifier: "option")
+            let completionBaseline = makeRuntimeLogFileSnapshot()
+            defer { completionBaseline.cancel() }
+            typeHotkey(
+                in: app,
+                key: item.triggerKey,
+                modifier: "option"
+            )
+            disappearanceOwner.markTriggerCompleted()
             waitForRuntimeLogFiles(
                 containing: [
                     "mock terminate request appID=\(selectedAppID)",
@@ -572,97 +495,37 @@ extension FlowTabUITests {
                     "appID=\(selectedAppID) sent=true",
                     "terminate post-refresh reason=workspace_notification appID=\(selectedAppID)"
                 ],
-                since: logSnapshot,
-                timeout: 10
+                since: completionBaseline,
+                timeout:
+                    FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                        .runtimeCompletion
             )
-            XCTAssertTrue(waitForNonExistence(selectedTile, timeout: 6))
-            app.terminate()
+            completionBaseline.cancel()
+            guard
+                let disappearanceEvidence =
+                    disappearanceOwner.waitForResolution(
+                        timeout:
+                            FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                                .selectedRowDisappearance
+                    )
+            else {
+                XCTFail(
+                    "Selected App row disappearance watchdog expired. "
+                        + "selectedAppID=\(selectedAppID) "
+                        + disappearanceOwner.diagnosticSummary
+                )
+                continue
+            }
+            XCTAssertFalse(disappearanceEvidence.value.exists)
+            disappearanceOwner.cancel()
         }
     }
 
-    func testSettingsInAppHotkeyExplicitAndFallbackMatrixStartsFocusedWindowSession() throws {
-        let cases: [(
-            rawSelections: [(control: String, option: String)],
-            expectedValues: [(control: String, value: String)],
-            triggerModifier: String,
-            triggerKey: String,
-            expectedInAppShortcut: String
-        )] = [
-            (
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "space"),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "space"),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
-                "option",
-                "b",
-                "Option + B"
-            ),
-            (
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "b"),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "option"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
-                [
-                    (Identifier.settingsHotkeyMainModifier, "option"),
-                    (Identifier.settingsHotkeyMainKey, "b"),
-                    (Identifier.settingsHotkeyQuitKey, "z"),
-                    (Identifier.settingsHotkeyInAppModifier, "control"),
-                    (Identifier.settingsHotkeyInAppKey, "b")
-                ],
-                "control",
-                "b",
-                "Control + B"
-            )
-        ]
-
-        for item in cases {
-            configureHotkeysThroughSettings(
-                rawSelections: item.rawSelections,
-                expectedValues: item.expectedValues,
-                expectedLogMarkers: [
-                    "inApp=\(item.expectedInAppShortcut)",
-                    "hotkeyReloadNotification sender=AppDelegate"
-                ]
-            )
-
-            let app = makeApp(
-                additionalArguments: hotkeyEffectArguments() + [
-                    "--flowtab-ui-mock-runtime-variant",
-                    "focused-current-app"
-                ]
-            )
-            launchFlowTabUITestApplication(app)
-            XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
-
-            let logSnapshot = makeRuntimeLogFileSnapshot()
-            app.activate()
-            typeHotkey(in: app, key: item.triggerKey, modifier: item.triggerModifier)
-            waitForRuntimeLogFiles(
-                containing: [
-                    "inAppHotkeyPressed dir=forward panelVisible=0 action=show",
-                    "activeSpaceIgnore trigger=in_app_show",
-                    "InApp Window Forward"
-                ],
-                since: logSnapshot
-            )
-            app.terminate()
-        }
-    }
-
-    private func hotkeyEffectArguments(resetDefaults: Bool = false) -> [String] {
+    func hotkeyEffectArguments(
+        resetDefaults: Bool = false,
+        usesSystemAccessibilityPermission: Bool = false,
+        accessibilityTrusted: Bool = true
+    ) -> [String] {
         var arguments: [String] = []
         if resetDefaults {
             arguments.append("--flowtab-ui-reset-defaults")
@@ -674,15 +537,20 @@ extension FlowTabUITests {
             "--flowtab-ui-enable-verbose-logs",
             "--flowtab-ui-record-hotkey-reload-diagnostics",
             "--flowtab-ui-enable-mock-hotkey-effects",
-            "--flowtab-ui-ax-trusted",
-            "YES",
+            "--flowtab-ui-mock-window-previews",
             "--flowtab-ui-screen-trusted",
             "YES"
         ]
+        if !usesSystemAccessibilityPermission {
+            arguments += [
+                "--flowtab-ui-ax-trusted",
+                accessibilityTrusted ? "YES" : "NO"
+            ]
+        }
         return arguments
     }
 
-    private func windowBehaviorRuntimeArguments(
+    func windowBehaviorRuntimeArguments(
         resetDefaults: Bool = false,
         opensSwitcher: Bool = false
     ) -> [String] {
@@ -694,6 +562,7 @@ extension FlowTabUITests {
             "--flowtab-ui-mock-runtime",
             "--flowtab-ui-mock-runtime-variant",
             "minimized-window-behavior",
+            "--flowtab-ui-mock-window-previews",
             "-showPermissionReminder",
             "NO",
             "--flowtab-ui-ax-trusted",
@@ -707,57 +576,7 @@ extension FlowTabUITests {
         return arguments
     }
 
-    private func configureHotkeysThroughSettings(
-        rawSelections: [(control: String, option: String)],
-        expectedValues: [(control: String, value: String)],
-        expectedLogMarkers: [String]
-    ) {
-        let app = makeApp(additionalArguments: hotkeyEffectArguments(resetDefaults: true))
-        launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
-
-        let logSnapshot = makeRuntimeLogFileSnapshot()
-        for selection in rawSelections {
-            selectOption(in: app, controlIdentifier: selection.control, optionIdentifier: selection.option)
-        }
-        for expectedValue in expectedValues {
-            assertValue(of: element(in: app, identifier: expectedValue.control), equals: expectedValue.value)
-        }
-        waitForRuntimeLogFiles(containing: expectedLogMarkers, since: logSnapshot)
-        app.terminate()
-    }
-
-    private func resetHotkeyDefaultsAfterCommandTabTakeoverTest() {
-        let cleanupApp = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "-showPermissionReminder",
-                "NO",
-                "--flowtab-ui-ax-trusted",
-                "YES",
-                "--flowtab-ui-screen-trusted",
-                "YES"
-            ]
-        )
-        launchFlowTabUITestApplication(cleanupApp)
-        cleanupApp.terminate()
-        _ = cleanupApp.wait(for: .notRunning, timeout: 6)
-    }
-
-    private func waitForCommandTabTakeoverMarker(_ expectedValue: Bool, timeout: TimeInterval) -> Bool {
-        let defaults = UserDefaults(suiteName: "io.github.potato-dumplings.flowtab") ?? .standard
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            defaults.synchronize()
-            if defaults.bool(forKey: "commandTabTakeoverPendingRestore") == expectedValue {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-
-    private func typeHotkey(in app: XCUIApplication, key: String, modifier: String) {
+    func typeHotkey(in app: XCUIApplication, key: String, modifier: String) {
         let modifierFlags = modifierFlags(for: modifier)
         switch key {
         case "space":
@@ -796,54 +615,14 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        openSettingsTab(in: app)
-
-        let inAppModifier = element(in: app, identifier: Identifier.settingsHotkeyInAppModifier)
-        let inAppKey = element(in: app, identifier: Identifier.settingsHotkeyInAppKey)
-        XCTAssertTrue(inAppModifier.waitForExistence(timeout: 5))
-        XCTAssertTrue(inAppKey.waitForExistence(timeout: 5))
-
-        XCTAssertFalse(inAppModifier.isEnabled)
-        XCTAssertFalse(inAppKey.isEnabled)
-    }
-
-    private func waitForAverageLuminance(
-        of element: XCUIElement,
-        timeout: TimeInterval,
-        matching predicate: (CGFloat) -> Bool
-    ) -> CGFloat? {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if let luminance = averageLuminance(of: element), predicate(luminance) {
-                return luminance
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return nil
-    }
-
-    private func averageLuminance(of element: XCUIElement) -> CGFloat? {
-        guard element.exists,
-              let bitmap = NSBitmapImageRep(data: element.screenshot().pngRepresentation),
-              bitmap.pixelsWide > 0,
-              bitmap.pixelsHigh > 0
-        else {
-            return nil
+        guard let controls = waitForDisabledSettingsInAppControls(
+            in: app,
+            trigger: { openSettingsTab(in: app) }
+        ) else {
+            return
         }
-
-        let sampleStep = max(1, min(bitmap.pixelsWide, bitmap.pixelsHigh) / 80)
-        var total: CGFloat = 0
-        var samples = 0
-        for y in stride(from: 0, to: bitmap.pixelsHigh, by: sampleStep) {
-            for x in stride(from: 0, to: bitmap.pixelsWide, by: sampleStep) {
-                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
-                total += color.redComponent * 0.2126
-                    + color.greenComponent * 0.7152
-                    + color.blueComponent * 0.0722
-                samples += 1
-            }
-        }
-        return samples > 0 ? total / CGFloat(samples) : nil
+        XCTAssertFalse(controls.shortcut.isEnabled)
+        XCTAssertFalse(controls.reverseModifiers.isEnabled)
     }
 
     private func assertSettingsPageSubtitleIsVisible(

@@ -386,8 +386,8 @@ private struct HomePermissionStatusRow: View {
         HomePermissionStatusColors.titleTextColor(colorScheme: colorScheme)
     }
 
-    private var statusTextColor: Color {
-        Color(nsColor: HomePermissionStatusColors.statusTextColor(isGranted: isGranted))
+    private var statusTextColor: NSColor {
+        HomePermissionStatusColors.statusTextColor(isGranted: isGranted)
     }
 
     var body: some View {
@@ -428,9 +428,18 @@ private struct HomePermissionStatusRow: View {
     }
 
     private var statusText: some View {
-        Text(AppStrings.text(isGranted ? .homePermissionGranted : .homePermissionMissing, language: language))
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(statusTextColor)
-            .lineLimit(1)
+        HomeAccessibleText(
+            text: AppStrings.text(
+                isGranted
+                    ? .homePermissionGranted
+                    : .homePermissionMissing,
+                language: language
+            ),
+            font: .systemFont(ofSize: 11, weight: .medium),
+            textColor: statusTextColor,
+            accessibilityIdentifier:
+                "\(accessibilityIdentifier).status"
+        )
+        .frame(height: 14)
     }
 }

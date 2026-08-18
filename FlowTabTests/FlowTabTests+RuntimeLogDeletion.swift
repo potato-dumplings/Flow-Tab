@@ -129,69 +129,6 @@ extension FlowTabTests {
         }
     }
 
-    func testRuntimeDiagnosticSessionRequiresExplicitStartAndExpires() {
-        guard let userDefaults = makeIsolatedUserDefaults() else { return }
-        defer { clearIsolatedUserDefaults(userDefaults) }
-
-        let startDate = Date(timeIntervalSince1970: 1_800_000_000)
-        userDefaults.set(true, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
-
-        XCTAssertFalse(RuntimeDiagnosticSessionStore.isActive(userDefaults: userDefaults, now: startDate))
-        XCTAssertNil(userDefaults.object(forKey: AppPreferenceKeys.enableVerboseDiagnostics))
-
-        let expirationDate = RuntimeDiagnosticSessionStore.start(
-            userDefaults: userDefaults,
-            now: startDate
-        )
-        XCTAssertEqual(
-            expirationDate.timeIntervalSince(startDate),
-            RuntimeDiagnosticSessionStore.duration,
-            accuracy: 0.001
-        )
-        XCTAssertTrue(
-            RuntimeDiagnosticSessionStore.isActive(
-                userDefaults: userDefaults,
-                now: expirationDate.addingTimeInterval(-1)
-            )
-        )
-        XCTAssertFalse(
-            RuntimeDiagnosticSessionStore.isActive(
-                userDefaults: userDefaults,
-                now: expirationDate.addingTimeInterval(1)
-            )
-        )
-        XCTAssertNil(userDefaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration))
-    }
-
-    func testRuntimeDiagnosticSessionReadDoesNotMutatePreferences() {
-        guard let userDefaults = makeIsolatedUserDefaults() else { return }
-        defer { clearIsolatedUserDefaults(userDefaults) }
-
-        let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let expiredTimestamp = now.addingTimeInterval(-1).timeIntervalSince1970
-        userDefaults.set(true, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
-        userDefaults.set(
-            expiredTimestamp,
-            forKey: AppPreferenceKeys.diagnosticSessionExpiration
-        )
-
-        XCTAssertFalse(
-            RuntimeDiagnosticSessionStore.readIsActive(
-                userDefaults: userDefaults,
-                now: now
-            )
-        )
-        XCTAssertEqual(
-            userDefaults.object(forKey: AppPreferenceKeys.enableVerboseDiagnostics) as? Bool,
-            true
-        )
-        XCTAssertEqual(
-            userDefaults.double(forKey: AppPreferenceKeys.diagnosticSessionExpiration),
-            expiredTimestamp,
-            accuracy: 0.001
-        )
-    }
-
     func testRuntimeLogClearAndWaitDeletesFilesAndRestartReadsNoEntries() async throws {
         let fileManager = FileManager.default
         let temporaryRoot = fileManager.temporaryDirectory

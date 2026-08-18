@@ -65,16 +65,23 @@ enum AppStringKey: String {
     case homePermissionMissing
     case hotkeyCommandTabTakeoverActive
     case hotkeyCommandTabTakeoverInactive
+    case hotkeyConflict
+    case hotkeyModifierPermissionlessRequirement
+    case hotkeyMainKeyPermissionlessRequirement
     case hotkeyMainSummary
     case hotkeyInAppSummary
     case hotkeySummaryReverseLabel
     case hotkeySummaryQuitLabel
     case hotkeySummaryInAppLabel
-    case hotkeyRowMainModifier
+    case hotkeyRowMainModifiers
+    case hotkeyRowMainReverseModifiers
     case hotkeyRowMainKey
     case hotkeyRowQuitKey
-    case hotkeyRowInAppModifier
-    case hotkeyRowInAppKey
+    case hotkeyRowInAppShortcut
+    case hotkeyRowInAppReverseModifiers
+    case hotkeyRecorderPrompt
+    case hotkeyRecorderModifierRequired
+    case hotkeyRecorderEditHint
     case settingsPageTitle
     case settingsPageSubtitle
     case settingsCardAppearanceTitle
@@ -148,8 +155,6 @@ enum AppStringKey: String {
     case logsPageSubtitle
     case logsSectionTitle
     case logsSectionSubtitle
-    case logsEnableVerbose
-    case logsDiagnosticSessionStatus
     case logsPrivacyNotice
     case logsLevel
     case logsDirectory
@@ -223,16 +228,23 @@ enum AppStrings {
             .homePermissionMissing: "未授权",
             .hotkeyCommandTabTakeoverActive: "已接管系统 Command + Tab / Command + Shift + Tab，退出 FlowTab 后会自动恢复。",
             .hotkeyCommandTabTakeoverInactive: "检测到 Command + Tab 组合：FlowTab 会自动尝试接管系统 Command + Tab / Command + Shift + Tab。",
+            .hotkeyConflict: "已被使用",
+            .hotkeyModifierPermissionlessRequirement: "未授权时仅支持修饰键",
+            .hotkeyMainKeyPermissionlessRequirement: "未授权时仅支持任意修饰键加一个普通键或功能键",
             .hotkeyMainSummary: "当前：{main}（{reverseLabel}：{reverse}），{quitLabel}：{quit}",
             .hotkeyInAppSummary: "{inAppLabel}：{main}（{reverseLabel}：{reverse}）",
             .hotkeySummaryReverseLabel: "反向",
             .hotkeySummaryQuitLabel: "结束应用",
             .hotkeySummaryInAppLabel: "应用内窗口",
-            .hotkeyRowMainModifier: "主修饰键",
+            .hotkeyRowMainModifiers: "主修饰键",
+            .hotkeyRowMainReverseModifiers: "反向修饰键",
             .hotkeyRowMainKey: "主切换按键",
             .hotkeyRowQuitKey: "结束应用按键",
-            .hotkeyRowInAppModifier: "应用内窗口修饰键",
-            .hotkeyRowInAppKey: "应用内窗口按键",
+            .hotkeyRowInAppShortcut: "应用内窗口",
+            .hotkeyRowInAppReverseModifiers: "应用内反向修饰键",
+            .hotkeyRecorderPrompt: "请按下快捷键",
+            .hotkeyRecorderModifierRequired: "请至少按下一个按键",
+            .hotkeyRecorderEditHint: "点击修改快捷键",
             .settingsPageTitle: "设置",
             .settingsPageSubtitle: "基础显示设置、快捷键与权限",
             .settingsCardAppearanceTitle: "外观",
@@ -298,17 +310,15 @@ enum AppStrings {
             .permissionScreenRequest: "请求屏幕录制权限",
             .permissionScreenManageActionLabel: "管理屏幕录制权限",
             .permissionScreenRequestActionLabel: "请求屏幕录制权限",
-            .permissionAccessibilityDetail: "用于应用切换、应用内窗口切换和最小化窗口处理。",
+            .permissionAccessibilityDetail: "用于应用切换、应用内窗口切换、多普通键快捷键监听和最小化窗口处理。",
             .permissionScreenDetail: "用于显示窗口真实预览画面；未授权时仅显示兜底信息。",
             .permissionHomeReminderToggle: "无权限时是否在首页提示获取权限",
             .permissionLaunchAtLoginToggle: "允许开机启动 FlowTab",
             .logsPageTitle: "日志",
-            .logsPageSubtitle: "脱敏运行日志、限时诊断与清理",
+            .logsPageSubtitle: "脱敏运行日志与清理",
             .logsSectionTitle: "日志",
             .logsSectionSubtitle: "所有持久化内容均为脱敏元数据",
-            .logsEnableVerbose: "启动 15 分钟详细诊断会话",
-            .logsDiagnosticSessionStatus: "详细诊断会话已开启，将在约 {minutes} 分钟后自动结束",
-            .logsPrivacyNotice: "日志仅保存事件类型、长度、计数和安装内稳定指纹。窗口标题、搜索词、浏览器标签标题和应用路径统一转换为脱敏元数据；诊断会话只增加高频脱敏事件。",
+            .logsPrivacyNotice: "日志等级决定写入的最低事件等级，DEBUG 和 INFO 会增加高频脱敏事件。日志仅保存事件类型、长度、计数和安装内稳定指纹；窗口标题、搜索词、浏览器标签标题和应用路径统一转换为脱敏元数据。",
             .logsLevel: "日志等级",
             .logsDirectory: "本地日志目录：{path}",
             .logsOpenDirectory: "打开目录",
@@ -376,16 +386,23 @@ enum AppStrings {
             .homePermissionMissing: "Missing",
             .hotkeyCommandTabTakeoverActive: "System Command + Tab / Command + Shift + Tab is now taken over and will be restored after FlowTab exits.",
             .hotkeyCommandTabTakeoverInactive: "Command + Tab combination detected: FlowTab will try to take over system Command + Tab / Command + Shift + Tab.",
+            .hotkeyConflict: "Already in use",
+            .hotkeyModifierPermissionlessRequirement: "Only modifier keys are supported without Accessibility permission",
+            .hotkeyMainKeyPermissionlessRequirement: "Use any modifiers with exactly one ordinary or function key without Accessibility permission",
             .hotkeyMainSummary: "Current: {main} ({reverseLabel}: {reverse}), {quitLabel}: {quit}",
             .hotkeyInAppSummary: "{inAppLabel}: {main} ({reverseLabel}: {reverse})",
             .hotkeySummaryReverseLabel: "Reverse",
             .hotkeySummaryQuitLabel: "Quit app",
             .hotkeySummaryInAppLabel: "In-app windows",
-            .hotkeyRowMainModifier: "Main modifier",
+            .hotkeyRowMainModifiers: "Main modifiers",
+            .hotkeyRowMainReverseModifiers: "Reverse modifiers",
             .hotkeyRowMainKey: "Main switch key",
             .hotkeyRowQuitKey: "Quit app key",
-            .hotkeyRowInAppModifier: "In-app window modifier",
-            .hotkeyRowInAppKey: "In-app window key",
+            .hotkeyRowInAppShortcut: "In-app windows",
+            .hotkeyRowInAppReverseModifiers: "In-app reverse modifiers",
+            .hotkeyRecorderPrompt: "Press shortcut",
+            .hotkeyRecorderModifierRequired: "Press at least one key",
+            .hotkeyRecorderEditHint: "Click to edit shortcut",
             .settingsPageTitle: "Settings",
             .settingsPageSubtitle: "Display, hotkeys, and permissions",
             .settingsCardAppearanceTitle: "Appearance",
@@ -451,17 +468,15 @@ enum AppStrings {
             .permissionScreenRequest: "Request",
             .permissionScreenManageActionLabel: "Manage Screen Recording permission",
             .permissionScreenRequestActionLabel: "Request Screen Recording permission",
-            .permissionAccessibilityDetail: "Used for app switching, in-app window switching, and minimized-window handling.",
+            .permissionAccessibilityDetail: "Used for app switching, in-app window switching, multi-key shortcut monitoring, and minimized-window handling.",
             .permissionScreenDetail: "Used for real window previews; fallback info is shown when not granted.",
             .permissionHomeReminderToggle: "Show Home reminder when permissions are missing",
             .permissionLaunchAtLoginToggle: "Allow FlowTab to launch at login",
             .logsPageTitle: "Logs",
-            .logsPageSubtitle: "Redacted runtime logs, timed diagnostics, and cleanup",
+            .logsPageSubtitle: "Redacted runtime logs and cleanup",
             .logsSectionTitle: "Logs",
             .logsSectionSubtitle: "All persisted content is redacted metadata",
-            .logsEnableVerbose: "Start a 15-minute diagnostic session",
-            .logsDiagnosticSessionStatus: "Detailed diagnostics are active and end automatically in about {minutes} minutes",
-            .logsPrivacyNotice: "Logs retain event types, lengths, counts, and installation-stable fingerprints. Window titles, search terms, browser tab titles, and application paths are converted to this redacted metadata; diagnostic sessions add only high-frequency redacted events.",
+            .logsPrivacyNotice: "The selected level controls the minimum event severity written; DEBUG and INFO add high-frequency redacted events. Logs retain only event types, lengths, counts, and installation-stable fingerprints. Window titles, search terms, browser tab titles, and application paths are converted to redacted metadata.",
             .logsLevel: "Log level",
             .logsDirectory: "Local logs directory: {path}",
             .logsOpenDirectory: "Open Directory",

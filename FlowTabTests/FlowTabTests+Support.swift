@@ -31,23 +31,6 @@ extension FlowTabTests {
         }
     }
 
-    @MainActor
-    func waitUntil(
-        _ description: String,
-        timeout: TimeInterval = 1.0,
-        pollIntervalNanoseconds: UInt64 = 5_000_000,
-        predicate: @MainActor @escaping () -> Bool
-    ) async -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if predicate() {
-                return true
-            }
-            try? await Task.sleep(nanoseconds: pollIntervalNanoseconds)
-        }
-        return predicate()
-    }
-
     func searchSampleApps() -> [AppSwitchCandidate] {
         [
             AppSwitchCandidate(
@@ -376,17 +359,17 @@ extension FlowTabTests {
                 let deletes = currentQuery.count - prefixLength
                 if deletes > 0 {
                     for _ in 0..<deletes {
-                        _ = coordinator.deleteBackwardInQuery()
+                        _ = coordinator.deleteBackwardInQueryWithoutRebuild()
                     }
                 }
 
                 let suffix = String(query.dropFirst(prefixLength))
                 if !suffix.isEmpty {
-                    _ = coordinator.appendQueryText(suffix)
+                    _ = coordinator.appendQueryTextWithoutRebuild(suffix)
                 } else if query.isEmpty && !coordinator.state.query.isEmpty {
-                    while coordinator.deleteBackwardInQuery() {}
+                    while coordinator.deleteBackwardInQueryWithoutRebuild() {}
                 }
-                drainPendingSearchRebuild(on: coordinator)
+                rebuildSearchResults(on: coordinator)
 
                 currentQuery = query
             }
@@ -400,8 +383,8 @@ extension FlowTabTests {
         let coordinator = SwitcherSearchCoordinator()
         coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: apps))
         _ = coordinator.activate(defaultScope: scope)
-        _ = coordinator.appendQueryText(query)
-        drainPendingSearchRebuild(on: coordinator)
+        _ = coordinator.appendQueryTextWithoutRebuild(query)
+        rebuildSearchResults(on: coordinator)
         return coordinator.state.results.prefix(10).map(\.id)
     }
     func runtimeSearchIndexProjection(
@@ -498,8 +481,8 @@ extension FlowTabTests {
             max: sortedSamples.last ?? 0
         )
     }
-    func drainPendingSearchRebuild(on coordinator: SwitcherSearchCoordinator) {
-        coordinator.flushPendingRebuild()
+    func rebuildSearchResults(on coordinator: SwitcherSearchCoordinator) {
+        coordinator.rebuildResults(resetSelection: true)
     }
     func withLaunchArgumentsForTesting(
         _ arguments: [String],

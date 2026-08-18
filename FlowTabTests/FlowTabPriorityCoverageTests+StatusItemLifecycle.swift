@@ -91,7 +91,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testStatusItemOpenActionReactivatesWindowAfterRestoringHiddenDefaultPolicy() async {
+    func testStatusItemOpenActionReactivatesWindowAfterRestoringHiddenDefaultPolicy() {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
 
         let previousHooks = AppDelegate.testHooks
@@ -111,10 +111,10 @@ extension FlowTabPriorityCoverageTests {
         let delegate = AppDelegate()
         delegate.handleStatusItemOpenAction(application: application)
 
-        let didRestore = await waitUntil("status-item restores hidden default policy after regular switch") {
-            activationPolicyApplication.appliedPolicies == [.regular, .accessory]
-        }
-        XCTAssertTrue(didRestore)
+        XCTAssertEqual(
+            activationPolicyApplication.appliedPolicies,
+            [.regular, .accessory]
+        )
         XCTAssertEqual(activationPolicyApplication.flowTabActivationPolicy, .accessory)
         XCTAssertEqual(application.activateCallCount, 2)
         XCTAssertEqual(window.makeKeyAndOrderFrontCallCount, 2)
@@ -149,7 +149,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testStatusItemOpenActionWaitsForWindowVisibilityBeforeRestoringAccessory() async {
+    func testStatusItemOpenActionWaitsForWindowVisibilityBeforeRestoringAccessory() {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
 
         let previousHooks = AppDelegate.testHooks
@@ -174,52 +174,66 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(window.makeKeyAndOrderFrontCallCount, 1)
 
         window.isVisible = true
-        let didRestore = await waitUntil("status-item waits for window visibility before restoring accessory") {
-            activationPolicyApplication.appliedPolicies == [.regular, .accessory]
-        }
-        XCTAssertTrue(didRestore)
+        window.emitPresentationEvidence(.windowDidBecomeKey)
+
+        XCTAssertEqual(
+            activationPolicyApplication.appliedPolicies,
+            [.regular, .accessory]
+        )
         XCTAssertGreaterThanOrEqual(application.activateCallCount, 2)
     }
 
     @MainActor
-    func testStatusItemOpenActionRetriesMiniaturizedWindowDuringTemporaryRegularActivation() async {
-        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+    func testTemporaryStatusItemActivationSupersedesPriorWindowObservation() {
+        let firstWindow = TestAppWindow(
+            isPanelWindow: false,
+            isMiniaturized: true,
+            isVisible: false
+        )
+        let firstApplication = TestAppWindowApplication(
+            isHidden: false,
+            appWindows: [firstWindow]
+        )
+        let secondWindow = TestAppWindow(
+            isPanelWindow: false,
+            isMiniaturized: true,
+            isVisible: false
+        )
+        let secondApplication = TestAppWindowApplication(
+            isHidden: false,
+            appWindows: [secondWindow]
+        )
+        let activationPolicyApplication =
+            TestActivationPolicyApplication(initialPolicy: .accessory)
 
-        let previousHooks = AppDelegate.testHooks
-        defer {
-            AppDelegate.testHooks = previousHooks
-            clearIsolatedUserDefaults(userDefaults)
-        }
-
-        let window = TestAppWindow(isPanelWindow: false, isMiniaturized: true, isVisible: false)
-        let application = TestAppWindowApplication(isHidden: false, appWindows: [window])
-        let activationPolicyApplication = TestActivationPolicyApplication(initialPolicy: .accessory)
-        AppDelegate.testHooks = AppDelegate.TestHooks(
-            userDefaults: userDefaults,
-            activationPolicyApplication: activationPolicyApplication
+        AppWindowCoordinator.activateMainWindowOrOpenHomeScene(
+            application: firstApplication,
+            activationPolicyApplication: activationPolicyApplication,
+            temporarilyUseRegularActivation: true
+        )
+        AppWindowCoordinator.activateMainWindowOrOpenHomeScene(
+            application: secondApplication,
+            activationPolicyApplication: activationPolicyApplication,
+            temporarilyUseRegularActivation: true
         )
 
-        let delegate = AppDelegate()
-        delegate.handleStatusItemOpenAction(application: application)
-
-        XCTAssertEqual(activationPolicyApplication.appliedPolicies, [.regular])
-        XCTAssertEqual(window.deminiaturizeCallCount, 1)
-
-        window.isMiniaturized = true
-        let didRetry = await waitUntil("status-item retries miniaturized window before restoring accessory") {
-            window.deminiaturizeCallCount >= 2
-                && window.makeKeyAndOrderFrontCallCount >= 2
-                && window.orderFrontRegardlessCallCount >= 2
-        }
-
-        XCTAssertTrue(didRetry)
-        XCTAssertFalse(window.isMiniaturized)
+        firstWindow.isVisible = true
+        firstWindow.emitPresentationEvidence(.windowDidBecomeKey)
         XCTAssertEqual(activationPolicyApplication.appliedPolicies, [.regular])
 
-        window.isVisible = true
-        let didRestore = await waitUntil("status-item restores after miniaturized retry becomes visible") {
-            activationPolicyApplication.appliedPolicies == [.regular, .accessory]
-        }
-        XCTAssertTrue(didRestore)
+        secondWindow.isVisible = true
+        secondWindow.emitPresentationEvidence(.windowDidBecomeKey)
+        XCTAssertEqual(
+            activationPolicyApplication.appliedPolicies,
+            [.regular, .accessory]
+        )
+        XCTAssertEqual(
+            firstWindow.activePresentationEvidenceObserverCount,
+            0
+        )
+        XCTAssertEqual(
+            secondWindow.activePresentationEvidenceObserverCount,
+            0
+        )
     }
 }

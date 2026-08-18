@@ -77,14 +77,6 @@ extension FlowTabUITests {
         SpaceFixtureAppIdentity.configured()
     }
 
-    private var spaceFixtureWorkflowReadyAccessibilityIdentifier: String {
-        "flowtab.spacefixture.workflow.ready"
-    }
-
-    private var spaceFixtureWorkflowSummaryAccessibilityIdentifier: String {
-        "flowtab.spacefixture.workflow.summary"
-    }
-
     private func makeSpaceFixtureApplication(for identity: SpaceFixtureAppIdentity) -> XCUIApplication {
         if let appURL = identity.appURL {
             return XCUIApplication(url: appURL)
@@ -108,21 +100,40 @@ extension FlowTabUITests {
     private func terminateSpaceFixtureAppIfRunning(identity: SpaceFixtureAppIdentity) {
         let app = makeSpaceFixtureApplication(for: identity)
         if app.state == .runningForeground || app.state == .runningBackground {
-            app.terminate()
-            waitForSpaceFixtureApplicationToTerminate(app)
+            terminateSpaceFixtureApplicationAndWait(
+                app,
+                identity: identity
+            )
         }
     }
 
     func launchSpaceFixtureApplicationAndWaitForForeground(
         _ app: XCUIApplication,
-        timeout: TimeInterval = 10
+        timeout: TimeInterval =
+            FlowTabUITestSupportWatchdogPolicy
+                .spaceFixtureForegroundActivation
     ) {
         app.launch()
-        if app.wait(for: .runningForeground, timeout: min(timeout, 3)) {
+        if app.wait(
+            for: .runningForeground,
+            timeout: min(
+                timeout,
+                FlowTabUITestSupportWatchdogPolicy
+                    .spaceFixtureInitialForegroundObservation
+            )
+        ) {
             return
         }
         app.activate()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: timeout))
+        let becameForeground = app.wait(
+            for: .runningForeground,
+            timeout: timeout
+        )
+        XCTAssertTrue(
+            becameForeground,
+            "Space fixture foreground watchdog expired. "
+                + "finalState=\(String(describing: app.state))"
+        )
     }
 
     func launchSpaceFixtureWorkflow(
@@ -137,6 +148,14 @@ extension FlowTabUITests {
         fixtureAdditionalArguments: [String] = []
     ) -> XCUIApplication {
         terminateSpaceFixtureAppIfRunning(identity: identity)
+        let readinessRoute =
+            makeSpaceFixtureWorkflowReadinessRoute()
+        let readinessObservation =
+            SpaceFixtureWorkflowReadinessObservationOwner(
+                route: readinessRoute
+            )
+        readinessObservation.start()
+        defer { readinessObservation.cancel() }
 
         var additionalArguments = [
             "--window-count", String(windowCount),
@@ -156,103 +175,72 @@ extension FlowTabUITests {
             ]
         }
         additionalArguments += fixtureAdditionalArguments
+        additionalArguments +=
+            readinessRoute.fixtureLaunchArguments
 
         let app = makeSpaceFixtureApp(identity: identity, additionalArguments: additionalArguments)
         launchSpaceFixtureApplicationAndWaitForForeground(app)
-        waitForSpaceFixtureWorkflowToStabilize(
+        let readinessWatchdog =
+            SpaceFixtureWorkflowReadinessUITestPolicy
+                .watchdog(
+                    enterFullscreenDelayMilliseconds:
+                        enterFullscreenDelayMilliseconds
+                )
+        guard let readinessEvidence =
+            waitForSpaceFixtureWorkflowReadinessEvidence(
+                observation: readinessObservation,
+                identity: identity,
+                windowCount: windowCount,
+                fullscreenWindowIndex:
+                    fullscreenWindowIndex,
+                timeout: readinessWatchdog
+            )
+        else {
+            return app
+        }
+        waitForSpaceFixtureWorkflowReadiness(
             in: app,
             expectedWindowTitles: expectedSpaceFixtureWorkflowWindowTitles(
                 titlePrefix: titlePrefix,
                 windowCount: windowCount
             ),
             fullscreenWindowIndex: fullscreenWindowIndex,
-            settleTimeout: max(4.5, Double(enterFullscreenDelayMilliseconds) / 1_000 + 3.5)
+            readinessTimeout: readinessWatchdog,
+            readinessEvidence: readinessEvidence
         )
 
         return app
     }
 
-    func waitForSpaceFixtureWorkflowToStabilize(
-        in app: XCUIApplication,
-        windowCount: Int,
-        titlePrefix: String,
-        fullscreenWindowIndex: Int?,
-        settleTimeout: TimeInterval
-    ) {
-        waitForSpaceFixtureWorkflowToStabilize(
-            in: app,
-            expectedWindowTitles: expectedSpaceFixtureWorkflowWindowTitles(
-                titlePrefix: titlePrefix,
-                windowCount: windowCount
-            ),
-            fullscreenWindowIndex: fullscreenWindowIndex,
-            settleTimeout: settleTimeout
-        )
-    }
-
-    func waitForSpaceFixtureWorkflowToStabilize(
-        in app: XCUIApplication,
-        expectedWindowTitles: [String],
-        fullscreenWindowIndex: Int?,
-        settleTimeout: TimeInterval
-    ) {
-        let readyLabel = element(in: app, identifier: spaceFixtureWorkflowReadyAccessibilityIdentifier)
-        XCTAssertTrue(readyLabel.waitForExistence(timeout: 8))
-        XCTAssertEqual(readyLabel.label, "Ready")
-
-        assertAnySpaceFixtureWorkflowLabel(
-            withIdentifier: spaceFixtureWorkflowSummaryAccessibilityIdentifier,
-            equals: expectedSpaceFixtureWorkflowSummary(windowTitles: expectedWindowTitles),
-            in: app,
-            timeout: 8
-        )
-
-        if let fullscreenWindowIndex {
-            let fullscreenMarker = element(
-                in: app,
-                identifier: "flowtab.spacefixture.window.mode.\(fullscreenWindowIndex)"
-            )
-            XCTAssertTrue(fullscreenMarker.waitForExistence(timeout: 8))
-            XCTAssertEqual(fullscreenMarker.label, "Fullscreen Target")
-        }
-
-        // XCTest can observe the fixture window metadata before macOS finishes the
-        // fullscreen Space transition, so give the system a wider settle window
-        // before FlowTab samples the real runtime topology.
-        RunLoop.current.run(until: Date().addingTimeInterval(settleTimeout))
-    }
-
-    private func assertAnySpaceFixtureWorkflowLabel(
-        withIdentifier identifier: String,
-        equals expectedValue: String,
-        in app: XCUIApplication,
-        timeout: TimeInterval
-    ) {
-        let labels = app.descendants(matching: .any).matching(identifier: identifier)
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            for label in labels.allElementsBoundByIndex {
-                if label.exists && elementStringValue(label) == expectedValue {
-                    return
-                }
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail("Expected a visible \(identifier) label with value '\(expectedValue)'")
-    }
-
-    func waitForSpaceFixtureApplicationToTerminate(
+    func terminateSpaceFixtureApplicationAndWait(
         _ app: XCUIApplication,
+        identity: SpaceFixtureAppIdentity,
         timeout: TimeInterval = 5
     ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if app.state == .notRunning {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
+        terminateSpaceFixtureApplicationAndWait(
+            app,
+            targetDescription:
+                identity.bundleIdentifier,
+            timeout: timeout
+        )
+    }
+
+    func terminateSpaceFixtureApplicationAndWait(
+        _ app: XCUIApplication,
+        targetDescription: String = "space-fixture application",
+        timeout: TimeInterval = 5
+    ) {
+        let evidence =
+            terminateFlowTabUITestApplication(
+                app,
+                targetDescription: targetDescription,
+                timeout: timeout
+            )
+        XCTAssertTrue(
+            evidence.isSatisfied,
+            "Space fixture termination failed. "
+                + evidence.diagnosticSummary
+        )
     }
 
     func makeRealRuntimeFlowTabApp(
@@ -312,22 +300,30 @@ extension FlowTabUITests {
                 "--staggered-layout"
             ]
         )
-        app.launch()
         defer {
             if app.state == .runningForeground || app.state == .runningBackground {
-                app.terminate()
+                terminateSpaceFixtureApplicationAndWait(
+                    app,
+                    identity: identity
+                )
             }
         }
-
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
-        waitForSpaceFixtureWorkflowToStabilize(
+        assertSpaceFixtureWindowModePublication(
             in: app,
-            windowCount: 3,
-            titlePrefix: "UITest",
-            fullscreenWindowIndex: nil,
-            settleTimeout: 1
-        )
-        XCTAssertTrue(element(in: app, identifier: "flowtab.spacefixture.window.mode.1").waitForExistence(timeout: 5))
+            windowIndex: 1,
+            expectedLabel: "Standard Window"
+        ) {
+            launchSpaceFixtureApplicationAndWaitForForeground(app)
+            waitForSpaceFixtureWorkflowReadiness(
+                in: app,
+                windowCount: 3,
+                titlePrefix: "UITest",
+                fullscreenWindowIndex: nil,
+                readinessTimeout:
+                    SpaceFixtureWorkflowReadinessUITestPolicy
+                        .defaultWatchdog
+            )
+        }
     }
 
     func testSpaceFixtureAppMarksFullscreenTargetWindowBeforeTransition() throws {
@@ -344,23 +340,21 @@ extension FlowTabUITests {
                 "--staggered-layout"
             ]
         )
-        app.launch()
         defer {
             if app.state == .runningForeground || app.state == .runningBackground {
-                app.terminate()
+                terminateSpaceFixtureApplicationAndWait(
+                    app,
+                    identity: identity
+                )
             }
         }
-
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
-        waitForSpaceFixtureWorkflowToStabilize(
+        assertSpaceFixtureWindowModePublication(
             in: app,
-            windowCount: 2,
-            titlePrefix: "Targeted",
-            fullscreenWindowIndex: 2,
-            settleTimeout: 1
-        )
-        XCTAssertTrue(element(in: app, identifier: "flowtab.spacefixture.window.mode.2").waitForExistence(timeout: 5))
-        XCTAssertEqual(element(in: app, identifier: "flowtab.spacefixture.window.mode.2").label, "Fullscreen Target")
+            windowIndex: 2,
+            expectedLabel: "Fullscreen Target"
+        ) {
+            launchSpaceFixtureApplicationAndWaitForForeground(app)
+        }
     }
 
     private func expectedSpaceFixtureWorkflowSummary(
@@ -379,34 +373,4 @@ extension FlowTabUITests {
         windowTitles.joined(separator: " | ")
     }
 
-    func assertSpaceFixtureWorkflowPermissionsAvailable() -> Bool {
-        let app = makeRealRuntimeFlowTabApp(
-            showsPermissionReminder: true,
-            additionalArguments: []
-        )
-        launchFlowTabUITestApplication(app)
-        defer {
-            if app.state == .runningForeground || app.state == .runningBackground {
-                app.terminate()
-            }
-        }
-
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
-        XCTAssertTrue(
-            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10)
-        )
-
-        let openSettingsButtons = app.buttons.matching(identifier: Identifier.permissionOpenSettings)
-        guard openSettingsButtons.firstMatch.waitForExistence(timeout: 2) else { return true }
-
-        XCTAssertTrue(hasHittableElement(in: openSettingsButtons, timeout: 5))
-        XCTAssertTrue(app.buttons.matching(identifier: Identifier.permissionDismiss).firstMatch.waitForExistence(timeout: 5))
-        XCTFail(
-            """
-            Space Fixture workflow requires Accessibility and Screen Recording permissions.
-            FlowTab showed the missing-permissions prompt instead of fixture window data.
-            """
-        )
-        return false
-    }
 }

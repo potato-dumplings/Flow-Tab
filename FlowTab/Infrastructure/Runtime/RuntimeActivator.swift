@@ -3,37 +3,8 @@ import ApplicationServices
 import Foundation
 import FlowTabCore
 
-struct ActivationConfirmationPolicy: Equatable {
-    var retryDelaysNanoseconds: [UInt64]
-
-    static let defaultFocusRecovery = ActivationConfirmationPolicy(
-        retryDelaysNanoseconds: [50_000_000, 150_000_000]
-    )
-
-    var isEnabled: Bool {
-        !retryDelaysNanoseconds.isEmpty
-    }
-}
-
 @MainActor
 final class RuntimeActivator {
-    private enum WindowFocusAttemptResult: Equatable {
-        case verified
-        case focusedButUnverified
-        case noFocusRoute
-
-        var debugName: String {
-            switch self {
-            case .verified:
-                return "verified"
-            case .focusedButUnverified:
-                return "focusedButUnverified"
-            case .noFocusRoute:
-                return "noFocusRoute"
-            }
-        }
-    }
-
     var activateCurrentAppIfNeededOverride: ((NSRunningApplication) -> Bool)?
     var requestActivationOverride: ((NSRunningApplication, ((NSRunningApplication) -> Void)?) -> Void)?
     var focusWindowOverride: ((String, String, Bool, NSRunningApplication) -> Void)?
@@ -47,25 +18,24 @@ final class RuntimeActivator {
     var axWindowTitleOverride: ((AXUIElement) -> String?)?
     var focusedAXWindowOverride: ((NSRunningApplication) -> AXUIElement?)?
     var focusCGWindowOverride: ((NSRunningApplication, CGWindowID) -> Bool)?
-    var activationConfirmationPolicy: ActivationConfirmationPolicy = .defaultFocusRecovery
-    var focusRecoveryRetryDelaysNanoseconds: [UInt64] {
-        get {
-            activationConfirmationPolicy.retryDelaysNanoseconds
-        }
-        set {
-            activationConfirmationPolicy = ActivationConfirmationPolicy(
-                retryDelaysNanoseconds: newValue
-            )
-        }
+    var focusRecoveryPolicy: RuntimeFocusRecoveryPolicy = .standard
+    let focusRecoveryCoordinator: RuntimeFocusRecoveryCoordinator
+
+    init(
+        focusRecoveryScheduler: (any RuntimeFocusRecoveryScheduling)? = nil,
+        notificationCenter: NotificationCenter = .default,
+        workspaceNotificationCenter: NotificationCenter =
+            NSWorkspace.shared.notificationCenter
+    ) {
+        focusRecoveryCoordinator = RuntimeFocusRecoveryCoordinator(
+            scheduler: focusRecoveryScheduler,
+            notificationCenter: notificationCenter,
+            workspaceNotificationCenter: workspaceNotificationCenter
+        )
     }
 
-    private var focusRecoveryTask: Task<Void, Never>?
-    private var focusRecoveryGeneration: UInt64 = 0
-
     func activate(target: ActivationTarget, contextsByID: [String: RuntimeAppContext]) {
-        focusRecoveryTask?.cancel()
-        focusRecoveryTask = nil
-        focusRecoveryGeneration &+= 1
+        focusRecoveryCoordinator.cancel(reason: "newActivation")
 
         switch target {
         case .app(let appID):
@@ -146,19 +116,38 @@ final class RuntimeActivator {
     }
 
     private func focusWindow(_ request: WindowFocusRequest, in app: NSRunningApplication) {
-        guard request.allowsAnyActivationRoute else {
-            if bindingAllowsChromeInternalActivationBypass(request, in: app) {
-                _ = finishChromeInternalWindowFocusIfVerified(request, in: app)
-                return
-            }
+        let allowsChromeInternalBypass =
+            bindingAllowsChromeInternalActivationBypass(request, in: app)
+        guard request.allowsAnyActivationRoute || allowsChromeInternalBypass else {
             RuntimeLog.debug(
                 .activation,
                 "focus-attempt skipped pid=\(app.processIdentifier) windowID=\(request.windowID) reason=binding_action_disallowed allowedActions=\(activationAllowedActionsDescription(request.bindingAllowedActions))"
             )
             return
         }
-        guard !attemptWindowFocus(request, in: app, allowChromeInternalFocus: true) else { return }
-        scheduleFocusRecovery(for: request, in: app)
+        let recoveryGeneration = startFocusRecovery(for: request, in: app)
+        let isVerified: Bool
+        if request.allowsAnyActivationRoute {
+            isVerified = attemptWindowFocus(
+                request,
+                in: app,
+                allowChromeInternalFocus: true
+            )
+        } else {
+            isVerified = finishChromeInternalWindowFocusIfVerified(
+                request,
+                in: app
+            )
+        }
+        if isVerified {
+            completeFocusRecoveryInitialAction(
+                generation: recoveryGeneration
+            )
+            return
+        }
+        performFocusRecoveryInitialReadback(
+            generation: recoveryGeneration
+        )
     }
 
     private func bindingAllowsChromeInternalActivationBypass(
@@ -194,14 +183,18 @@ final class RuntimeActivator {
     }
 
     @discardableResult
-    private func attemptWindowFocus(
+    func attemptWindowFocus(
         _ request: WindowFocusRequest,
         in app: NSRunningApplication,
         allowChromeInternalFocus: Bool
     ) -> Bool {
         if let focusWindowOverride {
             focusWindowOverride(request.windowID, request.title, request.restoreIfMinimized, app)
-            return reportWindowFocusVerified(request, in: app)
+            return reportWindowFocusVerified(
+                request,
+                readback: currentWindowFocusReadbackEvidence(in: app),
+                in: app
+            )
         }
 
         let cgFocusResult = attemptCGWindowFocus(request, in: app)
@@ -209,17 +202,17 @@ final class RuntimeActivator {
             .activation,
             "focus-attempt route=cg result=\(cgFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil") frontmost=\(runtimeActivationFrontmostDescription())"
         )
-        let cgFocusVerified: Bool
+        let cgFocusReadback: RuntimeWindowFocusReadbackEvidence?
         let cgFocusWasAccepted: Bool
         switch cgFocusResult {
-        case .verified:
-            cgFocusVerified = true
+        case let .verified(readback):
+            cgFocusReadback = readback
             cgFocusWasAccepted = true
         case .focusedButUnverified:
-            cgFocusVerified = false
+            cgFocusReadback = nil
             cgFocusWasAccepted = true
         case .noFocusRoute:
-            cgFocusVerified = false
+            cgFocusReadback = nil
             cgFocusWasAccepted = false
         }
 
@@ -239,16 +232,24 @@ final class RuntimeActivator {
                 "focus-attempt route=ax-direct result=\(axFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil")"
             )
             switch axFocusResult {
-            case .verified:
-                return reportWindowFocusVerified(request, in: app)
+            case let .verified(readback):
+                return reportWindowFocusVerified(
+                    request,
+                    readback: readback,
+                    in: app
+                )
             case .focusedButUnverified:
                 if allowChromeInternalFocus, finishChromeInternalWindowFocusIfVerified(request, in: app) {
                     return true
                 }
                 return false
             case .noFocusRoute:
-                if cgFocusVerified {
-                    return reportWindowFocusVerified(request, in: app)
+                if let cgFocusReadback {
+                    return reportWindowFocusVerified(
+                        request,
+                        readback: cgFocusReadback,
+                        in: app
+                    )
                 }
             }
         } else {
@@ -258,8 +259,12 @@ final class RuntimeActivator {
             )
         }
 
-        if cgFocusVerified {
-            return reportWindowFocusVerified(request, in: app)
+        if let cgFocusReadback {
+            return reportWindowFocusVerified(
+                request,
+                readback: cgFocusReadback,
+                in: app
+            )
         }
 
         guard request.allowsPublicAXRecovery else {
@@ -288,17 +293,23 @@ final class RuntimeActivator {
         )
         if cgFocusWasAccepted {
             let currentWindows = currentCGWindows(forPID: app.processIdentifier)
+            let focusReadback = currentWindowFocusReadbackEvidence(in: app)
             let hasActivationReadback = targetCGWindowHasActivationReadback(
                 targetCGWindowID,
                 in: app,
-                currentWindows: currentWindows
+                currentWindows: currentWindows,
+                focusReadback: focusReadback
             )
             if hasActivationReadback {
                 RuntimeLog.debug(
                     .activation,
                     "focus-attempt route=ax-recovery-readback result=verified pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
                 )
-                return reportWindowFocusVerified(request, in: app)
+                return reportWindowFocusVerified(
+                    request,
+                    readback: focusReadback,
+                    in: app
+                )
             }
             if targetCGWindowIsVisible(targetCGWindowID, in: app, currentWindows: currentWindows) {
                 RuntimeLog.debug(
@@ -331,8 +342,12 @@ final class RuntimeActivator {
                     "focus-attempt route=ax-public-recovery result=\(axFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
                 )
                 switch axFocusResult {
-                case .verified:
-                    return reportWindowFocusVerified(request, in: app)
+                case let .verified(readback):
+                    return reportWindowFocusVerified(
+                        request,
+                        readback: readback,
+                        in: app
+                    )
                 case .focusedButUnverified, .noFocusRoute:
                     if allowChromeInternalFocus, finishChromeInternalWindowFocusIfVerified(request, in: app) {
                         return true
@@ -350,8 +365,12 @@ final class RuntimeActivator {
                     .activation,
                     "focus-attempt route=ax-related result=\(relatedAXFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
                 )
-                if relatedAXFocusResult == .verified {
-                    return reportWindowFocusVerified(request, in: app)
+                if let readback = relatedAXFocusResult.verifiedReadback {
+                    return reportWindowFocusVerified(
+                        request,
+                        readback: readback,
+                        in: app
+                    )
                 }
             }
         }
@@ -361,8 +380,12 @@ final class RuntimeActivator {
                 .activation,
                 "focus-attempt route=cg-same-space result=\(sameSpaceCGFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
             )
-            if sameSpaceCGFocusResult == .verified {
-                return reportWindowFocusVerified(request, in: app)
+            if let readback = sameSpaceCGFocusResult.verifiedReadback {
+                return reportWindowFocusVerified(
+                    request,
+                    readback: readback,
+                    in: app
+                )
             }
         }
 
@@ -382,7 +405,7 @@ final class RuntimeActivator {
         route: String,
         request: WindowFocusRequest,
         in app: NSRunningApplication
-    ) -> WindowFocusAttemptResult {
+    ) -> RuntimeWindowFocusAttemptResult {
         guard bindingAllowsAXFocusRoute(route, request: request, window: window, app: app) else {
             return .noFocusRoute
         }
@@ -393,23 +416,27 @@ final class RuntimeActivator {
             )
             return .noFocusRoute
         }
-        guard verifyFocusAttempt(request, route: "ax-\(route)", in: app) else {
+        guard let readback = verifyFocusAttempt(
+            request,
+            route: "ax-\(route)",
+            in: app
+        ) else {
             return .focusedButUnverified
         }
-        return .verified
+        return .verified(readback)
     }
 
     private func verifyFocusAttempt(
         _ request: WindowFocusRequest,
         route: String,
         in app: NSRunningApplication
-    ) -> Bool {
+    ) -> RuntimeWindowFocusReadbackEvidence? {
         guard !request.spaceIDs.isEmpty else {
             RuntimeLog.debug(
                 .activation,
                 "focus-verify route=\(route) skipped=empty-spaces pid=\(app.processIdentifier) windowID=\(request.windowID)"
             )
-            return true
+            return currentWindowFocusReadbackEvidence(in: app)
         }
 
         guard let targetCGWindowID = request.targetCGWindowID(expectedPID: app.processIdentifier) else {
@@ -417,7 +444,7 @@ final class RuntimeActivator {
                 .activation,
                 "focus-verify route=\(route) skipped=no-target-cg pid=\(app.processIdentifier) windowID=\(request.windowID)"
             )
-            return true
+            return currentWindowFocusReadbackEvidence(in: app)
         }
 
         let currentWindows = currentCGWindows(forPID: app.processIdentifier)
@@ -426,7 +453,8 @@ final class RuntimeActivator {
             in: app,
             currentWindows: currentWindows
         )
-        let focusedCGWindowID = focusedAXWindowCGWindowID(in: app)
+        let focusReadback = currentWindowFocusReadbackEvidence(in: app)
+        let focusedCGWindowID = focusReadback.focusedCGWindowID
         let frontmostCGWindowID = frontmostVisibleCGWindowID(in: currentWindows)
         let hasFocusedCGWindowMatch = focusedCGWindowID == targetCGWindowID
         let hasFrontmostCGWindowMatch = focusedCGWindowID == nil && frontmostCGWindowID == targetCGWindowID
@@ -467,13 +495,16 @@ final class RuntimeActivator {
                 in: app
             )
         }
-        return hasFocusedCGWindowMatch || hasFrontmostCGWindowMatch
+        guard hasFocusedCGWindowMatch || hasFrontmostCGWindowMatch else {
+            return nil
+        }
+        return focusReadback
     }
 
     private func attemptCGWindowFocus(
         _ request: WindowFocusRequest,
         in app: NSRunningApplication
-    ) -> WindowFocusAttemptResult {
+    ) -> RuntimeWindowFocusAttemptResult {
         guard bindingAllowsActivationAction(
             .useForCGActivationFallback,
             route: "cg",
@@ -489,6 +520,7 @@ final class RuntimeActivator {
             return .noFocusRoute
         }
         let currentWindows = currentCGWindows(forPID: app.processIdentifier)
+        let focusReadback = currentWindowFocusReadbackEvidence(in: app)
         let isVisible = targetCGWindowIsVisible(
             targetCGWindowID,
             in: app,
@@ -497,7 +529,8 @@ final class RuntimeActivator {
         let hasActivationReadback = targetCGWindowHasActivationReadback(
             targetCGWindowID,
             in: app,
-            currentWindows: currentWindows
+            currentWindows: currentWindows,
+            focusReadback: focusReadback
         )
         RuntimeLog.debug(
             .activation,
@@ -520,19 +553,21 @@ final class RuntimeActivator {
                 route: "cg",
                 reason: .frontmostCGWindowMismatch,
                 targetCGWindowID: targetCGWindowID,
-                focusedCGWindowID: focusedAXWindowCGWindowID(in: app),
+                focusedCGWindowID: focusReadback.focusedCGWindowID,
                 currentWindows: currentWindows,
                 in: app
             )
         }
-        return isVisible && hasActivationReadback ? .verified : .focusedButUnverified
+        return isVisible && hasActivationReadback
+            ? .verified(focusReadback)
+            : .focusedButUnverified
     }
 
     private func attemptRelatedAXWindowFocus(
         _ request: WindowFocusRequest,
         publicWindows: [AXUIElement],
         in app: NSRunningApplication
-    ) -> WindowFocusAttemptResult? {
+    ) -> RuntimeWindowFocusAttemptResult? {
         guard RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: request.spaceIDs) else {
             return nil
         }
@@ -591,7 +626,7 @@ final class RuntimeActivator {
     private func attemptSameSpaceCGWindowFocus(
         _ request: WindowFocusRequest,
         in app: NSRunningApplication
-    ) -> WindowFocusAttemptResult? {
+    ) -> RuntimeWindowFocusAttemptResult? {
         guard bindingAllowsActivationAction(
             .useForCGActivationFallback,
             route: "cg-same-space",
@@ -634,6 +669,7 @@ final class RuntimeActivator {
         for candidate in candidates.sorted(by: RuntimeWindowTopologyClassifier.activationCandidateSort) {
             guard focusCGWindow(candidate.id, in: app) else { continue }
             let windowsAfterFocus = currentCGWindows(forPID: app.processIdentifier)
+            let focusReadback = currentWindowFocusReadbackEvidence(in: app)
             let isVisible = targetCGWindowIsVisible(
                 targetCGWindowID,
                 in: app,
@@ -642,14 +678,15 @@ final class RuntimeActivator {
             let hasActivationReadback = targetCGWindowHasActivationReadback(
                 targetCGWindowID,
                 in: app,
-                currentWindows: windowsAfterFocus
+                currentWindows: windowsAfterFocus,
+                focusReadback: focusReadback
             )
             RuntimeLog.debug(
                 .activation,
                 "cg-same-space verify pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) candidateCG=\(candidate.id) visible=\(isVisible ? 1 : 0) activationReadback=\(hasActivationReadback ? 1 : 0) frontmostCG=\(frontmostVisibleCGWindowID(in: windowsAfterFocus).map(String.init) ?? "nil") windows=\(runtimeActivationCGWindowSummary(windowsAfterFocus, targetCGWindowID: targetCGWindowID))"
             )
             if hasActivationReadback {
-                return .verified
+                return .verified(focusReadback)
             }
         }
         return .focusedButUnverified
@@ -669,16 +706,20 @@ final class RuntimeActivator {
             .activation,
             "focus-attempt route=chrome-internal result=\(result.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil")"
         )
-        guard result == .verified else {
+        guard let readback = result.verifiedReadback else {
             return false
         }
-        return reportWindowFocusVerified(request, in: app)
+        return reportWindowFocusVerified(
+            request,
+            readback: readback,
+            in: app
+        )
     }
 
     private func attemptChromeInternalWindowFocus(
         _ request: WindowFocusRequest,
         in app: NSRunningApplication
-    ) -> WindowFocusAttemptResult? {
+    ) -> RuntimeWindowFocusAttemptResult? {
         guard let browserSpec = RuntimeChromeWindowFocusBridge.scriptableBrowserSpec(for: app) else {
             return nil
         }
@@ -686,12 +727,14 @@ final class RuntimeActivator {
             return nil
         }
         let currentWindows = currentCGWindows(forPID: app.processIdentifier)
+        let initialFocusReadback = currentWindowFocusReadbackEvidence(in: app)
         if targetCGWindowHasActivationReadback(
             targetCGWindowID,
             in: app,
-            currentWindows: currentWindows
+            currentWindows: currentWindows,
+            focusReadback: initialFocusReadback
         ) {
-            return .verified
+            return .verified(initialFocusReadback)
         }
 
         let query = RuntimeChromeWindowFocusBridge.candidateQuery(
@@ -730,10 +773,14 @@ final class RuntimeActivator {
         guard focusResult.accepted else {
             return .noFocusRoute
         }
-        guard verifyFocusAttempt(request, route: "chrome-internal", in: app) else {
+        guard let readback = verifyFocusAttempt(
+            request,
+            route: "chrome-internal",
+            in: app
+        ) else {
             return .focusedButUnverified
         }
-        return .verified
+        return .verified(readback)
     }
 
     private func bindingAllowsAXFocusRoute(
@@ -832,11 +879,7 @@ final class RuntimeActivator {
         )
     }
 
-    private func focusedAXWindowCGWindowID(in app: NSRunningApplication) -> CGWindowID? {
-        focusedAXWindow(in: app).flatMap { AXWindowInspector.cgWindowID(for: $0) }
-    }
-
-    private func focusedAXWindow(in app: NSRunningApplication) -> AXUIElement? {
+    func focusedAXWindow(in app: NSRunningApplication) -> AXUIElement? {
         if let focusedAXWindowOverride {
             return focusedAXWindowOverride(app)
         }
@@ -849,14 +892,6 @@ final class RuntimeActivator {
             return nil
         }
         return focusedWindow
-    }
-
-    func currentFocusedAXWindowCGWindowIDForReconciliation(in app: NSRunningApplication) -> CGWindowID? {
-        focusedAXWindowCGWindowID(in: app)
-    }
-
-    func currentFocusedAXWindowForReconciliation(in app: NSRunningApplication) -> AXUIElement? {
-        focusedAXWindow(in: app)
     }
 
     private func targetCGWindowIsVisible(
@@ -885,64 +920,21 @@ final class RuntimeActivator {
 
     private func targetCGWindowHasActivationReadback(
         _ targetCGWindowID: CGWindowID?,
-        in app: NSRunningApplication,
-        currentWindows: [RuntimeCGWindowEntry]
+        in _: NSRunningApplication,
+        currentWindows: [RuntimeCGWindowEntry],
+        focusReadback: RuntimeWindowFocusReadbackEvidence
     ) -> Bool {
         guard let targetCGWindowID else { return true }
-        if focusedAXWindowCGWindowID(in: app) == targetCGWindowID {
+        if focusReadback.focusedCGWindowID == targetCGWindowID {
             return true
         }
         return frontmostVisibleCGWindowID(in: currentWindows) == targetCGWindowID
     }
 
-    private func frontmostVisibleCGWindowID(in currentWindows: [RuntimeCGWindowEntry]) -> CGWindowID? {
+    func frontmostVisibleCGWindowID(in currentWindows: [RuntimeCGWindowEntry]) -> CGWindowID? {
         currentWindows.first { window in
             window.isOnscreen && RuntimeCGWindowFacts.passesValidityConstraints(window)
         }?.id
-    }
-
-    private func scheduleFocusRecovery(for request: WindowFocusRequest, in app: NSRunningApplication) {
-        let policy = activationConfirmationPolicy
-        guard policy.isEnabled else { return }
-        focusRecoveryTask?.cancel()
-        focusRecoveryGeneration &+= 1
-        let generation = focusRecoveryGeneration
-        let retryDelays = policy.retryDelaysNanoseconds
-        RuntimeLog.info(
-            .activation,
-            "focus-recovery scheduled generation=\(generation) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil") attempts=\(policy.retryDelaysNanoseconds.count) delaysNs=\(retryDelays)"
-        )
-        focusRecoveryTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            defer {
-                if self.focusRecoveryGeneration == generation {
-                    self.focusRecoveryTask = nil
-                }
-            }
-
-            for (attemptIndex, delay) in retryDelays.enumerated() {
-                if delay > 0 {
-                    try? await Task.sleep(nanoseconds: delay)
-                }
-                guard !Task.isCancelled else { return }
-                guard self.focusRecoveryGeneration == generation else { return }
-                RuntimeLog.debug(
-                    .activation,
-                    "focus-recovery attempt=\(attemptIndex + 1) generation=\(generation) delayNs=\(delay) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil")"
-                )
-                if self.attemptWindowFocus(request, in: app, allowChromeInternalFocus: false) {
-                    RuntimeLog.info(
-                        .activation,
-                        "focus-recovery verified attempt=\(attemptIndex + 1) generation=\(generation) pid=\(app.processIdentifier) windowID=\(request.windowID)"
-                    )
-                    return
-                }
-            }
-            RuntimeLog.error(
-                .activation,
-                "focus-recovery exhausted generation=\(generation) attempts=\(retryDelays.count) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil")"
-            )
-        }
     }
 
     private func requestActivation(
@@ -1086,7 +1078,7 @@ final class RuntimeActivator {
         return focusResult.isAccepted
     }
 
-    private func currentCGWindows(forPID pid: pid_t) -> [RuntimeCGWindowEntry] {
+    func currentCGWindows(forPID pid: pid_t) -> [RuntimeCGWindowEntry] {
         if let currentCGWindowsOverride {
             return currentCGWindowsOverride(pid)
         }

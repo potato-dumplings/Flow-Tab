@@ -20,6 +20,15 @@ struct SearchSystemTextInputBridge: NSViewRepresentable {
         let view = SearchSystemTextInputContainerView()
         view.textView.delegate = context.coordinator
         context.coordinator.attach(textView: view.textView)
+        view.onWindowChanged = {
+            [weak coordinator = context.coordinator,
+             weak textView = view.textView] window in
+            guard let coordinator, let textView else { return }
+            coordinator.windowDidChange(
+                for: textView,
+                to: window
+            )
+        }
         return view
     }
 
@@ -41,6 +50,7 @@ struct SearchSystemTextInputBridge: NSViewRepresentable {
         _ nsView: SearchSystemTextInputContainerView,
         coordinator: Coordinator
     ) {
+        nsView.onWindowChanged = nil
         coordinator.detach(textView: nsView.textView)
     }
 
@@ -52,27 +62,75 @@ struct SearchSystemTextInputBridge: NSViewRepresentable {
 
         private var onInputChanged: (String, Int) -> Void
         private var onMarkedTextChanged: (Bool) -> Void
+        private let onKeyboardReadinessChanged: (Bool) -> Void
+        private let keyboardReadinessNotificationCenter:
+            NotificationCenter
         private var isApplyingViewState = false
         private weak var trackedTextView: NSTextView?
         private var lastPublishedInputSnapshot: InputSnapshot?
         private var lastPublishedMarkedTextState: Bool?
+        private var lastPublishedKeyboardReadiness = false
+        private var firstResponderSynchronizationGeneration = 0
+        private var isKeyboardReadinessActive = false
+        private weak var keyboardReadinessWindow: NSWindow?
+        private var keyboardReadinessObservers:
+            [NSObjectProtocol] = []
 
         init(
             onInputChanged: @escaping (String, Int) -> Void,
-            onMarkedTextChanged: @escaping (Bool) -> Void
+            onMarkedTextChanged: @escaping (Bool) -> Void,
+            onKeyboardReadinessChanged:
+                @escaping (Bool) -> Void = { _ in },
+            keyboardReadinessNotificationCenter:
+                NotificationCenter = .default
         ) {
             self.onInputChanged = onInputChanged
             self.onMarkedTextChanged = onMarkedTextChanged
+            self.onKeyboardReadinessChanged =
+                onKeyboardReadinessChanged
+            self.keyboardReadinessNotificationCenter =
+                keyboardReadinessNotificationCenter
         }
 
         func attach(textView: NSTextView) {
+            if trackedTextView !== textView {
+                cancelKeyboardReadinessObservation()
+                publishKeyboardReadiness(false)
+            }
             trackedTextView = textView
         }
 
         func detach(textView: NSTextView) {
             guard trackedTextView === textView else { return }
+            firstResponderSynchronizationGeneration &+= 1
+            isKeyboardReadinessActive = false
+            cancelKeyboardReadinessObservation()
             trackedTextView = nil
             onMarkedTextChanged(false)
+            publishKeyboardReadiness(false)
+        }
+
+        func windowDidChange(
+            for textView: NSTextView,
+            to window: NSWindow?
+        ) {
+            guard trackedTextView === textView else { return }
+            firstResponderSynchronizationGeneration &+= 1
+            guard isKeyboardReadinessActive,
+                  let window
+            else {
+                cancelKeyboardReadinessObservation()
+                publishKeyboardReadiness(false)
+                return
+            }
+            observeKeyboardReadiness(
+                for: textView,
+                in: window
+            )
+            synchronizeExactFirstResponder(
+                for: textView,
+                in: window
+            )
         }
 
         func updateCallbacks(
@@ -171,34 +229,58 @@ struct SearchSystemTextInputBridge: NSViewRepresentable {
         }
 
         private func synchronizeFirstResponder(for textView: NSTextView, isSearchActive: Bool) {
+            firstResponderSynchronizationGeneration &+= 1
+            let generation =
+                firstResponderSynchronizationGeneration
+            isKeyboardReadinessActive = isSearchActive
             if isSearchActive {
-                DispatchQueue.main.async { [weak textView] in
-                    guard let textView else { return }
+                DispatchQueue.main.async {
+                    [weak self, weak textView] in
+                    guard let self, let textView else { return }
+                    guard
+                        self.firstResponderSynchronizationGeneration
+                            == generation,
+                        self.isKeyboardReadinessActive,
+                        self.trackedTextView === textView
+                    else {
+                        return
+                    }
                     guard let window = textView.window else {
                         Self.logSearchInput("syncFirstResponder active=1 skipped=noWindow")
+                        self.cancelKeyboardReadinessObservation()
+                        self.publishKeyboardReadiness(false)
                         return
                     }
-                    if window.firstResponder === textView {
-                        Self.logSearchInput(
-                            "syncFirstResponder active=1 skipped=alreadyFirstResponder windowKey=\(window.isKeyWindow ? 1 : 0) appActive=\(NSApp.isActive ? 1 : 0)"
-                        )
-                        return
-                    }
-                    let before = Self.responderName(window.firstResponder)
-                    let didBecomeFirstResponder = window.makeFirstResponder(textView)
-                    let after = Self.responderName(window.firstResponder)
-                    Self.logSearchInput(
-                        "syncFirstResponder active=1 result=\(didBecomeFirstResponder ? 1 : 0) windowKey=\(window.isKeyWindow ? 1 : 0) appActive=\(NSApp.isActive ? 1 : 0) before=\(before) after=\(after)"
+                    self.observeKeyboardReadiness(
+                        for: textView,
+                        in: window
+                    )
+                    self.synchronizeExactFirstResponder(
+                        for: textView,
+                        in: window
                     )
                 }
             } else {
-                DispatchQueue.main.async { [weak textView] in
-                    guard let textView else { return }
+                cancelKeyboardReadinessObservation()
+                publishKeyboardReadiness(false)
+                DispatchQueue.main.async {
+                    [weak self, weak textView] in
+                    guard let self, let textView else { return }
+                    guard
+                        self.firstResponderSynchronizationGeneration
+                            == generation,
+                        !self.isKeyboardReadinessActive,
+                        self.trackedTextView === textView
+                    else {
+                        return
+                    }
                     guard let window = textView.window else {
                         Self.logSearchInput("syncFirstResponder active=0 skipped=noWindow")
                         return
                     }
-                    guard window.firstResponder === textView else { return }
+                    guard window.firstResponder === textView else {
+                        return
+                    }
                     let before = Self.responderName(window.firstResponder)
                     let clearedFirstResponder = window.makeFirstResponder(nil)
                     let after = Self.responderName(window.firstResponder)
@@ -209,6 +291,172 @@ struct SearchSystemTextInputBridge: NSViewRepresentable {
             }
         }
 
+        private func observeKeyboardReadiness(
+            for textView: NSTextView,
+            in window: NSWindow
+        ) {
+            if keyboardReadinessWindow === window,
+               !keyboardReadinessObservers.isEmpty
+            {
+                return
+            }
+            cancelKeyboardReadinessObservation()
+            keyboardReadinessWindow = window
+            let center =
+                keyboardReadinessNotificationCenter
+            keyboardReadinessObservers = [
+                center.addObserver(
+                    forName:
+                        NSWindow.didBecomeKeyNotification,
+                    object: window,
+                    queue: .main
+                ) {
+                    [weak self, weak textView, weak window] _ in
+                    guard
+                        let self,
+                        let textView,
+                        let window,
+                        self.isKeyboardReadinessActive,
+                        self.trackedTextView === textView,
+                        self.keyboardReadinessWindow === window
+                    else {
+                        return
+                    }
+                    self.handleKeyboardReadinessWindowBecameKey(
+                        for: textView,
+                        in: window
+                    )
+                },
+                center.addObserver(
+                    forName:
+                        NSWindow.didResignKeyNotification,
+                    object: window,
+                    queue: .main
+                ) {
+                    [weak self, weak textView, weak window] _ in
+                    guard
+                        let self,
+                        let textView,
+                        let window,
+                        self.isKeyboardReadinessActive,
+                        self.trackedTextView === textView,
+                        self.keyboardReadinessWindow === window
+                    else {
+                        return
+                    }
+                    self.publishKeyboardReadiness(false)
+                }
+            ]
+        }
+
+        private func cancelKeyboardReadinessObservation() {
+            let center =
+                keyboardReadinessNotificationCenter
+            keyboardReadinessObservers.forEach {
+                center.removeObserver($0)
+            }
+            keyboardReadinessObservers.removeAll()
+            keyboardReadinessWindow = nil
+        }
+
+        private func handleKeyboardReadinessWindowBecameKey(
+            for textView: NSTextView,
+            in window: NSWindow
+        ) {
+            let generation =
+                firstResponderSynchronizationGeneration
+            DispatchQueue.main.async {
+                [weak self, weak textView, weak window] in
+                guard
+                    let self,
+                    let textView,
+                    let window,
+                    self.firstResponderSynchronizationGeneration
+                        == generation,
+                    self.isKeyboardReadinessActive,
+                    self.trackedTextView === textView,
+                    self.keyboardReadinessWindow === window
+                else {
+                    return
+                }
+                self.synchronizeExactFirstResponder(
+                    for: textView,
+                    in: window
+                )
+            }
+        }
+
+        private func synchronizeExactFirstResponder(
+            for textView: NSTextView,
+            in window: NSWindow
+        ) {
+            if window.firstResponder === textView {
+                Self.logSearchInput(
+                    "syncFirstResponder active=1 skipped=alreadyFirstResponder windowKey=\(window.isKeyWindow ? 1 : 0) appActive=\(NSApp.isActive ? 1 : 0)"
+                )
+                _ = publishKeyboardReadiness(
+                    for: textView,
+                    in: window
+                )
+                return
+            }
+            let before =
+                Self.responderName(window.firstResponder)
+            let didBecomeFirstResponder =
+                window.makeFirstResponder(textView)
+            let after =
+                Self.responderName(window.firstResponder)
+            Self.logSearchInput(
+                "syncFirstResponder active=1 result=\(didBecomeFirstResponder ? 1 : 0) windowKey=\(window.isKeyWindow ? 1 : 0) appActive=\(NSApp.isActive ? 1 : 0) before=\(before) after=\(after)"
+            )
+            _ = publishKeyboardReadiness(
+                for: textView,
+                in: window
+            )
+        }
+
+        @discardableResult
+        private func publishKeyboardReadiness(
+            for textView: NSTextView,
+            in window: NSWindow
+        ) -> Bool {
+            let isReady =
+                window.isKeyWindow
+                    && window.firstResponder === textView
+            let didChange =
+                publishKeyboardReadiness(isReady)
+            guard isReady, didChange else {
+                return isReady
+            }
+            let identifier =
+                textView.accessibilityIdentifier()
+                    ?? "unavailable"
+            RuntimeLog.info(
+                .searchInput,
+                "keyboardReadiness ready=1 "
+                    + "identifier=\(identifier) "
+                    + "responder="
+                    + "\(Self.responderName(window.firstResponder)) "
+                    + "windowKey=1"
+            )
+            return true
+        }
+
+        @discardableResult
+        private func publishKeyboardReadiness(
+            _ isReady: Bool
+        ) -> Bool {
+            guard
+                lastPublishedKeyboardReadiness
+                    != isReady
+            else {
+                return false
+            }
+            lastPublishedKeyboardReadiness = isReady
+            onKeyboardReadinessChanged(isReady)
+            return true
+        }
+
         private static func logSearchInput(_ message: String) {
             RuntimeLog.debug(.searchInput, message)
         }
@@ -217,12 +465,17 @@ struct SearchSystemTextInputBridge: NSViewRepresentable {
             guard let responder else { return "nil" }
             return String(describing: type(of: responder))
         }
+
+        deinit {
+            cancelKeyboardReadinessObservation()
+        }
     }
 }
 
 final class SearchSystemTextInputContainerView: NSView {
     let textView: SearchSystemTextView
     let scrollView: NSScrollView
+    var onWindowChanged: ((NSWindow?) -> Void)?
 
     override init(frame frameRect: NSRect) {
         let textStorage = NSTextStorage()
@@ -305,6 +558,11 @@ final class SearchSystemTextInputContainerView: NSView {
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        onWindowChanged?(window)
+    }
 }
 
 final class SearchSystemTextView: NSTextView {
@@ -315,20 +573,62 @@ final class SearchSystemTextView: NSTextView {
 
 #if DEBUG
 @MainActor
+private final class SearchSystemTextInputBridgeTestWindow:
+    NSWindow
+{
+    var reportsKeyWindow = false
+    private weak var reportedFirstResponder: NSResponder?
+
+    override var isKeyWindow: Bool {
+        reportsKeyWindow
+    }
+
+    override var firstResponder: NSResponder? {
+        reportedFirstResponder
+    }
+
+    override func makeFirstResponder(
+        _ responder: NSResponder?
+    ) -> Bool {
+        reportedFirstResponder = responder
+        return true
+    }
+}
+
+@MainActor
 final class SearchSystemTextInputBridgeTestHarness {
     struct InputChange: Equatable {
         let query: String
         let cursorPosition: Int
     }
 
-    private let containerView = SearchSystemTextInputContainerView()
-    private let coordinator = SearchSystemTextInputBridge.Coordinator(
-        onInputChanged: { _, _ in },
-        onMarkedTextChanged: { _ in }
-    )
+    private let containerView =
+        SearchSystemTextInputContainerView()
+    private let keyboardReadinessNotificationCenter =
+        NotificationCenter()
+    private lazy var coordinator =
+        SearchSystemTextInputBridge.Coordinator(
+            onInputChanged: { _, _ in },
+            onMarkedTextChanged: { _ in },
+            onKeyboardReadinessChanged: {
+                [weak self] isReady in
+                self?.keyboardReadinessChanges
+                    .append(isReady)
+                self?.onKeyboardReadinessChanged?(
+                    isReady
+                )
+            },
+            keyboardReadinessNotificationCenter:
+                keyboardReadinessNotificationCenter
+        )
+    private var hostingWindow:
+        SearchSystemTextInputBridgeTestWindow?
+    private var onKeyboardReadinessChanged:
+        ((Bool) -> Void)?
 
     private(set) var inputChanges: [InputChange] = []
     private(set) var markedTextChanges: [Bool] = []
+    private(set) var keyboardReadinessChanges: [Bool] = []
 
     init() {
         containerView.textView.delegate = coordinator
@@ -355,6 +655,72 @@ final class SearchSystemTextInputBridgeTestHarness {
 
     var enclosingScrollView: NSScrollView? {
         containerView.textView.enclosingScrollView
+    }
+
+    var hasKeyboardReadinessTestObserver: Bool {
+        onKeyboardReadinessChanged != nil
+    }
+
+    func installInKeyWindow() -> NSWindow {
+        installInWindow(makeKey: true)
+    }
+
+    func installInWindow(
+        makeKey: Bool = false
+    ) -> NSWindow {
+        let window =
+            SearchSystemTextInputBridgeTestWindow(
+                contentRect: NSRect(
+                    x: 0,
+                    y: 0,
+                    width: 320,
+                    height: 80
+                ),
+                styleMask: [.titled],
+                backing: .buffered,
+                defer: false
+            )
+        window.contentView = containerView
+        window.reportsKeyWindow = makeKey
+        hostingWindow = window
+        return window
+    }
+
+    func makeHostingWindowKey() {
+        guard let hostingWindow else { return }
+        hostingWindow.reportsKeyWindow = true
+        keyboardReadinessNotificationCenter.post(
+            name: NSWindow.didBecomeKeyNotification,
+            object: hostingWindow
+        )
+    }
+
+    func postHostingWindowDidBecomeKey() {
+        guard let hostingWindow else { return }
+        keyboardReadinessNotificationCenter.post(
+            name: NSWindow.didBecomeKeyNotification,
+            object: hostingWindow
+        )
+    }
+
+    func observeKeyboardReadiness(
+        _ observer: @escaping (Bool) -> Void
+    ) {
+        onKeyboardReadinessChanged = observer
+    }
+
+    func closeHostingWindow() {
+        onKeyboardReadinessChanged = nil
+        coordinator.detach(textView: containerView.textView)
+        if hostingWindow?.firstResponder
+            === containerView.textView
+        {
+            _ = hostingWindow?.makeFirstResponder(nil)
+        }
+        hostingWindow?.reportsKeyWindow = false
+        containerView.textView.delegate = nil
+        hostingWindow?.contentView = nil
+        hostingWindow = nil
     }
 
     func synchronize(
@@ -387,6 +753,7 @@ final class SearchSystemTextInputBridgeTestHarness {
     func resetRecordedChanges() {
         inputChanges.removeAll()
         markedTextChanges.removeAll()
+        keyboardReadinessChanges.removeAll()
     }
 
     func detachTrackedTextView() {

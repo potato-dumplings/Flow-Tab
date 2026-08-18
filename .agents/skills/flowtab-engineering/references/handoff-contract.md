@@ -53,6 +53,8 @@ Use the full handoff for user-visible features, production bugfixes, architectur
 - Migration stages and exact affected boundaries.
 - Fallback or rollback boundary.
 - Runtime and process/tooling validation plan.
+- Current slice terminal state and raw-evidence cleanup result.
+- Any compact blocker bundle retained for named remediation, including its owner and cleanup boundary.
 
 ### Review Or Diagnosis
 

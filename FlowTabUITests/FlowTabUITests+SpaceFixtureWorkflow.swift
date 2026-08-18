@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import XCTest
 
@@ -16,8 +17,7 @@ extension FlowTabUITests {
 
     func testHomePageShowsRealSpaceFixtureWorkflowWindows() throws {
         runRealSpaceFixtureWorkflow { identity, app in
-            let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity)
-            assertValue(of: fixtureAppRow, equals: "3w", timeout: 20)
+            _ = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity, expectedValue: "3w")
             assertSpaceFixtureWindowTitles(
                 expectedSpaceFixtureWorkflowWindowTitles(titlePrefix: "Workflow", windowCount: 3),
                 in: app
@@ -39,28 +39,39 @@ extension FlowTabUITests {
         runRealSpaceFixtureWorkflow(
             flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
         ) { identity, app in
-            let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
-            XCTAssertTrue(
-                fixtureAppTile.waitForExistence(timeout: 8),
-                "FlowTab did not surface the Space Fixture app in the switcher app strip"
-            )
+            XCTAssertTrue(assertCurrentSwitcherAppProjection(
+                in: app,
+                exactEntry: "\(identity.bundleIdentifier):3",
+                timeout: FlowTabUITestSwitcherAppProjectionPolicy.standardFixtureProjectionWatchdog
+            ))
         }
     }
 
     func testSwitcherPanelQuitShortcutKeepsRealFixtureAppUntilProcessTerminates() throws {
         let identity = spaceFixtureAppIdentity
+        let terminationRoute =
+            makeSpaceFixtureTerminationFaultRoute()
+        let terminationObservation =
+            SpaceFixtureTerminationFaultObservationOwner(
+                route: terminationRoute
+            )
+        terminationObservation.start()
+        defer {
+            terminationObservation.cancel()
+        }
         let fixtureApp = launchSpaceFixtureWorkflow(
             identity: identity,
             windowCount: 1,
             fullscreenWindowIndex: nil,
             titlePrefix: "Quit Target",
             enterFullscreenDelayMilliseconds: 0,
-            terminationDelayMilliseconds: 2_400
+            terminationDelayMilliseconds: 2_400,
+            fixtureAdditionalArguments:
+                terminationRoute.fixtureLaunchArguments
         )
         defer {
             if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
-                fixtureApp.terminate()
-                waitForSpaceFixtureApplicationToTerminate(fixtureApp)
+                terminateSpaceFixtureApplicationAndWait(fixtureApp, identity: identity)
             }
         }
 
@@ -82,27 +93,136 @@ extension FlowTabUITests {
             }
         }
 
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
+        assertRealSpaceFixtureFlowTabIsForegroundReady(
+            app,
+            traceLabel: nil,
+            targetDescription: "quit-shortcut-post-fixture-launch"
+        )
 
-        let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
-        XCTAssertTrue(fixtureAppTile.waitForExistence(timeout: 12))
-        try postFlowTabUITestSelectSwitcherAppAndWaitForDelivery(
-            bundleIdentifier: identity.bundleIdentifier,
+        guard assertCurrentSwitcherAppProjection(
+            in: app,
+            exactEntry: "\(identity.bundleIdentifier):1",
+            timeout:
+                FlowTabUITestSwitcherAppProjectionPolicy
+                    .quitShortcutInitialProjectionWatchdog
+        ) else { return }
+        let fixtureAppTile = element(
+            in: app,
+            identifier: identity.switcherAppAccessibilityIdentifier
+        )
+        selectSwitcherAppDirectly(
+            in: app,
+            appID: identity.bundleIdentifier,
             traceLabel: "quitFixture.selectApp"
         )
-        XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "selected=\(identity.bundleIdentifier)", timeout: 5))
+        guard let removalObservation =
+                startSwitcherAppRemovalObservation(
+                    in: app,
+                    bundleIdentifier: identity.bundleIdentifier,
+                    expectedInitialWindowCount: 1
+                )
+        else { return }
+        defer { removalObservation.cancel() }
 
         let logSnapshot = makeRuntimeLogFileSnapshot()
+        defer { logSnapshot.cancel() }
+        let postTerminationRefreshObservation =
+            SpaceFixturePostTerminationRefreshObservationOwner(
+                bundleIdentifier: identity.bundleIdentifier,
+                baseline: logSnapshot
+            )
+        postTerminationRefreshObservation.start()
+        defer { postTerminationRefreshObservation.cancel() }
+        let terminationRequestPattern =
+            FlowTabUITestRuntimeLogRecordPattern
+                .exactTerminationRequest(
+                    bundleIdentifier:
+                        identity.bundleIdentifier
+                )
+        let terminationRequestExpression =
+            try NSRegularExpression(
+                pattern: terminationRequestPattern
+            )
+        var acceptsTerminationRequest = false
+        let terminationRequestObservation =
+            FlowTabUITestRuntimeLogObservationOwner(
+                expectation:
+                    .regularExpression(
+                        terminationRequestExpression,
+                        pattern: terminationRequestPattern,
+                        description:
+                            "exact quit-shortcut termination request"
+                    ),
+                observationRegistration:
+                    logSnapshot.observationRegistration(),
+                acceptsResolution: {
+                    acceptsTerminationRequest
+                },
+                readback: logSnapshot.makeReadback
+            )
+        terminationRequestObservation.start()
+        defer { terminationRequestObservation.cancel() }
         app.activate()
         app.typeKey("q", modifierFlags: .option)
+        acceptsTerminationRequest = true
+        terminationRequestObservation.requestReadback(
+            source: .triggerReadback
+        )
+        removalObservation.markTriggerCompleted()
 
-        waitForRuntimeLogFiles(
-            containing: [
-                "terminate request app=",
-                "appID=\(identity.bundleIdentifier) sent=true"
-            ],
-            since: logSnapshot,
-            timeout: 8
+        guard
+            terminationRequestObservation.waitForResolution(
+                timeout:
+                    FlowTabUITestRuntimeLogObservationPolicy
+                        .quitShortcutTerminationRequestWatchdog
+            ) != nil
+        else {
+            XCTFail(
+                "Quit-shortcut termination-request watchdog "
+                    + "expired. "
+                    + terminationRequestObservation
+                        .diagnosticSummary
+            )
+            return
+        }
+        let scheduledEvidence = try XCTUnwrap(
+            terminationObservation.waitForScheduled(
+                timeout:
+                    SpaceFixtureTerminationFaultObservationPolicy
+                        .scheduledEvidenceWatchdog
+            ),
+            "Fixture did not publish scheduled termination evidence: "
+                + terminationObservation.diagnosticSummary
+        )
+        XCTAssertEqual(
+            scheduledEvidence.source,
+            .terminationSignal
+        )
+        XCTAssertEqual(
+            scheduledEvidence.delayMilliseconds,
+            2_400
+        )
+        XCTAssertEqual(
+            scheduledEvidence.identity.bundleIdentifier,
+            identity.bundleIdentifier
+        )
+        postTerminationRefreshObservation.bindTarget(
+            processIdentifier:
+                scheduledEvidence.identity.processIdentifier,
+            requestGeneration: scheduledEvidence.requestGeneration
+        )
+        XCTAssertTrue(
+            NSRunningApplication.runningApplications(
+                withBundleIdentifier:
+                    identity.bundleIdentifier
+            ).contains {
+                !$0.isTerminated
+                    && $0.processIdentifier
+                        == scheduledEvidence
+                            .identity
+                            .processIdentifier
+            },
+            "Scheduled termination evidence did not identify the running fixture process."
         )
         XCTAssertNotEqual(fixtureApp.state, .notRunning)
         XCTAssertTrue(
@@ -110,17 +230,73 @@ extension FlowTabUITests {
             "The selected fixture app should remain in the panel while its process is still terminating."
         )
 
-        XCTAssertTrue(waitForApplicationToTerminate(fixtureApp, timeout: 8))
-        waitForRuntimeLogFiles(
-            containing: [
-                "terminate post-refresh reason=",
-                "appID=\(identity.bundleIdentifier)"
-            ],
-            since: logSnapshot,
-            timeout: 10
+        let appliedEvidence = try XCTUnwrap(
+            terminationObservation.waitForApplied(
+                requestGeneration:
+                    scheduledEvidence.requestGeneration,
+                timeout:
+                    SpaceFixtureTerminationFaultObservationPolicy
+                        .appliedEvidenceWatchdog
+            ),
+            "Fixture did not publish applied termination evidence: "
+                + terminationObservation.diagnosticSummary
         )
-        XCTAssertTrue(waitForNonExistence(fixtureAppTile, timeout: 8))
-        XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "apps=", timeout: 5))
+        XCTAssertEqual(
+            appliedEvidence.identity,
+            scheduledEvidence.identity
+        )
+        XCTAssertEqual(
+            appliedEvidence.source,
+            scheduledEvidence.source
+        )
+        let terminationWaitCompleted = fixtureApp.wait(
+            for: .notRunning,
+            timeout:
+                FlowTabUITestApplicationTerminationPolicy
+                    .quitShortcutFixtureWatchdog
+        )
+        let finalFixtureState = fixtureApp.state
+        XCTAssertEqual(
+            finalFixtureState,
+            .notRunning,
+            "Fixture process termination evidence was not satisfied. "
+                + "waiterCompleted=\(terminationWaitCompleted) "
+                + "finalState=\(String(describing: finalFixtureState))"
+        )
+        let refreshEvidence = try XCTUnwrap(
+            postTerminationRefreshObservation.waitForResolution(
+                timeout:
+                    SpaceFixturePostTerminationRefreshObservationPolicy
+                        .evidenceWatchdog
+            ),
+            "Post-termination projection refresh watchdog expired. "
+                + postTerminationRefreshObservation.diagnosticSummary
+        )
+        XCTAssertEqual(
+            refreshEvidence.value.reason,
+            "workspace_notification"
+        )
+        XCTAssertEqual(
+            refreshEvidence.value.bundleIdentifier,
+            identity.bundleIdentifier
+        )
+        XCTAssertEqual(
+            refreshEvidence.value.processIdentifier,
+            scheduledEvidence.identity.processIdentifier
+        )
+        XCTAssertEqual(
+            refreshEvidence.value.pendingGeneration,
+            scheduledEvidence.requestGeneration
+        )
+        XCTAssertTrue(refreshEvidence.value.matchedPending)
+        XCTAssertTrue(refreshEvidence.value.refreshed)
+        assertSwitcherAppRemoved(
+            removalObservation,
+            timeout:
+                FlowTabUITestSwitcherAppProjectionPolicy
+                    .quitShortcutRemovalWatchdog,
+            description: "Quit-shortcut fixture App projection removal"
+        )
     }
 
     func testRuntimeLifecycleRefreshesRealFixtureAppLaunchAndTermination() throws {
@@ -142,9 +318,17 @@ extension FlowTabUITests {
             }
         }
 
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
+        assertRealSpaceFixtureFlowTabIsForegroundReady(
+            app,
+            traceLabel: nil,
+            targetDescription: "runtime-lifecycle-before-fixture-launch"
+        )
 
         let launchLogSnapshot = makeRuntimeLogFileSnapshot()
+        let escapedLifecycleAppID =
+            NSRegularExpression.escapedPattern(
+                for: identity.bundleIdentifier
+            )
         let fixtureApp = launchSpaceFixtureWorkflow(
             identity: identity,
             windowCount: 1,
@@ -154,35 +338,57 @@ extension FlowTabUITests {
         )
         defer {
             if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
-                fixtureApp.terminate()
-                waitForSpaceFixtureApplicationToTerminate(fixtureApp)
+                terminateSpaceFixtureApplicationAndWait(fixtureApp, identity: identity)
             }
         }
 
         waitForRuntimeLogFiles(
-            containing: [
-                "runtimeLifecycle appLaunched appID=\(identity.bundleIdentifier)",
-                "pid="
-            ],
+            matching:
+                #"runtimeLifecycle appLaunched appID=\#(escapedLifecycleAppID) "#
+                + #"pid=[1-9][0-9]* maintenanceGeneration=[1-9][0-9]*"#,
             since: launchLogSnapshot,
-            timeout: 8
+            description: "exact workspace lifecycle launch evidence"
         )
 
         app.activate()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
-        let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity, timeout: 12)
-        assertValue(of: fixtureAppRow, equals: "1w", timeout: 12)
+        assertRealSpaceFixtureFlowTabIsForegroundReadyAfterFixtureLaunch(
+            app,
+            targetDescription: "runtime-lifecycle-after-fixture-launch"
+        )
+        _ = openHomeTabAndSelectSpaceFixtureApp(
+            in: app,
+            identity: identity,
+            expectedValue: "1w",
+            timeout:
+                FlowTabUITestSpaceFixtureHomeProjectionPolicy
+                    .runtimeLifecycleAppSummaryWatchdog
+        )
 
+        let runningFixtureProcesses =
+            NSRunningApplication.runningApplications(
+                withBundleIdentifier: identity.bundleIdentifier
+            ).filter { !$0.isTerminated }
+        let fixturePID = try XCTUnwrap(
+            runningFixtureProcesses.count == 1
+                ? runningFixtureProcesses.first?.processIdentifier
+                : nil,
+            "Expected one active lifecycle fixture process before termination. "
+                + "observedPIDs=\(runningFixtureProcesses.map(\.processIdentifier))"
+        )
         let terminationLogSnapshot = makeRuntimeLogFileSnapshot()
-        fixtureApp.terminate()
-        XCTAssertTrue(waitForApplicationToTerminate(fixtureApp, timeout: 8))
+        terminateSpaceFixtureApplicationAndWait(
+            fixtureApp,
+            identity: identity,
+            timeout:
+                FlowTabUITestApplicationTerminationPolicy
+                    .runtimeLifecycleFixtureWatchdog
+        )
         waitForRuntimeLogFiles(
-            containing: [
-                "runtimeLifecycle appTerminated appID=\(identity.bundleIdentifier)",
-                "pid="
-            ],
+            matching:
+                #"runtimeLifecycle appTerminated appID=\#(escapedLifecycleAppID) "#
+                + #"pid=\#(fixturePID) maintenanceGeneration=[1-9][0-9]*"#,
             since: terminationLogSnapshot,
-            timeout: 8
+            description: "exact workspace lifecycle termination evidence"
         )
     }
 
@@ -191,12 +397,16 @@ extension FlowTabUITests {
 
         guard assertSpaceFixtureWorkflowPermissionsAvailable() else { return }
 
+        let currentAppProjectionAcceptanceRoute =
+            makeSpaceFixtureCurrentAppProjectionAcceptanceRoute(bundleIdentifier: identity.bundleIdentifier)
+        currentAppProjectionAcceptanceRoute.removeReadback()
+        defer { currentAppProjectionAcceptanceRoute.removeReadback() }
         let app = makeRealRuntimeFlowTabApp(
             additionalArguments: [
                 "--flowtab-ui-runtime-log-level",
                 "DEBUG",
                 "--flowtab-ui-enable-verbose-logs"
-            ]
+            ] + currentAppProjectionAcceptanceRoute.flowTabLaunchArguments
         )
         launchFlowTabUITestApplication(app)
         defer {
@@ -205,9 +415,21 @@ extension FlowTabUITests {
             }
         }
 
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
+        assertRealSpaceFixtureFlowTabIsForegroundReady(
+            app,
+            traceLabel: nil,
+            targetDescription: "window-set-mutation-before-observer"
+        )
 
-        let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
+        let windowCloseRoute =
+            makeSpaceFixtureWindowCloseFaultRoute()
+        let windowCloseObservation =
+            SpaceFixtureWindowCloseFaultObservationOwner(
+                route: windowCloseRoute
+            )
+        windowCloseObservation.start()
+        defer { windowCloseObservation.cancel() }
+
         let fixtureApp = launchSpaceFixtureWorkflow(
             identity: identity,
             windowCount: 2,
@@ -215,41 +437,190 @@ extension FlowTabUITests {
             titlePrefix: "Mutation",
             enterFullscreenDelayMilliseconds: 0,
             closeWindowIndex: 2,
-            closeWindowDelayMilliseconds: 7_500
+            closeWindowDelayMilliseconds: 250,
+            fixtureAdditionalArguments:
+                windowCloseRoute.fixtureLaunchArguments
         )
         defer {
             if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
-                fixtureApp.terminate()
-                waitForSpaceFixtureApplicationToTerminate(fixtureApp)
+                terminateSpaceFixtureApplicationAndWait(fixtureApp, identity: identity)
             }
         }
+        guard let scheduledClose =
+                windowCloseObservation.waitForScheduled(
+                    timeout:
+                        SpaceFixtureWindowCloseFaultObservationPolicy
+                            .scheduledEvidenceWatchdog
+                )
+        else {
+            XCTFail(
+                "Missing scheduled fixture window-close evidence: "
+                    + windowCloseObservation
+                        .diagnosticSummary
+            )
+            return
+        }
+        let fixturePID = scheduledClose.identity.processIdentifier
+        XCTAssertEqual(
+            scheduledClose.snapshot
+                .targetWindowPlanIndex,
+            2
+        )
+        XCTAssertEqual(
+            scheduledClose.delayMilliseconds,
+            250
+        )
+        XCTAssertTrue(
+            scheduledClose.awaitsExplicitTrigger
+        )
+        XCTAssertEqual(
+            scheduledClose.identity.bundleIdentifier,
+            identity.bundleIdentifier
+        )
+        XCTAssertTrue(
+            NSRunningApplication.runningApplications(
+                withBundleIdentifier:
+                    identity.bundleIdentifier
+            ).contains {
+                !$0.isTerminated
+                    && $0.processIdentifier == fixturePID
+            }
+        )
+        XCTAssertTrue(
+            scheduledClose.snapshot
+                .targetWindowIsVisible
+        )
+        XCTAssertEqual(
+            scheduledClose.snapshot
+                .remainingWindowPlanIndices,
+            [1, 2]
+        )
 
         app.activate()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
-        let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity, timeout: 12)
-        assertValue(of: fixtureAppRow, equals: "2w", timeout: 12)
+        assertRealSpaceFixtureFlowTabIsForegroundReadyAfterFixtureLaunch(
+            app, targetDescription: "window-set-mutation-after-fixture-launch"
+        )
+        let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(
+            in: app,
+            identity: identity,
+            expectedValue: "2w",
+            timeout:
+                FlowTabUITestSpaceFixtureHomeProjectionPolicy
+                    .runtimeWindowMutationInitialSummaryWatchdog
+        )
 
-        assertValue(of: fixtureAppRow, equals: "1w", timeout: 15)
-        waitForRuntimeLogFiles(
-            containing: [
-                "homeRefreshSingleApp begin appID=\(identity.bundleIdentifier)",
-                "reason=ax_window_changed"
-            ],
-            since: mutationLogSnapshot,
-            timeout: 8
+        let currentAppProjectionAcceptance =
+            SpaceFixtureCurrentAppProjectionAcceptanceOwner(
+                route: currentAppProjectionAcceptanceRoute,
+                expectedPID: fixturePID
+            )
+        currentAppProjectionAcceptance.start()
+        defer { currentAppProjectionAcceptance.cancel() }
+        guard assertSpaceFixtureCurrentAppProjectionBaseline(
+            from: currentAppProjectionAcceptance,
+            identity: identity,
+            expectedPID: fixturePID
+        ) else { return }
+        guard currentAppProjectionAcceptance.startTargetObservation()
+        else {
+            XCTFail(
+                "Failed to establish post-close projection observer: "
+                    + currentAppProjectionAcceptance
+                        .diagnosticSummary
+            )
+            return
+        }
+
+        let postCloseHomeProjection =
+            makeSpaceFixtureHomeTransitionObservation(
+                in: app,
+                rowIdentifier: fixtureAppRow.identifier,
+                expectedValue: "1w"
+            )
+        postCloseHomeProjection.start()
+        defer { postCloseHomeProjection.cancel() }
+
+        let closedFixtureWindow = fixtureApp.windows[
+            "flowtab.spacefixture.window.2"
+        ]
+        assertElementDoesNotExistAfterTrigger(
+            closedFixtureWindow,
+            timeout:
+                SpaceFixtureWindowCloseFaultObservationPolicy
+                    .closedWindowDisappearanceWatchdog,
+            description:
+                "Exact Space fixture Window 2 disappearance"
+        ) {
+            windowCloseObservation.requestClose(
+                from: scheduledClose
+            )
+            postCloseHomeProjection.markTriggerCompleted()
+        }
+        guard let appliedClose =
+                windowCloseObservation.waitForApplied(
+                    requestGeneration:
+                        scheduledClose.requestGeneration,
+                    timeout:
+                        SpaceFixtureWindowCloseFaultObservationPolicy
+                            .appliedEvidenceWatchdog
+                )
+        else {
+            XCTFail(
+                "Missing applied fixture window-close evidence: "
+                    + windowCloseObservation
+                        .diagnosticSummary
+            )
+            return
+        }
+        XCTAssertEqual(
+            appliedClose.identity,
+            scheduledClose.identity
         )
-        waitForRuntimeLogFiles(
-            matching: #"homeAXDestroyed known appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+"#,
-            since: mutationLogSnapshot,
-            timeout: 8,
-            description: "known destroyed AX notification resolves to a registered window element"
+        XCTAssertEqual(
+            appliedClose.snapshot
+                .targetWindowPlanIndex,
+            2
         )
-        waitForRuntimeLogFiles(
-            matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=(none|[0-9]+)"#,
-            since: mutationLogSnapshot,
-            timeout: 8,
-            description: "known destroyed AX notification carries an affected CG window into shared runtime reconciliation"
+        XCTAssertEqual(
+            appliedClose.snapshot
+                .targetWindowNumber,
+            scheduledClose.snapshot
+                .targetWindowNumber
         )
+        XCTAssertFalse(
+            appliedClose.snapshot
+                .targetWindowIsVisible
+        )
+        XCTAssertFalse(
+            appliedClose.snapshot
+                .targetCGWindowIsOnScreen
+        )
+        XCTAssertEqual(
+            appliedClose.snapshot
+                .remainingWindowPlanIndices,
+            [1]
+        )
+        XCTAssertTrue(
+            fixtureApp.windows[
+                "flowtab.spacefixture.window.1"
+            ].exists
+        )
+        guard postCloseHomeProjection.waitForResolution(
+            timeout:
+                FlowTabUITestSpaceFixtureHomeProjectionPolicy
+                    .runtimeWindowMutationFinalSummaryWatchdog
+        ) != nil else {
+            XCTFail(
+                "Space Fixture post-close Home projection watchdog expired. "
+                    + postCloseHomeProjection.diagnosticSummary
+            )
+            return
+        }
+        guard assertSpaceFixtureCurrentAppProjectionAccepted(
+            by: currentAppProjectionAcceptance,
+            identity: identity,
+            expectedPID: fixturePID
+        ) else { return }
         XCTAssertNotEqual(fixtureApp.state, .notRunning)
     }
 
@@ -263,17 +634,24 @@ extension FlowTabUITests {
                 "--flowtab-ui-listen-switcher-trigger"
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         ) { identity, app in
-            let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
-            XCTAssertTrue(fixtureAppTile.waitForExistence(timeout: 8))
+            guard assertCurrentSwitcherAppProjection(
+                in: app,
+                exactEntry: "\(identity.bundleIdentifier):3",
+                timeout: FlowTabUITestSwitcherAppProjectionPolicy.standardFixtureProjectionWatchdog
+            ) else { return }
             selectSwitcherAppDirectly(
                 in: app,
                 appID: identity.bundleIdentifier,
                 traceLabel: "workflowWindowCards.selectApp"
             )
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-            app.typeKey(.downArrow, modifierFlags: [])
-            XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "mode=windowCycle", timeout: 5))
+            XCTAssertTrue(
+                enterSwitcherWindowCycle(
+                    expectedBundleIdentifier: identity.bundleIdentifier,
+                    in: app,
+                    timeout: FlowTabUITestSwitcherPreviewTransitionPolicy.standardFixtureEntryWatchdog
+                )
+            )
 
             assertSpaceFixtureSwitcherWindowCards(
                 expectedSpaceFixtureWorkflowWindowTitles(titlePrefix: "Workflow", windowCount: 3),
@@ -282,204 +660,37 @@ extension FlowTabUITests {
         }
     }
 
-    func testSwitcherPanelRefreshesOpenWindowLayerAfterRealFixtureWindowSetMutation() throws {
-        let identity = spaceFixtureAppIdentity
-
-        guard assertSpaceFixtureWorkflowPermissionsAvailable() else { return }
-
-        let fixtureApp = launchSpaceFixtureWorkflow(
-            identity: identity,
-            windowCount: 2,
-            fullscreenWindowIndex: nil,
-            titlePrefix: "Open Mutation",
-            enterFullscreenDelayMilliseconds: 0,
-            closeWindowIndex: 2,
-            closeWindowDelayMilliseconds: 15_000
-        )
-        let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
-        defer {
-            if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
-                fixtureApp.terminate()
-                waitForSpaceFixtureApplicationToTerminate(fixtureApp)
-            }
-        }
-
-        let app = makeRealRuntimeFlowTabApp(
-            additionalArguments: [
-                "--flowtab-ui-open-switcher",
-                "--flowtab-ui-runtime-log-level",
-                "DEBUG",
-                "--flowtab-ui-enable-verbose-logs",
-                "--flowtab-ui-listen-switcher-trigger",
-                "-windowLayerAutoEnterDelay", "30.0"
-            ] + FlowTabUITestSwitcherCommandPayload.launchArguments
-        )
-        launchFlowTabUITestApplication(app)
-        defer {
-            if app.state == .runningForeground || app.state == .runningBackground {
-                app.terminate()
-            }
-        }
-
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
-
-        let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
-        XCTAssertTrue(fixtureAppTile.waitForExistence(timeout: 12))
-        selectSwitcherAppDirectly(
-            in: app,
-            appID: identity.bundleIdentifier,
-            traceLabel: "openWindowLayerMutation.selectApp",
-            timeout: 8
-        )
-
-        let allTitles = expectedSpaceFixtureWorkflowWindowTitles(titlePrefix: "Open Mutation", windowCount: 2)
-        app.activate()
-        app.typeKey(.downArrow, modifierFlags: [])
-        XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "mode=windowCycle", timeout: 5))
-        _ = waitForSwitcherWindowCards(in: app, expectedTitles: allTitles, timeout: 8)
-
-        _ = waitForSwitcherWindowCards(
-            in: app,
-            expectedTitles: [allTitles[0]],
-            timeout: 25
-        )
-        waitForRuntimeLogFiles(
-            matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=(none|[0-9]+)"#,
-            since: mutationLogSnapshot,
-            timeout: 8,
-            description: "open Switcher window-layer mutation should flow through shared runtime AX destroyed reconciliation"
-        )
-        XCTAssertNotEqual(fixtureApp.state, .notRunning)
-    }
-
-    func testSwitcherPanelKeepsWindowLayerWhenSelectedFixtureWindowCloses() throws {
-        let identity = spaceFixtureAppIdentity
-
-        guard assertSpaceFixtureWorkflowPermissionsAvailable() else { return }
-
-        let fixtureApp = launchSpaceFixtureWorkflow(
-            identity: identity,
-            windowCount: 2,
-            fullscreenWindowIndex: nil,
-            titlePrefix: "Selected Mutation",
-            enterFullscreenDelayMilliseconds: 0,
-            closeWindowIndex: 1,
-            closeWindowDelayMilliseconds: 15_000
-        )
-        let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
-        defer {
-            if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
-                fixtureApp.terminate()
-                waitForSpaceFixtureApplicationToTerminate(fixtureApp)
-            }
-        }
-
-        let app = makeRealRuntimeFlowTabApp(
-            additionalArguments: [
-                "--flowtab-ui-open-switcher",
-                "--flowtab-ui-runtime-log-level",
-                "DEBUG",
-                "--flowtab-ui-enable-verbose-logs",
-                "--flowtab-ui-listen-switcher-trigger",
-                "-windowLayerAutoEnterDelay", "30.0"
-            ] + FlowTabUITestSwitcherCommandPayload.launchArguments
-        )
-        launchFlowTabUITestApplication(app)
-        defer {
-            if app.state == .runningForeground || app.state == .runningBackground {
-                app.terminate()
-            }
-        }
-
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
-
-        let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
-        XCTAssertTrue(fixtureAppTile.waitForExistence(timeout: 12))
-        selectSwitcherAppDirectly(
-            in: app,
-            appID: identity.bundleIdentifier,
-            traceLabel: "selectedWindowMutation.selectApp",
-            timeout: 8
-        )
-
-        let allTitles = expectedSpaceFixtureWorkflowWindowTitles(titlePrefix: "Selected Mutation", windowCount: 2)
-        app.activate()
-        app.typeKey(.downArrow, modifierFlags: [])
-        XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "mode=windowCycle", timeout: 5))
-        _ = waitForSwitcherWindowCards(in: app, expectedTitles: allTitles, timeout: 8)
-
-        _ = waitForSwitcherWindowCards(
-            in: app,
-            expectedTitles: [allTitles[1]],
-            timeout: 25
-        )
-        XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "mode=windowCycle", timeout: 5))
-        waitForRuntimeLogFiles(
-            matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=(none|[0-9]+)"#,
-            since: mutationLogSnapshot,
-            timeout: 8,
-            description: "selected fixture window close should preserve open Switcher window-layer through shared runtime reconciliation"
-        )
-        XCTAssertNotEqual(fixtureApp.state, .notRunning)
-    }
-
-    private func selectSwitcherAppDirectly(
+    func selectSwitcherAppDirectly(
         in app: XCUIApplication,
         appID: String,
         traceLabel: String,
         timeout: TimeInterval = 4
     ) {
         do {
-            try postFlowTabUITestSelectSwitcherAppAndWaitForDelivery(
-                bundleIdentifier: appID,
-                traceLabel: traceLabel,
-                timeout: timeout
-            )
+            try FlowTabUITestSwitcherCommandPayload.write(appID)
         } catch {
             XCTFail("Failed to select switcher app \(appID): \(error)")
             return
         }
 
-        XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "selected=\(appID)", timeout: timeout))
-    }
-
-    private func waitForSwitcherSummary(
-        in app: XCUIApplication,
-        containing marker: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestValue = ""
-        repeat {
-            latestValue = switcherSummary(in: app)
-            if latestValue.contains(marker) {
-                return true
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        XCTAssertTrue(
+            performAndWaitForSwitcherDiagnostics(
+                diagnosticsSummary,
+                key: "selected",
+                equals: appID,
+                timeout: timeout
+            ) {
+                postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                    .selectApp,
+                    traceLabel: traceLabel,
+                    timeout: timeout
+                )
             }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail("Expected switcher summary to contain \(marker). Latest summary: \(latestValue)")
-        return false
-    }
-
-    private func switcherSummary(in app: XCUIApplication) -> String {
-        let summary = element(in: app, identifier: Identifier.switcherSummary)
-        guard summary.exists else { return "" }
-        return elementStringValue(summary)
-    }
-
-    private func waitForApplicationToTerminate(
-        _ app: XCUIApplication,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if app.state == .notRunning {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
+        )
     }
 
     func makeSpaceFixtureWorkflowFile(_ contents: String) throws -> URL {
@@ -510,7 +721,7 @@ extension FlowTabUITests {
         )
         defer {
             if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
-                fixtureApp.terminate()
+                terminateSpaceFixtureApplicationAndWait(fixtureApp, identity: identity)
             }
         }
 
@@ -524,27 +735,12 @@ extension FlowTabUITests {
             }
         }
 
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
+        assertRealSpaceFixtureFlowTabIsForegroundReady(
+            app,
+            traceLabel: nil,
+            targetDescription: "standard-workflow-post-fixture-launch"
+        )
         assertions(identity, app)
-    }
-
-    private func openHomeTabAndSelectSpaceFixtureApp(
-        in app: XCUIApplication,
-        identity: SpaceFixtureAppIdentity,
-        timeout: TimeInterval = 20
-    ) -> XCUIElement {
-        XCTAssertTrue(
-            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10)
-        )
-
-        let fixtureAppRows = app.buttons.matching(identifier: identity.homeAppAccessibilityIdentifier)
-        let fixtureAppRow = fixtureAppRows.firstMatch
-        XCTAssertTrue(fixtureAppRow.waitForExistence(timeout: timeout))
-        XCTAssertTrue(
-            tapFirstHittable(in: fixtureAppRows, timeout: timeout),
-            "FlowTab did not surface the real Space Fixture app on the home page"
-        )
-        return fixtureAppRow
     }
 
     private func assertSpaceFixtureWindowTitles(

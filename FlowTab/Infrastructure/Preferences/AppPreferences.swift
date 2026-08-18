@@ -9,17 +9,16 @@ enum AppPreferenceKeys {
     static let hasPromptedAccessibilityPermission = "hasPromptedAccessibilityPermission"
     static let hiddenAppIDs = "hiddenAppIDs"
     static let hotkeyPrimaryModifier = "hotkeyPrimaryModifier"
+    static let hotkeyReverseModifiers = "hotkeyReverseModifiers"
     static let hotkeyMainKey = "hotkeyMainKey"
     static let hotkeyQuitKey = "hotkeyQuitKey"
-    static let inAppWindowHotkeyPrimaryModifier = "inAppWindowHotkeyPrimaryModifier"
-    static let inAppWindowHotkeyMainKey = "inAppWindowHotkeyMainKey"
+    static let inAppWindowHotkeyShortcutKeys = "inAppWindowHotkeyShortcutKeys"
+    static let inAppWindowHotkeyReverseKeys = "inAppWindowHotkeyReverseKeys"
     static let windowLayerAutoEnterDelay = "windowLayerAutoEnterDelay"
     static let autoRestoreMinimizedWindowOnSwitch = "autoRestoreMinimizedWindowOnSwitch"
     static let hideMinimizedAppsFromAppLayer = "hideMinimizedAppsFromAppLayer"
     static let searchEnabled = "searchEnabled"
     static let searchDefaultScope = "searchDefaultScope"
-    static let enableVerboseDiagnostics = "enableVerboseDiagnostics"
-    static let diagnosticSessionExpiration = "diagnosticSessionExpiration"
     static let runtimeLogLevel = "runtimeLogLevel"
     static let themeMode = "themeMode"
     static let appLanguage = "appLanguage"
@@ -32,21 +31,31 @@ enum AppPreferenceKeys {
         hasPromptedAccessibilityPermission,
         hiddenAppIDs,
         hotkeyPrimaryModifier,
+        hotkeyReverseModifiers,
         hotkeyMainKey,
         hotkeyQuitKey,
-        inAppWindowHotkeyPrimaryModifier,
-        inAppWindowHotkeyMainKey,
+        inAppWindowHotkeyShortcutKeys,
+        inAppWindowHotkeyReverseKeys,
         windowLayerAutoEnterDelay,
         autoRestoreMinimizedWindowOnSwitch,
         hideMinimizedAppsFromAppLayer,
         searchEnabled,
         searchDefaultScope,
-        enableVerboseDiagnostics,
-        diagnosticSessionExpiration,
         runtimeLogLevel,
         themeMode,
         appLanguage
     ]
+}
+
+enum AppPreferenceMaintenance {
+    private static let retiredKeys = [
+        "enableVerboseDiagnostics",
+        "diagnosticSessionExpiration"
+    ]
+
+    static func removeRetiredValues(userDefaults: UserDefaults = .standard) {
+        retiredKeys.forEach { userDefaults.removeObject(forKey: $0) }
+    }
 }
 
 enum AppLanguage: String, CaseIterable, Equatable, Sendable, Identifiable {
@@ -66,15 +75,34 @@ enum AppLanguage: String, CaseIterable, Equatable, Sendable, Identifiable {
 }
 
 enum AppLanguagePreferencesStore {
-    static let defaultLanguage: AppLanguage = .simplifiedChinese
+    static let invalidValueFallbackLanguage: AppLanguage = .simplifiedChinese
 
-    static func resolve(rawValue: String) -> AppLanguage {
-        AppLanguage(rawValue: rawValue) ?? defaultLanguage
+    static func firstLaunchLanguage(
+        preferredLanguageIdentifiers: [String] = Locale.preferredLanguages
+    ) -> AppLanguage {
+        guard let primaryIdentifier = preferredLanguageIdentifiers.first else {
+            return .english
+        }
+        let languageCode = Locale(identifier: primaryIdentifier)
+            .language.languageCode?.identifier
+        return languageCode?.lowercased() == "zh" ? .simplifiedChinese : .english
     }
 
-    static func load(userDefaults: UserDefaults = .standard) -> AppLanguage {
-        let rawValue = userDefaults.string(forKey: AppPreferenceKeys.appLanguage)
-            ?? defaultLanguage.rawValue
+    static func resolve(rawValue: String) -> AppLanguage {
+        AppLanguage(rawValue: rawValue) ?? invalidValueFallbackLanguage
+    }
+
+    static func load(
+        userDefaults: UserDefaults = .standard,
+        preferredLanguageIdentifiers: [String] = Locale.preferredLanguages
+    ) -> AppLanguage {
+        guard let rawValue = userDefaults.string(forKey: AppPreferenceKeys.appLanguage) else {
+            let language = firstLaunchLanguage(
+                preferredLanguageIdentifiers: preferredLanguageIdentifiers
+            )
+            userDefaults.set(language.rawValue, forKey: AppPreferenceKeys.appLanguage)
+            return language
+        }
         let resolved = resolve(rawValue: rawValue)
         if rawValue != resolved.rawValue {
             userDefaults.set(resolved.rawValue, forKey: AppPreferenceKeys.appLanguage)
@@ -93,19 +121,31 @@ extension Notification.Name {
     )
 }
 
-struct HotkeyRegistrationRequest: Sendable {
+struct HotkeyRegistrationRequest: Equatable, Sendable {
     private enum NotificationUserInfoKey {
         static let requestID = "requestID"
-        static let mainPrimaryModifier = "mainPrimaryModifier"
-        static let mainKey = "mainKey"
-        static let quitKey = "quitKey"
-        static let inAppPrimaryModifier = "inAppPrimaryModifier"
-        static let inAppMainKey = "inAppMainKey"
+        static let mainBaseKeys = "mainBaseKeys"
+        static let mainReverseKeys = "mainReverseKeys"
+        static let mainKeys = "mainKeys"
+        static let quitKeys = "quitKeys"
+        static let inAppShortcutKeys = "inAppShortcutKeys"
+        static let inAppReverseKeys = "inAppReverseKeys"
     }
 
     let requestID: UUID
     let mainConfiguration: SwitcherHotkeyConfiguration
     let inAppWindowConfiguration: SwitcherHotkeyConfiguration
+
+    var configurationSignature: String {
+        [
+            mainConfiguration.baseKeys.rawValue,
+            mainConfiguration.reverseKeys.rawValue,
+            mainConfiguration.mainKeys.rawValue,
+            mainConfiguration.quitKeys.rawValue,
+            inAppWindowConfiguration.baseKeys.rawValue,
+            inAppWindowConfiguration.reverseKeys.rawValue
+        ].joined(separator: "|")
+    }
 
     init(
         requestID: UUID = UUID(),
@@ -113,95 +153,106 @@ struct HotkeyRegistrationRequest: Sendable {
         inAppWindowConfiguration: SwitcherHotkeyConfiguration
     ) {
         let resolvedInAppWindowConfiguration =
-            InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
-                primaryModifierRaw: inAppWindowConfiguration.primaryModifier.rawValue,
-                mainKeyRaw: inAppWindowConfiguration.mainKey.rawValue,
-                mainHotkeyConfiguration: mainConfiguration
+            InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
+                shortcutKeysRaw: inAppWindowConfiguration.baseKeys.rawValue,
+                reverseKeysRaw: inAppWindowConfiguration.reverseKeys.rawValue,
+                switcherConfiguration: mainConfiguration
             )
         self.requestID = requestID
         self.mainConfiguration = mainConfiguration
-        self.inAppWindowConfiguration = SwitcherHotkeyConfiguration(
-            primaryModifier: resolvedInAppWindowConfiguration.primaryModifier,
-            mainKey: resolvedInAppWindowConfiguration.mainKey,
-            quitKey: inAppWindowConfiguration.quitKey
-        )
+        self.inAppWindowConfiguration =
+            resolvedInAppWindowConfiguration.configuration
     }
 
     static func load(userDefaults: UserDefaults = .standard) -> HotkeyRegistrationRequest {
-        let mainPrimaryModifierRaw = userDefaults.string(forKey: AppPreferenceKeys.hotkeyPrimaryModifier)
-            ?? SwitcherHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
-        let mainKeyRaw = userDefaults.string(forKey: AppPreferenceKeys.hotkeyMainKey)
-            ?? SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
-        let quitKeyRaw = userDefaults.string(forKey: AppPreferenceKeys.hotkeyQuitKey)
-            ?? SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
-        let inAppPrimaryModifierRaw = userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier)
-            ?? InAppWindowHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
-        let inAppMainKeyRaw = userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey)
-            ?? InAppWindowHotkeyPreferencesStore.defaultMainKey.rawValue
+        let mainBaseKeysRaw = userDefaults.string(
+            forKey: AppPreferenceKeys.hotkeyPrimaryModifier
+        ) ?? SwitcherHotkeyPreferencesStore.defaultBaseKeys.rawValue
+        let mainReverseKeysRaw = userDefaults.string(
+            forKey: AppPreferenceKeys.hotkeyReverseModifiers
+        ) ?? SwitcherHotkeyPreferencesStore.defaultReverseKeys.rawValue
+        let mainKeysRaw = userDefaults.string(
+            forKey: AppPreferenceKeys.hotkeyMainKey
+        ) ?? SwitcherHotkeyPreferencesStore.defaultMainKeys.rawValue
+        let quitKeysRaw = userDefaults.string(
+            forKey: AppPreferenceKeys.hotkeyQuitKey
+        ) ?? SwitcherHotkeyPreferencesStore.defaultQuitKeys.rawValue
+        let inAppShortcutKeysRaw = userDefaults.string(
+            forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+        ) ?? InAppWindowHotkeyPreferencesStore.defaultShortcutKeys.rawValue
+        let inAppReverseKeysRaw = userDefaults.string(
+            forKey: AppPreferenceKeys.inAppWindowHotkeyReverseKeys
+        ) ?? InAppWindowHotkeyPreferencesStore.defaultReverseKeys.rawValue
 
         let request = HotkeyRegistrationRequest.normalized(
-            mainPrimaryModifierRaw: mainPrimaryModifierRaw,
-            mainKeyRaw: mainKeyRaw,
-            quitKeyRaw: quitKeyRaw,
-            inAppPrimaryModifierRaw: inAppPrimaryModifierRaw,
-            inAppMainKeyRaw: inAppMainKeyRaw
+            mainBaseKeysRaw: mainBaseKeysRaw,
+            mainReverseKeysRaw: mainReverseKeysRaw,
+            mainKeysRaw: mainKeysRaw,
+            quitKeysRaw: quitKeysRaw,
+            inAppShortcutKeysRaw: inAppShortcutKeysRaw,
+            inAppReverseKeysRaw: inAppReverseKeysRaw
         )
         persistNormalizedValue(
-            request.mainConfiguration.primaryModifier.rawValue,
-            rawValue: mainPrimaryModifierRaw,
+            request.mainConfiguration.baseKeys.rawValue,
+            rawValue: mainBaseKeysRaw,
             forKey: AppPreferenceKeys.hotkeyPrimaryModifier,
             userDefaults: userDefaults
         )
         persistNormalizedValue(
-            request.mainConfiguration.mainKey.rawValue,
-            rawValue: mainKeyRaw,
+            request.mainConfiguration.reverseKeys.rawValue,
+            rawValue: mainReverseKeysRaw,
+            forKey: AppPreferenceKeys.hotkeyReverseModifiers,
+            userDefaults: userDefaults
+        )
+        persistNormalizedValue(
+            request.mainConfiguration.mainKeys.rawValue,
+            rawValue: mainKeysRaw,
             forKey: AppPreferenceKeys.hotkeyMainKey,
             userDefaults: userDefaults
         )
         persistNormalizedValue(
-            request.mainConfiguration.quitKey.rawValue,
-            rawValue: quitKeyRaw,
+            request.mainConfiguration.quitKeys.rawValue,
+            rawValue: quitKeysRaw,
             forKey: AppPreferenceKeys.hotkeyQuitKey,
             userDefaults: userDefaults
         )
         persistNormalizedValue(
-            request.inAppWindowConfiguration.primaryModifier.rawValue,
-            rawValue: inAppPrimaryModifierRaw,
-            forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier,
+            request.inAppWindowConfiguration.baseKeys.rawValue,
+            rawValue: inAppShortcutKeysRaw,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys,
             userDefaults: userDefaults
         )
         persistNormalizedValue(
-            request.inAppWindowConfiguration.mainKey.rawValue,
-            rawValue: inAppMainKeyRaw,
-            forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey,
+            request.inAppWindowConfiguration.reverseKeys.rawValue,
+            rawValue: inAppReverseKeysRaw,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyReverseKeys,
             userDefaults: userDefaults
         )
         return request
     }
 
     static func normalized(
-        mainPrimaryModifierRaw: String,
-        mainKeyRaw: String,
-        quitKeyRaw: String,
-        inAppPrimaryModifierRaw: String,
-        inAppMainKeyRaw: String
+        mainBaseKeysRaw: String,
+        mainReverseKeysRaw: String? = nil,
+        mainKeysRaw: String,
+        quitKeysRaw: String,
+        inAppShortcutKeysRaw: String,
+        inAppReverseKeysRaw: String? = nil
     ) -> HotkeyRegistrationRequest {
         let mainConfiguration = SwitcherHotkeyPreferencesStore.resolve(
-            primaryModifierRaw: mainPrimaryModifierRaw,
-            mainKeyRaw: mainKeyRaw,
-            quitKeyRaw: quitKeyRaw
+            baseKeysRaw: mainBaseKeysRaw,
+            reverseKeysRaw: mainReverseKeysRaw,
+            mainKeysRaw: mainKeysRaw,
+            quitKeysRaw: quitKeysRaw
         )
         let resolvedInAppWindowConfiguration =
-            InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
-                primaryModifierRaw: inAppPrimaryModifierRaw,
-                mainKeyRaw: inAppMainKeyRaw,
-                mainHotkeyConfiguration: mainConfiguration
+            InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
+                shortcutKeysRaw: inAppShortcutKeysRaw,
+                reverseKeysRaw: inAppReverseKeysRaw,
+                switcherConfiguration: mainConfiguration
             )
-        let inAppWindowConfiguration = SwitcherHotkeyConfiguration(
-            primaryModifier: resolvedInAppWindowConfiguration.primaryModifier,
-            mainKey: resolvedInAppWindowConfiguration.mainKey,
-            quitKey: .q
-        )
+        let inAppWindowConfiguration =
+            resolvedInAppWindowConfiguration.configuration
         return HotkeyRegistrationRequest(
             mainConfiguration: mainConfiguration,
             inAppWindowConfiguration: inAppWindowConfiguration
@@ -222,45 +273,54 @@ struct HotkeyRegistrationRequest: Sendable {
     init?(notificationUserInfo: [AnyHashable: Any]) {
         guard
             let requestIDRaw = notificationUserInfo[NotificationUserInfoKey.requestID] as? String,
-            let mainPrimaryModifierRaw =
-                notificationUserInfo[NotificationUserInfoKey.mainPrimaryModifier] as? String,
-            let mainKeyRaw = notificationUserInfo[NotificationUserInfoKey.mainKey] as? String,
-            let quitKeyRaw = notificationUserInfo[NotificationUserInfoKey.quitKey] as? String,
-            let inAppPrimaryModifierRaw =
-                notificationUserInfo[NotificationUserInfoKey.inAppPrimaryModifier] as? String,
-            let inAppMainKeyRaw = notificationUserInfo[NotificationUserInfoKey.inAppMainKey] as? String
+            let mainBaseKeysRaw =
+                notificationUserInfo[NotificationUserInfoKey.mainBaseKeys] as? String,
+            let mainReverseKeysRaw =
+                notificationUserInfo[NotificationUserInfoKey.mainReverseKeys] as? String,
+            let mainKeysRaw =
+                notificationUserInfo[NotificationUserInfoKey.mainKeys] as? String,
+            let quitKeysRaw =
+                notificationUserInfo[NotificationUserInfoKey.quitKeys] as? String,
+            let inAppShortcutKeysRaw =
+                notificationUserInfo[NotificationUserInfoKey.inAppShortcutKeys] as? String,
+            let inAppReverseKeysRaw =
+                notificationUserInfo[NotificationUserInfoKey.inAppReverseKeys] as? String
         else {
             return nil
         }
 
         let resolvedInAppWindowConfiguration = InAppWindowHotkeyPreferencesStore.resolve(
-            primaryModifierRaw: inAppPrimaryModifierRaw,
-            mainKeyRaw: inAppMainKeyRaw
+            shortcutKeysRaw: inAppShortcutKeysRaw,
+            reverseKeysRaw: inAppReverseKeysRaw
         )
         self.init(
             requestID: UUID(uuidString: requestIDRaw) ?? UUID(),
             mainConfiguration: SwitcherHotkeyPreferencesStore.resolve(
-                primaryModifierRaw: mainPrimaryModifierRaw,
-                mainKeyRaw: mainKeyRaw,
-                quitKeyRaw: quitKeyRaw
+                baseKeysRaw: mainBaseKeysRaw,
+                reverseKeysRaw: mainReverseKeysRaw,
+                mainKeysRaw: mainKeysRaw,
+                quitKeysRaw: quitKeysRaw
             ),
-            inAppWindowConfiguration: SwitcherHotkeyConfiguration(
-                primaryModifier: resolvedInAppWindowConfiguration.primaryModifier,
-                mainKey: resolvedInAppWindowConfiguration.mainKey,
-                quitKey: .q
-            )
+            inAppWindowConfiguration:
+                resolvedInAppWindowConfiguration.configuration
         )
     }
 
     var notificationUserInfo: [AnyHashable: Any] {
         [
             NotificationUserInfoKey.requestID: requestID.uuidString,
-            NotificationUserInfoKey.mainPrimaryModifier: mainConfiguration.primaryModifier.rawValue,
-            NotificationUserInfoKey.mainKey: mainConfiguration.mainKey.rawValue,
-            NotificationUserInfoKey.quitKey: mainConfiguration.quitKey.rawValue,
-            NotificationUserInfoKey.inAppPrimaryModifier:
-                inAppWindowConfiguration.primaryModifier.rawValue,
-            NotificationUserInfoKey.inAppMainKey: inAppWindowConfiguration.mainKey.rawValue
+            NotificationUserInfoKey.mainBaseKeys:
+                mainConfiguration.baseKeys.rawValue,
+            NotificationUserInfoKey.mainReverseKeys:
+                mainConfiguration.reverseKeys.rawValue,
+            NotificationUserInfoKey.mainKeys:
+                mainConfiguration.mainKeys.rawValue,
+            NotificationUserInfoKey.quitKeys:
+                mainConfiguration.quitKeys.rawValue,
+            NotificationUserInfoKey.inAppShortcutKeys:
+                inAppWindowConfiguration.baseKeys.rawValue,
+            NotificationUserInfoKey.inAppReverseKeys:
+                inAppWindowConfiguration.reverseKeys.rawValue
         ]
     }
 }
@@ -499,71 +559,5 @@ enum SearchInteractionPreferencesStore {
         return availableScopes(accessibilityTrusted: accessibilityTrusted).contains(resolved)
             ? resolved
             : .app
-    }
-}
-
-enum InAppWindowHotkeyPreferencesStore {
-    static let defaultPrimaryModifier: SwitcherPrimaryModifier = .control
-    static let defaultMainKey: SwitcherHotkeyKey = .tab
-
-    static func load(userDefaults: UserDefaults = .standard) -> SwitcherHotkeyConfiguration {
-        let primaryModifierRaw = userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier)
-            ?? defaultPrimaryModifier.rawValue
-        let mainKeyRaw = userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey)
-            ?? defaultMainKey.rawValue
-
-        let resolved = resolve(
-            primaryModifierRaw: primaryModifierRaw,
-            mainKeyRaw: mainKeyRaw
-        )
-
-        if primaryModifierRaw != resolved.primaryModifier.rawValue {
-            userDefaults.set(
-                resolved.primaryModifier.rawValue,
-                forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier
-            )
-        }
-        if mainKeyRaw != resolved.mainKey.rawValue {
-            userDefaults.set(
-                resolved.mainKey.rawValue,
-                forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey
-            )
-        }
-
-        return SwitcherHotkeyConfiguration(
-            primaryModifier: resolved.primaryModifier,
-            mainKey: resolved.mainKey,
-            quitKey: .q
-        )
-    }
-
-    static func resolve(
-        primaryModifierRaw: String,
-        mainKeyRaw: String
-    ) -> (primaryModifier: SwitcherPrimaryModifier, mainKey: SwitcherHotkeyKey) {
-        let primaryModifier = SwitcherPrimaryModifier(rawValue: primaryModifierRaw) ?? defaultPrimaryModifier
-        let mainKey = SwitcherHotkeyKey(rawValue: mainKeyRaw) ?? defaultMainKey
-        return (primaryModifier, mainKey)
-    }
-
-    static func resolveAvoidingMainHotkeyConflict(
-        primaryModifierRaw: String,
-        mainKeyRaw: String,
-        mainHotkeyConfiguration: SwitcherHotkeyConfiguration
-    ) -> (primaryModifier: SwitcherPrimaryModifier, mainKey: SwitcherHotkeyKey) {
-        let resolved = resolve(primaryModifierRaw: primaryModifierRaw, mainKeyRaw: mainKeyRaw)
-        guard
-            resolved.primaryModifier == mainHotkeyConfiguration.primaryModifier,
-            resolved.mainKey == mainHotkeyConfiguration.mainKey
-        else {
-            return resolved
-        }
-
-        let candidateModifiers = [defaultPrimaryModifier] + SwitcherPrimaryModifier.allCases
-        let fallbackPrimaryModifier = candidateModifiers.first {
-            $0 != mainHotkeyConfiguration.primaryModifier
-        } ?? defaultPrimaryModifier
-
-        return (fallbackPrimaryModifier, resolved.mainKey)
     }
 }

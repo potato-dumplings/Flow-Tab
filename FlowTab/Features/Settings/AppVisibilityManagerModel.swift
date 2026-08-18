@@ -1,6 +1,50 @@
 import Foundation
 import FlowTabCore
 
+enum AppVisibilityInventoryReadiness: String, Equatable {
+    case idle
+    case loading
+    case ready
+
+    var accessibilityIdentifier: String {
+        "flowtab.settings.app-visibility.inventory.\(rawValue)"
+    }
+}
+
+enum AppVisibilityQueryProjectionAccessibility {
+    static let identifierPrefix =
+        "flowtab.settings.app-visibility.list.query-generation."
+
+    static func identifier(generation: UInt64) -> String {
+        "\(identifierPrefix)\(generation)"
+    }
+}
+
+enum AppVisibilityFilterProjectionAccessibility {
+    static let identifierPrefix =
+        "flowtab.settings.app-visibility.filter-projection."
+
+    static func identifier(
+        filterRawValue: String,
+        generation: UInt64
+    ) -> String {
+        "\(identifierPrefix)\(filterRawValue).generation.\(generation)"
+    }
+}
+
+enum AppVisibilityDetailProjectionAccessibility {
+    static let identifierPrefix =
+        "flowtab.settings.app-visibility.detail."
+
+    static func identifierPrefix(appID: String) -> String {
+        "\(identifierPrefix)\(appID.flowTabAccessibilityIdentifierComponent).generation."
+    }
+
+    static func identifier(appID: String, generation: UInt64) -> String {
+        "\(identifierPrefix(appID: appID))\(generation)"
+    }
+}
+
 @MainActor
 final class AppVisibilityManagerModel: ObservableObject {
     enum Filter: String, CaseIterable, Identifiable {
@@ -25,9 +69,14 @@ final class AppVisibilityManagerModel: ObservableObject {
     @Published private(set) var apps: [InstalledAppRecord] = []
     @Published private(set) var hiddenAppIDs: Set<String>
     @Published private(set) var isLoading = false
-    @Published var query = ""
-    @Published var filter: Filter = .all
-    @Published var selectedAppID: String?
+    @Published private(set) var inventoryReadiness:
+        AppVisibilityInventoryReadiness = .idle
+    @Published private(set) var query = ""
+    @Published private(set) var queryProjectionGeneration: UInt64 = 0
+    @Published private(set) var filter: Filter = .all
+    @Published private(set) var filterProjectionGeneration: UInt64 = 0
+    @Published private(set) var selectedAppID: String?
+    @Published private(set) var selectionProjectionGeneration: UInt64 = 0
 
     private let inventoryService: AppInventoryService
     private let userDefaults: UserDefaults
@@ -78,6 +127,7 @@ final class AppVisibilityManagerModel: ObservableObject {
 
     func reload() {
         guard reloadTask == nil else { return }
+        inventoryReadiness = .loading
         isLoading = true
         let service = inventoryService
         reloadTask = Task { [weak self] in
@@ -93,9 +143,28 @@ final class AppVisibilityManagerModel: ObservableObject {
                 )
                 self.resolveSelectionAfterReload()
                 self.isLoading = false
+                self.inventoryReadiness = .ready
                 self.reloadTask = nil
             }
         }
+    }
+
+    func updateQuery(_ query: String) {
+        guard self.query != query else { return }
+        self.query = query
+        queryProjectionGeneration &+= 1
+    }
+
+    func updateFilter(_ filter: Filter) {
+        guard self.filter != filter else { return }
+        self.filter = filter
+        filterProjectionGeneration &+= 1
+    }
+
+    func selectApp(_ appID: String?) {
+        guard selectedAppID != appID else { return }
+        selectedAppID = appID
+        selectionProjectionGeneration &+= 1
     }
 
     func setHidden(_ hidden: Bool, for appID: String) {
@@ -129,7 +198,7 @@ final class AppVisibilityManagerModel: ObservableObject {
         if let selectedAppID, visible.contains(where: { $0.id == selectedAppID }) {
             return
         }
-        selectedAppID = visible.first?.id
+        selectApp(visible.first?.id)
     }
 
     private func matchesFilter(_ app: InstalledAppRecord) -> Bool {

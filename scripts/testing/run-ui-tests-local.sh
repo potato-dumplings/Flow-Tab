@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+INVOCATION_DIRECTORY="$(pwd -P)"
 DEFAULT_BUILD_ROOT="${ROOT_DIR}/.build-local/ui-tests"
 DEFAULT_SPACE_FIXTURE_BUILD_ROOT="${ROOT_DIR}/.build-local/space-fixture-workflow"
 BUILD_ROOT="${DEFAULT_BUILD_ROOT}"
@@ -11,6 +12,7 @@ ORIGINAL_HOME="${HOME}"
 ORIGINAL_CFFIXED_USER_HOME="${CFFIXED_USER_HOME:-${HOME}}"
 DEFAULT_UI_TEST_APP_PATH="${USER_HOME}/Applications/Flow Tab UITest.app"
 LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
+CODE_SIGNING_IDENTITY_PATH="${ROOT_DIR}/scripts/lib/code-signing-identity.sh"
 SPACE_FIXTURE_BUILD_SCRIPT="${ROOT_DIR}/scripts/testing/build-space-fixture-workflow.sh"
 SPACE_FIXTURE_BASELINE_WORKFLOW="${ROOT_DIR}/docs/fixtures/space-fixture-home-multi-app-workflow.json"
 SYSTEM_APP_MRU_FIXTURE_WORKFLOW="${ROOT_DIR}/docs/fixtures/space-fixture-system-app-mru-workflow.json"
@@ -39,6 +41,9 @@ CODE_SIGN_IDENTITY="${FLOWTAB_CODE_SIGN_IDENTITY:-}"
 RESOLVED_CODE_SIGN_IDENTITY=""
 declare -a EXTRA_ARGS=()
 
+# shellcheck source=/dev/null
+source "${CODE_SIGNING_IDENTITY_PATH}"
+
 expand_path() {
   local path="$1"
   if [[ "${path}" == "~/"* ]]; then
@@ -46,6 +51,15 @@ expand_path() {
     return
   fi
   printf '%s' "${path}"
+}
+
+resolve_invocation_path() {
+  local path="$1"
+  if [[ "${path}" == /* ]]; then
+    printf '%s' "${path}"
+    return
+  fi
+  printf '%s/%s' "${INVOCATION_DIRECTORY}" "${path#./}"
 }
 
 print_help() {
@@ -115,50 +129,6 @@ local_signing_config_value() {
   ' "${LOCAL_SIGNING_CONFIG_PATH}"
 }
 
-resolve_code_sign_identity() {
-  local requested="$1"
-  local team="$2"
-  local identities
-  local line
-  local identity
-
-  identities="$(
-    HOME="${ORIGINAL_HOME}" \
-    CFFIXED_USER_HOME="${ORIGINAL_CFFIXED_USER_HOME}" \
-    security find-identity -v -p codesigning 2>/dev/null || true
-  )"
-
-  while IFS= read -r line; do
-    identity="${line#*\"}"
-    identity="${identity%\"*}"
-
-    if [[ "${identity}" == "${line}" ]]; then
-      continue
-    fi
-
-    if [[ -n "${team}" && "${identity}" != *"(${team})" ]]; then
-      continue
-    fi
-
-    if [[ -n "${requested}" && "${requested}" != "Apple Development" && "${identity}" != "${requested}" ]]; then
-      continue
-    fi
-
-    if [[ -z "${requested}" && "${identity}" != Apple\ Development:* ]]; then
-      continue
-    fi
-
-    if [[ "${requested}" == "Apple Development" && "${identity}" != Apple\ Development:* ]]; then
-      continue
-    fi
-
-    printf '%s' "${identity}"
-    return 0
-  done <<< "${identities}"
-
-  return 1
-}
-
 resolve_runner_signing_identity() {
   if [[ -n "${RESOLVED_CODE_SIGN_IDENTITY}" ]]; then
     return 0
@@ -176,8 +146,14 @@ resolve_runner_signing_identity() {
     CODE_SIGN_IDENTITY="Apple Development"
   fi
 
-  if RESOLVED_CODE_SIGN_IDENTITY="$(resolve_code_sign_identity "${CODE_SIGN_IDENTITY}" "${DEVELOPMENT_TEAM}")"; then
-    echo "UI test runner signing identity: ${RESOLVED_CODE_SIGN_IDENTITY}"
+  if RESOLVED_CODE_SIGN_IDENTITY="$(
+    HOME="${ORIGINAL_HOME}" \
+    CFFIXED_USER_HOME="${ORIGINAL_CFFIXED_USER_HOME}" \
+      flowtab_resolve_code_sign_identity \
+        "${CODE_SIGN_IDENTITY}" \
+        "${DEVELOPMENT_TEAM}"
+  )"; then
+    echo "UI test runner signing fingerprint: ${RESOLVED_CODE_SIGN_IDENTITY}"
     return 0
   fi
 
@@ -207,94 +183,7 @@ sign_ui_test_runner() {
 }
 
 ensure_space_fixture_variants() {
-  local check_output
-
-  if check_output="$(/usr/bin/python3 - "${SPACE_FIXTURE_BASELINE_RESOLVED_PATH}" <<'PY'
-import json
-import os
-import sys
-
-resolved_path = sys.argv[1]
-expected_workflow = "multi-app-home-window-counts"
-expected_apps = {
-    "finder": ("Finder Fixture", "com.example.fixture.finder"),
-    "chrome": ("Chrome Fixture", "com.example.fixture.chrome"),
-    "notes": ("Notes Fixture", "com.example.fixture.notes"),
-}
-
-def sanitized_app_bundle_name(app_name, bundle_id):
-    return f"{app_name}-{bundle_id}.app".replace("/", "-").replace(":", "-")
-
-try:
-    with open(resolved_path, encoding="utf-8") as handle:
-        workflow = json.load(handle)
-except FileNotFoundError:
-    print(f"missing {resolved_path}")
-    raise SystemExit(1)
-except json.JSONDecodeError as error:
-    print(f"invalid JSON in {resolved_path}: {error}")
-    raise SystemExit(1)
-
-workflow_name = workflow.get("workflowName")
-if workflow_name != expected_workflow:
-    print(f"resolved workflow is {workflow_name!r}, expected {expected_workflow!r}")
-    raise SystemExit(1)
-
-apps = workflow.get("apps")
-if not isinstance(apps, list):
-    print("resolved workflow apps field is missing or invalid")
-    raise SystemExit(1)
-
-apps_by_id = {str(app.get("appID", "")).strip(): app for app in apps}
-for app_id, (expected_app_name, expected_bundle_id) in expected_apps.items():
-    app = apps_by_id.get(app_id)
-    if app is None:
-        print(f"missing fixture app {app_id}")
-        raise SystemExit(1)
-
-    bundle_id = str(app.get("bundleId", "")).strip()
-    if bundle_id != expected_bundle_id:
-        print(f"fixture app {app_id} has bundle id {bundle_id!r}, expected {expected_bundle_id!r}")
-        raise SystemExit(1)
-
-    app_path = str(app.get("appPath", "")).strip()
-    if not app_path or not os.path.isdir(app_path):
-        print(f"fixture app {app_id} path is missing: {app_path}")
-        raise SystemExit(1)
-
-    expected_basename = sanitized_app_bundle_name(expected_app_name, expected_bundle_id)
-    actual_basename = os.path.basename(app_path)
-    if actual_basename != expected_basename:
-        print(f"fixture app {app_id} path is {actual_basename!r}, expected {expected_basename!r}")
-        raise SystemExit(1)
-
-    plist_path = os.path.join(app_path, "Contents", "Info.plist")
-    try:
-        import plistlib
-        with open(plist_path, "rb") as handle:
-            plist = plistlib.load(handle)
-    except FileNotFoundError:
-        print(f"fixture app {app_id} Info.plist is missing: {plist_path}")
-        raise SystemExit(1)
-    except Exception as error:
-        print(f"fixture app {app_id} Info.plist is unreadable: {error}")
-        raise SystemExit(1)
-
-    actual_bundle_id = str(plist.get("CFBundleIdentifier", "")).strip()
-    if actual_bundle_id != expected_bundle_id:
-        print(
-            f"fixture app {app_id} Info.plist bundle id is {actual_bundle_id!r}, "
-            f"expected {expected_bundle_id!r}"
-        )
-        raise SystemExit(1)
-PY
-  )"; then
-    echo "Space fixture variants: ready (${SPACE_FIXTURE_BASELINE_RESOLVED_PATH})"
-    return
-  fi
-
-  echo "Space fixture variants: ${check_output}"
-  echo "Space fixture variants: rebuilding shared app variants from ${SPACE_FIXTURE_BASELINE_WORKFLOW}"
+  echo "Space fixture variants: rebuilding from current fixture source"
   "${SPACE_FIXTURE_BUILD_SCRIPT}" \
     --build-root "${SPACE_FIXTURE_BUILD_ROOT}" \
     --workflow-config "${SPACE_FIXTURE_BASELINE_WORKFLOW}" \
@@ -303,59 +192,7 @@ PY
 }
 
 ensure_system_app_mru_fixture_variants() {
-  local check_output
-
-  if check_output="$(/usr/bin/python3 - "${SYSTEM_APP_MRU_FIXTURE_RESOLVED_PATH}" <<'PY'
-import json
-import os
-import sys
-
-resolved_path = sys.argv[1]
-expected_bundle_ids = {
-    "atlas": "com.example.fixture.mru.atlas",
-    "beacon": "com.example.fixture.mru.beacon",
-    "comet": "com.example.fixture.mru.comet",
-    "delta": "com.example.fixture.mru.delta",
-    "ember": "com.example.fixture.mru.ember",
-    "fjord": "com.example.fixture.mru.fjord",
-    "grove": "com.example.fixture.mru.grove",
-    "harbor": "com.example.fixture.mru.harbor",
-}
-
-try:
-    with open(resolved_path, encoding="utf-8") as handle:
-        workflow = json.load(handle)
-except (FileNotFoundError, json.JSONDecodeError) as error:
-    print(error)
-    raise SystemExit(1)
-
-if workflow.get("workflowName") != "system-app-mru-eight-apps":
-    print("unexpected workflow name")
-    raise SystemExit(1)
-
-apps = workflow.get("apps")
-if not isinstance(apps, list) or len(apps) != len(expected_bundle_ids):
-    print("unexpected system MRU fixture count")
-    raise SystemExit(1)
-
-apps_by_id = {str(app.get("appID", "")).strip(): app for app in apps}
-for app_id, expected_bundle_id in expected_bundle_ids.items():
-    app = apps_by_id.get(app_id)
-    if app is None or str(app.get("bundleId", "")).strip() != expected_bundle_id:
-        print(f"missing or invalid system MRU fixture {app_id}")
-        raise SystemExit(1)
-    app_path = str(app.get("appPath", "")).strip()
-    if not app_path or not os.path.isdir(app_path):
-        print(f"missing system MRU fixture path for {app_id}: {app_path}")
-        raise SystemExit(1)
-PY
-  )"; then
-    echo "System app MRU fixture variants: ready (${SYSTEM_APP_MRU_FIXTURE_RESOLVED_PATH})"
-    return
-  fi
-
-  echo "System app MRU fixture variants: ${check_output}"
-  echo "System app MRU fixture variants: rebuilding from ${SYSTEM_APP_MRU_FIXTURE_WORKFLOW}"
+  echo "System app MRU fixture variants: rebuilding from current fixture source"
   "${SPACE_FIXTURE_BUILD_SCRIPT}" \
     --build-root "${SPACE_FIXTURE_BUILD_ROOT}/system-app-mru" \
     --workflow-config "${SYSTEM_APP_MRU_FIXTURE_WORKFLOW}" \
@@ -500,6 +337,7 @@ HOME_ROOT="${BUILD_ROOT}/home"
 MODULE_CACHE_ROOT="${BUILD_ROOT}/module-cache"
 PACKAGE_CACHE_PATH="${BUILD_ROOT}/source-packages"
 UI_TEST_RUNNER_PATH="${DERIVED_DATA_PATH}/Build/Products/Testing/FlowTabUITests-Runner.app"
+UI_TEST_XCTESTRUN_PATH=""
 if [[ "${HAS_CUSTOM_BUILD_ROOT}" == true ]]; then
   SPACE_FIXTURE_BUILD_ROOT="${BUILD_ROOT}/space-fixture-workflow"
 else
@@ -507,6 +345,12 @@ else
 fi
 SPACE_FIXTURE_BASELINE_RESOLVED_PATH="${SPACE_FIXTURE_BUILD_ROOT}/variants/resolved-workflow.json"
 SYSTEM_APP_MRU_FIXTURE_RESOLVED_PATH="${SPACE_FIXTURE_BUILD_ROOT}/system-app-mru-variants/resolved-workflow.json"
+SPACE_FIXTURE_BASELINE_ACCESSIBLE_PATH="$(
+  resolve_invocation_path "${SPACE_FIXTURE_BASELINE_RESOLVED_PATH}"
+)"
+SYSTEM_APP_MRU_FIXTURE_ACCESSIBLE_PATH="$(
+  resolve_invocation_path "${SYSTEM_APP_MRU_FIXTURE_RESOLVED_PATH}"
+)"
 if [[ "${HAS_CUSTOM_OUTPUT_ROOT}" == false ]]; then
   OUTPUT_ROOT="${BUILD_ROOT}"
 fi
@@ -591,7 +435,8 @@ export CFFIXED_USER_HOME="${HOME_ROOT}"
 export CLANG_MODULE_CACHE_PATH="${MODULE_CACHE_ROOT}/clang"
 export SWIFT_MODULECACHE_PATH="${MODULE_CACHE_ROOT}/swift"
 export SWIFTPM_PACKAGECACHE="${PACKAGE_CACHE_PATH}"
-export FLOWTAB_SYSTEM_APP_MRU_FIXTURE_WORKFLOW_PATH="${SYSTEM_APP_MRU_FIXTURE_RESOLVED_PATH}"
+export FLOWTAB_SPACE_FIXTURE_WORKFLOW_PATH="${SPACE_FIXTURE_BASELINE_ACCESSIBLE_PATH}"
+export FLOWTAB_SYSTEM_APP_MRU_FIXTURE_WORKFLOW_PATH="${SYSTEM_APP_MRU_FIXTURE_ACCESSIBLE_PATH}"
 
 if [[ "${USE_STABLE_UI_TEST_APP}" == true && -d "${UI_TEST_APP_PATH}" ]]; then
   export FLOWTAB_UI_TEST_APP_PATH="${UI_TEST_APP_PATH}"
@@ -617,6 +462,7 @@ echo "DerivedData: ${DERIVED_DATA_PATH}"
 echo "TMPDIR: ${TMPDIR}"
 echo "Module cache: ${MODULE_CACHE_ROOT}"
 echo "Source packages: ${PACKAGE_CACHE_PATH}"
+echo "Space fixture workflow: ${FLOWTAB_SPACE_FIXTURE_WORKFLOW_PATH}"
 echo "Action: ${ACTION}"
 if [[ -n "${FLOWTAB_UI_TEST_APP_PATH:-}" ]]; then
   echo "UI test app: ${FLOWTAB_UI_TEST_APP_PATH}"
@@ -640,14 +486,26 @@ build_xcodebuild_cmd() {
   local action="$1"
   local include_result_bundle="$2"
 
-  XCODEBUILD_CMD=(
-    xcodebuild
-    -project "${ROOT_DIR}/FlowTab.xcodeproj"
-    -scheme FlowTab
-    -destination "platform=macOS"
-    -derivedDataPath "${DERIVED_DATA_PATH}"
-    -clonedSourcePackagesDirPath "${PACKAGE_CACHE_PATH}"
-  )
+  if [[ "${action}" == "test-without-building" ]]; then
+    if [[ -z "${UI_TEST_XCTESTRUN_PATH}" ]]; then
+      echo "The UI test .xctestrun path is not configured." >&2
+      return 1
+    fi
+    XCODEBUILD_CMD=(
+      xcodebuild
+      -xctestrun "${UI_TEST_XCTESTRUN_PATH}"
+      -destination "platform=macOS"
+    )
+  else
+    XCODEBUILD_CMD=(
+      xcodebuild
+      -project "${ROOT_DIR}/FlowTab.xcodeproj"
+      -scheme FlowTab
+      -destination "platform=macOS"
+      -derivedDataPath "${DERIVED_DATA_PATH}"
+      -clonedSourcePackagesDirPath "${PACKAGE_CACHE_PATH}"
+    )
+  fi
 
   if [[ "${include_result_bundle}" == true ]]; then
     XCODEBUILD_CMD+=(-resultBundlePath "${RESULT_BUNDLE_PATH}")
@@ -655,11 +513,69 @@ build_xcodebuild_cmd() {
 
   # Local UI test builds do not use Xcode automatic signing. The wrapper signs
   # the generated XCTest runner after build-for-testing with the local identity.
-  if [[ "${HAS_CODE_SIGNING_OVERRIDE}" == false ]]; then
+  if [[ "${action}" != "test-without-building" && "${HAS_CODE_SIGNING_OVERRIDE}" == false ]]; then
     XCODEBUILD_CMD+=("CODE_SIGNING_ALLOWED=NO")
   fi
 
   XCODEBUILD_CMD+=("${action}")
+}
+
+set_xctestrun_environment_value() {
+  local xctestrun_path="$1"
+  local key_path="$2"
+  local value="$3"
+
+  if plutil -type "${key_path}" "${xctestrun_path}" >/dev/null 2>&1; then
+    plutil -replace "${key_path}" -string "${value}" "${xctestrun_path}"
+  else
+    plutil -insert "${key_path}" -string "${value}" "${xctestrun_path}"
+  fi
+}
+
+configure_ui_test_runner_environment() {
+  local products_root
+  local xctestrun_path
+  local -a xctestrun_paths=()
+
+  CURRENT_STAGE="configure_ui_test_runner_environment"
+  products_root="$(
+    resolve_invocation_path \
+      "${DERIVED_DATA_PATH}/Build/Products"
+  )"
+  while IFS= read -r -d '' xctestrun_path; do
+    xctestrun_paths+=("${xctestrun_path}")
+  done < <(
+    find "${products_root}" \
+      -maxdepth 1 \
+      -type f \
+      -name '*.xctestrun' \
+      -print0
+  )
+
+  if [[ "${#xctestrun_paths[@]}" -ne 1 ]]; then
+    echo "Expected one FlowTab .xctestrun file below ${products_root}; found ${#xctestrun_paths[@]}." >&2
+    return 1
+  fi
+
+  UI_TEST_XCTESTRUN_PATH="${xctestrun_paths[0]}"
+  if ! plutil -extract FlowTabUITests raw \
+    -expect dictionary \
+    -o /dev/null \
+    "${UI_TEST_XCTESTRUN_PATH}" 2>/dev/null
+  then
+    echo "The generated .xctestrun file has no FlowTabUITests entry: ${UI_TEST_XCTESTRUN_PATH}" >&2
+    return 1
+  fi
+
+  set_xctestrun_environment_value \
+    "${UI_TEST_XCTESTRUN_PATH}" \
+    "FlowTabUITests.EnvironmentVariables.FLOWTAB_SPACE_FIXTURE_WORKFLOW_PATH" \
+    "${SPACE_FIXTURE_BASELINE_ACCESSIBLE_PATH}"
+  set_xctestrun_environment_value \
+    "${UI_TEST_XCTESTRUN_PATH}" \
+    "FlowTabUITests.EnvironmentVariables.FLOWTAB_SYSTEM_APP_MRU_FIXTURE_WORKFLOW_PATH" \
+    "${SYSTEM_APP_MRU_FIXTURE_ACCESSIBLE_PATH}"
+  echo "Configured UI test runner environment: ${UI_TEST_XCTESTRUN_PATH}"
 }
 
 run_logged_stage() {
@@ -772,6 +688,7 @@ fi
 case "${ACTION}" in
   test)
     run_xcodebuild "build-for-testing" false
+    configure_ui_test_runner_environment
     run_logged_stage "signing" "${LOG_ROOT}/sign-ui-test-runner.log" sign_ui_test_runner
     if ((${#EXTRA_ARGS[@]} > 0)); then
       run_xcodebuild "test-without-building" true "${EXTRA_ARGS[@]}"
@@ -785,9 +702,11 @@ case "${ACTION}" in
     else
       run_xcodebuild "build-for-testing" false
     fi
+    configure_ui_test_runner_environment
     run_logged_stage "signing" "${LOG_ROOT}/sign-ui-test-runner.log" sign_ui_test_runner
     ;;
   test-without-building)
+    configure_ui_test_runner_environment
     run_logged_stage "signing" "${LOG_ROOT}/sign-ui-test-runner.log" sign_ui_test_runner
     if ((${#EXTRA_ARGS[@]} > 0)); then
       run_xcodebuild "test-without-building" true "${EXTRA_ARGS[@]}"

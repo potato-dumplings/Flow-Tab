@@ -1,12 +1,90 @@
 import AppKit
 import XCTest
 
+private enum FlowTabUITestSystemAppMRUPolicy {
+    static let appOrderWatchdog: TimeInterval = 10
+    static let appRankBootstrapLogWatchdog: TimeInterval = 10
+    static let fixtureActivationWatchdog: TimeInterval = 5
+    static let switcherDismissalWatchdog: TimeInterval = 4
+}
+
+struct FlowTabUITestWorkflowAppOrderEvidence: Equatable {
+    let diagnosticsValue: String?
+    let order: [String]
+
+    init(
+        diagnosticsValue: String?,
+        expectedAppIdentifiers: Set<String>
+    ) {
+        self.diagnosticsValue = diagnosticsValue
+        order = diagnosticsValue?
+            .split(separator: "|")
+            .compactMap { entry in
+                entry
+                    .split(separator: ":", maxSplits: 1)
+                    .first
+                    .map(String.init)
+            }
+            .filter(expectedAppIdentifiers.contains) ?? []
+    }
+
+    var diagnosticSummary: String {
+        "summaryExists=\(diagnosticsValue != nil) "
+            + "order=\(order) "
+            + "appsValue=\(diagnosticsValue ?? "nil")"
+    }
+
+    func matches(_ expectedOrder: [String]) -> Bool {
+        order == expectedOrder
+    }
+}
+
 extension FlowTabUITests {
+    func testSystemAppMRUPolicyUsesNamedWatchdogs() {
+        let policies = [
+            FlowTabUITestSystemAppMRUPolicy.appOrderWatchdog,
+            FlowTabUITestSystemAppMRUPolicy
+                .appRankBootstrapLogWatchdog,
+            FlowTabUITestSystemAppMRUPolicy
+                .fixtureActivationWatchdog,
+            FlowTabUITestSystemAppMRUPolicy.switcherDismissalWatchdog
+        ]
+        XCTAssertEqual(
+            FlowTabUITestSystemAppMRUPolicy.appOrderWatchdog,
+            10
+        )
+        XCTAssertEqual(
+            FlowTabUITestSystemAppMRUPolicy
+                .appRankBootstrapLogWatchdog,
+            10
+        )
+        XCTAssertEqual(
+            FlowTabUITestSystemAppMRUPolicy
+                .fixtureActivationWatchdog,
+            5
+        )
+        XCTAssertEqual(
+            FlowTabUITestSystemAppMRUPolicy.switcherDismissalWatchdog,
+            4
+        )
+        XCTAssertTrue(
+            policies.allSatisfy { $0.isFinite && $0 > 0 }
+        )
+    }
+
+    func testSystemAppMRUTerminationUsesCompatibleSharedWatchdog() {
+        let watchdog =
+            FlowTabUITestApplicationTerminationPolicy
+                .watchdogFailureObservationTimeout
+        XCTAssertEqual(watchdog, 5)
+        XCTAssertTrue(watchdog.isFinite && watchdog > 0)
+    }
+
     func testSystemAppMRURebuildsForEveryFlowTabProcessSession() throws {
         let workflow = try configuredSystemAppMRUFixtureWorkflow()
-        var initialLaunchLogSnapshot: [String: UInt64] = [:]
+        var initialLaunchLogSnapshot =
+            makeRuntimeLogFileSnapshot()
         let launchArguments = [
-            "--flowtab-ui-open-switcher",
             "--flowtab-ui-listen-switcher-trigger",
             "--flowtab-ui-runtime-log-level", "DEBUG",
             "--flowtab-ui-enable-verbose-logs",
@@ -24,20 +102,30 @@ extension FlowTabUITests {
             }
         ) { workflow, app in
             let fixtureAppIDs = workflow.apps.map(\.identity.bundleIdentifier)
-            let initialOrder = waitForWorkflowAppOrder(
+            let initialOrder = triggerAndWaitForWorkflowAppOrder(
                 fixtureAppIDs,
                 in: app,
-                timeout: 10
+                traceLabel: "system-app-mru.initial"
             )
             XCTAssertEqual(initialOrder, fixtureAppIDs)
             waitForRuntimeLogFiles(
                 containing: ["collectAppRank", "bootstrapFallback=0"],
                 since: initialLaunchLogSnapshot,
-                timeout: 10
+                timeout:
+                    FlowTabUITestSystemAppMRUPolicy
+                        .appRankBootstrapLogWatchdog
             )
 
-            app.terminate()
-            waitForFlowTabUITestApplicationToTerminate(app, timeout: 5)
+            let terminationEvidence = terminateFlowTabUITestApplication(
+                app,
+                targetDescription:
+                    "System App MRU initial FlowTab process"
+            )
+            XCTAssertTrue(
+                terminationEvidence.isSatisfied,
+                "FlowTab did not terminate before the MRU relaunch phase. "
+                    + terminationEvidence.diagnosticSummary
+            )
             let relaunchedExpectedOrder = [3, 7, 1, 5, 0, 6, 2, 4].map { fixtureAppIDs[$0] }
             establishSystemAppOrder(relaunchedExpectedOrder)
             let relaunchedLogSnapshot = makeRuntimeLogFileSnapshot()
@@ -52,38 +140,48 @@ extension FlowTabUITests {
                 }
             }
             launchFlowTabUITestApplication(relaunchedApp, traceLabel: "system-app-mru.relaunch")
-            XCTAssertTrue(
+            let relaunchedAppBecameReady =
                 waitForFlowTabUITestApplicationToBecomeReady(
                     relaunchedApp,
-                    timeout: 12,
+                    timeout:
+                        FlowTabUITestSupportWatchdogPolicy
+                            .foregroundActivation,
                     traceLabel: "system-app-mru.relaunch"
                 )
+            XCTAssertTrue(
+                relaunchedAppBecameReady,
+                "Relaunched FlowTab did not become foreground-ready before "
+                    + "the System MRU rebuilt-order trigger. "
+                    + "finalState=\(String(describing: relaunchedApp.state))"
             )
 
-            let rebuiltOrder = waitForWorkflowAppOrder(
-                fixtureAppIDs,
+            let rebuiltOrder = triggerAndWaitForWorkflowAppOrder(
+                relaunchedExpectedOrder,
                 in: relaunchedApp,
-                timeout: 10
+                traceLabel: "system-app-mru.relaunch-order"
             )
             XCTAssertEqual(rebuiltOrder, relaunchedExpectedOrder)
             XCTAssertNotEqual(rebuiltOrder, initialOrder)
             waitForRuntimeLogFiles(
                 containing: ["collectAppRank", "bootstrapFallback=0"],
                 since: relaunchedLogSnapshot,
-                timeout: 10
+                timeout:
+                    FlowTabUITestSystemAppMRUPolicy
+                        .appRankBootstrapLogWatchdog
             )
 
             for iteration in 1...10 {
-                relaunchedApp.typeKey(.escape, modifierFlags: [])
-                RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-                postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
-                    .global,
-                    traceLabel: "system-app-mru.reopen.\(iteration)"
-                )
-                let reopenedOrder = waitForWorkflowAppOrder(
-                    fixtureAppIDs,
+                dismissSwitcherAndWait(
                     in: relaunchedApp,
-                    timeout: 10
+                    timeout:
+                        FlowTabUITestSystemAppMRUPolicy
+                            .switcherDismissalWatchdog
+                )
+                let reopenedOrder = triggerAndWaitForWorkflowAppOrder(
+                    relaunchedExpectedOrder,
+                    in: relaunchedApp,
+                    traceLabel:
+                        "system-app-mru.reopen.\(iteration)"
                 )
                 XCTAssertEqual(reopenedOrder, relaunchedExpectedOrder)
             }
@@ -116,61 +214,100 @@ extension FlowTabUITests {
 
     private func establishSystemAppOrder(_ orderedAppIDs: [String]) {
         for bundleIdentifier in orderedAppIDs.reversed() {
-            XCUIApplication(bundleIdentifier: bundleIdentifier).activate()
-            XCTAssertTrue(
-                waitForFrontmostBundleIdentifier(bundleIdentifier, timeout: 5),
-                "Failed to establish the fixture application activation Oracle."
-            )
+            assertTriggerMakesApplicationFrontmost(
+                bundleIdentifier,
+                timeout:
+                    FlowTabUITestSystemAppMRUPolicy
+                        .fixtureActivationWatchdog,
+                message: "Failed to establish the fixture application activation Oracle."
+            ) {
+                XCUIApplication(
+                    bundleIdentifier: bundleIdentifier
+                ).activate()
+            }
         }
     }
 
-    private func waitForWorkflowAppOrder(
+    private func triggerAndWaitForWorkflowAppOrder(
         _ expectedAppIDs: [String],
         in app: XCUIApplication,
-        timeout: TimeInterval
+        traceLabel: String
     ) -> [String] {
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let expectedSet = Set(expectedAppIDs)
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestOrder: [String] = []
-
-        repeat {
-            if diagnosticsSummary.exists {
-                latestOrder = switcherPanelDiagnosticsValue(
-                    diagnosticsSummary,
-                    key: "apps"
+        let owner = FlowTabUITestConditionObservationOwner(
+            observationRegistration:
+                FlowTabUITestConditionReadbackScheduler
+                    .mainRunLoopRegistration(
+                        cadence:
+                            FlowTabUITestConditionObservationPolicy
+                                .xcuiReadbackCadence
+                    ),
+            readback: {
+                FlowTabUITestWorkflowAppOrderEvidence(
+                    diagnosticsValue: diagnosticsSummary.exists
+                        ? self.switcherPanelDiagnosticsValue(
+                            diagnosticsSummary,
+                            key: "apps"
+                        )
+                        : nil,
+                    expectedAppIdentifiers: expectedSet
                 )
-                .split(separator: "|")
-                .compactMap { entry in
-                    entry.split(separator: ":", maxSplits: 1).first.map(String.init)
-                }
-                .filter(expectedSet.contains)
-                if latestOrder.count == expectedAppIDs.count
-                    && Set(latestOrder) == expectedSet {
-                    return latestOrder
-                }
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
+            },
+            isSatisfied: { evidence in
+                evidence.matches(expectedAppIDs)
+            },
+            describe: \.diagnosticSummary
+        )
+        owner.start()
+        defer { owner.cancel() }
+
+        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+            .global,
+            traceLabel: traceLabel
+        )
+        if let evidence = owner.waitForResolution(
+            timeout: FlowTabUITestSystemAppMRUPolicy.appOrderWatchdog
+        ) {
+            return evidence.value.order
+        }
 
         XCTFail(
-            "Expected workflow app order \(expectedAppIDs), observed \(latestOrder). "
+            "Expected workflow app order \(expectedAppIDs). "
+                + "\(owner.diagnosticSummary). "
                 + switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary)
         )
-        return latestOrder
+        return owner.latestEvidence?.value.order ?? []
     }
 
-    private func waitForFlowTabUITestApplicationToTerminate(
-        _ app: XCUIApplication,
+    private func dismissSwitcherAndWait(
+        in app: XCUIApplication,
         timeout: TimeInterval
     ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if app.state == .notRunning {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        XCTFail("FlowTab did not terminate before the MRU relaunch phase.")
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: diagnosticsSummary
+        )
+        expectation.expectationDescription =
+            "System MRU switcher summary disappears after Escape"
+
+        app.typeKey(.escape, modifierFlags: [])
+
+        XCTAssertEqual(
+            XCTWaiter.wait(
+                for: [expectation],
+                timeout: timeout
+            ),
+            .completed,
+            "Switcher did not dismiss after Escape. "
+                + switcherDebugSummary(
+                    app,
+                    diagnosticsSummary: diagnosticsSummary
+                )
+        )
     }
 }

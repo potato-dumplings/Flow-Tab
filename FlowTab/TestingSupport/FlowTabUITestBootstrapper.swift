@@ -4,10 +4,25 @@ import Foundation
 
 @MainActor
 enum FlowTabUITestBootstrapper {
+    static let seededLogCategory = "UITestSeed"
+
     private static var hotkeyReloadDiagnosticsObserver: NSObjectProtocol?
     private static var switcherTriggerObservers: [SwitcherTriggerNotificationObserver] = []
     private static var switcherCommandObservers: [SwitcherCommandNotificationObserver] = []
-    private static var initialPanelOcclusionStaleGeneration = 0
+    static var initialPanelOcclusionStalenessOwner:
+        FlowTabUITestInitialPanelOcclusionStalenessOwner?
+    private static var mockWindowPreviewLatencyGeneration:
+        UInt64 = 0
+    private static var mockWindowPreviewLatencyOwner:
+        FlowTabUITestMockWindowPreviewLatencyOwner?
+    private static var mockWindowPreviewLatencyCaptureReset:
+        (() -> Void)?
+    static var initialPresentationObservationOwner:
+        FlowTabUITestInitialPresentationObservationOwner?
+    static var initialPresentationInputReadinessObservationOwner:
+        FlowTabUITestInitialPresentationInputReadinessObservationOwner?
+    static var initialSearchActivationObservationOwner:
+        FlowTabUITestInitialSearchActivationObservationOwner?
 
     private enum SwitcherTriggerNotification {
         static let global = Notification.Name("io.github.potato-dumplings.flowtab.ui-test.open-global-switcher")
@@ -40,15 +55,36 @@ enum FlowTabUITestBootstrapper {
         static let confirm = Notification.Name(
             "io.github.potato-dumplings.flowtab.ui-test.switcher-command.confirm"
         )
+        static let runtimeLogProbe = Notification.Name(
+            "io.github.potato-dumplings.flowtab.ui-test.switcher-command.runtime-log-probe"
+        )
     }
 
     static func prepareIfNeeded(userDefaults: UserDefaults = .standard) {
+        stopInitialPanelOcclusionStalenessInjection()
+        stopMockWindowPreviewLatencyInjection()
+        stopInitialUIPresentationObservation()
         if FlowTabTestLaunchOptions.isRunningUITests {
             RuntimeWindowRecencyTracker.shared.removeAll()
         }
 
         installMockRuntimeProjectionServiceIfNeeded()
         installFrontmostRuntimeProjectionOverrideIfNeeded()
+        FlowTabUITestCurrentAppProjectionEvidenceBootstrap
+            .prepareIfNeeded(
+                service: resolvedRuntimeProjectionService
+            )
+        FlowTabUITestProjectionAcknowledgementBootstrap
+            .prepareIfNeeded(
+                service: resolvedRuntimeProjectionService
+            )
+        FlowTabUITestHomeInitialProjectionApplicationBootstrap
+            .prepareIfNeeded(
+                service: resolvedRuntimeProjectionService
+            )
+        FlowTabUITestAXSuppressionReadbackBootstrap
+            .prepareIfNeeded()
+        FlowTabUITestShortcutEventInjectionBootstrap.prepareIfNeeded()
 
         if FlowTabTestLaunchOptions.resetsUserDefaultsOnLaunch {
             AppPreferenceKeys.allKeys.forEach { userDefaults.removeObject(forKey: $0) }
@@ -62,13 +98,14 @@ enum FlowTabUITestBootstrapper {
             FlowTabUITestMockRuntimeEffects.reset()
         }
 
-        if let runtimeLogLevelRaw = FlowTabTestLaunchOptions.runtimeLogLevelOverrideRawValue {
+        let runtimeLogLevelRaw =
+            FlowTabTestLaunchOptions.runtimeLogLevelOverrideRawValue
+            ?? (FlowTabTestLaunchOptions.enablesVerboseRuntimeLogs
+                ? RuntimeLogLevel.debug.rawValue
+                : nil)
+        if let runtimeLogLevelRaw {
             let resolved = RuntimeLogPreferencesStore.resolve(rawValue: runtimeLogLevelRaw)
             userDefaults.set(resolved.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
-        }
-
-        if FlowTabTestLaunchOptions.enablesVerboseRuntimeLogs {
-            RuntimeDiagnosticSessionStore.start(userDefaults: userDefaults)
         }
 
         installHotkeyReloadDiagnosticsIfNeeded()
@@ -82,7 +119,7 @@ enum FlowTabUITestBootstrapper {
                     let level = seededLevels[(index - 1) % seededLevels.count]
                     RuntimeDiagnostics.shared.log(
                         level: level,
-                        category: "UITest",
+                        category: seededLogCategory,
                         message: "seeded-\(level.rawValue.lowercased())-log-\(index)"
                     )
                 }
@@ -135,9 +172,16 @@ enum FlowTabUITestBootstrapper {
     private static func installMockRuntimeProjectionServiceIfNeeded() {
         guard FlowTabTestLaunchOptions.usesMockRuntimeProjection else { return }
         guard AppDelegate.testHooks.runtimeProjectionService == nil else { return }
+        let axWindowRepairAvailability: (@Sendable () -> Bool)?
+        if FlowTabTestLaunchOptions.keepsMockHomeProjectionDegraded {
+            axWindowRepairAvailability = { false }
+        } else {
+            axWindowRepairAvailability = nil
+        }
         let service = RuntimeProjectionService(
             label: "FlowTab.UITest.MockRuntimeProjectionService",
-            appDirectoryProvider: RuntimeUITestProjectionAppDirectoryProvider()
+            appDirectoryProvider: RuntimeUITestProjectionAppDirectoryProvider(),
+            axWindowRepairAvailability: axWindowRepairAvailability
         )
         AppDelegate.testHooks.runtimeProjectionService = service
         service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
@@ -205,15 +249,51 @@ enum FlowTabUITestBootstrapper {
     private static func installMockWindowPreviewsIfNeeded(
         panelController: SwitcherPanelController
     ) {
+        stopMockWindowPreviewLatencyInjection()
+        let model = panelController.modelForTesting
+        model.previewCaptureOverride = nil
+        model.previewCaptureBatchOverride = nil
         guard FlowTabTestLaunchOptions.usesMockWindowPreviews else { return }
         if let rawDelay = FlowTabTestLaunchOptions.mockWindowPreviewDelayMilliseconds {
-            let delayMilliseconds = max(1, min(rawDelay, 1_000))
+            let policy =
+                FlowTabUITestMockWindowPreviewLatencyPolicy(
+                    rawMilliseconds: rawDelay
+                )
+            mockWindowPreviewLatencyGeneration &+= 1
+            let owner =
+                FlowTabUITestMockWindowPreviewLatencyOwner(
+                    generation:
+                        mockWindowPreviewLatencyGeneration,
+                    policy: policy
+                ) { evidence in
+                    RuntimeLog.info(
+                        "UITest",
+                        "mock window preview latency "
+                            + evidence.logFields
+                    )
+                }
+            mockWindowPreviewLatencyOwner = owner
             let previewImage = makeMockWindowPreviewImage(
                 title: "Delayed Preview",
                 cgWindowID: nil
             )
-            panelController.modelForTesting.previewCaptureBatchOverride = { requests in
-                Thread.sleep(forTimeInterval: Double(delayMilliseconds) / 1_000)
+            model.previewCaptureBatchOverride = {
+                [weak owner] requests in
+                guard let owner else {
+                    return Array(
+                        repeating: nil,
+                        count: requests.count
+                    )
+                }
+                let evidence = owner.waitBeforeCapture(
+                    requestCount: requests.count
+                )
+                guard evidence.outcome == .elapsed else {
+                    return Array(
+                        repeating: nil,
+                        count: requests.count
+                    )
+                }
                 return requests.map { request in
                     RuntimeWindowPreviewProvider.CaptureResult(
                         image: previewImage,
@@ -223,9 +303,13 @@ enum FlowTabUITestBootstrapper {
                     )
                 }
             }
+            mockWindowPreviewLatencyCaptureReset = {
+                [weak model] in
+                model?.previewCaptureBatchOverride = nil
+            }
             return
         }
-        panelController.modelForTesting.previewCaptureOverride = { cgWindowID, _, title, inferTitleBarStyle in
+        model.previewCaptureOverride = { cgWindowID, _, title, inferTitleBarStyle in
             (
                 image: makeMockWindowPreviewImage(
                     title: title ?? "Window",
@@ -235,6 +319,25 @@ enum FlowTabUITestBootstrapper {
                 titleBarStyle: inferTitleBarStyle ? .dark : nil
             )
         }
+    }
+
+    static func stopMockWindowPreviewLatencyInjection() {
+        mockWindowPreviewLatencyOwner?.cancel()
+        mockWindowPreviewLatencyOwner = nil
+        mockWindowPreviewLatencyCaptureReset?()
+        mockWindowPreviewLatencyCaptureReset = nil
+    }
+
+    static var mockWindowPreviewLatencyGenerationForTesting:
+        UInt64
+    {
+        mockWindowPreviewLatencyGeneration
+    }
+
+    static var isMockWindowPreviewLatencyInjectionActiveForTesting:
+        Bool
+    {
+        mockWindowPreviewLatencyOwner != nil
     }
 
     private static func makeMockWindowPreviewImage(
@@ -284,33 +387,6 @@ enum FlowTabUITestBootstrapper {
     nonisolated private static func normalizedMockWindowTitle(_ title: String?) -> String {
         let normalized = (title ?? "Window").trimmingCharacters(in: .whitespacesAndNewlines)
         return normalized.isEmpty ? "Window" : normalized
-    }
-
-    fileprivate static func installInitialPanelOcclusionStaleOverrideIfNeeded(
-        panelController: SwitcherPanelController
-    ) {
-        guard let rawMilliseconds = FlowTabTestLaunchOptions.initialPanelOcclusionStaleMilliseconds else {
-            return
-        }
-        let milliseconds = max(1, min(rawMilliseconds, 5_000))
-        initialPanelOcclusionStaleGeneration += 1
-        let generation = initialPanelOcclusionStaleGeneration
-        panelController.panelOcclusionStateOverride = []
-        RuntimeLog.info(
-            "UITest",
-            "initial panel occlusion stale installed generation=\(generation) ms=\(milliseconds)"
-        )
-
-        Task { @MainActor [weak panelController] in
-            try? await Task.sleep(nanoseconds: UInt64(milliseconds) * 1_000_000)
-            guard generation == initialPanelOcclusionStaleGeneration else { return }
-            panelController?.panelOcclusionStateOverride = .visible
-            panelController?.handlePanelOcclusionStateDidChangeForTesting()
-            RuntimeLog.info(
-                "UITest",
-                "initial panel occlusion stale released generation=\(generation) ms=\(milliseconds)"
-            )
-        }
     }
 
     private static func installSwitcherTriggerNotificationsIfNeeded(
@@ -389,6 +465,11 @@ enum FlowTabUITestBootstrapper {
                 name: SwitcherCommandNotification.confirm,
                 panelController: panelController,
                 command: .confirm
+            ),
+            SwitcherCommandNotificationObserver(
+                name: SwitcherCommandNotification.runtimeLogProbe,
+                panelController: panelController,
+                command: .runtimeLogProbe
             )
         ]
         switcherCommandObservers.forEach { $0.install(in: center) }
@@ -421,153 +502,6 @@ enum FlowTabUITestBootstrapper {
         }
     }
 
-    static func presentInitialUIIfNeeded(panelController: SwitcherPanelController) {
-        guard FlowTabTestLaunchOptions.opensSwitcherOnLaunch else { return }
-        panelController.setModifierReleaseConfirmationSuppressedForTesting(true)
-
-        Task { @MainActor in
-            let retrySleepNanoseconds: UInt64 = 150_000_000
-            let maxAttempts = 20
-            let requiredStableSnapshotCount = 2
-            var lastObservedSnapshotSignature: [String] = []
-            var stableSnapshotCount = 0
-
-            for attempt in 0..<maxAttempts {
-                if presentLaunchSwitcher(panelController: panelController) {
-                    let snapshotSignature = launchSwitcherSnapshotSignature(
-                        panelController: panelController
-                    )
-                    if snapshotSignature == lastObservedSnapshotSignature {
-                        stableSnapshotCount += 1
-                    } else {
-                        lastObservedSnapshotSignature = snapshotSignature
-                        stableSnapshotCount = 1
-                    }
-
-                    if stableSnapshotCount >= requiredStableSnapshotCount {
-                        if FlowTabTestLaunchOptions.entersSearchOnLaunch {
-                            _ = panelController.enterSearchModeIfPossible()
-                        }
-                        return
-                    }
-
-                    panelController.cancelSelectionForTesting()
-                } else {
-                    lastObservedSnapshotSignature = []
-                    stableSnapshotCount = 0
-                }
-
-                guard attempt < maxAttempts - 1 else { return }
-                try? await Task.sleep(nanoseconds: retrySleepNanoseconds)
-            }
-        }
-    }
-
-    private static func presentLaunchSwitcher(panelController: SwitcherPanelController) -> Bool {
-        installInitialPanelOcclusionStaleOverrideIfNeeded(panelController: panelController)
-        if FlowTabTestLaunchOptions.opensInAppWindowSwitcherOnLaunch {
-            return panelController.presentInAppWindowHotkeySessionForTesting()
-        }
-        return panelController.presentGlobalHotkeySessionForTesting()
-    }
-
-    private static func launchSwitcherSnapshotSignature(
-        panelController: SwitcherPanelController
-    ) -> [String] {
-        guard let session = panelController.modelForTesting.session else { return [] }
-        if FlowTabTestLaunchOptions.opensInAppWindowSwitcherOnLaunch {
-            return session.apps.flatMap { app in
-                [app.id] + app.windows.map(\.id)
-            }
-        }
-        return session.apps.map(\.id)
-    }
-}
-
-private final class SwitcherTriggerNotificationObserver: NSObject {
-    enum Trigger: Sendable {
-        case global
-        case inApp
-        case search
-    }
-
-    private let name: Notification.Name
-    private weak var panelController: SwitcherPanelController?
-    private let trigger: Trigger
-
-    init(
-        name: Notification.Name,
-        panelController: SwitcherPanelController,
-        trigger: Trigger
-    ) {
-        self.name = name
-        self.panelController = panelController
-        self.trigger = trigger
-        super.init()
-    }
-
-    func install(in center: CFNotificationCenter?) {
-        CFNotificationCenterAddObserver(
-            center,
-            UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque()),
-            Self.handleDarwinNotification,
-            name.rawValue as CFString,
-            nil,
-            .deliverImmediately
-        )
-    }
-
-    func uninstall(from center: CFNotificationCenter?) {
-        let notificationName = CFNotificationName(name.rawValue as CFString)
-        CFNotificationCenterRemoveObserver(
-            center,
-            UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque()),
-            notificationName,
-            nil
-        )
-    }
-
-    private static let handleDarwinNotification: CFNotificationCallback = { _, observer, name, _, _ in
-        guard let observer else { return }
-        let notificationObserver = Unmanaged<SwitcherTriggerNotificationObserver>
-            .fromOpaque(observer)
-            .takeUnretainedValue()
-        notificationObserver.handleDarwinNotification(name: name.map { $0.rawValue as String })
-    }
-
-    private func handleDarwinNotification(name receivedName: String?) {
-        guard let panelController else { return }
-        let notificationName = receivedName ?? name.rawValue
-        let trigger = trigger
-        Task { @MainActor [panelController, notificationName, trigger] in
-            panelController.setModifierReleaseConfirmationSuppressedForTesting(true)
-            RuntimeLog.info("UITest", "received switcher trigger notification name=\(notificationName)")
-            let presented = Self.presentSwitcher(trigger, panelController: panelController)
-            RuntimeLog.info(
-                "UITest",
-                "completed switcher trigger notification name=\(notificationName) presented=\(presented ? 1 : 0)"
-            )
-        }
-    }
-
-    @MainActor
-    private static func presentSwitcher(
-        _ trigger: Trigger,
-        panelController: SwitcherPanelController
-    ) -> Bool {
-        FlowTabUITestBootstrapper.installInitialPanelOcclusionStaleOverrideIfNeeded(
-            panelController: panelController
-        )
-        switch trigger {
-        case .global:
-            return panelController.presentGlobalHotkeySessionForTesting()
-        case .inApp:
-            FlowTabUITestBootstrapper.synchronizeFrontmostAppOverrideIfNeeded()
-            return panelController.presentInAppWindowHotkeySessionForTesting()
-        case .search:
-            return panelController.presentSearchHotkeySessionForTesting()
-        }
-    }
 }
 
 private final class SwitcherCommandNotificationObserver: NSObject {
@@ -580,11 +514,14 @@ private final class SwitcherCommandNotificationObserver: NSObject {
         case selectSearchResult
         case searchConfirm
         case confirm
+        case runtimeLogProbe
     }
 
     private let name: Notification.Name
     private weak var panelController: SwitcherPanelController?
     private let command: Command
+    private let hotkeyInputSourceID = HotkeyInputSourceID()
+    private var hotkeyInputSequence: UInt64 = 0
 
     init(
         name: Notification.Name,
@@ -630,12 +567,13 @@ private final class SwitcherCommandNotificationObserver: NSObject {
         guard let panelController else { return }
         let notificationName = receivedName ?? name.rawValue
         let command = command
-        Task { @MainActor [panelController, notificationName, command] in
+        Task { @MainActor [weak self, panelController, notificationName, command] in
+            guard let self else { return }
             RuntimeLog.info(
                 "UITest",
                 "received switcher command notification name=\(notificationName) command=\(command.rawValue)"
             )
-            Self.perform(command, panelController: panelController)
+            self.perform(command, panelController: panelController)
             RuntimeLog.info(
                 "UITest",
                 "completed switcher command notification name=\(notificationName) command=\(command.rawValue)"
@@ -644,28 +582,42 @@ private final class SwitcherCommandNotificationObserver: NSObject {
     }
 
     @MainActor
-    private static func perform(
+    private func perform(
         _ command: Command,
         panelController: SwitcherPanelController
     ) {
         switch command {
         case .inAppForward:
-            panelController.inAppPrimaryModifierPressedOverride = true
-            panelController.handleInAppWindowHotkey(isBackward: false)
-            panelController.inAppPrimaryModifierPressedOverride = nil
+            hotkeyInputSequence &+= 1
+            panelController.registerHotkeyInputSource(
+                hotkeyInputSourceID,
+                for: .inAppWindowSwitcher
+            )
+            panelController.inAppHotkeyHoldSetPressedOverride = true
+            panelController.handleInAppWindowHotkeyInput(
+                HotkeyInputEvent(
+                    identity: HotkeyInputEventIdentity(
+                        sourceID: hotkeyInputSourceID,
+                        sequence: hotkeyInputSequence
+                    ),
+                    phase: .pressed,
+                    isBackward: false
+                )
+            )
+            panelController.inAppHotkeyHoldSetPressedOverride = nil
         case .advanceDown:
             panelController.advance(.downArrow)
         case .advanceRight:
             panelController.advance(.rightArrow)
         case .searchQuery:
-            guard let query = switcherCommandPayload() else { return }
+            guard let query = Self.switcherCommandPayload() else { return }
             panelController.modelForTesting.synchronizeSearchInput(
                 query: query,
                 cursorPosition: query.count
             )
         case .selectApp:
             guard
-                let appID = switcherCommandPayload()?
+                let appID = Self.switcherCommandPayload()?
                     .trimmingCharacters(in: .whitespacesAndNewlines),
                 !appID.isEmpty,
                 var session = panelController.modelForTesting.session
@@ -682,7 +634,7 @@ private final class SwitcherCommandNotificationObserver: NSObject {
             RuntimeLog.info("UITest", "select app command applied appID=\(appID)")
         case .selectSearchResult:
             guard
-                let resultID = switcherCommandPayload()?
+                let resultID = Self.switcherCommandPayload()?
                     .trimmingCharacters(in: .whitespacesAndNewlines),
                 !resultID.isEmpty
             else {
@@ -704,6 +656,12 @@ private final class SwitcherCommandNotificationObserver: NSObject {
             panelController.finishSelection()
         case .confirm:
             panelController.finishSelection()
+        case .runtimeLogProbe:
+            RuntimeDiagnostics.shared.log(
+                level: .info,
+                category: "UITest",
+                message: "runtime log observation probe"
+            )
         }
     }
 

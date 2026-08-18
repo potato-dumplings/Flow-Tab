@@ -96,8 +96,16 @@ class AppKitSettingsCardBaseView: NSView {
         ])
     }
 
-    static func makeControlRow(title: String, control: NSView) -> AppKitSettingsControlRow {
-        AppKitSettingsControlRow(title: title, control: control)
+    static func makeControlRow(
+        title: String,
+        control: NSView,
+        validationIdentifier: String? = nil
+    ) -> AppKitSettingsControlRow {
+        AppKitSettingsControlRow(
+            title: title,
+            control: control,
+            validationIdentifier: validationIdentifier
+        )
     }
 
     static func makeBodyLabel(_ token: FlowTypography.Token = .cardSubtitle) -> NSTextField {
@@ -166,16 +174,26 @@ class AppKitSettingsCardBaseView: NSView {
 final class AppKitSettingsControlRow: NSStackView {
     private let titleLabel = NSTextField(labelWithString: "")
     private let spacer = NSView()
+    private let control: NSView
+    private let controlRow = NSStackView()
+    private let validationContainer = NSView()
+    private let validationLabel = AppKitSettingsCardBaseView.makeStatusLabel(.micro)
 
-    init(title: String, control: NSView) {
+    init(
+        title: String,
+        control: NSView,
+        validationIdentifier: String? = nil
+    ) {
+        self.control = control
         super.init(frame: .zero)
-        buildViewHierarchy(control: control)
+        buildViewHierarchy(validationIdentifier: validationIdentifier)
         updateTitle(title)
     }
 
     required init?(coder: NSCoder) {
+        control = NSView()
         super.init(coder: coder)
-        buildViewHierarchy(control: NSView())
+        buildViewHierarchy(validationIdentifier: nil)
     }
 
     func updateTitle(_ title: String) {
@@ -183,7 +201,16 @@ final class AppKitSettingsControlRow: NSStackView {
         invalidateIntrinsicContentSize()
     }
 
-    private func buildViewHierarchy(control: NSView) {
+    func updateValidationMessage(_ message: String?) {
+        let resolvedMessage = message.flatMap { $0.isEmpty ? nil : $0 }
+        validationLabel.stringValue = resolvedMessage ?? ""
+        validationLabel.isHidden = resolvedMessage == nil
+        validationContainer.isHidden = resolvedMessage == nil
+        control.setAccessibilityHelp(resolvedMessage)
+        invalidateIntrinsicContentSize()
+    }
+
+    private func buildViewHierarchy(validationIdentifier: String?) {
         titleLabel.font = FlowTypography.appKit(.formLabel)
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.maximumNumberOfLines = 1
@@ -193,14 +220,42 @@ final class AppKitSettingsControlRow: NSStackView {
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        orientation = .horizontal
-        alignment = .centerY
-        spacing = 10
+        controlRow.orientation = .horizontal
+        controlRow.alignment = .centerY
+        controlRow.spacing = 10
+        controlRow.detachesHiddenViews = true
+        controlRow.translatesAutoresizingMaskIntoConstraints = false
+        controlRow.addArrangedSubview(titleLabel)
+        controlRow.addArrangedSubview(spacer)
+        controlRow.addArrangedSubview(control)
+
+        validationLabel.textColor = .systemRed
+        validationLabel.alignment = .center
+        validationLabel.isHidden = true
+        validationLabel.translatesAutoresizingMaskIntoConstraints = false
+        if let validationIdentifier {
+            validationLabel.setFlowTabTestingIdentifier(validationIdentifier)
+        }
+        validationContainer.isHidden = true
+        validationContainer.translatesAutoresizingMaskIntoConstraints = false
+        validationContainer.addSubview(validationLabel)
+
+        orientation = .vertical
+        alignment = .leading
+        spacing = 4
         detachesHiddenViews = true
         translatesAutoresizingMaskIntoConstraints = false
-        addArrangedSubview(titleLabel)
-        addArrangedSubview(spacer)
-        addArrangedSubview(control)
+        addArrangedSubview(controlRow)
+        addArrangedSubview(validationContainer)
+
+        NSLayoutConstraint.activate([
+            controlRow.widthAnchor.constraint(equalTo: widthAnchor),
+            validationContainer.widthAnchor.constraint(equalTo: widthAnchor),
+            validationLabel.leadingAnchor.constraint(equalTo: control.leadingAnchor),
+            validationLabel.trailingAnchor.constraint(equalTo: control.trailingAnchor),
+            validationLabel.topAnchor.constraint(equalTo: validationContainer.topAnchor),
+            validationLabel.bottomAnchor.constraint(equalTo: validationContainer.bottomAnchor)
+        ])
     }
 }
 

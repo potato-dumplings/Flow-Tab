@@ -1,0 +1,89 @@
+ObjC.import("AppKit");
+
+function unwrap(value, label) {
+  if (!value || (typeof value.isNil === "function" && value.isNil())) {
+    throw new Error(`Missing ${label}.`);
+  }
+  return String(ObjC.unwrap(value));
+}
+
+function standardizedPath(path) {
+  const resolvedURL = $.NSURL.fileURLWithPath(String(path))
+    .standardizedURL
+    .URLByResolvingSymlinksInPath;
+  return unwrap(
+    resolvedURL.path,
+    "standardized path"
+  );
+}
+
+function record(application) {
+  const launchDate = application.launchDate;
+  if (!launchDate || launchDate.isNil()) {
+    throw new Error("Missing launch date.");
+  }
+  return {
+    bundleIdentifier: unwrap(application.bundleIdentifier, "bundle identifier"),
+    bundlePath: standardizedPath(unwrap(application.bundleURL.path, "bundle path")),
+    executablePath: standardizedPath(
+      unwrap(application.executableURL.path, "executable path")
+    ),
+    launchDateSeconds: Number(launchDate.timeIntervalSinceReferenceDate),
+    processIdentifier: Number(application.processIdentifier),
+  };
+}
+
+function activeApplications(bundleIdentifier) {
+  const applications = $.NSRunningApplication
+    .runningApplicationsWithBundleIdentifier(bundleIdentifier);
+  const records = [];
+  for (let index = 0; index < Number(applications.count); index += 1) {
+    const application = applications.objectAtIndex(index);
+    if (!Boolean(application.terminated)) {
+      records.push(record(application));
+    }
+  }
+  return records;
+}
+
+function launchApplication(path) {
+  const error = $();
+  const application = $.NSWorkspace.sharedWorkspace
+    .launchApplicationAtURLOptionsConfigurationError(
+      $.NSURL.fileURLWithPath(path),
+      $.NSWorkspaceLaunchNewInstance,
+      $.NSDictionary.dictionary,
+      error
+    );
+  if (application.isNil()) {
+    throw new Error(`Unable to launch fixture: ${error.localizedDescription.js}`);
+  }
+  return record(application);
+}
+
+function forceTerminateAll(bundleIdentifier) {
+  const applications = $.NSRunningApplication
+    .runningApplicationsWithBundleIdentifier(bundleIdentifier);
+  for (let index = 0; index < Number(applications.count); index += 1) {
+    applications.objectAtIndex(index).forceTerminate;
+  }
+  return true;
+}
+
+function run(arguments) {
+  if (arguments.length < 2) {
+    throw new Error("Expected an operation and value.");
+  }
+  const operation = arguments[0];
+  if (operation === "launch") {
+    return JSON.stringify(launchApplication(arguments[1]));
+  }
+  if (operation === "active") {
+    return JSON.stringify(activeApplications(arguments[1]));
+  }
+  if (operation === "force-all") {
+    forceTerminateAll(arguments[1]);
+    return "forced";
+  }
+  throw new Error(`Unknown operation: ${operation}`);
+}

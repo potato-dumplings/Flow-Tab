@@ -163,6 +163,7 @@ final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSett
         searchEnabledSwitch.action = #selector(handleSearchEnabledChanged)
         searchEnabledSwitch.setFlowTabTestingIdentifier("flowtab.settings.search.enabled")
         searchDefaultScopeSelect.setFlowTabTestingIdentifier("flowtab.settings.search.default-scope")
+        summaryLabel.setFlowTabTestingIdentifier("flowtab.settings.search.summary")
         searchDefaultScopeSelect.onSelectionChanged = { [weak self] rawValue in
             self?.handleSearchDefaultScopeChanged(rawValue)
         }

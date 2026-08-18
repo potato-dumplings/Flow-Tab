@@ -207,15 +207,29 @@ extension FlowTabTests {
         )
 
         let hotkeyCard = try sectionCard(in: container.pageView, containingText: "快捷键")
-        try assertTextFieldIsVisiblyLaidOut("主修饰键", in: hotkeyCard)
-        try assertControlIsVisiblyLaidOut(
-            identifier: "flowtab.settings.hotkey.main-modifier",
-            in: hotkeyCard
-        )
-        try assertControlIsVisiblyLaidOut(
-            identifier: "flowtab.settings.hotkey.in-app-key",
-            in: hotkeyCard
-        )
+        for label in [
+            "主修饰键",
+            "反向修饰键",
+            "主切换按键",
+            "结束应用按键",
+            "应用内窗口",
+            "应用内反向修饰键"
+        ] {
+            try assertTextFieldIsVisiblyLaidOut(label, in: hotkeyCard)
+        }
+        for identifier in [
+            "flowtab.settings.hotkey.main-modifiers",
+            "flowtab.settings.hotkey.main-reverse-modifiers",
+            "flowtab.settings.hotkey.main-key",
+            "flowtab.settings.hotkey.quit-key",
+            "flowtab.settings.hotkey.in-app-shortcut",
+            "flowtab.settings.hotkey.in-app-reverse-modifiers"
+        ] {
+            try assertControlIsVisiblyLaidOut(
+                identifier: identifier,
+                in: hotkeyCard
+            )
+        }
     }
 
     @MainActor
@@ -345,165 +359,6 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testSettingsRootThemeSwitchMatchesColdDarkLayoutInSwiftUIHost() throws {
-        let previousSelectedTab = HomeTabState.shared.selectedTab
-        let previousLanguageRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.appLanguage)
-        let previousThemeRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.themeMode)
-        let previousPresentationContext = FlowPresentationState.shared.context
-        HomeTabState.shared.selectedTab = .settings
-        FlowPresentationState.shared.setAppLanguage(rawValue: AppLanguage.english.rawValue)
-        FlowPresentationState.shared.setThemeMode(rawValue: ThemeMode.light.rawValue)
-        defer {
-            HomeTabState.shared.selectedTab = previousSelectedTab
-            FlowPresentationState.shared.setAppLanguage(rawValue: previousPresentationContext.appLanguage.rawValue)
-            FlowPresentationState.shared.setThemeMode(rawValue: previousPresentationContext.themeMode.rawValue)
-            restoreStandardUserDefaultsValue(previousLanguageRaw, forKey: AppPreferenceKeys.appLanguage)
-            restoreStandardUserDefaultsValue(previousThemeRaw, forKey: AppPreferenceKeys.themeMode)
-        }
-
-        let hostedView = NSHostingView(
-            rootView: HomeRootView()
-                .frame(width: 1_440, height: 900, alignment: .topLeading)
-        )
-        hostedView.frame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
-        hostedView.layoutSubtreeIfNeeded()
-
-        let initialContainer: AppKitSettingsPageContainerView = try XCTUnwrap(
-            descendantViews(in: hostedView).compactMap { $0 as? AppKitSettingsPageContainerView }.first
-        )
-        settleSettingsContainerLayout(initialContainer)
-
-        FlowPresentationState.shared.setThemeMode(rawValue: ThemeMode.dark.rawValue)
-
-        XCTAssertTrue(
-            waitForRunLoopCondition(timeout: 1.0) {
-                hostedView.layoutSubtreeIfNeeded()
-                let containers = descendantViews(in: hostedView)
-                    .compactMap { $0 as? AppKitSettingsPageContainerView }
-                guard containers.count == 1, let container = containers.first else { return false }
-                return container.appearance?.isFlowTabDarkInterface == true
-                    && settingsCardBackgroundIsDark(in: container.pageView)
-            },
-            "Root theme changes should rebuild or refresh Settings with the target app appearance."
-        )
-        let switchedContainer: AppKitSettingsPageContainerView = try XCTUnwrap(
-            descendantViews(in: hostedView).compactMap { $0 as? AppKitSettingsPageContainerView }.first
-        )
-        settleSettingsContainerLayout(switchedContainer)
-
-        let switchedFrames = settingsCardFramesByTitle(in: switchedContainer.pageView, relativeTo: hostedView)
-
-        let coldDarkHostedView = NSHostingView(
-            rootView: HomeRootView()
-                .frame(width: 1_440, height: 900, alignment: .topLeading)
-        )
-        coldDarkHostedView.frame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
-        coldDarkHostedView.layoutSubtreeIfNeeded()
-        XCTAssertTrue(
-            waitForRunLoopCondition(timeout: 1.0) {
-                coldDarkHostedView.layoutSubtreeIfNeeded()
-                let containers = descendantViews(in: coldDarkHostedView)
-                    .compactMap { $0 as? AppKitSettingsPageContainerView }
-                guard containers.count == 1, let container = containers.first else { return false }
-                return container.appearance?.isFlowTabDarkInterface == true
-                    && settingsCardBackgroundIsDark(in: container.pageView)
-            },
-            "Cold dark Settings should settle with the target app appearance."
-        )
-        let coldDarkContainer: AppKitSettingsPageContainerView = try XCTUnwrap(
-            descendantViews(in: coldDarkHostedView).compactMap { $0 as? AppKitSettingsPageContainerView }.first
-        )
-        settleSettingsContainerLayout(coldDarkContainer)
-        let coldDarkFrames = settingsCardFramesByTitle(in: coldDarkContainer.pageView, relativeTo: coldDarkHostedView)
-
-        XCTAssertEqual(switchedFrames.keys.sorted(), coldDarkFrames.keys.sorted())
-        for (title, switchedFrame) in switchedFrames {
-            let coldFrame = try XCTUnwrap(coldDarkFrames[title], "Missing cold dark card frame for \(title)")
-            assertFrameEqual(switchedFrame, coldFrame, accuracy: 1, message: "Hot theme switch differs from cold dark layout for \(title)")
-        }
-        try assertSettingsCardsStayNearHeader(in: switchedContainer.pageView)
-    }
-
-    @MainActor
-    func testSettingsRootFollowSystemThemeChangeRebuildsSettingsBridgeLikeExplicitSwitch() throws {
-        let aquaAppearance = try XCTUnwrap(NSAppearance(named: .aqua))
-        let darkAppearance = try XCTUnwrap(NSAppearance(named: .darkAqua))
-        let previousSelectedTab = HomeTabState.shared.selectedTab
-        let previousLanguageRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.appLanguage)
-        let previousThemeRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.themeMode)
-        let previousAppearance = NSApp.appearance
-        let previousPresentationContext = FlowPresentationState.shared.context
-        HomeTabState.shared.selectedTab = .settings
-        NSApp.appearance = aquaAppearance
-        postSystemAppearanceChangedNotification()
-        FlowPresentationState.shared.setAppLanguage(rawValue: AppLanguage.english.rawValue)
-        FlowPresentationState.shared.setThemeMode(rawValue: ThemeMode.followSystem.rawValue)
-        XCTAssertTrue(
-            waitForRunLoopCondition(timeout: 1.0) {
-                FlowPresentationState.shared.context.resolvedColorScheme == .light
-            },
-            "Test setup should settle in follow-system light mode before switching the system appearance."
-        )
-        defer {
-            HomeTabState.shared.selectedTab = previousSelectedTab
-            NSApp.appearance = previousAppearance
-            postSystemAppearanceChangedNotification()
-            FlowPresentationState.shared.setAppLanguage(rawValue: previousPresentationContext.appLanguage.rawValue)
-            FlowPresentationState.shared.setThemeMode(rawValue: previousPresentationContext.themeMode.rawValue)
-            restoreStandardUserDefaultsValue(previousLanguageRaw, forKey: AppPreferenceKeys.appLanguage)
-            restoreStandardUserDefaultsValue(previousThemeRaw, forKey: AppPreferenceKeys.themeMode)
-        }
-
-        let hostedView = NSHostingView(
-            rootView: HomeRootView()
-                .frame(width: 1_440, height: 900, alignment: .topLeading)
-        )
-        hostedView.frame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
-        hostedView.layoutSubtreeIfNeeded()
-
-        let initialContainer: AppKitSettingsPageContainerView = try XCTUnwrap(
-            descendantViews(in: hostedView).compactMap { $0 as? AppKitSettingsPageContainerView }.first
-        )
-        settleSettingsContainerLayout(initialContainer)
-        let initialContainerID = ObjectIdentifier(initialContainer)
-
-        NSApp.appearance = darkAppearance
-        postSystemAppearanceChangedNotification()
-
-        var followSystemBridgeDiagnostics = ""
-        XCTAssertTrue(
-            waitForRunLoopCondition(timeout: 1.0) {
-                hostedView.layoutSubtreeIfNeeded()
-                let containers = descendantViews(in: hostedView)
-                    .compactMap { $0 as? AppKitSettingsPageContainerView }
-                guard containers.count == 1, let container = containers.first else { return false }
-                let context = FlowPresentationState.shared.context
-                let rebuiltContainer = ObjectIdentifier(container) != initialContainerID
-                let containerIsDark = container.appearance?.isFlowTabDarkInterface == true
-                let cardIsDark = settingsCardBackgroundIsDark(in: container.pageView)
-                followSystemBridgeDiagnostics = """
-                theme=\(context.themeMode.rawValue) system=\(context.systemColorScheme) resolved=\(context.resolvedColorScheme) \
-                target=\(context.targetNSAppearanceName.rawValue) \
-                rebuilt=\(rebuiltContainer) containerDark=\(containerIsDark) cardDark=\(cardIsDark)
-                """
-                return context.themeMode == .followSystem
-                    && context.resolvedColorScheme == .dark
-                    && rebuiltContainer
-                    && containerIsDark
-                    && cardIsDark
-            },
-            "Follow-system theme changes should rebuild Settings through the same bridge path as explicit theme switches. \(followSystemBridgeDiagnostics)"
-        )
-        let rebuiltContainer: AppKitSettingsPageContainerView = try XCTUnwrap(
-            descendantViews(in: hostedView).compactMap { $0 as? AppKitSettingsPageContainerView }.first
-        )
-        settleSettingsContainerLayout(rebuiltContainer)
-        try assertSettingsCardsStayNearHeader(in: rebuiltContainer.pageView)
-        assertCardsDoNotOverlap(settingsCards(in: rebuiltContainer.pageView), in: rebuiltContainer.pageView)
-        assertArrangedSubviewsDoNotOverlap(in: rebuiltContainer.pageView)
-    }
-
-    @MainActor
     func testSidebarPermissionStatusExpandsForEnglishAtSidebarWidth() {
         let hostedView = NSHostingView(
             rootView: HomePermissionStatusCard(
@@ -554,12 +409,11 @@ extension FlowTabTests {
             searchEnabled: true,
             searchDefaultScopeRaw: SwitcherSearchScope.window.rawValue,
             hiddenAppCount: hiddenAppCount,
-            hotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
+            hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.option.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
-            inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
-            inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
-            commandTabTakeoverActive: false,
+            inAppWindowHotkeyShortcutKeysRaw: "control+tab",
+            commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: accessibilityTrusted,
             screenCaptureTrusted: screenCaptureTrusted,
             targetNSAppearanceName: themeMode
@@ -855,39 +709,11 @@ extension FlowTabTests {
         )
     }
 
-    private func waitForRunLoopCondition(timeout: TimeInterval, condition: () -> Bool) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if condition() { return true }
-            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.01))
-        }
-        return condition()
-    }
-
     private func restoreStandardUserDefaultsValue(_ value: String?, forKey key: String) {
         if let value {
             UserDefaults.standard.set(value, forKey: key)
         } else {
             UserDefaults.standard.removeObject(forKey: key)
-        }
-    }
-
-    @MainActor
-    private func postSystemAppearanceChangedNotification() {
-        SystemThemeState.shared.refreshColorScheme()
-        DistributedNotificationCenter.default().postNotificationName(
-            Notification.Name("AppleInterfaceThemeChangedNotification"),
-            object: nil,
-            userInfo: nil,
-            deliverImmediately: true
-        )
-    }
-
-    private func settingsCardBackgroundIsDark(in view: NSView) -> Bool {
-        settingsCards(in: view).contains { card in
-            guard let backgroundColor = card.layer?.backgroundColor else { return false }
-            let color = NSColor(cgColor: backgroundColor)?.usingColorSpace(.sRGB)
-            return (color?.brightnessComponent ?? 1) < 0.3
         }
     }
 

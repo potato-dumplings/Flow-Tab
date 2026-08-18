@@ -63,6 +63,7 @@ struct AppVisibilityManagerView: View {
         .onChange(of: model.filter) { _ in
             resolveSelectionAfterVisibleAppsChange()
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("flowtab.settings.app-visibility.manager")
     }
 
@@ -110,6 +111,9 @@ struct AppVisibilityManagerView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .accessibilityIdentifier(
+                    model.inventoryReadiness.accessibilityIdentifier
+                )
             }
         }
     }
@@ -135,13 +139,19 @@ struct AppVisibilityManagerView: View {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .stroke(borderColor, lineWidth: 1)
         )
-        .accessibilityIdentifier("flowtab.settings.app-visibility.filter")
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(
+            AppVisibilityFilterProjectionAccessibility.identifier(
+                filterRawValue: model.filter.rawValue,
+                generation: model.filterProjectionGeneration
+            )
+        )
     }
 
     private func filterButton(_ filter: AppVisibilityManagerModel.Filter) -> some View {
         let isSelected = model.filter == filter
         return Button {
-            model.filter = filter
+            model.updateFilter(filter)
         } label: {
             Text(filter.title(language: appLanguage))
                 .font(.system(size: 12, weight: isSelected ? .medium : .regular))
@@ -168,7 +178,10 @@ struct AppVisibilityManagerView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
             AppVisibilitySearchField(
-                text: $model.query,
+                text: Binding(
+                    get: { model.query },
+                    set: model.updateQuery
+                ),
                 placeholder: AppStrings.text(.appVisibilitySearchPlaceholder, language: appLanguage),
                 accessibilityIdentifier: "flowtab.settings.app-visibility.search"
             )
@@ -191,7 +204,10 @@ struct AppVisibilityManagerView: View {
         return FlowSnappedListScrollView(
             rowCount: visibleApps.count,
             rowHeight: Layout.listRowHeight,
-            accessibilityIdentifier: "flowtab.settings.app-visibility.list"
+            accessibilityIdentifier:
+                AppVisibilityQueryProjectionAccessibility.identifier(
+                    generation: model.queryProjectionGeneration
+                )
         ) {
             ForEach(Array(visibleApps.enumerated()), id: \.element.id) { index, app in
                 appRowButton(
@@ -222,7 +238,7 @@ struct AppVisibilityManagerView: View {
 
     private func appRowButton(app: InstalledAppRecord, isLast: Bool) -> some View {
         Button {
-            model.selectedAppID = app.id
+            model.selectApp(app.id)
         } label: {
             AppVisibilityListRow(
                 app: app,
@@ -350,6 +366,13 @@ struct AppVisibilityManagerView: View {
 
             Spacer(minLength: 0)
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(
+            AppVisibilityDetailProjectionAccessibility.identifier(
+                appID: app.id,
+                generation: model.selectionProjectionGeneration
+            )
+        )
     }
 
     private func detailRow(title: String, value: String) -> some View {
@@ -381,11 +404,11 @@ struct AppVisibilityManagerView: View {
     private func resolveSelectionAfterVisibleAppsChange() {
         let visibleApps = model.visibleApps
         guard let selectedAppID = model.selectedAppID else {
-            model.selectedAppID = visibleApps.first?.id
+            model.selectApp(visibleApps.first?.id)
             return
         }
         if !visibleApps.contains(where: { $0.id == selectedAppID }) {
-            model.selectedAppID = visibleApps.first?.id
+            model.selectApp(visibleApps.first?.id)
         }
     }
 }

@@ -4,279 +4,32 @@ import XCTest
 @testable import FlowTab
 
 extension FlowTabPriorityCoverageTests {
-    func testChromeFocusBridgeScriptUsesNamedPropagationDelay() {
-        let script = RuntimeChromeWindowFocusBridge.focusWindowScriptForTesting(windowID: 12_345)
-
-        XCTAssertEqual(
-            RuntimeChromeWindowFocusBridge.scriptStatePropagationDelaySecondsForTesting,
-            0.05
-        )
-        XCTAssertTrue(script.contains("set targetWindowID to 12345"))
-        XCTAssertEqual(script.components(separatedBy: "delay 0.05").count - 1, 2)
-        XCTAssertFalse(script.contains("delay 0.050"))
-    }
-
-    func testChromeFocusBridgeUsesScriptableBrowserSpecForScripts() {
-        let chromeSpec = RuntimeChromeWindowFocusBridge.scriptableBrowserSpec(
-            forBundleIdentifier: "com.google.Chrome"
-        )
-
-        XCTAssertEqual(chromeSpec, .chrome)
-        XCTAssertNil(
-            RuntimeChromeWindowFocusBridge.scriptableBrowserSpec(
-                forBundleIdentifier: "com.example.unsupported-browser"
-            )
-        )
-        XCTAssertTrue(
-            RuntimeChromeWindowFocusBridge.focusWindowScriptForTesting(
-                windowID: 12_345,
-                bundleIdentifier: "com.google.Chrome"
-            )?.contains("tell application id \"com.google.Chrome\"") ?? false
-        )
-        XCTAssertTrue(
-            RuntimeChromeWindowFocusBridge.windowListScriptForTesting(
-                bundleIdentifier: "com.google.Chrome"
-            )?.contains("tell application id \"com.google.Chrome\"") ?? false
-        )
-        XCTAssertNil(
-            RuntimeChromeWindowFocusBridge.focusWindowScriptForTesting(
-                windowID: 12_345,
-                bundleIdentifier: "com.example.unsupported-browser"
-            )
-        )
-    }
-
-    func testChromeFocusBridgeCandidateDecisionRejectsCloseCandidates() {
-        let frame = CGRect(x: 0, y: 40, width: 1_200, height: 800)
-        let candidates = [
-            RuntimeChromeWindowFocusBridge.Candidate(
-                windowID: 31,
-                name: "Inbox - Gmail",
-                activeTabTitle: "Inbox - Gmail",
-                bounds: frame,
-                titleAffinity: 0,
-                geometryDistance: 12
-            ),
-            RuntimeChromeWindowFocusBridge.Candidate(
-                windowID: 44,
-                name: "Inbox - Gmail",
-                activeTabTitle: "Inbox - Gmail",
-                bounds: frame.offsetBy(dx: 3, dy: 0),
-                titleAffinity: 0,
-                geometryDistance: 15
-            )
-        ]
-
-        let decision = RuntimeChromeWindowFocusBridge.candidateDecision(
-            candidates,
-            targetCGWindowID: 456,
-            fallbackTitle: "Inbox - Gmail",
-            fallbackFrame: frame,
-            currentCGWindows: []
-        )
-
-        guard case let .ambiguous(ambiguousCandidates, reason) = decision else {
-            return XCTFail("Expected close Chrome candidates to remain ambiguous")
-        }
-        XCTAssertEqual(reason, "insufficient-score-separation")
-        XCTAssertEqual(ambiguousCandidates.map(\.windowID), [31, 44])
-        XCTAssertNil(
-            RuntimeChromeWindowFocusBridge.selectCandidate(
-                candidates,
-                targetCGWindowID: 456,
-                fallbackTitle: "Inbox - Gmail",
-                fallbackFrame: frame,
-                currentCGWindows: []
-            )
-        )
-    }
-
-    func testChromeFocusBridgeCandidateDecisionSelectsClearCandidate() {
-        let frame = CGRect(x: 0, y: 40, width: 1_200, height: 800)
-        let clearCandidate = RuntimeChromeWindowFocusBridge.Candidate(
-            windowID: 31,
-            name: "Inbox - Gmail",
-            activeTabTitle: "Inbox - Gmail",
-            bounds: frame,
-            titleAffinity: 0,
-            geometryDistance: 12
-        )
-        let weakCandidate = RuntimeChromeWindowFocusBridge.Candidate(
-            windowID: 44,
-            name: "Calendar",
-            activeTabTitle: "Calendar",
-            bounds: frame.offsetBy(dx: 320, dy: 0),
-            titleAffinity: 2,
-            geometryDistance: 320
-        )
-
-        let decision = RuntimeChromeWindowFocusBridge.candidateDecision(
-            [clearCandidate, weakCandidate],
-            targetCGWindowID: 456,
-            fallbackTitle: "Inbox - Gmail",
-            fallbackFrame: frame,
-            currentCGWindows: []
-        )
-
-        guard case let .selected(candidate, confidence) = decision else {
-            return XCTFail("Expected clear Chrome candidate to be selected")
-        }
-        XCTAssertEqual(candidate.windowID, 31)
-        XCTAssertEqual(confidence, .uniqueStrongSignals)
-    }
-
-    func testChromeFocusBridgeCandidateDecisionReportsQueryErrorAsUnavailable() {
-        let query = RuntimeChromeWindowFocusBridge.CandidateQuery(
-            candidates: [],
-            chromeWindowCount: 0,
-            error: "apple-event-not-authorized"
-        )
-
-        let decision = RuntimeChromeWindowFocusBridge.candidateDecision(
-            query,
-            targetCGWindowID: 456,
-            fallbackTitle: "Inbox - Gmail",
-            fallbackFrame: CGRect(x: 0, y: 40, width: 1_200, height: 800),
-            currentCGWindows: []
-        )
-
-        guard case let .unavailable(reason) = decision else {
-            return XCTFail("Expected Chrome candidate query error to become unavailable decision")
-        }
-        XCTAssertEqual(reason, "candidate-query-error:apple-event-not-authorized")
-        XCTAssertTrue(decision.logDescription.contains("unavailable:reason="))
-        XCTAssertTrue(decision.logDescription.contains("apple-event-not-authorized"))
-    }
-
-    func testChromeFocusBridgeCandidateDecisionUsesTargetOrdinalForScoreTies() {
-        let frame = CGRect(x: 0, y: 40, width: 1_200, height: 800)
-        let candidates = [
-            RuntimeChromeWindowFocusBridge.Candidate(
-                windowID: 31,
-                name: "Inbox - Gmail",
-                activeTabTitle: "Inbox - Gmail",
-                bounds: frame,
-                titleAffinity: 0,
-                geometryDistance: 12
-            ),
-            RuntimeChromeWindowFocusBridge.Candidate(
-                windowID: 44,
-                name: "Inbox - Gmail",
-                activeTabTitle: "Inbox - Gmail",
-                bounds: frame,
-                titleAffinity: 0,
-                geometryDistance: 12
-            )
-        ]
-        let cgWindows = [
-            RuntimeCGWindowEntry(
-                id: 455,
-                title: "Inbox - Gmail",
-                bounds: frame,
-                isOnscreen: false,
-                alpha: 1,
-                storeType: 1
-            ),
-            RuntimeCGWindowEntry(
-                id: 456,
-                title: "Inbox - Gmail",
-                bounds: frame,
-                isOnscreen: false,
-                alpha: 1,
-                storeType: 1
-            )
-        ]
-
-        let decision = RuntimeChromeWindowFocusBridge.candidateDecision(
-            candidates,
-            targetCGWindowID: 456,
-            fallbackTitle: "Inbox - Gmail",
-            fallbackFrame: frame,
-            currentCGWindows: cgWindows
-        )
-
-        guard case let .selected(candidate, confidence) = decision else {
-            return XCTFail("Expected target ordinal to resolve the score tie")
-        }
-        XCTAssertEqual(candidate.windowID, 44)
-        XCTAssertEqual(confidence, .targetOrdinalTieBreak)
-    }
-
-    func testChromeFocusBridgeCandidateDecisionUsesTargetOrdinalWhenCGTitlesAreUnavailable() {
-        let frame = CGRect(x: 0, y: 40, width: 1_200, height: 800)
-        let candidates = [
-            RuntimeChromeWindowFocusBridge.Candidate(
-                windowID: 31,
-                name: "First Tab",
-                activeTabTitle: "First Tab",
-                bounds: frame,
-                titleAffinity: 2,
-                geometryDistance: 12
-            ),
-            RuntimeChromeWindowFocusBridge.Candidate(
-                windowID: 44,
-                name: "Second Tab",
-                activeTabTitle: "Second Tab",
-                bounds: frame,
-                titleAffinity: 2,
-                geometryDistance: 12
-            )
-        ]
-        let cgWindows = [
-            RuntimeCGWindowEntry(
-                id: 455,
-                title: nil,
-                bounds: frame,
-                isOnscreen: false,
-                alpha: 1,
-                storeType: 1
-            ),
-            RuntimeCGWindowEntry(
-                id: 456,
-                title: nil,
-                bounds: frame,
-                isOnscreen: false,
-                alpha: 1,
-                storeType: 1
-            )
-        ]
-
-        let decision = RuntimeChromeWindowFocusBridge.candidateDecision(
-            candidates,
-            targetCGWindowID: 456,
-            fallbackTitle: "Google Chrome",
-            fallbackFrame: frame,
-            currentCGWindows: cgWindows
-        )
-
-        guard case let .selected(candidate, confidence) = decision else {
-            return XCTFail("Expected target ordinal to resolve the title-unavailable score tie")
-        }
-        XCTAssertEqual(candidate.windowID, 44)
-        XCTAssertEqual(confidence, .targetOrdinalTieBreak)
-    }
-
     @MainActor
-    func testRuntimeActivatorActivationConfirmationPolicyWrapsRetryDelays() {
+    func testRuntimeActivatorFocusRecoveryPolicyNamesPollingAndWatchdog() {
         let activator = RuntimeActivator()
 
         XCTAssertEqual(
-            activator.activationConfirmationPolicy,
-            .defaultFocusRecovery
+            activator.focusRecoveryPolicy,
+            .standard
         )
-        XCTAssertTrue(activator.activationConfirmationPolicy.isEnabled)
+        XCTAssertTrue(activator.focusRecoveryPolicy.isEnabled)
 
-        activator.focusRecoveryRetryDelaysNanoseconds = [1, 2, 3]
+        activator.focusRecoveryPolicy = RuntimeFocusRecoveryPolicy(
+            pollingIntervals: [0.1, 0.2, 0.3],
+            watchdogInterval: 4
+        )
         XCTAssertEqual(
-            activator.activationConfirmationPolicy,
-            ActivationConfirmationPolicy(retryDelaysNanoseconds: [1, 2, 3])
+            activator.focusRecoveryPolicy.pollingInterval(forAttempt: 1),
+            0.1
         )
+        XCTAssertEqual(
+            activator.focusRecoveryPolicy.pollingInterval(forAttempt: 4),
+            0.3
+        )
+        XCTAssertEqual(activator.focusRecoveryPolicy.watchdogInterval, 4)
 
-        activator.activationConfirmationPolicy = ActivationConfirmationPolicy(
-            retryDelaysNanoseconds: []
-        )
-        XCTAssertTrue(activator.focusRecoveryRetryDelaysNanoseconds.isEmpty)
-        XCTAssertFalse(activator.activationConfirmationPolicy.isEnabled)
+        activator.focusRecoveryPolicy = .disabled
+        XCTAssertFalse(activator.focusRecoveryPolicy.isEnabled)
     }
 
     func testRuntimeCGWindowFocusBridgeClassifiesStructuredResults() {
@@ -314,7 +67,10 @@ extension FlowTabPriorityCoverageTests {
         let targetCGWindowID: CGWindowID = 245_101
         let axWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
 
-        activator.focusRecoveryRetryDelaysNanoseconds = [20_000_000]
+        activator.focusRecoveryPolicy = RuntimeFocusRecoveryPolicy(
+            pollingIntervals: [0.02],
+            watchdogInterval: 1
+        )
         var focusCallCount = 0
         activator.focusAXWindowOverride = { window, restoreIfMinimized, _ in
             XCTAssertTrue(CFEqual(window, axWindow))
@@ -323,7 +79,7 @@ extension FlowTabPriorityCoverageTests {
             return true
         }
 
-        let verifiedVisibleTarget = expectation(description: "focus retry verifies target CG window onscreen")
+        let verifiedVisibleTarget = expectation(description: "unmetCondition=focusRecoveryTargetCGWindowOnscreen")
         var didFulfillVisibleTarget = false
         var visibilityChecks: [Bool] = []
         activator.currentCGWindowsOverride = { pid in
@@ -372,7 +128,7 @@ extension FlowTabPriorityCoverageTests {
             contextsByID: [appID: context]
         )
 
-        await fulfillment(of: [verifiedVisibleTarget], timeout: 1.0)
+        await fulfillment(of: [verifiedVisibleTarget], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeFocusRecoveryObservation)
         XCTAssertEqual(focusCallCount, 2)
         XCTAssertEqual(visibilityChecks.first, false)
         XCTAssertTrue(visibilityChecks.contains(true))
@@ -384,7 +140,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         var requestActivationCallCount = 0
         activator.requestActivationOverride = { _, completion in
@@ -452,7 +208,10 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = [20_000_000]
+        activator.focusRecoveryPolicy = RuntimeFocusRecoveryPolicy(
+            pollingIntervals: [0.02],
+            watchdogInterval: 1
+        )
 
         var requestActivationCallCount = 0
         activator.requestActivationOverride = { _, completion in
@@ -510,7 +269,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let axWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         activator.focusAXWindowOverride = { _, _, _ in
@@ -573,7 +332,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
         activator.focusedAXWindowOverride = { _ in nil }
 
         let frontmostCGWindowID: CGWindowID = 245_251
@@ -650,7 +409,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
         activator.focusedAXWindowOverride = { _ in nil }
         activator.currentAXWindowsOverride = { _ in [] }
 
@@ -761,7 +520,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let targetAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         let targetPointer = Unmanaged.passUnretained(targetAXWindow).toOpaque()
@@ -851,7 +610,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let staleAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         let stalePointer = Unmanaged.passUnretained(staleAXWindow).toOpaque()
@@ -926,7 +685,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let axWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         activator.focusCGWindowOverride = { _, _ in false }
@@ -1011,7 +770,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let axWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         let targetCGWindowID: CGWindowID = 245_254
@@ -1099,7 +858,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let targetAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         let focusedAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier + 1)
@@ -1198,7 +957,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         var requestActivationCallCount = 0
         activator.requestActivationOverride = { _, completion in
@@ -1272,7 +1031,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let sameTitleAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         let sameTitlePointer = Unmanaged.passUnretained(sameTitleAXWindow).toOpaque()
@@ -1363,7 +1122,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let unrelatedAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         activator.currentAXWindowsOverride = { _ in [unrelatedAXWindow] }
@@ -1441,7 +1200,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let relatedAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         let unrelatedAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
@@ -1566,7 +1325,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         activator.currentAXWindowsOverride = { _ in [] }
         activator.focusAXWindowOverride = { _, _, _ in
@@ -1653,7 +1412,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         var requestActivationCallCount = 0
         activator.requestActivationOverride = { _, completion in
@@ -1730,7 +1489,10 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = [20_000_000]
+        activator.focusRecoveryPolicy = RuntimeFocusRecoveryPolicy(
+            pollingIntervals: [0.02],
+            watchdogInterval: 1
+        )
 
         var requestActivationCallCount = 0
         activator.requestActivationOverride = { _, completion in
@@ -1746,7 +1508,7 @@ extension FlowTabPriorityCoverageTests {
             return true
         }
 
-        let visibilitySettled = expectation(description: "cg bridge retry sees target window onscreen")
+        let visibilitySettled = expectation(description: "unmetCondition=focusRecoveryCGBridgeTargetOnscreen")
         var didFulfillVisibilitySettled = false
         var cgWindowReadCount = 0
         activator.currentCGWindowsOverride = { pid in
@@ -1795,7 +1557,7 @@ extension FlowTabPriorityCoverageTests {
             contextsByID: [appID: context]
         )
 
-        await fulfillment(of: [visibilitySettled], timeout: 1.0)
+        await fulfillment(of: [visibilitySettled], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeFocusRecoveryObservation)
         XCTAssertEqual(requestActivationCallCount, 0)
         XCTAssertEqual(focusedCGWindowIDs, [targetCGWindowID, targetCGWindowID])
         XCTAssertGreaterThanOrEqual(cgWindowReadCount, 2)
@@ -1884,7 +1646,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let targetFrame = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let targetCGWindowID: CGWindowID = 245_505
@@ -2005,8 +1767,11 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         }
-        activator.focusRecoveryRetryDelaysNanoseconds = [20_000_000]
-        let recoveredFocus = expectation(description: "focus recovered window after activation settles")
+        activator.focusRecoveryPolicy = RuntimeFocusRecoveryPolicy(
+            pollingIntervals: [0.02],
+            watchdogInterval: 1
+        )
+        let recoveredFocus = expectation(description: "unmetCondition=focusRecoveryExactAXWindowAttempted")
         var focusedWindowPointers: [UnsafeMutableRawPointer] = []
         activator.focusAXWindowOverride = { window, restoreIfMinimized, _ in
             XCTAssertFalse(restoreIfMinimized)
@@ -2048,7 +1813,7 @@ extension FlowTabPriorityCoverageTests {
             contextsByID: [appID: context]
         )
 
-        await fulfillment(of: [recoveredFocus], timeout: 1.0)
+        await fulfillment(of: [recoveredFocus], timeout: FlowTabPriorityCoverageWatchdogPolicy.runtimeFocusRecoveryObservation)
         XCTAssertGreaterThanOrEqual(focusedWindowPointers.count, 2)
         XCTAssertEqual(focusedWindowPointers.first, stalePointer)
         XCTAssertEqual(focusedWindowPointers.last, recoveredPointer)

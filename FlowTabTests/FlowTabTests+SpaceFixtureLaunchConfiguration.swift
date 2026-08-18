@@ -66,6 +66,19 @@ extension FlowTabTests {
         )
         XCTAssertFalse(configuration.preservesDesktopAfterFullscreen)
         XCTAssertTrue(configuration.publishesApplicationAccessibilityChildren)
+        XCTAssertNil(configuration.applicationAXSuppressionRoute)
+        XCTAssertNil(
+            configuration.terminationFaultEvidenceRoute
+        )
+        XCTAssertNil(
+            configuration.windowCloseFaultEvidenceRoute
+        )
+        XCTAssertNil(
+            configuration.windowCloseFaultTriggerRoute
+        )
+        XCTAssertNil(
+            configuration.workflowReadinessRoute
+        )
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 0)
         XCTAssertNil(configuration.closeWindowIndex)
         XCTAssertEqual(configuration.closeWindowDelayMilliseconds, 0)
@@ -92,6 +105,19 @@ extension FlowTabTests {
         XCTAssertEqual(configuration.enterFullscreenDelayMilliseconds, 0)
         XCTAssertFalse(configuration.preservesDesktopAfterFullscreen)
         XCTAssertFalse(configuration.publishesApplicationAccessibilityChildren)
+        XCTAssertNil(configuration.applicationAXSuppressionRoute)
+        XCTAssertNil(
+            configuration.terminationFaultEvidenceRoute
+        )
+        XCTAssertNil(
+            configuration.windowCloseFaultEvidenceRoute
+        )
+        XCTAssertNil(
+            configuration.windowCloseFaultTriggerRoute
+        )
+        XCTAssertNil(
+            configuration.workflowReadinessRoute
+        )
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 0)
         XCTAssertNil(configuration.closeWindowIndex)
         XCTAssertEqual(configuration.closeWindowDelayMilliseconds, 0)
@@ -103,14 +129,62 @@ extension FlowTabTests {
                 "FlowTabSpaceFixture",
                 "--window-count", "3",
                 "--terminate-delay-ms", "1200",
+                "--termination-evidence-notification-name",
+                "test.fixture.termination",
+                "--window-close-evidence-notification-name",
+                "test.fixture.window-close",
+                "--window-close-trigger-notification-name",
+                "test.fixture.window-close.trigger",
+                "--workflow-readiness-notification-name",
+                "test.fixture.workflow-readiness",
+                "--workflow-readiness-readback-path",
+                "workflow-readiness-test.plist",
                 "--close-window-index", "2",
                 "--close-window-delay-ms", "1800"
             ]
         )
 
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 1200)
+        XCTAssertEqual(
+            configuration.terminationFaultEvidenceRoute,
+            SpaceFixtureTerminationFaultEvidenceRoute(
+                notificationName: Notification.Name(
+                    "test.fixture.termination"
+                )
+            )
+        )
         XCTAssertEqual(configuration.closeWindowIndex, 2)
         XCTAssertEqual(configuration.closeWindowDelayMilliseconds, 1800)
+        XCTAssertEqual(
+            configuration.windowCloseFaultEvidenceRoute,
+            SpaceFixtureWindowCloseFaultEvidenceRoute(
+                notificationName: Notification.Name(
+                    "test.fixture.window-close"
+                )
+            )
+        )
+        XCTAssertEqual(
+            configuration.windowCloseFaultTriggerRoute,
+            SpaceFixtureWindowCloseFaultTriggerRoute(
+                notificationName: Notification.Name(
+                    "test.fixture.window-close.trigger"
+                )
+            )
+        )
+        XCTAssertEqual(
+            configuration.workflowReadinessRoute,
+            SpaceFixtureWorkflowReadinessRoute(
+                notificationName: Notification.Name(
+                    "test.fixture.workflow-readiness"
+                ),
+                readbackURL:
+                    FileManager.default.temporaryDirectory
+                        .appendingPathComponent(
+                            "workflow-readiness-test.plist"
+                        )
+                        .standardizedFileURL
+            )
+        )
     }
 
     func testSpaceFixtureWindowPlannerCreatesStaggeredPlansAndFullscreenMarker() {
@@ -184,8 +258,22 @@ extension FlowTabTests {
                 "--staggered-layout",
                 "--enter-fullscreen-delay-ms", "900",
                 "--terminate-delay-ms", "1100",
+                "--termination-evidence-notification-name",
+                "test.fixture.workflow.termination",
+                "--window-close-evidence-notification-name",
+                "test.fixture.workflow.window-close",
+                "--window-close-trigger-notification-name",
+                "test.fixture.workflow.window-close.trigger",
+                "--workflow-readiness-notification-name",
+                "test.fixture.workflow.readiness",
+                "--close-window-index", "2",
+                "--close-window-delay-ms", "1800",
                 "--preserve-desktop-after-fullscreen",
-                "--suppress-app-accessibility-children"
+                "--suppress-app-accessibility-children",
+                "--projection-acknowledgement-notification-name",
+                "test.fixture.projection.ack",
+                "--accessibility-suppression-notification-name",
+                "test.fixture.ax.suppressed"
             ]
         )
 
@@ -198,8 +286,55 @@ extension FlowTabTests {
         XCTAssertTrue(configuration.usesStaggeredLayout)
         XCTAssertEqual(configuration.enterFullscreenDelayMilliseconds, 900)
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 1100)
+        XCTAssertEqual(
+            configuration.terminationFaultEvidenceRoute,
+            SpaceFixtureTerminationFaultEvidenceRoute(
+                notificationName: Notification.Name(
+                    "test.fixture.workflow.termination"
+                )
+            )
+        )
+        XCTAssertEqual(configuration.closeWindowIndex, 2)
+        XCTAssertEqual(configuration.closeWindowDelayMilliseconds, 1800)
+        XCTAssertEqual(
+            configuration.windowCloseFaultEvidenceRoute,
+            SpaceFixtureWindowCloseFaultEvidenceRoute(
+                notificationName: Notification.Name(
+                    "test.fixture.workflow.window-close"
+                )
+            )
+        )
+        XCTAssertEqual(
+            configuration.windowCloseFaultTriggerRoute,
+            SpaceFixtureWindowCloseFaultTriggerRoute(
+                notificationName: Notification.Name(
+                    "test.fixture.workflow.window-close.trigger"
+                )
+            )
+        )
+        XCTAssertEqual(
+            configuration.workflowReadinessRoute,
+            SpaceFixtureWorkflowReadinessRoute(
+                notificationName: Notification.Name(
+                    "test.fixture.workflow.readiness"
+                )
+            )
+        )
         XCTAssertTrue(configuration.preservesDesktopAfterFullscreen)
         XCTAssertFalse(configuration.publishesApplicationAccessibilityChildren)
+        XCTAssertEqual(
+            configuration.applicationAXSuppressionRoute,
+            SpaceFixtureApplicationAXSuppressionRoute(
+                projectionAcknowledgementNotificationName:
+                    Notification.Name(
+                        "test.fixture.projection.ack"
+                    ),
+                suppressionCompletionNotificationName:
+                    Notification.Name(
+                        "test.fixture.ax.suppressed"
+                    )
+            )
+        )
         XCTAssertEqual(configuration.windows[0].configuredTitle, "Chrome Window 1")
         XCTAssertFalse(configuration.windows[0].noisyCGSiblings)
         XCTAssertEqual(configuration.windows[0].kind, .panel)

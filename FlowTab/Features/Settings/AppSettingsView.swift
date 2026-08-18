@@ -2,81 +2,20 @@ import SwiftUI
 import AppKit
 import FlowTabCore
 
-enum PermissionPollingTarget: String, CaseIterable, Equatable {
-    case accessibility
-    case screenCapture
-}
-
-struct PermissionPollingTaskRegistry: Equatable {
-    private(set) var activeTargets: Set<PermissionPollingTarget> = []
-
-    mutating func markStarted(_ target: PermissionPollingTarget) {
-        activeTargets.insert(target)
-    }
-
-    mutating func markStopped(_ target: PermissionPollingTarget) {
-        activeTargets.remove(target)
-    }
-
-    mutating func markAllStopped() {
-        activeTargets.removeAll()
-    }
-
-    func isActive(_ target: PermissionPollingTarget) -> Bool {
-        activeTargets.contains(target)
-    }
-}
-
-struct PermissionPollingPolicy: Equatable {
-    var intervalNanoseconds: UInt64
-    var attemptLimit: Int
-
-    static let `default` = PermissionPollingPolicy(
-        intervalNanoseconds: 500_000_000,
-        attemptLimit: 40
-    )
-
-    var timeoutSeconds: Double {
-        Double(intervalNanoseconds * UInt64(attemptLimit)) / 1_000_000_000
-    }
-
-    var timeoutDescription: String {
-        "\(Int(timeoutSeconds))s"
-    }
-}
-
-struct PermissionPollingDiagnostic: Equatable {
-    enum Action: String, Equatable {
-        case timeout
-    }
-
-    let target: PermissionPollingTarget
-    let attempt: Int
-    let attemptLimit: Int
-    let elapsedMs: Double
-    let finalPermissionGranted: Bool
-    let timeoutDescription: String
-    let bundleIdentifier: String
-    let bundlePath: String
-    let action: Action
-
-    var logMessage: String {
-        [
-            "permission poll",
-            "target=\(target.rawValue)",
-            "action=\(action.rawValue)",
-            "attempt=\(attempt)/\(attemptLimit)",
-            "elapsedMs=\(String(format: "%.3f", elapsedMs))",
-            "finalPermissionGranted=\(finalPermissionGranted)",
-            "timeout=\(timeoutDescription)",
-            "bundle=\(bundleIdentifier)",
-            "path=\(bundlePath)"
-        ].joined(separator: " ")
-    }
-}
-
 struct AppSettingsView: View {
     let isActive: Bool
+    let appVisibilityNavigationAnimationPolicy:
+        SettingsAppVisibilityNavigationAnimationPolicy
+
+    init(
+        isActive: Bool,
+        appVisibilityNavigationAnimationPolicy:
+            SettingsAppVisibilityNavigationAnimationPolicy = .default
+    ) {
+        self.isActive = isActive
+        self.appVisibilityNavigationAnimationPolicy =
+            appVisibilityNavigationAnimationPolicy
+    }
 
     @ObservedObject private var presentation = FlowPresentationState.shared
     @AppStorage(AppPreferenceKeys.showShortcutHint) private var showShortcutHint = true
@@ -96,51 +35,45 @@ struct AppSettingsView: View {
     @AppStorage(AppPreferenceKeys.searchDefaultScope)
     private var searchDefaultScopeRaw = SearchInteractionPreferencesStore.defaultScope.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyPrimaryModifier)
-    private var hotkeyPrimaryModifierRaw = SwitcherHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
+    private var hotkeyPrimaryModifierRaw = SwitcherHotkeyPreferencesStore.defaultBaseKeys.rawValue
+    @AppStorage(AppPreferenceKeys.hotkeyReverseModifiers)
+    private var hotkeyReverseModifiersRaw =
+        SwitcherHotkeyPreferencesStore.defaultReverseKeys.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyMainKey)
-    private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
+    private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKeys.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyQuitKey)
-    private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
-    @AppStorage(CommandTabTakeoverController.takeoverMarkerKey)
-    private var commandTabTakeoverActive = false
-    @AppStorage(AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier)
-    private var inAppWindowHotkeyPrimaryModifierRaw =
-        InAppWindowHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
-    @AppStorage(AppPreferenceKeys.inAppWindowHotkeyMainKey)
-    private var inAppWindowHotkeyMainKeyRaw = InAppWindowHotkeyPreferencesStore.defaultMainKey.rawValue
+    private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKeys.rawValue
+    @AppStorage(AppPreferenceKeys.inAppWindowHotkeyShortcutKeys)
+    private var inAppWindowHotkeyShortcutKeysRaw =
+        InAppWindowHotkeyPreferencesStore.defaultShortcutKeys.rawValue
+    @AppStorage(AppPreferenceKeys.inAppWindowHotkeyReverseKeys)
+    private var inAppWindowHotkeyReverseKeysRaw =
+        InAppWindowHotkeyPreferencesStore.defaultReverseKeys.rawValue
     @AppStorage(AppPreferenceKeys.windowLayerAutoEnterDelay)
     private var windowLayerAutoEnterDelayRaw = WindowLayerPreferencesStore.defaultAutoEnterDelay
     @State private var accessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
     @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
     @State private var hasAttemptedScreenCapturePermissionRequest = false
-    @State private var permissionPollTasksByTarget: [PermissionPollingTarget: Task<Void, Never>] = [:]
-    @State private var permissionPollingGenerationsByTarget: [PermissionPollingTarget: UInt64] = [:]
-    @State private var permissionPollingTaskRegistry = PermissionPollingTaskRegistry()
+    @StateObject private var permissionObservationCoordinator =
+        RuntimePermissionObservationCoordinator()
+    @StateObject private var hotkeyRegistrationObservationOwner =
+        HotkeyRegistrationObservationOwner()
     @State private var windowLayerAutoEnterDelayText = ""
     @State private var didInitialize = false
     @State private var isWindowLayerAutoEnterDelayEditing = false
     @State private var isApplyingLaunchAtLoginPreference = false
     @State private var lastNotifiedHotkeySignature = ""
+    @State private var hotkeyConflict: HotkeySettingsConflictPresentation?
+    @State private var hotkeyPermissionRequirement:
+        HotkeySettingsPermissionPresentation?
     @State private var hiddenAppCount = AppVisibilityPreferencesStore.loadHiddenAppIDs().count
     @State private var showsAppVisibilityManager = false
 
-    private let appVisibilityNavigationAnimation = Animation.easeInOut(duration: 0.18)
-    private let permissionPollingPolicy: PermissionPollingPolicy = .default
+    private let permissionObservationPolicy:
+        RuntimePermissionObservationPolicy = .standard
 
-    private var permissionPollIntervalNanoseconds: UInt64 {
-        permissionPollingPolicy.intervalNanoseconds
-    }
-
-    private var permissionPollAttemptLimit: Int {
-        permissionPollingPolicy.attemptLimit
-    }
-
-    private var permissionPollTimeoutSeconds: Double {
-        permissionPollingPolicy.timeoutSeconds
-    }
-
-    private var permissionPollTimeoutDescription: String {
-        permissionPollingPolicy.timeoutDescription
+    private var appVisibilityNavigationAnimation: Animation {
+        .easeInOut(duration: appVisibilityNavigationAnimationPolicy.duration)
     }
 
     private var bundleIdentifier: String {
@@ -153,21 +86,31 @@ struct AppSettingsView: View {
 
     private var hotkeyConfiguration: SwitcherHotkeyConfiguration {
         SwitcherHotkeyPreferencesStore.resolve(
-            primaryModifierRaw: hotkeyPrimaryModifierRaw,
-            mainKeyRaw: hotkeyMainKeyRaw,
-            quitKeyRaw: hotkeyQuitKeyRaw
+            baseKeysRaw: hotkeyPrimaryModifierRaw,
+            reverseKeysRaw: hotkeyReverseModifiersRaw,
+            mainKeysRaw: hotkeyMainKeyRaw,
+            quitKeysRaw: hotkeyQuitKeyRaw
         )
     }
 
     private var inAppWindowHotkeyConfiguration: SwitcherHotkeyConfiguration {
         let resolved = InAppWindowHotkeyPreferencesStore.resolve(
-            primaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw,
-            mainKeyRaw: inAppWindowHotkeyMainKeyRaw
+            shortcutKeysRaw: inAppWindowHotkeyShortcutKeysRaw,
+            reverseKeysRaw: inAppWindowHotkeyReverseKeysRaw
         )
-        return SwitcherHotkeyConfiguration(
-            primaryModifier: resolved.primaryModifier,
-            mainKey: resolved.mainKey,
-            quitKey: .q
+        return resolved.configuration
+    }
+
+    private var currentHotkeyRegistrationRequest: HotkeyRegistrationRequest {
+        HotkeyRegistrationRequest(
+            mainConfiguration: hotkeyConfiguration,
+            inAppWindowConfiguration: inAppWindowHotkeyConfiguration
+        )
+    }
+
+    private var commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState {
+        hotkeyRegistrationObservationOwner.takeoverState(
+            matching: currentHotkeyRegistrationRequest
         )
     }
 
@@ -236,11 +179,17 @@ struct AppSettingsView: View {
                 searchDefaultScopeRaw: $searchDefaultScopeRaw,
                 hiddenAppCount: hiddenAppCount,
                 hotkeyPrimaryModifierRaw: $hotkeyPrimaryModifierRaw,
+                hotkeyReverseModifiersRaw: $hotkeyReverseModifiersRaw,
                 hotkeyMainKeyRaw: $hotkeyMainKeyRaw,
                 hotkeyQuitKeyRaw: $hotkeyQuitKeyRaw,
-                inAppWindowHotkeyPrimaryModifierRaw: $inAppWindowHotkeyPrimaryModifierRaw,
-                inAppWindowHotkeyMainKeyRaw: $inAppWindowHotkeyMainKeyRaw,
-                commandTabTakeoverActive: commandTabTakeoverActive,
+                inAppWindowHotkeyShortcutKeysRaw:
+                    $inAppWindowHotkeyShortcutKeysRaw,
+                inAppWindowHotkeyReverseKeysRaw:
+                    $inAppWindowHotkeyReverseKeysRaw,
+                commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
+                hotkeyConflict: hotkeyConflict,
+                hotkeyPermissionRequirement:
+                    hotkeyPermissionRequirement,
                 accessibilityTrusted: accessibilityTrusted,
                 screenCaptureTrusted: screenCaptureTrusted,
                 onWindowLayerAutoEnterDelayTextChanged: applyWindowLayerAutoEnterDelayText,
@@ -248,11 +197,11 @@ struct AppSettingsView: View {
                 onWindowLayerAutoEnterDelayEditingChanged: {
                     isWindowLayerAutoEnterDelayEditing = $0
                 },
-                onMainHotkeyChanged: handleMainHotkeyChanged,
-                onQuitHotkeyChanged: handleQuitHotkeyChanged,
-                onInAppWindowHotkeyChanged: handleInAppWindowHotkeyChanged,
+                onHotkeyChanged: handleHotkeyChanged,
+                onDismissHotkeyConflict: dismissHotkeyValidation,
                 onLaunchAtLoginChanged: handleLaunchAtLoginChanged,
                 onManageAppVisibility: {
+                    dismissHotkeyValidation()
                     refreshHiddenAppCount()
                     withAnimation(appVisibilityNavigationAnimation) {
                         showsAppVisibilityManager = true
@@ -312,16 +261,19 @@ struct AppSettingsView: View {
         .onChange(of: hotkeyPrimaryModifierRaw) { _ in
             handleStoredMainHotkeyChanged()
         }
+        .onChange(of: hotkeyReverseModifiersRaw) { _ in
+            handleStoredMainHotkeyChanged()
+        }
         .onChange(of: hotkeyMainKeyRaw) { _ in
             handleStoredMainHotkeyChanged()
         }
         .onChange(of: hotkeyQuitKeyRaw) { _ in
             handleStoredMainHotkeyChanged()
         }
-        .onChange(of: inAppWindowHotkeyPrimaryModifierRaw) { _ in
+        .onChange(of: inAppWindowHotkeyShortcutKeysRaw) { _ in
             handleStoredInAppWindowHotkeyChanged()
         }
-        .onChange(of: inAppWindowHotkeyMainKeyRaw) { _ in
+        .onChange(of: inAppWindowHotkeyReverseKeysRaw) { _ in
             handleStoredInAppWindowHotkeyChanged()
         }
         .onReceive(NotificationCenter.default.publisher(
@@ -330,6 +282,11 @@ struct AppSettingsView: View {
             guard isActive else { return }
             refreshAccessibilityStatus()
             refreshScreenCaptureStatus()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSApplication.didResignActiveNotification
+        )) { _ in
+            dismissHotkeyValidation()
         }
         .onReceive(NotificationCenter.default.publisher(
             for: UserDefaults.didChangeNotification
@@ -343,7 +300,9 @@ struct AppSettingsView: View {
             refreshHiddenAppCount()
         }
         .onDisappear {
-            cancelPermissionPolling()
+            dismissHotkeyValidation()
+            cancelPermissionObservation()
+            hotkeyRegistrationObservationOwner.stop()
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("flowtab.tab.settings.content")
@@ -352,9 +311,12 @@ struct AppSettingsView: View {
     @MainActor
     private func handleVisibilityChanged(_ active: Bool) {
         guard active else {
-            cancelPermissionPolling()
+            dismissHotkeyValidation()
+            cancelPermissionObservation()
+            hotkeyRegistrationObservationOwner.stop()
             return
         }
+        hotkeyRegistrationObservationOwner.start()
         if !didInitialize {
             enforceHotkeyConsistency()
             enforceInAppWindowHotkeyConsistency()
@@ -367,51 +329,54 @@ struct AppSettingsView: View {
         refreshScreenCaptureStatus()
     }
 
-    private func cancelPermissionPolling() {
-        permissionPollTasksByTarget.values.forEach { $0.cancel() }
-        permissionPollTasksByTarget.removeAll()
-        for target in PermissionPollingTarget.allCases {
-            advancePermissionPollingGeneration(for: target)
-        }
-        permissionPollingTaskRegistry.markAllStopped()
-    }
-
-    private func cancelPermissionPolling(target: PermissionPollingTarget) {
-        permissionPollTasksByTarget[target]?.cancel()
-        permissionPollTasksByTarget[target] = nil
-        advancePermissionPollingGeneration(for: target)
-        permissionPollingTaskRegistry.markStopped(target)
+    private func cancelPermissionObservation() {
+        permissionObservationCoordinator.cancelAll()
     }
 
     private func requestAccessibilityPermission() {
-        cancelPermissionPolling(target: .accessibility)
-        let trusted = AccessibilityPermissionChecker.requestPermission()
+        let initialEvidence = startPermissionObservation(
+            target: .accessibility
+        )
+        guard !initialEvidence.isGranted else { return }
+
+        let requestReturnedGranted =
+            AccessibilityPermissionChecker.requestPermission()
         RuntimeLog.info(
             .permission,
-            "prompt requested immediateTrusted=\(trusted) bundle=\(bundleIdentifier) path=\(bundlePath)"
+            "prompt requested returnedGranted=\(requestReturnedGranted) bundle=\(bundleIdentifier) path=\(bundlePath)"
         )
-        refreshAccessibilityStatus()
-        if !trusted {
-            startPermissionPolling(target: .accessibility)
-        }
+        permissionObservationCoordinator.readback(
+            target: .accessibility,
+            source: .requestReadback
+        )
     }
 
     private func requestScreenCapturePermission() {
-        cancelPermissionPolling(target: .screenCapture)
-        let trusted = ScreenCapturePermissionChecker.requestScreenCapturePermission()
+        let initialEvidence = startPermissionObservation(
+            target: .screenCapture
+        )
+        guard !initialEvidence.isGranted else {
+            hasAttemptedScreenCapturePermissionRequest = false
+            return
+        }
+
+        let requestReturnedGranted =
+            ScreenCapturePermissionChecker.requestScreenCapturePermission()
         RuntimeLog.info(
             .permission,
-            "screenCapture prompt requested immediateTrusted=\(trusted) bundle=\(bundleIdentifier) path=\(bundlePath)"
+            "screenCapture prompt requested returnedGranted=\(requestReturnedGranted) bundle=\(bundleIdentifier) path=\(bundlePath)"
         )
-        refreshScreenCaptureStatus()
-        if !trusted {
+        let requestEvidence = permissionObservationCoordinator.readback(
+            target: .screenCapture,
+            source: .requestReadback
+        )
+        if requestEvidence?.isGranted == false {
             // Screen capture prompts are often one-shot after denial; keep first click as request, then route later clicks.
             if hasAttemptedScreenCapturePermissionRequest {
                 presentScreenCapturePermissionReminder()
             } else {
                 hasAttemptedScreenCapturePermissionRequest = true
             }
-            startPermissionPolling(target: .screenCapture)
         } else {
             hasAttemptedScreenCapturePermissionRequest = false
         }
@@ -454,6 +419,9 @@ struct AppSettingsView: View {
 
     private func refreshAccessibilityStatus() {
         accessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
+        if accessibilityTrusted {
+            hotkeyPermissionRequirement = nil
+        }
     }
 
     private func refreshScreenCaptureStatus() {
@@ -509,50 +477,76 @@ struct AppSettingsView: View {
 
     private func enforceHotkeyConsistency() {
         let resolved = hotkeyConfiguration
-        if hotkeyPrimaryModifierRaw != resolved.primaryModifier.rawValue {
-            hotkeyPrimaryModifierRaw = resolved.primaryModifier.rawValue
+        if hotkeyPrimaryModifierRaw != resolved.baseKeys.rawValue {
+            hotkeyPrimaryModifierRaw = resolved.baseKeys.rawValue
         }
-        if hotkeyMainKeyRaw != resolved.mainKey.rawValue {
-            hotkeyMainKeyRaw = resolved.mainKey.rawValue
+        if hotkeyReverseModifiersRaw != resolved.reverseKeys.rawValue {
+            hotkeyReverseModifiersRaw = resolved.reverseKeys.rawValue
         }
-        if hotkeyQuitKeyRaw != resolved.quitKey.rawValue {
-            hotkeyQuitKeyRaw = resolved.quitKey.rawValue
+        if hotkeyMainKeyRaw != resolved.mainKeys.rawValue {
+            hotkeyMainKeyRaw = resolved.mainKeys.rawValue
+        }
+        if hotkeyQuitKeyRaw != resolved.quitKeys.rawValue {
+            hotkeyQuitKeyRaw = resolved.quitKeys.rawValue
         }
     }
 
     private func enforceInAppWindowHotkeyConsistency() {
-        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
-            primaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw,
-            mainKeyRaw: inAppWindowHotkeyMainKeyRaw,
-            mainHotkeyConfiguration: hotkeyConfiguration
+        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
+            shortcutKeysRaw: inAppWindowHotkeyShortcutKeysRaw,
+            reverseKeysRaw: inAppWindowHotkeyReverseKeysRaw,
+            switcherConfiguration: hotkeyConfiguration
         )
-        if inAppWindowHotkeyPrimaryModifierRaw != resolved.primaryModifier.rawValue {
-            inAppWindowHotkeyPrimaryModifierRaw = resolved.primaryModifier.rawValue
+        if inAppWindowHotkeyShortcutKeysRaw != resolved.shortcutKeys.rawValue {
+            inAppWindowHotkeyShortcutKeysRaw = resolved.shortcutKeys.rawValue
         }
-        if inAppWindowHotkeyMainKeyRaw != resolved.mainKey.rawValue {
-            inAppWindowHotkeyMainKeyRaw = resolved.mainKey.rawValue
+        if inAppWindowHotkeyReverseKeysRaw
+            != resolved.reverseKeys.rawValue
+        {
+            inAppWindowHotkeyReverseKeysRaw =
+                resolved.reverseKeys.rawValue
         }
     }
 
     @MainActor
-    private func handleMainHotkeyChanged(_ values: AppKitSettingsHotkeyRawValues) {
-        let request = normalizedHotkeyRegistrationRequest(from: values)
-        applyNormalizedHotkeyValues(from: request)
-        notifyHotkeyConfigChanged(using: request)
+    private func handleHotkeyChanged(_ candidate: HotkeySettingsChangeCandidate) {
+        let result = HotkeySettingsChangeTransaction.apply(
+            candidate,
+            accessibilityTrusted: accessibilityTrusted
+        ) { request in
+            applyNormalizedHotkeyValues(from: request)
+            notifyHotkeyConfigChanged(using: request)
+        }
+        switch result {
+        case .applied:
+            dismissHotkeyValidation()
+        case let .conflict(conflict):
+            hotkeyPermissionRequirement = nil
+            hotkeyConflict = HotkeySettingsConflictPresentation(
+                field: candidate.field,
+                conflict: conflict
+            )
+            RuntimeLog.warning(
+                .hotKey,
+                "settings conflict=\(conflict.rawValue) field=\(candidate.field.rawValue) action=rejected"
+            )
+        case .accessibilityRequired:
+            hotkeyConflict = nil
+            hotkeyPermissionRequirement =
+                HotkeySettingsPermissionPresentation(
+                    field: candidate.field
+                )
+            RuntimeLog.warning(
+                .hotKey,
+                "settings accessibilityRequired field=\(candidate.field.rawValue) action=rejected"
+            )
+        }
     }
 
     @MainActor
-    private func handleQuitHotkeyChanged(_ values: AppKitSettingsHotkeyRawValues) {
-        let request = normalizedHotkeyRegistrationRequest(from: values)
-        applyNormalizedHotkeyValues(from: request)
-        notifyHotkeyConfigChanged(using: request)
-    }
-
-    @MainActor
-    private func handleInAppWindowHotkeyChanged(_ values: AppKitSettingsHotkeyRawValues) {
-        let request = normalizedHotkeyRegistrationRequest(from: values)
-        applyNormalizedHotkeyValues(from: request)
-        notifyHotkeyConfigChanged(using: request)
+    private func dismissHotkeyValidation() {
+        hotkeyConflict = nil
+        hotkeyPermissionRequirement = nil
     }
 
     @MainActor
@@ -573,33 +567,33 @@ struct AppSettingsView: View {
         notifyHotkeyConfigChangedIfNeeded(using: HotkeyRegistrationRequest.load())
     }
 
-    private func normalizedHotkeyRegistrationRequest(
-        from values: AppKitSettingsHotkeyRawValues
-    ) -> HotkeyRegistrationRequest {
-        HotkeyRegistrationRequest.normalized(
-            mainPrimaryModifierRaw: values.hotkeyPrimaryModifierRaw,
-            mainKeyRaw: values.hotkeyMainKeyRaw,
-            quitKeyRaw: values.hotkeyQuitKeyRaw,
-            inAppPrimaryModifierRaw: values.inAppWindowHotkeyPrimaryModifierRaw,
-            inAppMainKeyRaw: values.inAppWindowHotkeyMainKeyRaw
-        )
-    }
-
     private func applyNormalizedHotkeyValues(from request: HotkeyRegistrationRequest) {
-        if hotkeyPrimaryModifierRaw != request.mainConfiguration.primaryModifier.rawValue {
-            hotkeyPrimaryModifierRaw = request.mainConfiguration.primaryModifier.rawValue
+        if hotkeyPrimaryModifierRaw != request.mainConfiguration.baseKeys.rawValue {
+            hotkeyPrimaryModifierRaw = request.mainConfiguration.baseKeys.rawValue
         }
-        if hotkeyMainKeyRaw != request.mainConfiguration.mainKey.rawValue {
-            hotkeyMainKeyRaw = request.mainConfiguration.mainKey.rawValue
+        if hotkeyReverseModifiersRaw
+            != request.mainConfiguration.reverseKeys.rawValue
+        {
+            hotkeyReverseModifiersRaw =
+                request.mainConfiguration.reverseKeys.rawValue
         }
-        if hotkeyQuitKeyRaw != request.mainConfiguration.quitKey.rawValue {
-            hotkeyQuitKeyRaw = request.mainConfiguration.quitKey.rawValue
+        if hotkeyMainKeyRaw != request.mainConfiguration.mainKeys.rawValue {
+            hotkeyMainKeyRaw = request.mainConfiguration.mainKeys.rawValue
         }
-        if inAppWindowHotkeyPrimaryModifierRaw != request.inAppWindowConfiguration.primaryModifier.rawValue {
-            inAppWindowHotkeyPrimaryModifierRaw = request.inAppWindowConfiguration.primaryModifier.rawValue
+        if hotkeyQuitKeyRaw != request.mainConfiguration.quitKeys.rawValue {
+            hotkeyQuitKeyRaw = request.mainConfiguration.quitKeys.rawValue
         }
-        if inAppWindowHotkeyMainKeyRaw != request.inAppWindowConfiguration.mainKey.rawValue {
-            inAppWindowHotkeyMainKeyRaw = request.inAppWindowConfiguration.mainKey.rawValue
+        if inAppWindowHotkeyShortcutKeysRaw
+            != request.inAppWindowConfiguration.baseKeys.rawValue
+        {
+            inAppWindowHotkeyShortcutKeysRaw =
+                request.inAppWindowConfiguration.baseKeys.rawValue
+        }
+        if inAppWindowHotkeyReverseKeysRaw
+            != request.inAppWindowConfiguration.reverseKeys.rawValue
+        {
+            inAppWindowHotkeyReverseKeysRaw =
+                request.inAppWindowConfiguration.reverseKeys.rawValue
         }
     }
 
@@ -659,41 +653,43 @@ struct AppSettingsView: View {
     private func persistHotkeyRegistrationRequest(_ request: HotkeyRegistrationRequest) {
         let userDefaults = UserDefaults.standard
         userDefaults.set(
-            request.mainConfiguration.primaryModifier.rawValue,
+            request.mainConfiguration.baseKeys.rawValue,
             forKey: AppPreferenceKeys.hotkeyPrimaryModifier
         )
-        userDefaults.set(request.mainConfiguration.mainKey.rawValue, forKey: AppPreferenceKeys.hotkeyMainKey)
-        userDefaults.set(request.mainConfiguration.quitKey.rawValue, forKey: AppPreferenceKeys.hotkeyQuitKey)
         userDefaults.set(
-            request.inAppWindowConfiguration.primaryModifier.rawValue,
-            forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier
+            request.mainConfiguration.reverseKeys.rawValue,
+            forKey: AppPreferenceKeys.hotkeyReverseModifiers
+        )
+        userDefaults.set(request.mainConfiguration.mainKeys.rawValue, forKey: AppPreferenceKeys.hotkeyMainKey)
+        userDefaults.set(request.mainConfiguration.quitKeys.rawValue, forKey: AppPreferenceKeys.hotkeyQuitKey)
+        userDefaults.set(
+            request.inAppWindowConfiguration.baseKeys.rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
         )
         userDefaults.set(
-            request.inAppWindowConfiguration.mainKey.rawValue,
-            forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey
+            request.inAppWindowConfiguration.reverseKeys.rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyReverseKeys
         )
-    }
-
-    @MainActor
-    private func notifyHotkeyConfigChanged() {
-        let request = HotkeyRegistrationRequest(
-            mainConfiguration: hotkeyConfiguration,
-            inAppWindowConfiguration: inAppWindowHotkeyConfiguration
-        )
-        notifyHotkeyConfigChanged(using: request)
     }
 
     @MainActor
     private func notifyHotkeyConfigChangedIfNeeded(using request: HotkeyRegistrationRequest) {
-        let signature = hotkeyRequestSignature(request)
+        let signature = request.configurationSignature
         guard signature != lastNotifiedHotkeySignature else { return }
         lastNotifiedHotkeySignature = signature
+        guard
+            !hotkeyRegistrationObservationOwner
+                .hasMatchingRegistration(for: request)
+        else {
+            return
+        }
         notifyHotkeyConfigChanged(using: request)
     }
 
     @MainActor
     private func notifyHotkeyConfigChanged(using request: HotkeyRegistrationRequest) {
-        lastNotifiedHotkeySignature = hotkeyRequestSignature(request)
+        lastNotifiedHotkeySignature = request.configurationSignature
+        hotkeyRegistrationObservationOwner.prepare(for: request)
         persistHotkeyRegistrationRequest(request)
         RuntimeLog.info(
             .hotKey,
@@ -712,16 +708,7 @@ struct AppSettingsView: View {
                 userInfo: request.notificationUserInfo
             )
         }
-    }
-
-    private func hotkeyRequestSignature(_ request: HotkeyRegistrationRequest) -> String {
-        [
-            request.mainConfiguration.primaryModifier.rawValue,
-            request.mainConfiguration.mainKey.rawValue,
-            request.mainConfiguration.quitKey.rawValue,
-            request.inAppWindowConfiguration.primaryModifier.rawValue,
-            request.inAppWindowConfiguration.mainKey.rawValue
-        ].joined(separator: "|")
+        hotkeyRegistrationObservationOwner.readback()
     }
 
     private func notifyAppVisibilityPreferenceChanged() {
@@ -737,94 +724,66 @@ struct AppSettingsView: View {
         hiddenAppCount = AppVisibilityPreferencesStore.loadHiddenAppIDs().count
     }
 
-    private func startPermissionPolling(target: PermissionPollingTarget) {
-        cancelPermissionPolling(target: target)
-        let generation = advancePermissionPollingGeneration(for: target)
-        let task = Task { @MainActor in
-            let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-            for _ in 0..<permissionPollAttemptLimit {
-                try? await Task.sleep(nanoseconds: permissionPollIntervalNanoseconds)
-                let trusted = refreshPermissionStatus(for: target)
-                if trusted {
-                    RuntimeLog.info(.permission, permissionPollingSuccessMessage(for: target))
-                    clearPermissionPollingTaskIfCurrent(target: target, generation: generation)
-                    return
-                }
-            }
-            let diagnostic = permissionPollingDiagnostic(
-                target: target,
-                startMs: startMs,
-                finalPermissionGranted: permissionGranted(for: target)
-            )
-            RuntimeLog.warning(
-                .permission,
-                diagnostic.logMessage
-            )
-            clearPermissionPollingTaskIfCurrent(target: target, generation: generation)
-        }
-        permissionPollTasksByTarget[target] = task
-        permissionPollingTaskRegistry.markStarted(target)
-    }
-
-    @discardableResult
-    private func advancePermissionPollingGeneration(for target: PermissionPollingTarget) -> UInt64 {
-        let nextGeneration = (permissionPollingGenerationsByTarget[target] ?? 0) &+ 1
-        permissionPollingGenerationsByTarget[target] = nextGeneration
-        return nextGeneration
-    }
-
-    private func clearPermissionPollingTaskIfCurrent(
-        target: PermissionPollingTarget,
-        generation: UInt64
-    ) {
-        guard permissionPollingGenerationsByTarget[target] == generation else { return }
-        permissionPollTasksByTarget[target] = nil
-        permissionPollingTaskRegistry.markStopped(target)
-    }
-
-    private func refreshPermissionStatus(for target: PermissionPollingTarget) -> Bool {
-        switch target {
-        case .accessibility:
-            refreshAccessibilityStatus()
-        case .screenCapture:
-            refreshScreenCaptureStatus()
-        }
-        return permissionGranted(for: target)
-    }
-
-    private func permissionGranted(for target: PermissionPollingTarget) -> Bool {
-        switch target {
-        case .accessibility:
-            accessibilityTrusted
-        case .screenCapture:
-            screenCaptureTrusted
-        }
-    }
-
-    private func permissionPollingSuccessMessage(for target: PermissionPollingTarget) -> String {
-        switch target {
-        case .accessibility:
-            return "trusted=true after prompt bundle=\(bundleIdentifier) path=\(bundlePath)"
-        case .screenCapture:
-            return "screenCapture trusted=true after prompt bundle=\(bundleIdentifier) path=\(bundlePath)"
-        }
-    }
-
-    private func permissionPollingDiagnostic(
-        target: PermissionPollingTarget,
-        startMs: Double,
-        finalPermissionGranted: Bool
-    ) -> PermissionPollingDiagnostic {
-        PermissionPollingDiagnostic(
+    private func startPermissionObservation(
+        target: RuntimePermissionTarget
+    ) -> RuntimePermissionObservationEvidence {
+        permissionObservationCoordinator.start(
             target: target,
-            attempt: permissionPollAttemptLimit,
-            attemptLimit: permissionPollAttemptLimit,
-            elapsedMs: max(0, RuntimePerformanceClock.monotonicMilliseconds() - startMs),
-            finalPermissionGranted: finalPermissionGranted,
-            timeoutDescription: permissionPollTimeoutDescription,
-            bundleIdentifier: bundleIdentifier,
-            bundlePath: bundlePath,
-            action: .timeout
+            mode: permissionObservationPolicy.permissionRequestMode,
+            readPermission: {
+                permissionReadback(for: target)
+            },
+            onEvidence: { evidence in
+                applyPermissionEvidence(evidence)
+            },
+            onWatchdog: { diagnostic in
+                RuntimeLog.warning(.permission, diagnostic.logMessage)
+            }
+        )
+    }
+
+    private func permissionReadback(
+        for target: RuntimePermissionTarget
+    ) -> Bool {
+        switch target {
+        case .accessibility:
+            return AccessibilityPermissionChecker.isTrusted()
+        case .screenCapture:
+            return ScreenCapturePermissionChecker.hasScreenCapturePermission
+        }
+    }
+
+    private func applyPermissionEvidence(
+        _ evidence: RuntimePermissionObservationEvidence
+    ) {
+        switch evidence.target {
+        case .accessibility:
+            accessibilityTrusted = evidence.isGranted
+            if evidence.isGranted {
+                hotkeyPermissionRequirement = nil
+            }
+        case .screenCapture:
+            screenCaptureTrusted = evidence.isGranted
+            if evidence.isGranted {
+                hasAttemptedScreenCapturePermissionRequest = false
+            }
+        }
+        guard evidence.isGranted,
+              evidence.source != .initialReadback
+        else {
+            return
+        }
+        RuntimeLog.info(
+            .permission,
+            [
+                "permission observed",
+                "target=\(evidence.target.rawValue)",
+                "source=\(evidence.source.rawValue)",
+                "readbacks=\(evidence.readbackCount)",
+                "elapsedMs=\(String(format: "%.3f", evidence.elapsedMs))",
+                "bundle=\(bundleIdentifier)",
+                "path=\(bundlePath)"
+            ].joined(separator: " ")
         )
     }
 }

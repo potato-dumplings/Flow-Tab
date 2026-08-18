@@ -9,7 +9,7 @@ enum RuntimeAXWindowAbsencePolicy {
         switch remoteScanCompleteness {
         case nil, .some(.complete(_)):
             true
-        case .some(.partialTimedOut(_, _)), .some(.unavailable):
+        case .some(.unavailable):
             false
         }
     }

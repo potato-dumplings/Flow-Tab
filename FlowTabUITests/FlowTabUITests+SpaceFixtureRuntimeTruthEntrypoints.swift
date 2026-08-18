@@ -40,8 +40,8 @@ extension FlowTabUITests {
         )
         let fullscreenTitle = try XCTUnwrap(fullscreenWindowTitle(in: targetApp))
         let standardTitle = try XCTUnwrap(firstStandardWorkflowWindowTitle(in: targetApp))
-        var runtimeLogSnapshot = makeRuntimeLogFileSnapshot()
-
+        let runtimeLogSnapshot = makeRuntimeLogFileSnapshot()
+        defer { runtimeLogSnapshot.cancel() }
         try runRealSpaceFixtureWorkflow(
             workflow,
             flowTabAdditionalArguments: runtimeTruthSwitcherLaunchArguments(),
@@ -57,7 +57,7 @@ extension FlowTabUITests {
                         self.waitForWorkflowSpaceContainingCGWindow(
                             title: fullscreenTitle,
                             app: targetApp,
-                            timeout: 12
+                            timeout: FlowTabUITestRuntimeTruthWatchdogPolicy.optionTabInitialTopology
                         ),
                         "Option+Tab noisy roundtrip must start on a Space containing the fullscreen sibling."
                     )
@@ -66,7 +66,7 @@ extension FlowTabUITests {
                         self.waitForFrontmostWorkflowSpaceCGWindow(
                             title: fullscreenTitle,
                             app: targetApp,
-                            timeout: 12
+                            timeout: FlowTabUITestRuntimeTruthWatchdogPolicy.optionTabInitialTopology
                         ),
                         "Option+Tab roundtrip must start with the fullscreen sibling frontmost."
                     )
@@ -78,7 +78,6 @@ extension FlowTabUITests {
             }
         ) { _, app in
             logWorkflowSpaceObservation("\(traceLabel).beforeTrigger", app: targetApp)
-            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: traceLabel)
             var diagnosticsSummary = try assertGlobalSwitcherWindowStateReady(
                 for: targetApp,
                 in: app,
@@ -102,7 +101,7 @@ extension FlowTabUITests {
                 waitForActiveSpaceWorkflowCGWindow(
                     title: fullscreenTitle,
                     app: targetApp,
-                    timeout: 4
+                    timeout: FlowTabUITestRuntimeTruthWatchdogPolicy.optionTabInitialWindowStateTopology
                 ),
                 "Option+Tab first window-state phase must open from the fullscreen sibling's Space."
             )
@@ -118,35 +117,27 @@ extension FlowTabUITests {
                 diagnosticsSummary: diagnosticsSummary,
                 traceLabel: traceLabel
             )
-
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "\(traceLabel).confirmStandard")
-            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: standardSelection.windowNumber,
-                    title: standardTitle,
-                    app: targetApp,
-                    timeout: 12
-                )
+            confirmOptionTabSelectionAndWaitForEvidence(
+                windowNumber: standardSelection.windowNumber,
+                title: standardTitle,
+                app: targetApp,
+                diagnosticsSummary: diagnosticsSummary,
+                activationWatchdog: FlowTabUITestRuntimeTruthWatchdogPolicy.optionTabConfirmedWindowActivation,
+                dismissalWatchdog: FlowTabUITestRuntimeTruthWatchdogPolicy.optionTabSwitcherDismissal,
+                traceLabel: "\(traceLabel).confirmStandard"
             )
             logWorkflowSpaceObservation("\(traceLabel).afterStandardConfirm", app: targetApp)
 
-            diagnosticsSummary = try relaunchGlobalSwitcher(
+            diagnosticsSummary = try relaunchGlobalSwitcherAndWaitForFrontmostWorkflowWindow(
                 app,
                 for: targetApp,
+                windowNumber: standardSelection.windowNumber,
+                title: standardTitle,
                 traceLabel: traceLabel,
-                allowsNoisyCGSiblings: allowsNoisyCGSiblings
+                allowsNoisyCGSiblings: allowsNoisyCGSiblings,
+                activationWatchdog: FlowTabUITestRuntimeTruthWatchdogPolicy.optionTabRelaunchWindowTopology
             )
             logWorkflowSpaceObservation("\(traceLabel).afterSecondWindowStateReady", app: targetApp)
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: standardSelection.windowNumber,
-                    title: standardTitle,
-                    app: targetApp,
-                    timeout: 4
-                ),
-                "Option+Tab second window-state phase must open from the normal sibling's Space."
-            )
             assertSwitcherSelectedWindowTitle(
                 standardTitle,
                 in: app,
@@ -169,16 +160,14 @@ extension FlowTabUITests {
                 diagnosticsSummary: diagnosticsSummary,
                 traceLabel: traceLabel
             )
-
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "\(traceLabel).confirmFullscreen")
-            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: fullscreenSelection.windowNumber,
-                    title: targetFullscreenTitle,
-                    app: targetApp,
-                    timeout: 12
-                )
+            confirmOptionTabSelectionAndWaitForEvidence(
+                windowNumber: fullscreenSelection.windowNumber,
+                title: targetFullscreenTitle,
+                app: targetApp,
+                diagnosticsSummary: diagnosticsSummary,
+                activationWatchdog: FlowTabUITestRuntimeTruthWatchdogPolicy.optionTabConfirmedWindowActivation,
+                dismissalWatchdog: FlowTabUITestRuntimeTruthWatchdogPolicy.optionTabSwitcherDismissal,
+                traceLabel: "\(traceLabel).confirmFullscreen"
             )
             logWorkflowSpaceObservation("\(traceLabel).afterFullscreenConfirm", app: targetApp)
         }
@@ -238,7 +227,7 @@ extension FlowTabUITests {
                         self.waitForWorkflowSpaceContainingCGWindow(
                             title: fullscreenTitle,
                             app: targetApp,
-                            timeout: 12
+                            timeout: FlowTabUITestRuntimeTruthWatchdogPolicy.windowSearchInitialTopology
                         ),
                         "Window search noisy roundtrip must start on a Space containing the fullscreen sibling."
                     )
@@ -247,7 +236,7 @@ extension FlowTabUITests {
                         self.waitForFrontmostWorkflowSpaceCGWindow(
                             title: fullscreenTitle,
                             app: targetApp,
-                            timeout: 12
+                            timeout: FlowTabUITestRuntimeTruthWatchdogPolicy.windowSearchInitialTopology
                         ),
                         "Window search roundtrip must start with the fullscreen sibling frontmost."
                     )
@@ -259,20 +248,17 @@ extension FlowTabUITests {
             }
         ) { _, app in
             logWorkflowSpaceObservation("\(traceLabel).beforeTrigger", app: targetApp)
+            let readiness =
+                prepareWindowSearchPresentationReadiness(
+                    in: app,
+                    workflowApp: targetApp,
+                    allowsNoisyCGSiblings:
+                        allowsNoisyCGSiblings
+                )
             postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.search, traceLabel: traceLabel)
-            var searchInput = assertWindowSearchReady(in: app)
-            var diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            assertWindowSearchDataUsesWorkflowWindowCount(
-                for: targetApp,
+            var searchInput = requireWindowSearchPresentation(
                 in: app,
-                diagnosticsSummary: diagnosticsSummary,
-                stage: "before first search query",
-                allowsNoisyCGSiblings: allowsNoisyCGSiblings
-            )
-            assertWindowSearchUsesCommittedGenerationIndex(
-                in: app,
-                diagnosticsSummary: diagnosticsSummary,
-                stage: "before first search query"
+                observedBy: readiness
             )
             logWorkflowSpaceObservation("\(traceLabel).afterSearchReady", app: targetApp)
             XCTAssertTrue(
@@ -280,12 +266,12 @@ extension FlowTabUITests {
                     ? waitForWorkflowSpaceContainingCGWindow(
                         title: fullscreenTitle,
                         app: targetApp,
-                        timeout: 4
+                        timeout: FlowTabUITestRuntimeTruthWatchdogPolicy.windowSearchInitialPresentationTopology
                     )
                     : waitForActiveSpaceWorkflowCGWindow(
                     title: fullscreenTitle,
                     app: targetApp,
-                    timeout: 4
+                    timeout: FlowTabUITestRuntimeTruthWatchdogPolicy.windowSearchInitialPresentationTopology
                 ),
                 "Window search first phase must open from the fullscreen sibling's Space."
             )
@@ -308,42 +294,31 @@ extension FlowTabUITests {
                 traceLabel: traceLabel
             )
 
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.searchConfirm, traceLabel: "\(traceLabel).confirmStandard")
-            XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: standardSelection.windowNumber,
-                    title: standardTitle,
-                    app: targetApp,
-                    timeout: 12
-                )
+            confirmWindowSearchSelectionAndWaitForEvidence(
+                windowNumber: standardSelection.windowNumber,
+                title: standardTitle,
+                app: targetApp,
+                searchInput: searchInput,
+                traceLabel: "\(traceLabel).confirmStandard"
             )
             logWorkflowSpaceObservation("\(traceLabel).afterStandardConfirm", app: targetApp)
 
-            searchInput = relaunchWindowSearch(app, traceLabel: traceLabel)
-            diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            assertWindowSearchDataUsesWorkflowWindowCount(
-                for: targetApp,
-                in: app,
-                diagnosticsSummary: diagnosticsSummary,
-                stage: "before second search query",
-                allowsNoisyCGSiblings: allowsNoisyCGSiblings
-            )
-            assertWindowSearchUsesCommittedGenerationIndex(
-                in: app,
-                diagnosticsSummary: diagnosticsSummary,
-                stage: "before second search query"
-            )
-            logWorkflowSpaceObservation("\(traceLabel).afterSecondSearchReady", app: targetApp)
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: standardSelection.windowNumber,
-                    title: standardTitle,
-                    app: targetApp,
-                    timeout: 4
-                ),
-                "Window search second phase must open from the normal sibling's Space."
-            )
+            searchInput = try relaunchWindowSearchAndWaitForFrontmostWorkflowWindow(
+                windowNumber: standardSelection.windowNumber,
+                title: standardTitle,
+                app: targetApp,
+                traceLabel: "\(traceLabel).secondSearch"
+            ) {
+                let relaunchedSearchInput = relaunchWindowSearch(
+                    app,
+                    workflowApp: targetApp,
+                    allowsNoisyCGSiblings:
+                        allowsNoisyCGSiblings,
+                    traceLabel: traceLabel
+                )
+                logWorkflowSpaceObservation("\(traceLabel).afterSecondSearchReady", app: targetApp)
+                return relaunchedSearchInput
+            }
             let fullscreenSelection = try searchAndSelectWorkflowWindow(
                 title: fullscreenTitle,
                 app: targetApp,
@@ -351,15 +326,12 @@ extension FlowTabUITests {
                 traceLabel: traceLabel
             )
 
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.searchConfirm, traceLabel: "\(traceLabel).confirmFullscreen")
-            XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: fullscreenSelection.windowNumber,
-                    title: fullscreenSelection.title,
-                    app: targetApp,
-                    timeout: 12
-                )
+            confirmWindowSearchSelectionAndWaitForEvidence(
+                windowNumber: fullscreenSelection.windowNumber,
+                title: fullscreenSelection.title,
+                app: targetApp,
+                searchInput: searchInput,
+                traceLabel: "\(traceLabel).confirmFullscreen"
             )
             logWorkflowSpaceObservation("\(traceLabel).afterFullscreenConfirm", app: targetApp)
         }
@@ -397,30 +369,23 @@ extension FlowTabUITests {
 
         for (index, phase) in phases.enumerated() {
             if index > 0 {
-                searchInput = relaunchWindowSearch(app, traceLabel: traceLabel)
-                let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-                assertWindowSearchDataUsesWorkflowWindowCount(
-                    for: targetApp,
-                    in: app,
-                    diagnosticsSummary: diagnosticsSummary,
-                    stage: "before \(phase.trace) search query",
-                    allowsNoisyCGSiblings: true
+                let previousSelection = try XCTUnwrap(
+                    currentSelection,
+                    "Noisy Window Search relaunch requires the preceding exact window selection."
                 )
-                assertWindowSearchUsesCommittedGenerationIndex(
-                    in: app,
-                    diagnosticsSummary: diagnosticsSummary,
-                    stage: "before \(phase.trace) search query"
-                )
-                if let currentSelection {
-                    XCTAssertTrue(
-                        waitForExactFrontmostWorkflowCGWindow(
-                            windowNumber: currentSelection.windowNumber,
-                            title: currentSelection.title,
-                            app: targetApp,
-                            timeout: 4
-                        ),
-                        "Noisy window search \(phase.trace) phase must reopen from \(currentSelection.title)."
+                searchInput = try relaunchWindowSearchAndWaitForFrontmostWorkflowWindow(
+                    windowNumber: previousSelection.windowNumber,
+                    title: previousSelection.title,
+                    app: targetApp,
+                    traceLabel: "\(traceLabel).relaunch.\(phase.trace)"
+                ) {
+                    let relaunchedSearchInput = relaunchWindowSearch(
+                        app,
+                        workflowApp: targetApp,
+                        allowsNoisyCGSiblings: true,
+                        traceLabel: traceLabel
                     )
+                    return relaunchedSearchInput
                 }
             }
 
@@ -431,19 +396,12 @@ extension FlowTabUITests {
                 traceLabel: "\(traceLabel).\(phase.trace)"
             )
 
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
-                .searchConfirm,
+            confirmWindowSearchSelectionAndWaitForEvidence(
+                windowNumber: selection.windowNumber,
+                title: phase.title,
+                app: targetApp,
+                searchInput: searchInput,
                 traceLabel: "\(traceLabel).confirm.\(phase.trace)"
-            )
-            XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: selection.windowNumber,
-                    title: phase.title,
-                    app: targetApp,
-                    timeout: 12
-                ),
-                "Noisy window search must activate the exact \(phase.title) CG window selected in \(phase.trace)."
             )
             currentSelection = selection
             logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
@@ -454,61 +412,90 @@ extension FlowTabUITests {
         for workflowApp: SpaceFixtureResolvedWorkflow.App,
         in app: XCUIApplication,
         traceLabel: String,
-        allowsNoisyCGSiblings: Bool = false
+        allowsNoisyCGSiblings: Bool = false,
+        globalTriggerTraceLabel: String? = nil
     ) throws -> XCUIElement {
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+        let diagnosticsBaseline =
+            switcherDiagnosticsSnapshot(
+                diagnosticsSummary,
+                keys: ["selected"]
+            )
 
         logFlowTabUITestTrace(
-            "[\(traceLabel).selectWorkflowApp.direct] target=\(workflowApp.identity.bundleIdentifier) selected=\(switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected"))"
+            "[\(traceLabel).selectWorkflowApp.direct] "
+                + "target="
+                + workflowApp.identity.bundleIdentifier
+                + " baseline={"
+                + diagnosticsBaseline.diagnosticSummary
+                + "}"
         )
-        try postFlowTabUITestSelectSwitcherAppAndWaitForDelivery(
-            bundleIdentifier: workflowApp.identity.bundleIdentifier,
-            traceLabel: "\(traceLabel).selectApp"
-        )
-        assertSwitcherSelectedApp(
-            workflowApp,
+        let appProjectionExpectation:
+            FlowTabUITestSwitcherAppProjectionExpectation =
+                allowsNoisyCGSiblings
+                    ? .bundleIdentifier(
+                        workflowApp.identity.bundleIdentifier
+                    )
+                    : .exactEntry(
+                        switcherAppStripSummary(
+                            for: workflowApp
+                        )
+                    )
+        _ = try performAndWaitForSwitcherAppSelection(
             in: app,
-            diagnosticsSummary: diagnosticsSummary,
-            stage: "before entering Option+Tab window state"
+            bundleIdentifier: workflowApp.identity.bundleIdentifier,
+            appProjectionExpectation:
+                appProjectionExpectation,
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .switcherDiagnosticsAppSelectionProjectionApplication,
+            trigger: {
+                postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                    .global,
+                    traceLabel:
+                        globalTriggerTraceLabel
+                            ?? traceLabel
+                )
+                try FlowTabUITestSwitcherCommandPayload.write(
+                    workflowApp.identity.bundleIdentifier
+                )
+                postFlowTabUITestSwitcherCommand(
+                    .selectApp,
+                    traceLabel: "\(traceLabel).selectApp"
+                )
+            }
         )
-        if allowsNoisyCGSiblings {
-            XCTAssertTrue(
-                waitForSwitcherAppEntry(
-                    diagnosticsSummary,
-                    bundleIdentifier: workflowApp.identity.bundleIdentifier,
-                    timeout: 4
-                ),
-                """
-                Option+Tab switcher did not include \(workflowApp.appName) after selecting it.
-
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-        } else {
-            XCTAssertTrue(
-                waitForSwitcherAppsSummary(
-                    diagnosticsSummary,
-                    toContain: switcherAppStripSummary(for: workflowApp),
-                    timeout: 4
-                ),
-                """
-                Option+Tab switcher did not include \(workflowApp.appName) after selecting it.
-
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-        }
-
-        logWorkflowSpaceObservation("\(traceLabel).beforeEnterWindowState", app: workflowApp)
-        postFlowTabUITestSwitcherCommandAndWaitForDelivery(.advanceDown, traceLabel: "\(traceLabel).enterWindowState")
-        logWorkflowSpaceObservation("\(traceLabel).afterEnterWindowState", app: workflowApp)
+        let previewExpectation =
+            FlowTabUITestSwitcherPreviewProjectionExpectation
+                .workflowApp(
+                    workflowApp,
+                    allowsNoisyCGSiblings:
+                        allowsNoisyCGSiblings
+                )
         XCTAssertTrue(
-            waitForSwitcherDiagnosticsValue(
-                diagnosticsSummary,
-                key: "mode",
-                toHavePrefix: "windowCycle",
-                timeout: 4
+            enterSwitcherPreview(
+                workflowApp,
+                diagnostics: diagnosticsSummary,
+                previewExpectation:
+                    previewExpectation,
+                timeout:
+                    FlowTabUITestRuntimeTruthWatchdogPolicy
+                        .switcherWindowCyclePreviewProjection,
+                trigger: {
+                    self.logWorkflowSpaceObservation(
+                        "\(traceLabel).beforeEnterWindowState",
+                        app: workflowApp
+                    )
+                    postFlowTabUITestSwitcherCommand(
+                        .advanceDown,
+                        traceLabel:
+                            "\(traceLabel).enterWindowState"
+                    )
+                    self.logWorkflowSpaceObservation(
+                        "\(traceLabel).afterEnterWindowState",
+                        app: workflowApp
+                    )
+                }
             ),
             """
             Option+Tab switcher did not enter app window state.
@@ -516,190 +503,7 @@ extension FlowTabUITests {
             \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
             """
         )
-        assertSwitcherSelectedApp(
-            workflowApp,
-            in: app,
-            diagnosticsSummary: diagnosticsSummary,
-            stage: "after entering Option+Tab window state"
-        )
-        if allowsNoisyCGSiblings {
-            XCTAssertTrue(
-                waitForNoisyFullscreenWorkflowPreviewTitles(
-                    diagnosticsSummary,
-                    for: workflowApp,
-                    timeout: 8
-                ),
-                """
-                Option+Tab noisy app window state did not include the required real windows.
-
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-        } else {
-            XCTAssertTrue(
-                waitForSwitcherPreviewTitles(
-                    diagnosticsSummary,
-                    toEqual: Set(workflowApp.expectedWindowTitles),
-                    timeout: 8
-                ),
-                """
-                Option+Tab app window state did not expose the expected real windows.
-
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-        }
         return diagnosticsSummary
-    }
-
-    private func assertSwitcherSelectedApp(
-        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
-        in app: XCUIApplication,
-        diagnosticsSummary: XCUIElement,
-        stage: String
-    ) {
-        XCTAssertTrue(
-            waitForSwitcherDiagnosticsValue(
-                diagnosticsSummary,
-                key: "selected",
-                toEqual: workflowApp.identity.bundleIdentifier,
-                timeout: 4
-            ),
-            """
-            Option+Tab selected the wrong app \(stage). Expected \
-            \(workflowApp.identity.bundleIdentifier).
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-    }
-
-    private func assertWindowSearchDataUsesWorkflowWindowCount(
-        for workflowApp: SpaceFixtureResolvedWorkflow.App,
-        in app: XCUIApplication,
-        diagnosticsSummary: XCUIElement,
-        stage: String,
-        allowsNoisyCGSiblings: Bool = false
-    ) {
-        XCTAssertTrue(
-            waitForWindowSearchResults(
-                diagnosticsSummary,
-                matching: workflowApp,
-                requiresExactCount: !allowsNoisyCGSiblings,
-                timeout: 4
-            ),
-            """
-            Window search committed index exposed the wrong window rows for \
-            \(workflowApp.appName) \(stage). Expected titles \
-            \(workflowApp.expectedWindowTitles.sorted())\(allowsNoisyCGSiblings ? "" : " count=\(workflowApp.windowCount)").
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-    }
-
-    private func waitForWindowSearchResults(
-        _ diagnosticsSummary: XCUIElement,
-        matching workflowApp: SpaceFixtureResolvedWorkflow.App,
-        requiresExactCount: Bool,
-        timeout: TimeInterval
-    ) -> Bool {
-        let expectedTitles = Set(workflowApp.expectedWindowTitles)
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let rows = searchWindowResultObservations(from: diagnosticsSummary)
-                .filter { $0.appID == workflowApp.identity.bundleIdentifier }
-            let titles = Set(rows.compactMap(\.title))
-            let countMatches = !requiresExactCount || rows.count == workflowApp.windowCount
-            if expectedTitles.isSubset(of: titles), countMatches {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-
-    private func assertWindowSearchUsesCommittedGenerationIndex(
-        in app: XCUIApplication,
-        diagnosticsSummary: XCUIElement,
-        stage: String
-    ) {
-        let deadline = Date().addingTimeInterval(4)
-        repeat {
-            let readiness = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "searchIndexReadiness"
-            )
-            let resultState = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "searchIndexResultState"
-            )
-            let degraded = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "searchIndexDegraded"
-            )
-            let coversCurrentGeneration = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "searchIndexCoversCurrentGeneration"
-            )
-            let barrierRequested = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "searchFreshnessBarrierRequested"
-            )
-            if readiness == "committedGenerationValidated",
-               resultState == "committedGenerationResult",
-               degraded == "0",
-               coversCurrentGeneration == "1",
-               barrierRequested == "0" {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Window search did not read a committed-generation Search index \(stage).
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-    }
-
-    func selectGlobalSwitcherWindow(
-        title: String,
-        in app: XCUIApplication,
-        diagnosticsSummary: XCUIElement,
-        traceLabel: String
-    ) throws -> RuntimeTruthWindowSelection {
-        let attempts = max(1, switcherPreviewTitles(from: diagnosticsSummary).count + 3)
-        var latestTitle = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindowTitle")
-        var latestWindowID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindow")
-
-        if latestTitle == title {
-            return try runtimeTruthWindowSelection(title: latestTitle, windowID: latestWindowID)
-        }
-
-        for attempt in 0..<attempts {
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.advanceRight, traceLabel: "\(traceLabel).selectWindow")
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-            latestTitle = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindowTitle")
-            latestWindowID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindow")
-            logFlowTabUITestTrace(
-                "[\(traceLabel).selectAttempt.\(attempt + 1)] target=\(title) selected=\(latestTitle) windowID=\(latestWindowID)"
-            )
-            if latestTitle == title {
-                return try runtimeTruthWindowSelection(title: latestTitle, windowID: latestWindowID)
-            }
-        }
-
-        XCTFail(
-            """
-            Option+Tab window state did not select \(title).
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-        return try runtimeTruthWindowSelection(title: latestTitle, windowID: latestWindowID)
     }
 
     private func searchAndSelectWorkflowWindow(
@@ -708,15 +512,22 @@ extension FlowTabUITests {
         in app: XCUIApplication,
         traceLabel: String
     ) throws -> RuntimeTruthWindowSelection {
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        try postFlowTabUITestSwitcherSearchQueryAndWaitForDelivery(title, traceLabel: "\(traceLabel).query")
-
         let result = try XCTUnwrap(
-            waitForSearchWindowResult(
+            try performAndWaitForCommittedSearchWindowResult(
                 in: app,
+                scope: "window",
+                query: title,
                 title: title,
                 appName: workflowApp.appName,
-                timeout: 8
+                timeout:
+                    FlowTabUITestRuntimeTruthWatchdogPolicy
+                        .windowSearchQueryProjectionPublication,
+                trigger: {
+                    try self.postFlowTabUITestSwitcherSearchQueryAndWaitForDelivery(
+                        title,
+                        traceLabel: "\(traceLabel).query"
+                    )
+                }
             )
         )
         let windowNumber = try XCTUnwrap(
@@ -739,23 +550,22 @@ extension FlowTabUITests {
             result.resultID,
             "Search result \(result.identifier) did not expose a stable result id."
         )
-        try postFlowTabUITestSelectSearchResultAndWaitForDelivery(
+        _ = try performAndWaitForWindowSearchResultSelection(
+            in: app,
             resultID: resultID,
-            traceLabel: "\(traceLabel).selectSearchResult"
-        )
-
-        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        XCTAssertTrue(
-            waitForSwitcherSearchSelectedResult(
-                resultID,
-                diagnosticsSummary: diagnosticsSummary,
-                timeout: 2
-            ),
-            """
-            Search result command did not select \(resultID).
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
+            timeout:
+                FlowTabUITestRuntimeTruthWatchdogPolicy
+                    .windowSearchResultSelectionApplication,
+            trigger: {
+                try FlowTabUITestSwitcherCommandPayload.write(
+                    resultID
+                )
+                postFlowTabUITestSwitcherCommand(
+                    .selectSearchResult,
+                    traceLabel:
+                        "\(traceLabel).selectSearchResult"
+                )
+            }
         )
     }
 
@@ -812,88 +622,35 @@ extension FlowTabUITests {
         allowsNoisyCGSiblings: Bool = false
     ) throws -> XCUIElement {
         XCTAssertTrue(app.state == .runningForeground || app.state == .runningBackground)
-        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: "\(traceLabel).relaunch")
         return try assertGlobalSwitcherWindowStateReady(
             for: workflowApp,
             in: app,
             traceLabel: traceLabel,
-            allowsNoisyCGSiblings: allowsNoisyCGSiblings
+            allowsNoisyCGSiblings: allowsNoisyCGSiblings,
+            globalTriggerTraceLabel:
+                "\(traceLabel).relaunch"
         )
     }
 
-    private func relaunchWindowSearch(_ app: XCUIApplication, traceLabel: String) -> XCUIElement {
+    private func relaunchWindowSearch(
+        _ app: XCUIApplication,
+        workflowApp: SpaceFixtureResolvedWorkflow.App,
+        allowsNoisyCGSiblings: Bool,
+        traceLabel: String
+    ) -> XCUIElement {
         XCTAssertTrue(app.state == .runningForeground || app.state == .runningBackground)
+        let readiness =
+            prepareWindowSearchPresentationReadiness(
+                in: app,
+                workflowApp: workflowApp,
+                allowsNoisyCGSiblings:
+                    allowsNoisyCGSiblings
+            )
         postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.search, traceLabel: "\(traceLabel).relaunch")
-        return assertWindowSearchReady(in: app)
+        return requireWindowSearchPresentation(
+            in: app,
+            observedBy: readiness
+        )
     }
 
-    private func assertWindowSearchReady(in app: XCUIApplication) -> XCUIElement {
-        let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        XCTAssertTrue(searchInput.waitForExistence(timeout: 12))
-        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 12))
-        return searchInput
-    }
-
-    private func waitForSwitcherDiagnosticsValue(
-        _ diagnosticsSummary: XCUIElement,
-        key: String,
-        toHavePrefix expectedValuePrefix: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if switcherPanelDiagnosticsValue(diagnosticsSummary, key: key).hasPrefix(expectedValuePrefix) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-
-    private func waitForSwitcherDiagnosticsValue(
-        _ diagnosticsSummary: XCUIElement,
-        key: String,
-        toEqual expectedValue: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if switcherPanelDiagnosticsValue(diagnosticsSummary, key: key) == expectedValue {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-
-    private func waitForSwitcherPreviewTitles(
-        _ diagnosticsSummary: XCUIElement,
-        toEqual expectedTitles: Set<String>,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if Set(switcherPreviewTitles(from: diagnosticsSummary)) == expectedTitles {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-
-    private func waitForSwitcherPreviewTitles(
-        _ diagnosticsSummary: XCUIElement,
-        toContain expectedTitles: Set<String>,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if expectedTitles.isSubset(of: Set(switcherPreviewTitles(from: diagnosticsSummary))) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
 }

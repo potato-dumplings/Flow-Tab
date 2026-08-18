@@ -183,6 +183,7 @@ final class LiveSwitcherModel: ObservableObject {
     let activator = RuntimeActivator()
     let iconProvider = AppIconProvider()
     let searchCoordinator = SwitcherSearchCoordinator()
+    let searchSchedulingOwner: SwitcherSearchSchedulingOwner
     let windowRecencyTracker: RuntimeWindowRecencyTracker
     var previewProviderResolver = WindowPreviewProviderResolver.default
     let previewImageCache = BoundedImageCache(
@@ -228,7 +229,6 @@ final class LiveSwitcherModel: ObservableObject {
     var autoEnterSuppressedAppID: String?
     var titleBarStyleInferenceEnabled = false
     var searchInputHasMarkedText = false
-    var pendingSearchComputationTask: Task<Void, Never>?
     var pendingTerminateRequest: PendingTerminateRequest?
     var terminateAppInstanceGeneration: UInt64 = 0
     var runtimeProjectionMaintenanceGeneration: UInt64 = 0
@@ -240,15 +240,17 @@ final class LiveSwitcherModel: ObservableObject {
     var lastRuntimeProjectionMaintenanceDiagnostic: RuntimeProjectionMaintenanceDiagnostic?
     var lastSearchIndexReadDiagnostic: SearchIndexReadDiagnostic?
     var pendingSearchActivationAfterFreshnessBarrier = false
-    var searchComputationRevision: UInt64 = 0
-    var searchDebounceNanoseconds: UInt64 = 20_000_000
 
     init(
         windowRecencyTracker: RuntimeWindowRecencyTracker = .shared,
-        runtimeProjectionService: any RuntimeProjectionServing = sharedRuntimeProjectionService
+        runtimeProjectionService: any RuntimeProjectionServing =
+            sharedRuntimeProjectionService,
+        searchSchedulingOwner: SwitcherSearchSchedulingOwner? = nil
     ) {
         self.windowRecencyTracker = windowRecencyTracker
         self.runtimeProjectionService = runtimeProjectionService
+        self.searchSchedulingOwner =
+            searchSchedulingOwner ?? SwitcherSearchSchedulingOwner()
         activator.windowFocusVerifiedHandler = { [windowRecencyTracker, runtimeProjectionService] verification in
             windowRecencyTracker.recordVerifiedFocus(
                 appID: verification.appID,
@@ -895,12 +897,6 @@ final class LiveSwitcherModel: ObservableObject {
         autoEnterSuppressedAppID = nil
         pendingManualWindowLayerEntryAppID = nil
         titleBarStyleInferenceEnabled = false
-    }
-
-    func cancelPendingSearchComputation() {
-        pendingSearchComputationTask?.cancel()
-        pendingSearchComputationTask = nil
-        searchComputationRevision &+= 1
     }
 
     func appSwitcherPayloadWithWindowRecencyApplied(

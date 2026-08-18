@@ -951,44 +951,42 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(interactive.useCase, .interactive)
         XCTAssertEqual(interactive.maximumElementID, 750)
-        XCTAssertEqual(interactive.timeoutSeconds, 0.080, accuracy: 0.000_001)
+        XCTAssertEqual(
+            RuntimeAXRemoteWindowResolverForTesting.scanElementIDs(for: .interactive),
+            UInt64(0)..<750
+        )
 
         XCTAssertEqual(hotPath.useCase, .hotPath)
         XCTAssertEqual(hotPath.maximumElementID, 1_000)
-        XCTAssertEqual(hotPath.timeoutSeconds, 0.100, accuracy: 0.000_001)
+        XCTAssertEqual(
+            RuntimeAXRemoteWindowResolverForTesting.scanElementIDs(for: .hotPath),
+            UInt64(0)..<1_000
+        )
 
         XCTAssertEqual(background.useCase, .background)
         XCTAssertEqual(background.maximumElementID, 2_000)
-        XCTAssertEqual(background.timeoutSeconds, 0.250, accuracy: 0.000_001)
-        XCTAssertLessThan(interactive.timeoutSeconds, background.timeoutSeconds)
-
         XCTAssertEqual(
-            RuntimeAXRemoteWindowResolverForTesting.scanCompleteness(
-                scannedCount: 24,
-                timedOut: true,
-                policy: background
-            ),
-            .partialTimedOut(scanned: 24, maximum: 2_000)
+            RuntimeAXRemoteWindowResolverForTesting.scanElementIDs(for: .background),
+            UInt64(0)..<2_000
         )
     }
 
-    func testRuntimeAXRemoteWindowResolverReportsCompleteScanSeparatelyFromTimeout() {
+    func testRuntimeAXRemoteWindowResolverReportsCompleteScanAfterVisitingConfiguredRange() {
+        var visitedElementIDs: [UInt64] = []
+        let resolvedElement = AXUIElementCreateApplication(
+            NSRunningApplication.current.processIdentifier
+        )
+        let result = RuntimeAXRemoteWindowResolverForTesting.scan(for: .hotPath) { elementID in
+            visitedElementIDs.append(elementID)
+            return elementID == 24 ? resolvedElement : nil
+        }
+
+        XCTAssertEqual(visitedElementIDs, Array(UInt64(0)..<1_000))
+        XCTAssertEqual(result.windows.count, 1)
+        XCTAssertTrue(result.windows.contains(where: { CFEqual($0, resolvedElement) }))
         XCTAssertEqual(
-            RuntimeAXRemoteWindowResolverForTesting.scanCompleteness(
-                scannedCount: 1_000,
-                timedOut: false
-            ),
+            result.completeness,
             .complete(scanned: 1_000)
-        )
-    }
-
-    func testRuntimeAXRemoteWindowResolverReportsPartialTimedOutScan() {
-        XCTAssertEqual(
-            RuntimeAXRemoteWindowResolverForTesting.scanCompleteness(
-                scannedCount: 24,
-                timedOut: true
-            ),
-            .partialTimedOut(scanned: 24, maximum: 1_000)
         )
     }
 
@@ -1047,9 +1045,8 @@ extension FlowTabPriorityCoverageTests {
     func testAXWindowInspectorFetchResultCarriesRemoteScanCompleteness() {
         let currentApp = NSRunningApplication.current
         let remoteWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
-        let expectedCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness = .partialTimedOut(
-            scanned: 24,
-            maximum: 1_000
+        let expectedCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness = .complete(
+            scanned: 1_000
         )
         let previousTrustedOverride = AccessibilityPermissionChecker.isTrustedOverrideForTesting
         let previousRemoteScanOverride = AXWindowInspector.remoteWindowScanResultOverrideForTesting
@@ -1074,61 +1071,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(result.remoteScanCompleteness, expectedCompleteness)
         XCTAssertTrue(result.windows.contains(where: { CFEqual($0, remoteWindow) }))
         XCTAssertTrue(
-            result.logDetails.contains("remoteScan=partialTimedOut scanned=24 maximum=1000")
+            result.logDetails.contains("remoteScan=complete scanned=1000")
         )
     }
 
-    @MainActor
-    func testAXWindowInspectorResolvesRemoteWindowsWithoutWaitingForMainThreadWhenRequestedFromBackground() {
-        XCTAssertTrue(Thread.isMainThread)
-        let previousTrustedOverride = AccessibilityPermissionChecker.isTrustedOverrideForTesting
-        let previousRemoteOverride = AXWindowInspector.remoteWindowsResolverOverrideForTesting
-        let previousRemoteScanOverride = AXWindowInspector.remoteWindowScanResultOverrideForTesting
-        let lock = NSLock()
-        var resolverThreadIsMain: Bool?
-        let currentApp = NSRunningApplication.current
-        let workerStarted = DispatchSemaphore(value: 0)
-        let resolverInvoked = DispatchSemaphore(value: 0)
-        let fetchCompleted = DispatchSemaphore(value: 0)
-        AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
-        AXWindowInspector.remoteWindowScanResultOverrideForTesting = nil
-        AXWindowInspector.remoteWindowsResolverOverrideForTesting = { _ in
-            lock.lock()
-            resolverThreadIsMain = Thread.isMainThread
-            lock.unlock()
-            resolverInvoked.signal()
-            return []
-        }
-        defer {
-            AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousTrustedOverride
-            AXWindowInspector.remoteWindowScanResultOverrideForTesting = previousRemoteScanOverride
-            AXWindowInspector.remoteWindowsResolverOverrideForTesting = previousRemoteOverride
-        }
-
-        DispatchQueue(label: "FlowTabTests.AXBackgroundRemoteResolution").async {
-            workerStarted.signal()
-            _ = AXWindowInspector.windowsFetchResult(
-                for: currentApp,
-                includeRemoteWindows: true
-            )
-            fetchCompleted.signal()
-        }
-
-        XCTAssertEqual(workerStarted.wait(timeout: .now() + 1), .success)
-        Thread.sleep(forTimeInterval: 0.25)
-        let resolverResult = resolverInvoked.wait(timeout: .now())
-        XCTAssertEqual(
-            resolverResult,
-            .success,
-            "Remote AX scanning must not synchronously wait for the main thread while the main thread is busy."
-        )
-        if resolverResult == .success {
-            XCTAssertEqual(fetchCompleted.wait(timeout: .now() + 1), .success)
-        }
-
-        lock.lock()
-        let resolverRanOnMain = resolverThreadIsMain
-        lock.unlock()
-        XCTAssertEqual(resolverRanOnMain, false)
-    }
 }

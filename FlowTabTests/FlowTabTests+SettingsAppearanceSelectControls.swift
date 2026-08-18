@@ -298,6 +298,85 @@ extension FlowTabTests {
         XCTAssertFalse(control.accessibilityPerformPress())
     }
 
+    @MainActor
+    func testHotkeySettingsCardReprojectsNormalizedSelectionsWhenStateIsUnchanged() throws {
+        let state = HotkeySettingsCardState(
+            hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.option.rawValue,
+            hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
+            hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
+            inAppWindowHotkeyShortcutKeysRaw: "control+tab",
+            commandTabTakeoverRegistrationState: .inactive,
+            accessibilityTrusted: true,
+            appLanguageRaw: AppLanguage.simplifiedChinese.rawValue
+        )
+        let view = HotkeySettingsCardAppKitView()
+        view.update(with: state)
+
+        let quitRecorder: FlowSettingsShortcutRecorderControl = try XCTUnwrap(
+            descendant(in: view, identifier: "flowtab.settings.hotkey.quit-key")
+        )
+        let inAppRecorder: FlowSettingsShortcutRecorderControl = try XCTUnwrap(
+            descendant(in: view, identifier: "flowtab.settings.hotkey.in-app-shortcut")
+        )
+        quitRecorder.update(
+            keys: [.tab],
+            recordingPrompt: "",
+            keyRequiredPrompt: "",
+            accessibilityLabel: ""
+        )
+        inAppRecorder.update(
+            keys: [.option, .space],
+            recordingPrompt: "",
+            keyRequiredPrompt: "",
+            accessibilityLabel: ""
+        )
+
+        view.update(with: state)
+
+        XCTAssertEqual(quitRecorder.recordedKeys, state.hotkeyConfiguration.quitKeys)
+        XCTAssertEqual(
+            inAppRecorder.recordedKeys,
+            state.inAppWindowHotkeyConfiguration.baseKeys
+        )
+    }
+
+    @MainActor
+    func testSettingsPageImmediatelyProjectsNormalizedHotkeyValues() throws {
+        let view = AppKitSettingsPageView()
+        view.update(with: makeSettingsPageState(themeModeRaw: ThemeMode.followSystem.rawValue))
+
+        let quitRecorder: FlowSettingsShortcutRecorderControl = try XCTUnwrap(
+            descendant(in: view, identifier: "flowtab.settings.hotkey.quit-key")
+        )
+        let inAppRecorder: FlowSettingsShortcutRecorderControl = try XCTUnwrap(
+            descendant(in: view, identifier: "flowtab.settings.hotkey.in-app-shortcut")
+        )
+        quitRecorder.update(
+            keys: [.tab],
+            recordingPrompt: "",
+            keyRequiredPrompt: "",
+            accessibilityLabel: ""
+        )
+        inAppRecorder.update(
+            keys: [.option, .space],
+            recordingPrompt: "",
+            keyRequiredPrompt: "",
+            accessibilityLabel: ""
+        )
+
+        view.updateHotkeyContent(
+            with: AppKitSettingsHotkeyRawValues(
+                hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.option.rawValue,
+                hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
+                hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
+                inAppWindowHotkeyShortcutKeysRaw: "control+tab"
+            )
+        )
+
+        XCTAssertEqual(quitRecorder.recordedKeys, [.q])
+        XCTAssertEqual(inAppRecorder.recordedKeys, [.control, .tab])
+    }
+
     func testFlowDropdownSharedControlDoesNotReadPresentationOrLocalizationState() throws {
         let repoRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -519,8 +598,7 @@ extension FlowTabTests {
 
         let selectIdentifiers = [
             "flowtab.settings.appearance.app-language",
-            "flowtab.settings.search.default-scope",
-            "flowtab.settings.hotkey.main-modifier"
+            "flowtab.settings.search.default-scope"
         ]
 
         for identifier in selectIdentifiers {
@@ -552,6 +630,27 @@ extension FlowTabTests {
             assertColor(dropdownControl.textColorForTesting, resolvesTo: expectedInk, in: selectControl.effectiveAppearance)
             XCTAssertFalse(dropdownControl.selectedTitleForTesting.isEmpty, file: file, line: line)
         }
+
+        let hotkeyRecorder: FlowSettingsShortcutRecorderControl = try XCTUnwrap(
+            descendant(
+                in: container,
+                identifier: "flowtab.settings.hotkey.main-modifiers"
+            ),
+            file: file,
+            line: line
+        )
+        hotkeyRecorder.layoutSubtreeIfNeeded()
+        XCTAssertEqual(
+            hotkeyRecorder.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]),
+            expectedAppearanceName,
+            file: file,
+            line: line
+        )
+        let hotkeyDropdown: FlowDropdownControl? = descendant(
+            in: hotkeyRecorder,
+            as: FlowDropdownControl.self
+        )
+        XCTAssertNil(hotkeyDropdown, file: file, line: line)
     }
 
     private func makeSettingsPageState(
@@ -571,12 +670,11 @@ extension FlowTabTests {
             searchEnabled: true,
             searchDefaultScopeRaw: SwitcherSearchScope.app.rawValue,
             hiddenAppCount: 2,
-            hotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
+            hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.option.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
-            inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
-            inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
-            commandTabTakeoverActive: false,
+            inAppWindowHotkeyShortcutKeysRaw: "control+tab",
+            commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: false,
             screenCaptureTrusted: false,
             targetNSAppearanceName: ThemePreferencesStore.resolve(rawValue: themeModeRaw)

@@ -11,6 +11,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var panelController: SwitcherPanelController?
     private(set) var hotkeyMonitor: (any HotkeyMonitoring)?
     private(set) var inAppWindowHotkeyMonitor: (any HotkeyMonitoring)?
+    private(set) var latestHotkeyRegistrationEvidence: HotkeyRegistrationEvidence?
+    private var hotkeyRegistrationGeneration: UInt64 = 0
+    private var lastHotkeyAccessibilityTrusted: Bool?
     private lazy var commandTabTakeoverController: any CommandTabTakeoverControlling = {
 #if FLOWTAB_TESTING
         Self.testHooks.commandTabTakeoverController ?? CommandTabTakeoverController()
@@ -26,9 +29,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var appVisibilityObserver: NSObjectProtocol?
     private(set) var languageObserver: NSObjectProtocol?
     private(set) var workspaceLifecycleObservers: [NSObjectProtocol] = []
+    private var appLaunchWindowEvidenceCoordinator:
+        (any RuntimeAppLaunchWindowEvidenceCoordinating)?
+    private var requestedAccessibilityPermissionThisLaunch = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
+        AppPreferenceMaintenance.removeRetiredValues(userDefaults: resolvedUserDefaults)
 #if FLOWTAB_TESTING
         FlowTabUITestBootstrapper.prepareIfNeeded(userDefaults: resolvedUserDefaults)
 #endif
@@ -41,14 +48,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         FlowTabUITestBootstrapper.configurePanelControllerIfNeeded(panelController: panelController)
 #endif
 
-        setupHotkeyMonitors(using: HotkeyRegistrationRequest.load(userDefaults: resolvedUserDefaults))
+        let hotkeyRequest = HotkeyRegistrationRequest.load(
+            userDefaults: resolvedUserDefaults
+        )
+        let hotkeyAccessSnapshot =
+            currentHotkeyChordEventAccessSnapshot()
+        requestAccessibilityPermissionIfNeeded()
+        requestChordEventAccessIfNeeded(
+            for: hotkeyRequest,
+            accessSnapshot: hotkeyAccessSnapshot
+        )
+        setupHotkeyMonitors(
+            using: hotkeyRequest,
+            source:
+                HotkeyRegistrationEvidence
+                    .applicationLaunchSource,
+            accessibilityTrusted:
+                hotkeyAccessSnapshot.accessibilityTrusted
+        )
         installHotkeyObserver()
         installAppVisibilityObserver()
         installLanguageObserver()
+        appLaunchWindowEvidenceCoordinator = makeAppLaunchWindowEvidenceCoordinator()
         installWorkspaceLifecycleObserver()
 
         installStatusItem()
-        requestAccessibilityPermissionIfNeeded()
 #if FLOWTAB_TESTING
         if !FlowTabTestLaunchOptions.suppressesHomeWindowOnLaunch {
             AppWindowCoordinator.openHomeInCurrentProcess()
@@ -70,8 +94,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !userDefaults.bool(forKey: AppPreferenceKeys.hasPromptedAccessibilityPermission)
         else { return }
 
-        _ = AccessibilityPermissionChecker.requestPermission()
+        requestAccessibilityPermission(source: "application_launch")
         userDefaults.set(true, forKey: AppPreferenceKeys.hasPromptedAccessibilityPermission)
+    }
+
+    private func requestChordEventAccessIfNeeded(
+        for request: HotkeyRegistrationRequest,
+        accessSnapshot: HotkeyChordEventAccessSnapshot
+    ) {
+        guard HotkeyMonitoringBackendPolicy
+            .requiresCoordinatedChordEventMonitoring(
+                mainConfiguration: request.mainConfiguration,
+                inAppWindowConfiguration:
+                    request.inAppWindowConfiguration
+            )
+        else {
+            return
+        }
+        guard !accessSnapshot.accessibilityTrusted else {
+            return
+        }
+        requestAccessibilityPermission(source: "chord_hotkey")
+    }
+
+    private func requestAccessibilityPermission(source: String) {
+        guard !requestedAccessibilityPermissionThisLaunch else { return }
+        requestedAccessibilityPermissionThisLaunch = true
+        let granted = AccessibilityPermissionChecker.requestPermission()
+        RuntimeLog.info(
+            .permission,
+            "accessibility request source=\(source) granted=\(granted)"
+        )
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        let accessSnapshot = currentHotkeyChordEventAccessSnapshot()
+        if lastHotkeyAccessibilityTrusted
+            != accessSnapshot.accessibilityTrusted
+        {
+            setupHotkeyMonitors(
+                using: HotkeyRegistrationRequest.load(
+                    userDefaults: resolvedUserDefaults
+                ),
+                source: "accessibility_readback",
+                accessibilityTrusted:
+                    accessSnapshot.accessibilityTrusted
+            )
+            return
+        }
+        hotkeyMonitor?.start()
+        inAppWindowHotkeyMonitor?.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -96,8 +168,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             workspaceLifecycleObservers.removeAll()
         }
+        appLaunchWindowEvidenceCoordinator?.stop()
+        appLaunchWindowEvidenceCoordinator = nil
         hotkeyMonitor?.stop()
         inAppWindowHotkeyMonitor?.stop()
+#if FLOWTAB_TESTING
+        resolvedStressRunner.stop()
+        FlowTabUITestBootstrapper
+            .stopInitialPanelOcclusionStalenessInjection()
+        FlowTabUITestBootstrapper
+            .stopMockWindowPreviewLatencyInjection()
+        FlowTabUITestBootstrapper
+            .stopInitialUIPresentationObservation()
+        FlowTabUITestProjectionAcknowledgementBootstrap.stop()
+        FlowTabUITestHomeInitialProjectionApplicationBootstrap
+            .stop()
+        FlowTabUITestAXSuppressionReadbackBootstrap.stop()
+#endif
         commandTabTakeoverController.restoreSystemShortcutsIfNeeded()
     }
 
@@ -125,116 +212,237 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func requestHotkeyReload(using request: HotkeyRegistrationRequest, source: String) {
+    @discardableResult
+    func requestHotkeyReload(
+        using request: HotkeyRegistrationRequest,
+        source: String
+    ) -> HotkeyRegistrationEvidence {
         RuntimeLog.info(
             .hotKey,
             "re-register requested source=\(source) requestID=\(request.requestID.uuidString) main=\(request.mainConfiguration.mainShortcutText) inApp=\(request.inAppWindowConfiguration.mainShortcutText)"
         )
-        applyHotkeyReload(request, source: source)
+        let accessSnapshot = currentHotkeyChordEventAccessSnapshot()
+        requestChordEventAccessIfNeeded(
+            for: request,
+            accessSnapshot: accessSnapshot
+        )
+        let evidence = applyHotkeyReload(
+            request,
+            source: source,
+            accessibilityTrusted: accessSnapshot.accessibilityTrusted
+        )
         NotificationCenter.default.post(
             name: .flowTabReRegisterHotkeys,
             object: self,
             userInfo: request.notificationUserInfo
         )
+        return evidence
     }
 
-    private func setupHotkeyMonitors(using request: HotkeyRegistrationRequest) {
-        setupHotkeyMonitor(using: request)
-        setupInAppWindowHotkeyMonitor(using: request)
+    @discardableResult
+    private func setupHotkeyMonitors(
+        using request: HotkeyRegistrationRequest,
+        source: String,
+        accessibilityTrusted: Bool
+    ) -> HotkeyRegistrationEvidence {
+        lastHotkeyAccessibilityTrusted = accessibilityTrusted
+        let inAppConfiguration = request.inAppWindowConfiguration
+        var effectiveMainConfiguration = request.mainConfiguration
+        var accessPlan = HotkeyMonitoringAccessPolicy.plan(
+            mainConfiguration: effectiveMainConfiguration,
+            inAppWindowConfiguration: inAppConfiguration,
+            accessibilityTrusted: accessibilityTrusted
+        )
+        let shouldTakeOverCommandTab =
+            accessPlan.mainRouteState.isActive
+                && effectiveMainConfiguration.usesCommandTab
+            || accessPlan.inAppWindowRouteState.isActive
+                && inAppConfiguration.usesCommandTab
+        let takeoverReady = commandTabTakeoverController
+            .reconcileIfNeeded(
+                shouldTakeOver: shouldTakeOverCommandTab
+            )
+        if accessPlan.mainRouteState.isActive,
+           effectiveMainConfiguration.usesCommandTab,
+           !takeoverReady
+        {
+            effectiveMainConfiguration =
+                SwitcherHotkeyPreferencesStore.commandTabFallback(
+                    for: effectiveMainConfiguration
+                )
+            accessPlan = HotkeyMonitoringAccessPolicy.plan(
+                mainConfiguration: effectiveMainConfiguration,
+                inAppWindowConfiguration: inAppConfiguration,
+                accessibilityTrusted: accessibilityTrusted
+            )
+            RuntimeLog.info(
+                .hotKey,
+                "fallback main=\(effectiveMainConfiguration.mainShortcutText) "
+                    + "backward=\(effectiveMainConfiguration.backwardShortcutText) "
+                    + "because Command+Tab takeover failed"
+            )
+        }
+
+        setupHotkeyMonitor(
+            configuration: effectiveMainConfiguration,
+            routeState: accessPlan.mainRouteState
+        )
+        let inAppRouteState = setupInAppWindowHotkeyMonitor(
+            configuration: inAppConfiguration,
+            effectiveMainConfiguration: effectiveMainConfiguration,
+            routeState: accessPlan.inAppWindowRouteState
+        )
+        let commandTabTakeoverActive = takeoverReady
+            && (
+                accessPlan.mainRouteState.isActive
+                    && effectiveMainConfiguration.usesCommandTab
+                || inAppRouteState.isActive
+                    && inAppConfiguration.usesCommandTab
+            )
+        hotkeyRegistrationGeneration &+= 1
+        let evidence = HotkeyRegistrationEvidence(
+            generation: hotkeyRegistrationGeneration,
+            request: request,
+            commandTabTakeoverActive: commandTabTakeoverActive,
+            mainRouteState: accessPlan.mainRouteState,
+            inAppWindowRouteState: inAppRouteState,
+            source: source
+        )
+        latestHotkeyRegistrationEvidence = evidence
+        RuntimeLog.info(
+            .hotKey,
+            "registration evidence generation=\(evidence.generation) requestID=\(evidence.requestID.uuidString) commandTabTakeoverActive=\(evidence.commandTabTakeoverActive) mainRoute=\(evidence.mainRouteState.rawValue) inAppRoute=\(evidence.inAppWindowRouteState.rawValue)"
+        )
+        NotificationCenter.default.post(
+            name: .flowTabHotkeyRegistrationEvidenceDidChange,
+            object: self,
+            userInfo: evidence.notificationUserInfo
+        )
+        return evidence
     }
 
-    private func applyHotkeyReload(_ request: HotkeyRegistrationRequest, source: String) {
+    @discardableResult
+    private func applyHotkeyReload(
+        _ request: HotkeyRegistrationRequest,
+        source: String,
+        accessibilityTrusted: Bool? = nil
+    ) -> HotkeyRegistrationEvidence {
         RuntimeLog.info(
             .hotKey,
             "re-register applying source=\(source) requestID=\(request.requestID.uuidString)"
         )
-        setupHotkeyMonitors(using: request)
+        return setupHotkeyMonitors(
+            using: request,
+            source: source,
+            accessibilityTrusted: accessibilityTrusted
+                ?? currentHotkeyChordEventAccessSnapshot()
+                    .accessibilityTrusted
+        )
     }
 
-    private func setupHotkeyMonitor(using request: HotkeyRegistrationRequest) {
+    private func setupHotkeyMonitor(
+        configuration: SwitcherHotkeyConfiguration,
+        routeState: HotkeyRouteRegistrationState
+    ) {
         hotkeyMonitor?.stop()
-
-        var hotkeyConfiguration = request.mainConfiguration
-        let inAppHotkeyConfiguration = request.inAppWindowConfiguration
-        let mainUsesCommandTab =
-            hotkeyConfiguration.primaryModifier == .command && hotkeyConfiguration.mainKey == .tab
-        let inAppUsesCommandTab =
-            inAppHotkeyConfiguration.primaryModifier == .command && inAppHotkeyConfiguration.mainKey == .tab
-        let takeoverReady = commandTabTakeoverController.reconcileIfNeeded(
-            shouldTakeOver: mainUsesCommandTab || inAppUsesCommandTab
+        hotkeyMonitor = nil
+        panelController?.unregisterHotkeyInputSource(
+            for: .globalAppSwitcher
         )
-        if mainUsesCommandTab, !takeoverReady {
-            hotkeyConfiguration = SwitcherHotkeyConfiguration(
-                primaryModifier: .option,
-                mainKey: hotkeyConfiguration.mainKey,
-                quitKey: hotkeyConfiguration.quitKey
-            )
-            RuntimeLog.info(.hotKey, "fallback to Option+Tab because Command+Tab takeover failed")
-        }
-
-        let monitor = makeHotkeyMonitor(
-            configuration: hotkeyConfiguration,
-            signature: 0x46544142, // "FTAB"
-            forwardHotkeyID: 1,
-            backwardHotkeyID: 2
-        )
-        monitor.onHotkeyPressed = { [weak panelController] isBackward in
-            panelController?.handleGlobalHotkey(isBackward: isBackward)
-            RuntimeLog.debug(
+        guard routeState.isActive else {
+            RuntimeLog.info(
                 .hotKey,
-                isBackward ? "HotKey Backward" : "HotKey Forward"
+                "register main action=paused reason=accessibility "
+                    + "forward=\(configuration.mainShortcutText) "
+                    + "backward=\(configuration.backwardShortcutText)"
             )
-        }
-        monitor.onHotkeyReleased = { [weak panelController] isBackward in
-            panelController?.handleGlobalHotkeyReleased()
-            RuntimeLog.debug(
-                .hotKey,
-                isBackward ? "HotKey Backward Released" : "HotKey Forward Released"
-            )
-        }
-        RuntimeLog.info(
-            .hotKey,
-            "register main=\(hotkeyConfiguration.mainShortcutText) backward=\(hotkeyConfiguration.backwardShortcutText) quit=\(hotkeyConfiguration.quitShortcutText)"
-        )
-        hotkeyMonitor = monitor
-    }
-
-    private func setupInAppWindowHotkeyMonitor(using request: HotkeyRegistrationRequest) {
-        inAppWindowHotkeyMonitor?.stop()
-
-        let mainConfiguration = request.mainConfiguration
-        let inAppConfiguration = request.inAppWindowConfiguration
-        if
-            mainConfiguration.primaryModifier == inAppConfiguration.primaryModifier
-                && mainConfiguration.mainKey == inAppConfiguration.mainKey
-        {
-            RuntimeLog.info(.hotKey, "skip register in-app window hotkey due conflict with main shortcut")
-            inAppWindowHotkeyMonitor = nil
             return
         }
 
         let monitor = makeHotkeyMonitor(
-            configuration: inAppConfiguration,
+            configuration: configuration,
+            signature: 0x46544142, // "FTAB"
+            forwardHotkeyID: 1,
+            backwardHotkeyID: 2
+        )
+        if routeState.requiresChordEventMonitoring {
+            monitor.requireChordEventMonitoring()
+        }
+        panelController?.registerHotkeyInputSource(
+            monitor.inputSourceID,
+            for: .globalAppSwitcher
+        )
+        monitor.onHotkeyEvent = { [weak panelController] event in
+            panelController?.handleGlobalHotkeyInput(event)
+            let direction = event.isBackward ? "Backward" : "Forward"
+            let phase = event.phase == .pressed ? "" : " Released"
+            RuntimeLog.debug(
+                .hotKey,
+                "HotKey \(direction)\(phase)"
+            )
+        }
+        hotkeyMonitor = monitor
+        monitor.start()
+        RuntimeLog.info(
+            .hotKey,
+            "register main=\(configuration.mainShortcutText) backward=\(configuration.backwardShortcutText) quit=\(configuration.quitShortcutText) route=\(routeState.rawValue)"
+        )
+    }
+
+    private func setupInAppWindowHotkeyMonitor(
+        configuration: SwitcherHotkeyConfiguration,
+        effectiveMainConfiguration: SwitcherHotkeyConfiguration,
+        routeState: HotkeyRouteRegistrationState
+    ) -> HotkeyRouteRegistrationState {
+        inAppWindowHotkeyMonitor?.stop()
+        inAppWindowHotkeyMonitor = nil
+        panelController?.unregisterHotkeyInputSource(
+            for: .inAppWindowSwitcher
+        )
+        guard routeState.isActive else {
+            RuntimeLog.info(
+                .hotKey,
+                "register in-app action=paused reason=accessibility"
+            )
+            return routeState
+        }
+
+        if !effectiveMainConfiguration.reservedShortcuts.isDisjoint(
+            with: configuration.switchingShortcuts
+        ) {
+            RuntimeLog.info(.hotKey, "skip register in-app window hotkey due conflict with main shortcut")
+            return .skippedConflict
+        }
+
+        let monitor = makeHotkeyMonitor(
+            configuration: configuration,
             signature: 0x4654574E, // "FTWN"
             forwardHotkeyID: 101,
             backwardHotkeyID: 102
         )
-        monitor.onHotkeyPressed = { [weak panelController] isBackward in
-            panelController?.handleInAppWindowHotkey(isBackward: isBackward)
+        if routeState.requiresChordEventMonitoring {
+            monitor.requireChordEventMonitoring()
+        }
+        panelController?.registerHotkeyInputSource(
+            monitor.inputSourceID,
+            for: .inAppWindowSwitcher
+        )
+        monitor.onHotkeyEvent = { [weak panelController] event in
+            panelController?.handleInAppWindowHotkeyInput(event)
+            let direction = event.isBackward ? "Backward" : "Forward"
+            let phase = event.phase == .pressed ? "" : " Released"
             RuntimeLog.debug(
                 .hotKey,
-                isBackward ? "InApp Window Backward" : "InApp Window Forward"
+                "InApp Window \(direction)\(phase)"
             )
         }
-        monitor.onHotkeyReleased = { [weak panelController] _ in
-            panelController?.handleInAppWindowHotkeyReleased()
-            RuntimeLog.debug(.hotKey, "InApp Window Released")
-        }
+        inAppWindowHotkeyMonitor = monitor
+        monitor.start()
         RuntimeLog.info(
             .hotKey,
-            "register in-app main=\(inAppConfiguration.mainShortcutText) backward=\(inAppConfiguration.backwardShortcutText)"
+            "register in-app main=\(configuration.mainShortcutText) backward=\(configuration.backwardShortcutText) route=\(routeState.rawValue)"
         )
-        inAppWindowHotkeyMonitor = monitor
+        return routeState
     }
 
     private func installHotkeyObserver() {
@@ -246,52 +454,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            let postedRequest = notification.userInfo.flatMap(HotkeyRegistrationRequest.init)
-            let sendingDelegateID = (notification.object as AnyObject?).map(ObjectIdentifier.init)
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                if Self.shared !== self {
-                    if let postedRequest {
-                        RuntimeLog.debug(
-                            .hotKey,
-                            "re-register ignored source=notification_stale_delegate requestID=\(postedRequest.requestID.uuidString)"
-                        )
-                    } else {
-                        RuntimeLog.warning(
-                            .hotKey,
-                            "re-register ignored source=notification_stale_delegate requestID=missing_payload"
-                        )
-                    }
-                    return
-                }
-                if sendingDelegateID == ObjectIdentifier(self) {
-                    if let postedRequest {
-                        RuntimeLog.debug(
-                            .hotKey,
-                            "re-register ignored source=notification_self requestID=\(postedRequest.requestID.uuidString)"
-                        )
-                    } else {
-                        RuntimeLog.warning(
-                            .hotKey,
-                            "re-register ignored source=notification_self requestID=missing_payload"
-                        )
-                    }
-                    return
-                }
-                guard let postedRequest else {
-                    RuntimeLog.warning(
-                        .hotKey,
-                        "re-register ignored source=notification_missing_payload"
-                    )
-                    return
-                }
-                RuntimeLog.info(
-                    .hotKey,
-                    "re-register requested source=notification_payload requestID=\(postedRequest.requestID.uuidString) main=\(postedRequest.mainConfiguration.mainShortcutText) inApp=\(postedRequest.inAppWindowConfiguration.mainShortcutText)"
-                )
-                self.applyHotkeyReload(postedRequest, source: "notification_payload")
+            MainActor.assumeIsolated {
+                self?.handleHotkeyReloadNotification(notification)
             }
         }
+    }
+
+    private func handleHotkeyReloadNotification(_ notification: Notification) {
+        let postedRequest =
+            notification.userInfo.flatMap(HotkeyRegistrationRequest.init)
+        let sendingDelegateID =
+            (notification.object as AnyObject?).map(ObjectIdentifier.init)
+        if Self.shared !== self {
+            if let postedRequest {
+                RuntimeLog.debug(
+                    .hotKey,
+                    "re-register ignored source=notification_stale_delegate requestID=\(postedRequest.requestID.uuidString)"
+                )
+            } else {
+                RuntimeLog.warning(
+                    .hotKey,
+                    "re-register ignored source=notification_stale_delegate requestID=missing_payload"
+                )
+            }
+            return
+        }
+        if sendingDelegateID == ObjectIdentifier(self) {
+            if let postedRequest {
+                RuntimeLog.debug(
+                    .hotKey,
+                    "re-register ignored source=notification_self requestID=\(postedRequest.requestID.uuidString)"
+                )
+            } else {
+                RuntimeLog.warning(
+                    .hotKey,
+                    "re-register ignored source=notification_self requestID=missing_payload"
+                )
+            }
+            return
+        }
+        guard let postedRequest else {
+            RuntimeLog.warning(
+                .hotKey,
+                "re-register ignored source=notification_missing_payload"
+            )
+            return
+        }
+        RuntimeLog.info(
+            .hotKey,
+            "re-register requested source=notification_payload requestID=\(postedRequest.requestID.uuidString) main=\(postedRequest.mainConfiguration.mainShortcutText) inApp=\(postedRequest.inAppWindowConfiguration.mainShortcutText)"
+        )
+        applyHotkeyReload(postedRequest, source: "notification_payload")
     }
 
     private func installAppVisibilityObserver() {
@@ -341,6 +554,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             let appID = RuntimeAppIdentity.appID(for: app)
+            self.appLaunchWindowEvidenceCoordinator?.prepareObservation(
+                appID: appID,
+                pid: app.processIdentifier
+            )
             self.resolvedRuntimeProjectionService.signalAppLaunched(
                 appID: appID,
                 pid: app.processIdentifier,
@@ -357,12 +574,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             let appID = RuntimeAppIdentity.appID(for: app)
-            self.resolvedRuntimeProjectionService.signalAppTerminated(
+            self.appLaunchWindowEvidenceCoordinator?.cancelObservation(
+                appID: appID,
+                pid: app.processIdentifier
+            )
+            self.resolvedRuntimeProjectionService.scheduleWorkspaceAppTerminated(
                 appID: appID,
                 pid: app.processIdentifier
             )
         }
         workspaceLifecycleObservers = [didLaunchObserver, didTerminateObserver]
+    }
+
+    func makeDefaultAppLaunchWindowEvidenceCoordinator()
+        -> any RuntimeAppLaunchWindowEvidenceCoordinating
+    {
+        RuntimeAppLaunchWindowEvidenceCoordinator(
+            onAppWindowChanged: { [weak self] appID, pid in
+                self?.resolvedRuntimeProjectionService.signalAppWindowsChanged(
+                    appID: appID,
+                    pid: pid
+                )
+            },
+            onAXWindowDestroyed: { [weak self] appID, pid, axWindowID in
+                self?.resolvedRuntimeProjectionService.signalAXWindowDestroyed(
+                    appID: appID,
+                    pid: pid,
+                    axWindowID: axWindowID
+                )
+            }
+        )
     }
 
     func applyActivationPolicyFromPreferences() {
@@ -515,6 +756,12 @@ extension AppDelegate {
         NSWorkspace.shared.notificationCenter
     }
 
+    func makeAppLaunchWindowEvidenceCoordinator()
+        -> any RuntimeAppLaunchWindowEvidenceCoordinating
+    {
+        makeDefaultAppLaunchWindowEvidenceCoordinator()
+    }
+
     func makePanelController() -> SwitcherPanelController {
         SwitcherPanelController(
             model: LiveSwitcherModel(runtimeProjectionService: resolvedRuntimeProjectionService)
@@ -531,8 +778,15 @@ extension AppDelegate {
             configuration: configuration,
             signature: signature,
             forwardHotkeyID: forwardHotkeyID,
-            backwardHotkeyID: backwardHotkeyID
+            backwardHotkeyID: backwardHotkeyID,
+            startsMonitoring: false
         )
+    }
+
+    func currentHotkeyChordEventAccessSnapshot()
+        -> HotkeyChordEventAccessSnapshot
+    {
+        .current()
     }
 }
 #endif

@@ -3,48 +3,27 @@ import CoreGraphics
 import Foundation
 import XCTest
 
-struct SwitcherSearchWindowResultObservation: Equatable {
-    let identifier: String
-    let searchableText: String
-    let resultID: String?
-    let title: String?
-    let appName: String?
-    let appID: String?
-    let windowID: String?
+private enum FlowTabUITestMultiAppFullscreenWindowSearchPolicy {
+    static let diagnosticsPublicationWatchdog: TimeInterval = 8
 
-    init(
+    static func waitForDiagnosticsPublication(
+        initialReadback: () -> Bool,
+        waitForPublication: (TimeInterval) -> Bool
+    ) -> Bool {
+        if initialReadback() {
+            return true
+        }
+        return waitForPublication(diagnosticsPublicationWatchdog)
+    }
+
+    static func diagnosticsPublicationFailure(
         identifier: String,
-        searchableText: String,
-        resultID: String? = nil,
-        title: String? = nil,
-        appName: String? = nil,
-        appID: String? = nil,
-        windowID: String? = nil
-    ) {
-        self.identifier = identifier
-        self.searchableText = searchableText
-        self.resultID = resultID
-        self.title = title
-        self.appName = appName
-        self.appID = appID
-        self.windowID = windowID
-    }
-
-    var windowNumber: CGWindowID? {
-        if let windowID, let rawWindowID = windowID.split(separator: ":").last, let parsed = UInt32(rawWindowID) {
-            return CGWindowID(parsed)
-        }
-        guard let rawWindowID = identifier.split(separator: "-").last else { return nil }
-        guard let parsed = UInt32(rawWindowID) else { return nil }
-        return CGWindowID(parsed)
-    }
-
-    func matches(title: String, appName: String) -> Bool {
-        if let observedTitle = self.title, let observedAppName = self.appName {
-            return observedTitle == title && observedAppName == appName
-        }
-        return searchableText.localizedCaseInsensitiveContains(title)
-            && searchableText.localizedCaseInsensitiveContains(appName)
+        finalExists: Bool
+    ) -> String {
+        "Fullscreen multi-app Window Search diagnostics "
+            + "publication watchdog expired; unmetCondition="
+            + "exactDiagnosticsSummaryExists identifier="
+            + "\(identifier) finalExists=\(finalExists ? 1 : 0)"
     }
 }
 
@@ -56,47 +35,11 @@ extension FlowTabUITests {
             workflow,
             flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
         ) { workflow, app in
-            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-
-            for workflowApp in workflow.apps {
-                assertSwitcherAppStripContainsWorkflowApp(
-                    workflowApp,
-                    in: app,
-                    diagnosticsSummary: diagnosticsSummary
-                )
-                if diagnosticsSummary.exists {
-                    XCTAssertTrue(
-                        waitForSwitcherAppEntry(
-                            diagnosticsSummary,
-                            bundleIdentifier: workflowApp.identity.bundleIdentifier,
-                            timeout: 2
-                        ),
-                        """
-                        FlowTab did not include \(workflowApp.appName) in the switcher diagnostics summary.
-
-                        \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                        """
-                    )
-                }
-            }
+            _ = waitForSpaceFixtureSwitcherAppStripProjection(
+                workflow,
+                in: app
+            )
         }
-    }
-
-    private func assertSwitcherAppStripContainsWorkflowApp(
-        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
-        in app: XCUIApplication,
-        diagnosticsSummary: XCUIElement
-    ) {
-        let appTile = element(in: app, identifier: workflowApp.identity.switcherAppAccessibilityIdentifier)
-        XCTAssertTrue(
-            appTile.waitForExistence(timeout: 8),
-            """
-            FlowTab did not expose \(workflowApp.appName) through \
-            \(workflowApp.identity.switcherAppAccessibilityIdentifier).
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
     }
 
     func testSwitcherPanelPreviewCyclesThroughWorkflowAppsWithoutMixingWindowCards() throws {
@@ -105,57 +48,51 @@ extension FlowTabUITests {
         try runRealSpaceFixtureWorkflow(
             workflow,
             flowTabAdditionalArguments: [
-                "--flowtab-ui-open-switcher",
                 "--flowtab-ui-listen-switcher-trigger",
+                "--flowtab-ui-runtime-log-level", "DEBUG",
+                "--flowtab-ui-enable-verbose-logs",
                 "-windowLayerAutoEnterDelay", "30.0"
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         ) { workflow, app in
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(
-                element(
-                    in: app,
-                    identifier: workflow.apps[0].identity.switcherAppAccessibilityIdentifier
-                ).waitForExistence(timeout: 8)
-            )
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+            guard waitForSpaceFixtureSwitcherAppStripProjection(
+                workflow,
+                in: app,
+                trigger: {
+                    self.postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                        .global,
+                        traceLabel: "multi-app-preview.initial"
+                    )
+                }
+            ) != nil else { return }
             selectSwitcherWorkflowApp(workflow.apps[0], in: app, diagnosticsSummary: diagnosticsSummary)
 
             var observedAppIDs: [String] = []
             for workflowApp in workflow.apps {
                 selectSwitcherWorkflowApp(workflowApp, in: app, diagnosticsSummary: diagnosticsSummary)
-                app.typeKey(.downArrow, modifierFlags: [])
-                let selectedApp = try XCTUnwrap(
-                    matchedWorkflowAppForVisibleSwitcherPreview(
-                        workflow,
-                        diagnosticsSummaryElement: diagnosticsSummary,
-                        excludingAppIDs: Set(observedAppIDs)
-                    ),
-                    """
-                    Switcher preview did not stabilize to a single workflow app window set.
-
-                    \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-
-                    \(self.multiAppWorkflowSetupMessage(
-                        reason: "Resolved switcher workflow window titles did not match a single app.",
-                        scenarioSourceURL: SpaceFixtureMultiAppWorkflowDefaults.switcherWorkflowSourceURL
-                    ))
-                    """
-                )
+                guard
+                    performAndWaitForSwitcherSelectedAppPreviewTransition(
+                        workflowApp,
+                        in: app,
+                        diagnosticsSummaryElement:
+                            diagnosticsSummary,
+                        trigger: {
+                            app.typeKey(
+                                .downArrow,
+                                modifierFlags: []
+                            )
+                        }
+                    ) != nil
+                else {
+                    return
+                }
                 XCTAssertFalse(
-                    observedAppIDs.contains(selectedApp.appID),
-                    "Switcher app cycle repeated \(selectedApp.appName) before visiting every workflow app"
+                    observedAppIDs.contains(workflowApp.appID),
+                    "Switcher app cycle repeated \(workflowApp.appName) before visiting every workflow app"
                 )
-                observedAppIDs.append(selectedApp.appID)
-                let visibleTitles = switcherPreviewTitles(from: diagnosticsSummary)
-                XCTAssertEqual(Set(visibleTitles), Set(selectedApp.expectedWindowTitles))
-                assertSwitcherPreviewShowsOnlyExpectedTitles(
-                    selectedApp.expectedWindowTitles,
-                    in: diagnosticsSummary,
-                    timeout: 8
-                )
+                observedAppIDs.append(workflowApp.appID)
 
-                app.typeKey(.upArrow, modifierFlags: [])
-                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+                guard exitSwitcherPreview(workflowApp, in: app, diagnostics: diagnosticsSummary) else { return }
             }
 
             XCTAssertEqual(Set(observedAppIDs), Set(workflow.apps.map(\.appID)))
@@ -170,20 +107,32 @@ extension FlowTabUITests {
             flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
         ) { workflow, app in
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(
-                element(
-                    in: app,
-                    identifier: workflow.apps[0].identity.switcherAppAccessibilityIdentifier
-                ).waitForExistence(timeout: 8)
-            )
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+            guard waitForSpaceFixtureSwitcherAppStripProjection(
+                workflow,
+                in: app
+            ) != nil else { return }
             selectSwitcherWorkflowApp(workflow.apps[0], in: app, diagnosticsSummary: diagnosticsSummary)
 
             var observedAppIDs: [String] = []
             var previousWindowCardIdentifiers: Set<String> = []
             for workflowApp in workflow.apps {
                 selectSwitcherWorkflowApp(workflowApp, in: app, diagnosticsSummary: diagnosticsSummary)
-                app.typeKey(.downArrow, modifierFlags: [])
+                let windowCards = try assertSwitcherPreviewWindowCards(
+                    in: app,
+                    diagnosticsSummary: diagnosticsSummary,
+                    selectedApp: workflowApp,
+                    excludedTitles: workflow.otherExpectedWindowTitles(
+                        excluding: workflowApp.appID
+                    ),
+                    previousWindowCardIdentifiers:
+                        previousWindowCardIdentifiers,
+                    trigger: {
+                        app.typeKey(
+                            .downArrow,
+                            modifierFlags: []
+                        )
+                    }
+                )
                 let selectedApp = try XCTUnwrap(
                     matchedWorkflowAppForVisibleSwitcherPreview(
                         workflow,
@@ -201,279 +150,24 @@ extension FlowTabUITests {
                     ))
                     """
                 )
+                XCTAssertEqual(
+                    selectedApp.appID,
+                    workflowApp.appID,
+                    "Switcher cards should belong to the explicitly selected workflow app"
+                )
                 XCTAssertFalse(
                     observedAppIDs.contains(selectedApp.appID),
                     "Switcher app cycle repeated \(selectedApp.appName) before visiting every workflow app"
                 )
                 observedAppIDs.append(selectedApp.appID)
 
-                let windowCards = try assertSwitcherPreviewWindowCards(
-                    in: app,
-                    diagnosticsSummary: diagnosticsSummary,
-                    selectedApp: selectedApp,
-                    excludedTitles: workflow.otherExpectedWindowTitles(excluding: selectedApp.appID),
-                    previousWindowCardIdentifiers: previousWindowCardIdentifiers
-                )
                 previousWindowCardIdentifiers = Set(windowCards.map(\.identifier))
 
-                app.typeKey(.upArrow, modifierFlags: [])
-                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+                guard exitSwitcherPreview(selectedApp, in: app, diagnostics: diagnosticsSummary) else { return }
             }
 
             XCTAssertEqual(Set(observedAppIDs), Set(workflow.apps.map(\.appID)))
         }
-    }
-
-    func testSwitcherPanelRefreshesOpenWorkflowAppWindowLayerAfterMultiAppWindowSetMutation() throws {
-        let workflow = try configuredSwitcherSpaceFixtureWorkflow()
-        let targetApp = try XCTUnwrap(
-            workflow.apps.first { $0.appID == "chrome" },
-            "Switcher workflow must include the Chrome-style fixture app for multi-app mutation proof"
-        )
-        let remainingTitles = Array(targetApp.expectedWindowTitles.prefix(1))
-        XCTAssertEqual(targetApp.expectedWindowTitles.count, 2)
-        XCTAssertEqual(remainingTitles.count, 1)
-
-        try runRealSpaceFixtureWorkflow(
-            workflow,
-            flowTabAdditionalArguments: [
-                "--flowtab-ui-open-switcher",
-                "--flowtab-ui-runtime-log-level",
-                "DEBUG",
-                "--flowtab-ui-enable-verbose-logs",
-                "--flowtab-ui-listen-switcher-trigger",
-                "-windowLayerAutoEnterDelay", "30.0"
-            ] + FlowTabUITestSwitcherCommandPayload.launchArguments,
-            workflowAppLaunchArguments: { workflowApp in
-                guard workflowApp.appID == targetApp.appID else { return [] }
-                return [
-                    "--close-window-index", "2",
-                    "--close-window-delay-ms", "30000"
-                ]
-            }
-        ) { workflow, app in
-            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
-            XCTAssertTrue(
-                element(
-                    in: app,
-                    identifier: targetApp.identity.switcherAppAccessibilityIdentifier
-                ).waitForExistence(timeout: 8)
-            )
-
-            let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
-            selectSwitcherWorkflowApp(targetApp, in: app, diagnosticsSummary: diagnosticsSummary)
-            app.activate()
-            app.typeKey(.downArrow, modifierFlags: [])
-            XCTAssertTrue(waitForSwitcherMode(diagnosticsSummary, modePrefix: "windowCycle", timeout: 5))
-            assertSwitcherPreviewShowsOnlyExpectedTitles(
-                targetApp.expectedWindowTitles,
-                in: diagnosticsSummary,
-                timeout: 8
-            )
-
-            assertSwitcherPreviewShowsOnlyExpectedTitles(
-                remainingTitles,
-                in: diagnosticsSummary,
-                timeout: 40
-            )
-            XCTAssertTrue(waitForSwitcherMode(diagnosticsSummary, modePrefix: "windowCycle", timeout: 5))
-            waitForRuntimeLogFiles(
-                containing: [
-                    "runtimeAXDestroyed appID=\(targetApp.identity.bundleIdentifier)",
-                    "affectedCGWindowID="
-                ],
-                since: mutationLogSnapshot,
-                timeout: 8
-            )
-            XCTAssertNotEqual(
-                XCUIApplication(bundleIdentifier: targetApp.identity.bundleIdentifier).state,
-                .notRunning
-            )
-            XCTAssertEqual(
-                Set(switcherPreviewTitles(from: diagnosticsSummary)),
-                Set(remainingTitles),
-                """
-                Multi-app open Switcher mutation should keep the selected app's window layer isolated.
-
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-            XCTAssertTrue(
-                Set(switcherPreviewTitles(from: diagnosticsSummary))
-                    .isDisjoint(with: Set(workflow.otherExpectedWindowTitles(excluding: targetApp.appID))),
-                """
-                Multi-app open Switcher mutation exposed another app's window card.
-
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-        }
-    }
-
-    func testSwitcherPanelRefreshesOpenFullscreenWorkflowAppWindowLayerAfterTargetWindowCloses() throws {
-        let workflow = try configuredSwitcherSpaceFixtureWorkflow()
-        let targetApp = try XCTUnwrap(
-            workflow.apps.first { $0.appID == "notes" },
-            "Switcher workflow must include the Notes-style fixture app for fullscreen target-window mutation proof"
-        )
-        let fullscreenWindowIndex = try XCTUnwrap(targetApp.fullscreenWindowIndex)
-        let fullscreenTitles = Set(targetApp.fullscreenWindowTitles)
-        let remainingTitles = targetApp.expectedWindowTitles.filter { !fullscreenTitles.contains($0) }
-        XCTAssertEqual(targetApp.expectedWindowTitles.count, 2)
-        XCTAssertEqual(fullscreenTitles.count, 1)
-        XCTAssertEqual(remainingTitles.count, 1)
-
-        try runRealSpaceFixtureWorkflow(
-            workflow,
-            flowTabAdditionalArguments: [
-                "--flowtab-ui-open-switcher",
-                "--flowtab-ui-runtime-log-level",
-                "DEBUG",
-                "--flowtab-ui-enable-verbose-logs",
-                "--flowtab-ui-listen-switcher-trigger",
-                "-windowLayerAutoEnterDelay", "30.0"
-            ] + FlowTabUITestSwitcherCommandPayload.launchArguments,
-            workflowAppLaunchArguments: { workflowApp in
-                guard workflowApp.appID == targetApp.appID else { return [] }
-                return [
-                    "--close-window-index", "\(fullscreenWindowIndex)",
-                    "--close-window-delay-ms", "30000"
-                ]
-            }
-        ) { workflow, app in
-            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
-            XCTAssertTrue(
-                element(
-                    in: app,
-                    identifier: targetApp.identity.switcherAppAccessibilityIdentifier
-                ).waitForExistence(timeout: 8)
-            )
-
-            let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
-            selectSwitcherWorkflowApp(targetApp, in: app, diagnosticsSummary: diagnosticsSummary)
-            app.activate()
-            app.typeKey(.downArrow, modifierFlags: [])
-            XCTAssertTrue(waitForSwitcherMode(diagnosticsSummary, modePrefix: "windowCycle", timeout: 5))
-            XCTAssertTrue(
-                waitForNoisyFullscreenWorkflowPreviewTitles(
-                    diagnosticsSummary,
-                    for: targetApp,
-                    timeout: 12
-                ),
-                """
-                Expected the open Switcher window layer to expose the Notes fullscreen target before mutation.
-
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-            let closedFullscreenTitle = try XCTUnwrap(
-                visibleFullscreenWindowTitle(in: diagnosticsSummary, for: targetApp)
-            )
-
-            assertSwitcherPreviewShowsOnlyExpectedTitles(
-                remainingTitles,
-                in: diagnosticsSummary,
-                timeout: 45
-            )
-            XCTAssertTrue(waitForSwitcherMode(diagnosticsSummary, modePrefix: "windowCycle", timeout: 5))
-            waitForRuntimeLogFiles(
-                containing: [
-                    "runtimeAXDestroyed appID=\(targetApp.identity.bundleIdentifier)",
-                    "affectedCGWindowID="
-                ],
-                since: mutationLogSnapshot,
-                timeout: 8
-            )
-            XCTAssertNotEqual(
-                XCUIApplication(bundleIdentifier: targetApp.identity.bundleIdentifier).state,
-                .notRunning
-            )
-            XCTAssertFalse(
-                switcherPreviewTitles(from: diagnosticsSummary).contains(closedFullscreenTitle),
-                """
-                Open Switcher window layer still exposed the closed fullscreen target window.
-
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-            XCTAssertTrue(
-                Set(switcherPreviewTitles(from: diagnosticsSummary))
-                    .isDisjoint(with: Set(workflow.otherExpectedWindowTitles(excluding: targetApp.appID))),
-                """
-                Fullscreen target-window mutation exposed another app's window card.
-
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-        }
-    }
-
-    func selectSwitcherWorkflowApp(
-        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
-        in app: XCUIApplication,
-        diagnosticsSummary: XCUIElement,
-        maxMoves: Int = 40
-    ) {
-        if selectSwitcherWorkflowAppDirectly(workflowApp, diagnosticsSummary: diagnosticsSummary) {
-            return
-        }
-
-        for attempt in 0..<maxMoves {
-            let selectedAppID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected")
-            let selectedMode = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "mode")
-            logFlowTabUITestTrace(
-                "[selectWorkflowApp.\(attempt + 1)] target=\(workflowApp.identity.bundleIdentifier) selected=\(selectedAppID) mode=\(selectedMode)"
-            )
-            if selectedAppID
-                == workflowApp.identity.bundleIdentifier {
-                return
-            }
-            if selectedMode.hasPrefix("windowCycle(") {
-                app.typeKey(.upArrow, modifierFlags: [])
-                RunLoop.current.run(until: Date().addingTimeInterval(0.12))
-                continue
-            }
-            app.typeKey(.rightArrow, modifierFlags: [])
-            RunLoop.current.run(until: Date().addingTimeInterval(0.08))
-        }
-
-        XCTFail(
-            """
-            Failed to select switcher workflow app \(workflowApp.appName).
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-    }
-
-    private func selectSwitcherWorkflowAppDirectly(
-        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
-        diagnosticsSummary: XCUIElement,
-        timeout: TimeInterval = 1.5
-    ) -> Bool {
-        do {
-            try FlowTabUITestSwitcherCommandPayload.write(workflowApp.identity.bundleIdentifier)
-        } catch {
-            return false
-        }
-
-        postFlowTabUITestSwitcherCommand(
-            .selectApp,
-            traceLabel: "selectWorkflowApp.direct.\(workflowApp.appID)"
-        )
-
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected")
-                == workflowApp.identity.bundleIdentifier {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.08))
-        } while Date() < deadline
-
-        return false
     }
 
     func testSwitcherPanelWindowSearchFindsAndActivatesRealWorkflowWindow() throws {
@@ -484,6 +178,8 @@ extension FlowTabUITests {
             "Switcher workflow must include a real fixture window titled \(targetWindowTitle)"
         )
 
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
         try runRealSpaceFixtureWorkflow(
             workflow,
             flowTabAdditionalArguments: [
@@ -491,31 +187,48 @@ extension FlowTabUITests {
                 "-searchDefaultScope",
                 "window"
             ]
+                + FlowTabUITestSwitcherSearchConfirmationPolicy
+                    .applicationEvidenceLaunchArguments
         ) { _, app in
-            let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-            XCTAssertTrue(searchInput.waitForExistence(timeout: 8))
+            let searchInput =
+                requireInitialFlowTabSearchInput(
+                    in: app,
+                    observedBy: readiness
+                )
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-            app.typeText(targetWindowTitle)
-
-            guard let result = waitForSearchWindowResult(
+            guard let result = performAndWaitForCommittedSearchWindowResult(
                 in: app,
+                scope: "window",
+                query: targetWindowTitle,
                 title: targetWindowTitle,
                 appName: targetApp.appName,
-                timeout: 8
+                timeout:
+                    FlowTabUITestWindowSearchQueryProjectionPolicy
+                        .multiAppResultPublicationWatchdog,
+                trigger: {
+                    app.typeText(targetWindowTitle)
+                }
             ) else { return }
             let targetWindowNumber = try XCTUnwrap(
                 result.windowNumber,
                 "Search result \(result.identifier) did not expose a CG window number."
             )
 
-            confirmSwitcherSearchSelection(in: app, searchInput: searchInput)
             XCTAssertTrue(
-                waitForFrontmostWorkflowWindow(
+                triggerAndWaitForFrontmostWorkflowWindow(
                     windowNumber: targetWindowNumber,
                     title: targetWindowTitle,
                     app: targetApp,
-                    timeout: 10
+                    timeout:
+                        FlowTabUITestWorkflowWindowActivationObservationPolicy
+                            .multiAppWindowSearchActivationWatchdog,
+                    trigger: {
+                        confirmSwitcherSearchSelection(
+                            in: app,
+                            searchInput: searchInput,
+                            expectedQuery: targetWindowTitle
+                        )
+                    }
                 ),
                 "Search confirmation did not activate the \(targetWindowTitle) fixture window."
             )
@@ -529,6 +242,8 @@ extension FlowTabUITests {
             "Switcher workflow must include the Chrome-style fixture app for app-scope search"
         )
 
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
         try runRealSpaceFixtureWorkflow(
             workflow,
             flowTabAdditionalArguments: [
@@ -536,33 +251,122 @@ extension FlowTabUITests {
                 "-searchDefaultScope",
                 "app"
             ]
+                + FlowTabUITestSwitcherSearchConfirmationPolicy
+                    .applicationEvidenceLaunchArguments
         ) { _, app in
-            let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-            XCTAssertTrue(searchInput.waitForExistence(timeout: 8))
+            let searchInput =
+                requireInitialFlowTabSearchInput(
+                    in: app,
+                    observedBy: readiness
+                )
             XCTAssertNotEqual(
                 NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
                 targetApp.identity.bundleIdentifier,
                 "The app-scope activation scenario must start outside the target fixture app."
             )
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-            app.typeText(targetApp.identity.switcherSearchQuery)
-
-            let result = element(
-                in: app,
-                identifier: targetApp.identity.switcherSearchAppAccessibilityIdentifier
-            )
             XCTAssertTrue(
-                result.waitForExistence(timeout: 8),
-                "FlowTab did not expose \(targetApp.appName) as a real app-scope search result."
+                performAndWaitForCommittedSearchResultRow(
+                    in: app,
+                    scope: "app",
+                    query:
+                        targetApp.identity.switcherSearchQuery,
+                    resultID:
+                        "app:"
+                        + targetApp.identity.bundleIdentifier,
+                    rowIdentifier:
+                        targetApp.identity
+                            .switcherSearchAppAccessibilityIdentifier,
+                    timeout:
+                        FlowTabUITestSwitcherSearchResultObservationPolicy
+                            .multiAppAppSearchResultPublicationWatchdog,
+                    trigger: {
+                        app.typeText(
+                            targetApp.identity.switcherSearchQuery
+                        )
+                    }
+                ),
+                "FlowTab did not publish \(targetApp.appName) as the "
+                    + "exact committed App Search result."
             )
 
-            confirmSwitcherSearchSelection(in: app, searchInput: searchInput)
-            XCTAssertTrue(
-                waitForFrontmostWorkflowApp(targetApp, timeout: 10),
-                "Search confirmation did not activate the \(targetApp.appName) fixture app."
-            )
+            assertTriggerMakesApplicationFrontmost(
+                targetApp.identity.bundleIdentifier,
+                timeout:
+                    FlowTabUITestFrontmostApplicationObservationPolicy
+                        .multiAppAppSearchActivationWatchdog,
+                message:
+                    "Search confirmation did not activate "
+                    + "the \(targetApp.appName) fixture app."
+            ) {
+                confirmSwitcherSearchSelection(
+                    in: app,
+                    searchInput: searchInput,
+                    expectedQuery:
+                        targetApp.identity.switcherSearchQuery
+                )
+            }
         }
+    }
+
+    func testMultiAppFullscreenWindowSearchPolicyPreservesCompatibleDiagnosticsWatchdog() {
+        XCTAssertEqual(
+            FlowTabUITestMultiAppFullscreenWindowSearchPolicy
+                .diagnosticsPublicationWatchdog,
+            8
+        )
+    }
+
+    func testMultiAppFullscreenWindowSearchAcceptsInitiallyPublishedDiagnostics() {
+        var waitInvocations = 0
+
+        XCTAssertTrue(
+            FlowTabUITestMultiAppFullscreenWindowSearchPolicy
+                .waitForDiagnosticsPublication(
+                    initialReadback: { true },
+                    waitForPublication: { _ in
+                        waitInvocations += 1
+                        return false
+                    }
+                )
+        )
+        XCTAssertEqual(waitInvocations, 0)
+    }
+
+    func testMultiAppFullscreenWindowSearchAcceptsWaitedDiagnosticsEvidence() {
+        var observedWatchdogs: [TimeInterval] = []
+
+        XCTAssertTrue(
+            FlowTabUITestMultiAppFullscreenWindowSearchPolicy
+                .waitForDiagnosticsPublication(
+                    initialReadback: { false },
+                    waitForPublication: { watchdog in
+                        observedWatchdogs.append(watchdog)
+                        return true
+                    }
+                )
+        )
+        XCTAssertEqual(
+            observedWatchdogs,
+            [
+                FlowTabUITestMultiAppFullscreenWindowSearchPolicy
+                    .diagnosticsPublicationWatchdog
+            ]
+        )
+    }
+
+    func testMultiAppFullscreenWindowSearchWatchdogReportsFinalDiagnosticsEvidence() {
+        XCTAssertEqual(
+            FlowTabUITestMultiAppFullscreenWindowSearchPolicy
+                .diagnosticsPublicationFailure(
+                    identifier: Identifier.switcherSummary,
+                    finalExists: false
+                ),
+            "Fullscreen multi-app Window Search diagnostics "
+                + "publication watchdog expired; unmetCondition="
+                + "exactDiagnosticsSummaryExists identifier="
+                + "flowtab.testing.switcher.summary finalExists=0"
+        )
     }
 
     func testSwitcherPanelWindowSearchActivatesFullscreenWorkflowWindowAcrossSpaces() throws {
@@ -576,6 +380,8 @@ extension FlowTabUITests {
             "Switcher workflow must expose the fullscreen fixture window title"
         )
 
+        let readiness =
+            prepareInitialFlowTabSearchInputReadiness()
         try runRealSpaceFixtureWorkflow(
             workflow,
             flowTabAdditionalArguments: [
@@ -583,45 +389,112 @@ extension FlowTabUITests {
                 "-searchDefaultScope",
                 "window"
             ]
+                + FlowTabUITestSwitcherSearchConfirmationPolicy
+                    .applicationEvidenceLaunchArguments
         ) { _, app in
-            let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
+            let searchInput =
+                requireInitialFlowTabSearchInput(
+                    in: app,
+                    observedBy: readiness
+                )
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-            XCTAssertTrue(searchInput.waitForExistence(timeout: 8))
-            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+            let diagnosticsPublished =
+                FlowTabUITestMultiAppFullscreenWindowSearchPolicy
+                    .waitForDiagnosticsPublication(
+                        initialReadback: {
+                            diagnosticsSummary.exists
+                        },
+                        waitForPublication: { watchdog in
+                            diagnosticsSummary.waitForExistence(
+                                timeout: watchdog
+                            )
+                        }
+                    )
+            guard diagnosticsPublished else {
+                XCTFail(
+                    FlowTabUITestMultiAppFullscreenWindowSearchPolicy
+                        .diagnosticsPublicationFailure(
+                            identifier:
+                                diagnosticsSummary.identifier,
+                            finalExists: diagnosticsSummary.exists
+                        )
+                )
+                return
+            }
             XCTAssertNotEqual(
                 NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
                 targetApp.identity.bundleIdentifier,
                 "The fullscreen activation scenario must start outside the target fixture app."
             )
 
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-            app.typeText(targetWindowTitle)
-
-            guard let result = waitForSearchWindowResult(
+            guard let result = performAndWaitForCommittedSearchWindowResult(
                 in: app,
+                scope: "window",
+                query: targetWindowTitle,
                 title: targetWindowTitle,
                 appName: targetApp.appName,
-                timeout: 8
+                timeout:
+                    FlowTabUITestWindowSearchQueryProjectionPolicy
+                        .multiAppResultPublicationWatchdog,
+                trigger: {
+                    app.typeText(targetWindowTitle)
+                }
             ) else { return }
             let targetWindowNumber = try XCTUnwrap(
                 result.windowNumber,
                 "Search result \(result.identifier) did not expose a CG window number."
             )
 
-            confirmSwitcherSearchSelection(in: app, searchInput: searchInput)
-            XCTAssertTrue(
-                waitForNonExistence(diagnosticsSummary, timeout: 4),
-                "FlowTab panel remained visible after confirming the fullscreen window target."
-            )
-            XCTAssertTrue(
-                waitForFrontmostWorkflowWindow(
+            let panelDismissal =
+                FlowTabUITestElementNonExistenceObservationOwner(
+                    elementIdentifier: diagnosticsSummary.identifier,
+                    readback: {
+                        diagnosticsSummary.exists
+                    }
+                )
+            panelDismissal.start()
+            defer { panelDismissal.cancel() }
+            guard panelDismissal.latestEvidence?.value.exists == true else {
+                XCTFail(
+                    "Fullscreen Window Search panel baseline mismatch; "
+                        + "expectedExists=1. "
+                        + panelDismissal.diagnosticSummary
+                )
+                return
+            }
+
+            guard
+                triggerAndWaitForFrontmostWorkflowWindow(
                     windowNumber: targetWindowNumber,
                     title: targetWindowTitle,
                     app: targetApp,
-                    timeout: 12
-                ),
-                "Search confirmation did not activate the fullscreen \(targetWindowTitle) fixture window."
-            )
+                    timeout:
+                        FlowTabUITestWorkflowWindowActivationObservationPolicy
+                            .fullscreenMultiAppWindowSearchActivationWatchdog,
+                    trigger: {
+                        confirmSwitcherSearchSelection(
+                            in: app,
+                            searchInput: searchInput,
+                            expectedQuery: targetWindowTitle
+                        )
+                        panelDismissal.markTriggerCompleted()
+                    }
+                )
+            else { return }
+            guard
+                panelDismissal.waitForResolution(
+                    timeout:
+                        FlowTabUITestElementNonExistenceObservationPolicy
+                            .fullscreenMultiAppWindowSearchPanelDismissalWatchdog
+                ) != nil
+            else {
+                XCTFail(
+                    "FlowTab panel remained visible after confirming the "
+                        + "fullscreen window target. "
+                        + panelDismissal.diagnosticSummary
+                )
+                return
+            }
         }
     }
 
@@ -771,187 +644,65 @@ extension FlowTabUITests {
         }
     }
 
-    private func matchedWorkflowAppForVisibleSwitcherPreview(
-        _ workflow: SpaceFixtureResolvedWorkflow,
-        diagnosticsSummaryElement: XCUIElement,
-        excludingAppIDs: Set<String> = []
-    ) -> SpaceFixtureResolvedWorkflow.App? {
-        let deadline = Date().addingTimeInterval(12)
-        repeat {
-            let selectedBundleIdentifier = switcherPanelDiagnosticsValue(
-                diagnosticsSummaryElement,
-                key: "selected"
-            )
-            let visibleTitles = switcherPreviewTitles(from: diagnosticsSummaryElement)
-            for workflowApp in workflow.apps {
-                guard !excludingAppIDs.contains(workflowApp.appID) else {
-                    continue
-                }
-                guard selectedBundleIdentifier == workflowApp.identity.bundleIdentifier else {
-                    continue
-                }
-                if Set(visibleTitles) == Set(workflowApp.expectedWindowTitles) {
-                    return workflowApp
-                }
-            }
-
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        return nil
-    }
-
-    private func waitForFrontmostWorkflowApp(
-        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestFrontmostBundleIdentifier: String?
-        repeat {
-            latestFrontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            if latestFrontmostBundleIdentifier == workflowApp.identity.bundleIdentifier {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected frontmost app \(workflowApp.appName), \
-            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil").
-            """
-        )
-        return false
-    }
-
-    private func assertSwitcherPreviewShowsOnlyExpectedTitles(
-        _ expectedTitles: [String],
-        in diagnosticsSummaryElement: XCUIElement,
-        timeout: TimeInterval
-    ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        var visibleTitles: [String] = []
-        repeat {
-            visibleTitles = switcherPreviewTitles(from: diagnosticsSummaryElement)
-            if Set(visibleTitles) == Set(expectedTitles) {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTAssertEqual(
-            Set(visibleTitles),
-            Set(expectedTitles),
-            """
-            Expected switcher preview titles \(expectedTitles.sorted()), \
-            found \(visibleTitles.sorted())
-            """
-        )
-    }
-
-    private func waitForSwitcherMode(
-        _ diagnosticsSummaryElement: XCUIElement,
-        modePrefix: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let mode = switcherPanelDiagnosticsValue(diagnosticsSummaryElement, key: "mode")
-            if mode.hasPrefix(modePrefix) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        return false
-    }
-
     private func assertSwitcherPreviewWindowCards(
         in app: XCUIApplication,
         diagnosticsSummary: XCUIElement,
         selectedApp: SpaceFixtureResolvedWorkflow.App,
         excludedTitles: [String],
         previousWindowCardIdentifiers: Set<String>,
-        timeout: TimeInterval = 8
+        trigger: () -> Void
     ) throws -> [SwitcherWindowCardObservation] {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestCards: [SwitcherWindowCardObservation] = []
-        repeat {
-            latestCards = switcherWindowCardObservations(in: app)
-            let latestTitles = Set(latestCards.map(\.title))
-            let expectedTitles = Set(selectedApp.expectedWindowTitles)
-            let currentCardIdentifiers = Set(latestCards.map(\.identifier))
-            let oldCardsWereRemoved = previousWindowCardIdentifiers.isEmpty
-                || currentCardIdentifiers.isDisjoint(with: previousWindowCardIdentifiers)
-            let excludedTitlesAreAbsent = latestTitles.isDisjoint(with: Set(excludedTitles))
+        let expectation =
+            FlowTabUITestSwitcherWindowCardExpectation(
+                expectedTitles: selectedApp.expectedWindowTitles,
+                excludedTitles: excludedTitles,
+                previousWindowCardIdentifiers:
+                    previousWindowCardIdentifiers
+            )
+        var triggerDidComplete = false
+        let owner =
+            FlowTabUITestSwitcherWindowCardObservationOwner(
+                expectation: expectation,
+                acceptsResolution: {
+                    triggerDidComplete
+                },
+                readback: {
+                    FlowTabUITestSwitcherWindowCardSnapshot(
+                        cards:
+                            self.switcherWindowCardObservations(
+                                in: app
+                            )
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+        trigger()
+        triggerDidComplete = true
+        owner.requestReadback(source: .triggerReadback)
 
-            if latestTitles == expectedTitles,
-               latestCards.count == selectedApp.expectedWindowTitles.count,
-               excludedTitlesAreAbsent,
-               oldCardsWereRemoved {
-                return latestCards
-            }
-
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTAssertEqual(
-            Set(latestCards.map(\.title)),
-            Set(selectedApp.expectedWindowTitles),
-            """
-            Expected real switcher window card anchors for \(selectedApp.appName) to expose \
-            \(selectedApp.expectedWindowTitles.sorted()), found \(latestCards.map(\.title).sorted()).
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-        XCTAssertTrue(
-            Set(latestCards.map(\.title)).isDisjoint(with: Set(excludedTitles)),
-            """
-            Switcher preview kept window card anchors from another workflow app.
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-        XCTAssertTrue(
-            previousWindowCardIdentifiers.isEmpty
-                || Set(latestCards.map(\.identifier)).isDisjoint(with: previousWindowCardIdentifiers),
-            """
-            Switcher preview kept stale window card anchors after switching apps.
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-
-        return latestCards
-    }
-
-    func waitForSearchWindowResult(
-        in app: XCUIApplication,
-        title: String,
-        appName: String,
-        timeout: TimeInterval
-    ) -> SwitcherSearchWindowResultObservation? {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestResults: [SwitcherSearchWindowResultObservation] = []
-        repeat {
-            latestResults = searchWindowResultObservations(in: app)
-            if let result = latestResults.first(where: { $0.matches(title: title, appName: appName) }) {
-                return result
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
+        if let evidence = owner.waitForResolution(
+            timeout: FlowTabUITestSwitcherWindowCardPolicy.multiAppCardIdentityProjectionWatchdog
+        ) {
+            return evidence.value.cards
+        }
 
         XCTFail(
             """
-            Expected a window-scope search result for \(appName) / \(title), \
-            found \(latestResults.map(\.identifier).sorted()).
+            Switcher window-card identity watchdog expired for \
+            \(selectedApp.appName).
+
+            \(owner.diagnosticSummary)
+
+            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
             """
         )
-        return nil
+        return owner.latestSnapshot?.cards ?? []
     }
 
-    private func searchWindowResultObservations(in app: XCUIApplication) -> [SwitcherSearchWindowResultObservation] {
+    func searchWindowResultObservations(
+        in app: XCUIApplication
+    ) -> [SwitcherSearchWindowResultObservation] {
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         let diagnosticResults = searchWindowResultObservations(from: diagnosticsSummary)
         if !diagnosticResults.isEmpty {
@@ -963,34 +714,13 @@ extension FlowTabUITests {
     func searchWindowResultObservations(
         from diagnosticsSummaryElement: XCUIElement
     ) -> [SwitcherSearchWindowResultObservation] {
-        let rawValue = switcherPanelDiagnosticsValue(diagnosticsSummaryElement, key: "searchResults")
-        guard !rawValue.isEmpty, rawValue != "inactive" else { return [] }
-
-        var seenResultIDs: Set<String> = []
-        return rawValue
-            .split(separator: "|", omittingEmptySubsequences: true)
-            .compactMap { entry -> SwitcherSearchWindowResultObservation? in
-                let fields = entry.split(separator: ",", omittingEmptySubsequences: false)
-                guard fields.count == 6 else { return nil }
-                guard fields[1] == "window" else { return nil }
-
-                let resultID = switcherDiagnosticsUnescaped(fields[0])
-                guard seenResultIDs.insert(resultID).inserted else { return nil }
-                let appID = switcherDiagnosticsUnescaped(fields[2])
-                let windowID = switcherDiagnosticsUnescaped(fields[3])
-                let title = switcherDiagnosticsUnescaped(fields[4])
-                let appName = switcherDiagnosticsUnescaped(fields[5])
-                let identifier = "flowtab.switcher.search.window.\(resultID.flowTabUITestAccessibilityIdentifierComponent)"
-                return SwitcherSearchWindowResultObservation(
-                    identifier: identifier,
-                    searchableText: [title, appName, appID, windowID].joined(separator: "\n"),
-                    resultID: resultID,
-                    title: title,
-                    appName: appName,
-                    appID: appID,
-                    windowID: windowID
+        searchWindowResultObservations(
+            inDiagnosticsProjection:
+                switcherPanelDiagnosticsValue(
+                    diagnosticsSummaryElement,
+                    key: "searchResults"
                 )
-            }
+        )
     }
 
     private func searchWindowResultObservationsFromElements(in app: XCUIApplication) -> [SwitcherSearchWindowResultObservation] {
@@ -1015,169 +745,10 @@ extension FlowTabUITests {
             }
     }
 
-    private func switcherDiagnosticsUnescaped(_ value: Substring) -> String {
-        let rawValue = String(value)
-        return rawValue.removingPercentEncoding ?? rawValue
-    }
-
-    func confirmSwitcherSearchSelection(in app: XCUIApplication, searchInput: XCUIElement) {
-        app.typeText("\r")
-        if !waitForNonExistence(searchInput, timeout: 1.2) {
-            app.typeText("\r")
-        }
-        XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
-    }
-
     func switcherAppStripSummary(
         for workflowApp: SpaceFixtureResolvedWorkflow.App
     ) -> String {
         "\(workflowApp.identity.bundleIdentifier):\(workflowApp.windowCount)"
-    }
-
-    func waitForSwitcherAppsSummary(
-        _ diagnosticsSummaryElement: XCUIElement,
-        toContain expectedEntry: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let entries = Set(
-                switcherPanelDiagnosticsValue(diagnosticsSummaryElement, key: "apps")
-                    .split(separator: "|")
-                    .map(String.init)
-            )
-            if entries.contains(expectedEntry) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        return false
-    }
-
-    func waitForSwitcherAppEntry(
-        _ diagnosticsSummary: XCUIElement,
-        bundleIdentifier: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let entries = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "apps")
-                .split(separator: "|")
-                .map(String.init)
-            if entries.contains(where: { entry in
-                entry.split(separator: ":", maxSplits: 1).first.map(String.init) == bundleIdentifier
-            }) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-
-    func switcherPreviewTitles(from diagnosticsSummaryElement: XCUIElement) -> [String] {
-        let rawValue = switcherPanelDiagnosticsValue(diagnosticsSummaryElement, key: "preview")
-        guard rawValue != "inactive" else { return [] }
-        guard let separatorRange = rawValue.range(of: "::") else { return [] }
-        let titles = rawValue[separatorRange.upperBound...]
-        guard !titles.isEmpty else { return [] }
-        return titles.split(separator: "|").map(String.init)
-    }
-
-    func assertSwitcherSelectedWindowTitle(
-        _ expectedTitle: String,
-        in app: XCUIApplication,
-        diagnosticsSummary: XCUIElement,
-        timeout: TimeInterval = 4,
-        message: String
-    ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestTitle = switcherPanelDiagnosticsValue(
-            diagnosticsSummary,
-            key: "selectedWindowTitle"
-        )
-        repeat {
-            if latestTitle == expectedTitle {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-            latestTitle = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "selectedWindowTitle"
-            )
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            \(message)
-            Expected selected window title \(expectedTitle), found \(latestTitle).
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-    }
-
-    func assertSwitcherSelectedWindowTitle(
-        oneOf expectedTitles: Set<String>,
-        in app: XCUIApplication,
-        diagnosticsSummary: XCUIElement,
-        timeout: TimeInterval = 4,
-        message: String
-    ) {
-        XCTAssertFalse(expectedTitles.isEmpty, "Expected at least one allowed selected window title.")
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestTitle = switcherPanelDiagnosticsValue(
-            diagnosticsSummary,
-            key: "selectedWindowTitle"
-        )
-        repeat {
-            if expectedTitles.contains(latestTitle) {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-            latestTitle = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "selectedWindowTitle"
-            )
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            \(message)
-            Expected selected window title in \(expectedTitles.sorted()), found \(latestTitle).
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-    }
-
-    func noisyFullscreenWorkflowPreviewContainsRequiredRealWindows(
-        _ diagnosticsSummary: XCUIElement,
-        for workflowApp: SpaceFixtureResolvedWorkflow.App
-    ) -> Bool {
-        let previewTitles = Set(switcherPreviewTitles(from: diagnosticsSummary))
-        let fullscreenTitles = Set(workflowApp.fullscreenWindowTitles)
-        let standardTitles = Set(workflowApp.expectedWindowTitles).subtracting(fullscreenTitles)
-        guard !fullscreenTitles.isEmpty else {
-            return Set(workflowApp.expectedWindowTitles).isSubset(of: previewTitles)
-        }
-        return standardTitles.isSubset(of: previewTitles)
-            && !previewTitles.isDisjoint(with: fullscreenTitles)
-    }
-
-    func waitForNoisyFullscreenWorkflowPreviewTitles(
-        _ diagnosticsSummary: XCUIElement,
-        for workflowApp: SpaceFixtureResolvedWorkflow.App,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if noisyFullscreenWorkflowPreviewContainsRequiredRealWindows(diagnosticsSummary, for: workflowApp) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
     }
 
     func visibleFullscreenWindowTitle(
@@ -1186,38 +757,6 @@ extension FlowTabUITests {
     ) -> String? {
         let previewTitles = Set(switcherPreviewTitles(from: diagnosticsSummary))
         return workflowApp.fullscreenWindowTitles.first { previewTitles.contains($0) }
-    }
-
-    func waitForSwitcherSearchSelectedResult(
-        _ expectedResultID: String,
-        diagnosticsSummary: XCUIElement,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let latestValue = switcherPanelDiagnosticsValue(
-                diagnosticsSummary,
-                key: "searchSelectedResult"
-            )
-            let decoded = latestValue.removingPercentEncoding ?? latestValue
-            if decoded == expectedResultID {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-
-    func switcherPanelDiagnosticsValue(
-        _ diagnosticsSummaryElement: XCUIElement,
-        key: String
-    ) -> String {
-        let prefix = "\(key)="
-        let source = elementStringValue(diagnosticsSummaryElement)
-        guard let valueStart = source.range(of: prefix)?.upperBound else { return "" }
-        let remaining = source[valueStart...]
-        guard let valueEnd = remaining.firstIndex(of: ";") else { return String(remaining) }
-        return String(remaining[..<valueEnd])
     }
 
     private func switcherPanelDiagnosticsDebugSummary(_ diagnosticsSummaryElement: XCUIElement) -> String {

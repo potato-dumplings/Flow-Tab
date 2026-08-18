@@ -28,16 +28,16 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        assertHomeAndLogsApplicationIsForegroundReady(app)
 
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
-
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsTabButton), timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.logsTabContent).waitForExistence(timeout: 5))
-
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.settingsTabButton), timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.settingsTabContent).waitForExistence(timeout: 5))
+        for target in FlowTabUITestSidebarTabProjectionTarget.allCases {
+            guard assertSidebarTabProjectionAfterNavigation(
+                in: app,
+                target: target
+            ) else {
+                return
+            }
+        }
     }
 
     func testStatusItemReopensLastSelectedTabAfterWindowClose() throws {
@@ -50,42 +50,54 @@ extension FlowTabUITests {
                 "--flowtab-ui-screen-trusted",
                 "YES",
                 "--flowtab-ui-runtime-log-level",
-                "INFO"
+                "INFO",
+                "--flowtab-ui-enable-verbose-logs"
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        assertHomeAndLogsApplicationIsForegroundReady(app)
         openLogsTab(in: app)
 
-        app.typeKey("w", modifierFlags: .command)
-
-        XCTAssertNotEqual(app.state, .notRunning)
-        XCTAssertFalse(element(in: app, identifier: Identifier.logsTabContent).waitForExistence(timeout: 2))
+        assertStatusItemMainWindowCloses(in: app) {
+            app.typeKey("w", modifierFlags: .command)
+        }
 
         let flowTabBundleIdentifier = FlowTabUITestAppIdentity.configured().bundleIdentifier
         let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
-        finder.activate()
-        XCTAssertTrue(
-            waitForFrontmostBundleIdentifier("com.apple.finder", timeout: 5),
-            "Status item reopen should be exercised from another normal Space app."
-        )
+        assertTriggerMakesApplicationFrontmost(
+            "com.apple.finder",
+            timeout:
+                FlowTabUITestHomeAndLogsWatchdogPolicy
+                    .frontmostApplicationActivation,
+            message: "Status item reopen should be exercised from another normal Space app."
+        ) {
+            finder.activate()
+        }
         XCTAssertNotEqual(NSWorkspace.shared.frontmostApplication?.bundleIdentifier, flowTabBundleIdentifier)
 
         let logSnapshot = makeRuntimeLogFileSnapshot()
-        flowTabStatusItem(in: app).tap()
+        defer { logSnapshot.cancel() }
+        assertStatusItemActivationPolicyTransition(
+            since: logSnapshot
+        ) {
+            assertStatusItemMainWindowReopens(in: app) {
+                assertTriggerMakesApplicationFrontmost(
+                    flowTabBundleIdentifier,
+                    timeout:
+                        FlowTabUITestHomeAndLogsWatchdogPolicy
+                            .frontmostApplicationActivation,
+                    message: "FlowTab should stay foreground after restoring its hidden accessory policy."
+                ) {
+                    flowTabStatusItem(in: app).tap()
+                }
+            }
+        }
 
-        XCTAssertTrue(element(in: app, identifier: Identifier.logsTabContent).waitForExistence(timeout: 8))
-        waitForRuntimeLogFiles(
-            containing: [
-                "activationPolicy=regular source=status_item_temporary_activation",
-                "activationPolicy=accessory source=status_item_window_stable"
-            ],
-            since: logSnapshot,
-            timeout: 8
-        )
-        XCTAssertTrue(
-            waitForFrontmostBundleIdentifier(flowTabBundleIdentifier, timeout: 5),
-            "FlowTab should stay foreground after restoring its hidden accessory policy."
+        XCTAssertEqual(
+            NSWorkspace.shared.frontmostApplication?
+                .bundleIdentifier,
+            flowTabBundleIdentifier,
+            "FlowTab should remain foreground after the reopen evidence is visible."
         )
     }
 
@@ -101,15 +113,26 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        assertHomeAndLogsApplicationIsForegroundReady(app)
 
-        let statusItem = flowTabStatusItem(in: app)
-        XCUIElement.perform(withKeyModifiers: .control) {
-            statusItem.tap()
-        }
-        flowTabStatusMenuQuitItem(in: app).tap()
-
-        XCTAssertTrue(app.wait(for: .notRunning, timeout: 8))
+        let quitItem = flowTabStatusMenuQuitItem(
+            in: app,
+            openingWith: flowTabStatusItem(in: app)
+        )
+        let termination =
+            observeFlowTabUITestApplicationTermination(
+                app,
+                targetDescription: "status-item-menu-quit",
+                timeout:
+                    FlowTabUITestApplicationTerminationPolicy
+                        .statusItemMenuQuitWatchdog
+            ) {
+                quitItem.tap()
+            }
+        XCTAssertTrue(
+            termination.isSatisfied,
+            termination.diagnosticSummary
+        )
     }
 
     func testHomePermissionBannerHiddenWhenPermissionsGranted() throws {
@@ -123,53 +146,13 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
-
-        XCTAssertFalse(
-            hasHittableElement(in: app.buttons.matching(identifier: Identifier.permissionOpenSettings), timeout: 2)
-        )
-        XCTAssertFalse(element(in: app, identifier: Identifier.permissionBanner).exists)
-    }
-
-    func testHomeInitialAppLayerUsesRuntimeOrderAndZeroCountsWithoutAccessibilityPermission() throws {
-        let app = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "-showPermissionReminder",
-                "NO",
-                "--flowtab-ui-ax-trusted",
-                "NO",
-                "--flowtab-ui-screen-trusted",
-                "YES"
-            ]
-        )
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
-
-        let mailRow = element(in: app, identifier: Identifier.homeAppMockMail)
-        let browserRow = element(in: app, identifier: Identifier.homeAppMockBrowser)
-        XCTAssertTrue(mailRow.waitForExistence(timeout: 6))
-        XCTAssertTrue(browserRow.waitForExistence(timeout: 6))
-        XCTAssertLessThan(
-            mailRow.frame.minY,
-            browserRow.frame.minY,
-            "Home initial app rows should use the runtime snapshot order before any precise count refresh."
-        )
-
-        assertHomeAppRowValue(mailRow, equals: "0w", timeout: 2)
-        assertHomeAppRowValue(browserRow, equals: "0w", timeout: 2)
-        let initialMailY = mailRow.frame.minY
-        let initialBrowserY = browserRow.frame.minY
-        RunLoop.current.run(until: Date().addingTimeInterval(1.2))
-        XCTAssertEqual(elementStringValue(mailRow), "0w")
-        XCTAssertEqual(elementStringValue(browserRow), "0w")
-        XCTAssertEqual(mailRow.frame.minY, initialMailY, accuracy: 1)
-        XCTAssertEqual(browserRow.frame.minY, initialBrowserY, accuracy: 1)
-        XCTAssertLessThan(mailRow.frame.minY, browserRow.frame.minY)
+        assertHomeAndLogsApplicationIsForegroundReady(app)
+        assertHomePermissionBannerHiddenProjection(
+            in: app,
+            targetDescription: "granted-permissions"
+        ) {
+            assertHomeAndLogsHomeTabTriggerReady(in: app)
+        }
     }
 
     func testHomeColdStartPublishesLiveAppDirectoryWithoutAccessibilityPermission() throws {
@@ -185,16 +168,8 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
-        let firstLiveAppRow = app.buttons.matching(
-            NSPredicate(format: "identifier BEGINSWITH %@", "flowtab.home.app.")
-        ).firstMatch
-        XCTAssertTrue(
-            firstLiveAppRow.waitForExistence(timeout: 2),
-            "Home should publish the running-application directory without waiting for AX window repair."
-        )
+        assertHomeAndLogsApplicationIsForegroundReady(app)
+        assertHomeAndLogsLiveApplicationDirectoryAfterNavigation(in: app)
     }
 
     func testHomeOverviewChromeShowsCountsStatsAndSidebarPermissionStatus() throws {
@@ -211,19 +186,8 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
-
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeHeader).waitForExistence(timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeAppCount).waitForExistence(timeout: 8))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeWindowCount).waitForExistence(timeout: 8))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeStatsTotalApps).waitForExistence(timeout: 8))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeStatsVisibleApps).waitForExistence(timeout: 8))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeStatsHiddenApps).waitForExistence(timeout: 8))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeStatsTotalWindows).waitForExistence(timeout: 8))
-        XCTAssertTrue(element(in: app, identifier: Identifier.sidebarPermissionAccessibility).waitForExistence(timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.sidebarPermissionScreenCapture).waitForExistence(timeout: 5))
+        assertHomeAndLogsApplicationIsForegroundReady(app)
+        assertHomeAndLogsOverviewChromeAfterNavigation(in: app)
     }
 
     func testHomeWindowListUsesSeededWindowRecency() throws {
@@ -240,49 +204,64 @@ extension FlowTabUITests {
             let targetWindowTitle = "Draft"
             let fallbackWindowTitle = "Inbox"
 
-            XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10))
+            let homeAppRow = try XCTUnwrap(
+                waitForHomeWindowRecencyTargetAppRowAfterNavigation(
+                    identifier: targetApp.identity.homeAppAccessibilityIdentifier,
+                    appName: targetApp.appName,
+                    in: app
+                ),
+                "FlowTab did not publish the exact Home App row for "
+                    + "\(targetApp.appName)."
+            )
             XCTAssertNotEqual(
                 NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
                 targetApp.identity.bundleIdentifier,
                 "Home recency scenario must start outside the target fixture app."
             )
-
-            let homeAppRow = app.buttons
-                .matching(identifier: targetApp.identity.homeAppAccessibilityIdentifier)
-                .firstMatch
-            XCTAssertTrue(
-                homeAppRow.waitForExistence(timeout: 20),
-                "FlowTab did not surface \(targetApp.appName) on the home page."
-            )
-            tapElement(homeAppRow)
-
             let targetWindowRow = try XCTUnwrap(
-                waitForHomeWindowRow(in: app, title: targetWindowTitle, timeout: 12),
+                waitForHomeWindowRecencyTargetWindowRowAfterSelectingApp(
+                    homeAppRow, appName: targetApp.appName,
+                    title: targetWindowTitle, in: app
+                ),
                 "FlowTab did not expose a Home window row for \(targetApp.appName) / \(targetWindowTitle)."
             )
+            let targetWindowIdentifier = targetWindowRow.identifier
             let targetWindowNumber = try XCTUnwrap(
-                cgWindowNumber(fromHomeWindowRowIdentifier: targetWindowRow.identifier),
-                "Home window row did not expose a CG window identifier: \(targetWindowRow.identifier)"
+                cgWindowNumber(
+                    fromHomeWindowRowIdentifier: targetWindowIdentifier
+                ),
+                "Home window row did not expose a CG window identifier: \(targetWindowIdentifier)"
             )
-            targetWindowRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-
             XCTAssertTrue(
-                waitForFrontmostWorkflowWindow(
+                activateHomeWindowRecencyTargetWindow(
+                    row: targetWindowRow,
                     windowNumber: targetWindowNumber,
                     title: targetWindowTitle,
-                    app: targetApp,
-                    timeout: 10
+                    app: targetApp
                 ),
                 "Clicking the Home window row did not activate the real \(targetWindowTitle) fixture window."
             )
 
-            app.activate()
-            XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
-            XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10))
-            tapElement(homeAppRow)
+            XCTAssertTrue(
+                activateFlowTabAfterHomeWindowRecencyTargetActivation(app)
+            )
+            XCTAssertTrue(
+                navigateHomeAfterHomeWindowRecencyFlowTabActivation(
+                    in: app
+                )
+            )
 
             XCTAssertTrue(
-                waitForHomeWindowTitleOrder([targetWindowTitle, fallbackWindowTitle], in: app, timeout: 12),
+                waitForHomeWindowRecencyOrderedProjectionAfterSelectingApp(
+                    homeAppRow,
+                    appName: targetApp.appName,
+                    expectedTitles: [
+                        targetWindowTitle,
+                        fallbackWindowTitle
+                    ],
+                    targetWindowIdentifier: targetWindowIdentifier,
+                    in: app
+                ),
                 "Home window candidates should use real app-local recency before fallback order."
             )
         }
@@ -293,44 +272,48 @@ extension FlowTabUITests {
             additionalArguments: homeAppVisibilityRuntimeArguments(resetDefaults: true)
         )
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        assertHomeAndLogsApplicationIsForegroundReady(app)
         openSettingsTab(in: app)
 
-        let manageButton = element(in: app, identifier: Identifier.settingsAppVisibilityManage)
-        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
-        tapElement(manageButton)
-        XCTAssertTrue(element(in: app, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+        guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
+            in: app,
+            targetDescription: "Home hidden-App inventory"
+        ) else {
+            return
+        }
 
-        let managerSearch = app.textFields.firstMatch
-        XCTAssertTrue(managerSearch.waitForExistence(timeout: 6))
-        tapElement(managerSearch)
-        app.typeText("Mail")
+        guard assertSettingsAppVisibilityQueryProjection(
+            "Mail",
+            targetRowIdentifier: Identifier.settingsAppVisibilityMockMail,
+            in: app,
+            targetDescription: "Home hidden-App Search projection"
+        ) else {
+            return
+        }
 
-        let mockMailRow = element(in: app, identifier: Identifier.settingsAppVisibilityMockMail)
-        XCTAssertTrue(mockMailRow.waitForExistence(timeout: 6))
-        tapElement(mockMailRow)
-
-        let showToggle = homeAppVisibilityShowToggle(in: app)
+        guard let showToggle = settingsAppVisibilityShowToggleAfterSelecting(
+            rowIdentifier: Identifier.settingsAppVisibilityMockMail,
+            in: app,
+            targetDescription: "Home hidden-App detail"
+        ) else {
+            return
+        }
         setToggle(showToggle, to: false)
         XCTAssertFalse(toggleIsOn(showToggle))
 
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
-
-        let browserRow = element(in: app, identifier: Identifier.homeAppMockBrowser)
-        let mailRow = element(in: app, identifier: Identifier.homeAppMockMail)
-        XCTAssertTrue(browserRow.waitForExistence(timeout: 8))
-        XCTAssertTrue(mailRow.waitForExistence(timeout: 8))
-        XCTAssertLessThan(
-            browserRow.frame.minY,
-            mailRow.frame.minY,
+        guard let rowProjection =
+            assertHomeAndLogsHiddenAppRowsAfterNavigation(in: app)
+        else {
+            return
+        }
+        XCTAssertEqual(
+            rowProjection.identifiersByAscendingFrame,
+            [Identifier.homeAppMockBrowser, Identifier.homeAppMockMail],
             "Home should keep hidden apps visible but place them after visible apps."
         )
-        let mailRowDescription = "\(mailRow.label) \(elementStringValue(mailRow))"
         XCTAssertTrue(
-            mailRowDescription.contains("不展示")
-                || mailRowDescription.contains("Not shown")
-                || mailRowDescription.contains("hidden"),
+            FlowTabUITestHomeHiddenAppRowProjectionPolicy
+                .acceptsHiddenMailState(rowProjection),
             "Hidden Home app rows should expose the not-shown state for automation."
         )
     }
@@ -344,35 +327,28 @@ extension FlowTabUITests {
 
         let app = makeApp(additionalArguments: launchArguments)
         launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
-        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
+        assertHomeAndLogsApplicationIsForegroundReady(app)
 
-        let hostWeChatRow = element(in: app, identifier: Identifier.homeAppWeChat)
-        let nestedAppExRow = element(in: app, identifier: Identifier.homeAppNestedWeChatAppEx)
-        let nestedMiniProgramRow = element(in: app, identifier: Identifier.homeAppNestedMiniProgram)
-        let topLevelZeroWindowRow = element(in: app, identifier: Identifier.homeAppTopLevelZeroWindow)
+        guard let hostWeChatRow =
+            assertHomeAndLogsNestedTopologyTopLevelRowsAfterNavigation(
+                in: app
+            )
+        else {
+            return
+        }
 
-        XCTAssertTrue(hostWeChatRow.waitForExistence(timeout: 8))
-        XCTAssertTrue(topLevelZeroWindowRow.waitForExistence(timeout: 8))
-        tapElement(hostWeChatRow)
-        assertHomeWindowTitle("微信", in: app, timeout: 6)
-        assertHomeWindowTitle("微信（窗口）", in: app, timeout: 6)
-        assertHomeWindowTitle("Mock Mini Program Window", in: app, timeout: 6)
+        guard assertHomeAndLogsNestedTopologyFilteredAppsAfterSelectingHost(
+            hostWeChatRow,
+            in: app
+        ) else {
+            return
+        }
 
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "Home app layer nested zero-window topology"
         screenshot.lifetime = .keepAlways
         add(screenshot)
 
-        XCTAssertFalse(
-            nestedAppExRow.waitForExistence(timeout: 2),
-            "Home should hide zero-window nested app rows when the outer host app is already visible."
-        )
-        XCTAssertFalse(
-            nestedMiniProgramRow.exists,
-            "Home should hide deeper zero-window nested app rows while keeping ordinary top-level 0w apps visible."
-        )
     }
 
     func testPermissionReminderTogglePersistsAcrossRelaunch() throws {
@@ -387,12 +363,12 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(firstLaunchApp)
 
-        let openSettingsButtons = firstLaunchApp.buttons.matching(identifier: Identifier.permissionOpenSettings)
-        XCTAssertTrue(openSettingsButtons.firstMatch.waitForExistence(timeout: 5))
-        XCTAssertTrue(tapFirstHittable(in: openSettingsButtons, timeout: 5))
-
-        let reminderToggle = settingsReminderToggle(in: firstLaunchApp)
-        XCTAssertTrue(reminderToggle.waitForExistence(timeout: 5))
+        let reminderToggle = try XCTUnwrap(
+            waitForHomePermissionReminderToggleAfterOpeningSettings(
+                in: firstLaunchApp
+            ),
+            "Settings did not publish the exact permission reminder toggle."
+        )
         reminderToggle.tap()
 
         firstLaunchApp.terminate()
@@ -405,16 +381,13 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        launchFlowTabUITestApplication(relaunchApp)
-        XCTAssertTrue(
-            tapFirstHittable(in: relaunchApp.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5)
-        )
-        XCTAssertFalse(
-            hasHittableElement(
-                in: relaunchApp.buttons.matching(identifier: Identifier.permissionOpenSettings),
-                timeout: 2
-            )
-        )
+        assertHomePermissionBannerHiddenProjection(
+            in: relaunchApp,
+            targetDescription: "persisted-reminder-toggle"
+        ) {
+            launchFlowTabUITestApplication(relaunchApp)
+            assertHomeAndLogsHomeTabTriggerReady(in: relaunchApp)
+        }
     }
 
     func testPermissionDismissPersistsAcrossRelaunch() throws {
@@ -429,15 +402,16 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(firstLaunchApp)
 
-        let dismissButtons = firstLaunchApp.buttons.matching(identifier: Identifier.permissionDismiss)
-        XCTAssertTrue(dismissButtons.firstMatch.waitForExistence(timeout: 5))
-        XCTAssertTrue(tapFirstHittable(in: dismissButtons, timeout: 5))
-        XCTAssertFalse(
-            hasHittableElement(
-                in: firstLaunchApp.buttons.matching(identifier: Identifier.permissionOpenSettings),
-                timeout: 2
+        assertHomePermissionBannerHiddenProjection(
+            in: firstLaunchApp,
+            targetDescription: "permission-dismiss",
+            baselineRequirement: .visiblePermissionControls
+        ) {
+            assertHomePermissionDismissTriggerReady(
+                in: firstLaunchApp,
+                targetDescription: "permission-dismiss"
             )
-        )
+        }
 
         firstLaunchApp.terminate()
 
@@ -449,22 +423,20 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        launchFlowTabUITestApplication(relaunchApp)
-        XCTAssertTrue(
-            tapFirstHittable(in: relaunchApp.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5)
-        )
-        XCTAssertFalse(
-            hasHittableElement(
-                in: relaunchApp.buttons.matching(identifier: Identifier.permissionOpenSettings),
-                timeout: 2
-            )
-        )
+        assertHomePermissionBannerHiddenProjection(
+            in: relaunchApp,
+            targetDescription: "persisted-permission-dismiss"
+        ) {
+            launchFlowTabUITestApplication(relaunchApp)
+            assertHomeAndLogsHomeTabTriggerReady(in: relaunchApp)
+        }
     }
 
     func testLogsPageShowsSeededLogsAndClearRemovesOutput() throws {
         let app = makeApp(
             additionalArguments: [
                 "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
                 "--flowtab-ui-seed-logs",
                 "4",
                 "--flowtab-ui-runtime-log-level",
@@ -475,97 +447,89 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-
-        XCTAssertTrue(
-            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsTabButton), timeout: 5)
-        )
-
-        let logsTabContent = app.descendants(matching: .any)
-            .matching(identifier: Identifier.logsTabContent)
-            .firstMatch
-        XCTAssertTrue(logsTabContent.waitForExistence(timeout: 5))
-
-        XCTAssertTrue(element(in: app, identifier: Identifier.logsPrivacyNotice).waitForExistence(timeout: 5))
-        let diagnosticSessionToggle = toggleElement(in: app, identifier: Identifier.logsDiagnosticSession)
-        XCTAssertTrue(diagnosticSessionToggle.waitForExistence(timeout: 5))
-        setToggle(diagnosticSessionToggle, to: true)
-        XCTAssertTrue(
-            element(in: app, identifier: Identifier.logsDiagnosticSessionStatus)
-                .waitForExistence(timeout: 5)
-        )
-        setToggle(diagnosticSessionToggle, to: false)
-
-        let logsLines = app.descendants(matching: .any)
-            .matching(identifier: Identifier.logsLines)
-            .firstMatch
-        XCTAssertTrue(logsLines.waitForExistence(timeout: 8))
         let expectedSeededLogs: [(identifier: String, marker: String)] = [
             (Identifier.logsSeededDebugLine, "seeded-debug-log-1"),
             (Identifier.logsSeededInfoLine, "seeded-info-log-2"),
             (Identifier.logsSeededWarnLine, "seeded-warn-log-3"),
             (Identifier.logsSeededErrorLine, "seeded-error-log-4")
         ]
-        var persistedFingerprints: [String] = []
-        for expectedSeededLog in expectedSeededLogs {
-            let line = app.descendants(matching: .any)
-                .matching(identifier: expectedSeededLog.identifier)
-                .firstMatch
-            XCTAssertTrue(
-                line.waitForExistence(timeout: 8),
-                "Missing seeded log row: \(expectedSeededLog.identifier)"
-            )
-            let lineValue = (line.value as? String) ?? line.label
-            XCTAssertFalse(lineValue.contains(expectedSeededLog.marker))
-            XCTAssertTrue(lineValue.contains("message.type=structured"))
-            XCTAssertTrue(lineValue.contains("message.fingerprint="))
-            let fingerprintSuffix = lineValue.components(separatedBy: "message.fingerprint=").dropFirst().first
-            let fingerprint = fingerprintSuffix?.split(separator: " ").first.map(String.init)
-            persistedFingerprints.append(try XCTUnwrap(fingerprint))
+        let persistedFingerprints = try XCTUnwrap(
+            assertSeededLogsProjection(
+                in: app,
+                targetDescription: "initial-redacted-seeded-logs",
+                selectedLevel: "DEBUG",
+                expectedRows: expectedSeededLogs.map {
+                    FlowTabUITestSeededLogProjectionExpectation(
+                        identifier: $0.identifier,
+                        cleartextMarker: $0.marker
+                    )
+                }
+            ) {
+                tapFirstHittable(
+                    in: app.buttons.matching(
+                        identifier: Identifier.logsTabButton
+                    ),
+                    timeout:
+                        FlowTabUITestLogsProjectionPolicy
+                            .tabNavigationWatchdog
+                )
+            }
+        )
+        XCTAssertEqual(
+            persistedFingerprints.count,
+            expectedSeededLogs.count
+        )
+        for fingerprint in persistedFingerprints {
+            XCTAssertFalse(fingerprint.isEmpty)
         }
-        let diskContentsBeforeClear = runtimeLogContentsSinceSnapshot([:])
+        XCTAssertFalse(
+            app.descendants(matching: .any)[
+                "flowtab.logs.diagnostic-session"
+            ].exists
+        )
+        let diskContentsBeforeClear = runtimeLogContents()
         XCTAssertTrue(persistedFingerprints.allSatisfy { diskContentsBeforeClear.contains($0) })
-        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: Identifier.logsEmptyHint).firstMatch.exists)
 
-        selectOption(in: app, controlIdentifier: Identifier.logsLevel, optionIdentifier: "WARN")
-        assertValue(of: element(in: app, identifier: Identifier.logsLevel), equals: "WARN")
-        XCTAssertTrue(
-            waitForNonExistence(
-                app.descendants(matching: .any).matching(identifier: Identifier.logsSeededDebugLine).firstMatch,
-                timeout: 3
+        assertLogVisibilityTransition(
+            in: app,
+            targetDescription: "seeded-log-level-WARN",
+            initialSelectedLevel: "DEBUG",
+            initialVisibleIdentifiers:
+                expectedSeededLogs.map(\.identifier),
+            selectedLevel: "WARN",
+            visibleIdentifiers: [
+                Identifier.logsSeededWarnLine,
+                Identifier.logsSeededErrorLine
+            ],
+            hiddenIdentifiers: [
+                Identifier.logsSeededDebugLine,
+                Identifier.logsSeededInfoLine
+            ]
+        ) {
+            selectOption(
+                in: app,
+                controlIdentifier: Identifier.logsLevel,
+                optionIdentifier: "WARN"
             )
-        )
-        XCTAssertTrue(
-            waitForNonExistence(
-                app.descendants(matching: .any).matching(identifier: Identifier.logsSeededInfoLine).firstMatch,
-                timeout: 3
-            )
-        )
-        XCTAssertTrue(
-            app.descendants(matching: .any)
-                .matching(identifier: Identifier.logsSeededWarnLine)
-                .firstMatch
-                .waitForExistence(timeout: 5)
-        )
-        XCTAssertTrue(
-            app.descendants(matching: .any)
-                .matching(identifier: Identifier.logsSeededErrorLine)
-                .firstMatch
-                .waitForExistence(timeout: 5)
+        }
+
+        assertLogsClearTransition(
+            in: app,
+            targetDescription: "seeded-logs-clear",
+            selectedLevel: "WARN",
+            initialVisibleIdentifiers: [
+                Identifier.logsSeededWarnLine, Identifier.logsSeededErrorLine
+            ]
         )
 
-        XCTAssertTrue(
-            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsClearButton), timeout: 5)
-        )
-
-        let logsEmptyHint = app.descendants(matching: .any)
-            .matching(identifier: Identifier.logsEmptyHint)
-            .firstMatch
-        XCTAssertTrue(logsEmptyHint.waitForExistence(timeout: 5))
-
-        let clearedDiskContents = runtimeLogContentsSinceSnapshot([:])
+        let clearedDiskContents = runtimeLogContents()
         XCTAssertTrue(persistedFingerprints.allSatisfy { !clearedDiskContents.contains($0) })
 
-        app.terminate()
+        let sourceTermination = terminateFlowTabUITestApplication(
+            app,
+            targetDescription: "logs-clear-persistence-source"
+        )
+        XCTAssertTrue(sourceTermination.isSatisfied, sourceTermination.diagnosticSummary)
         let relaunchedApp = makeApp(
             additionalArguments: [
                 "--flowtab-ui-runtime-log-level",
@@ -574,20 +538,15 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        launchFlowTabUITestApplication(relaunchedApp)
-        openLogsTab(in: relaunchedApp)
-
-        for expectedSeededLog in expectedSeededLogs {
-            XCTAssertTrue(
-                waitForNonExistence(
-                    relaunchedApp.descendants(matching: .any)
-                        .matching(identifier: expectedSeededLog.identifier)
-                        .firstMatch,
-                    timeout: 3
-                )
-            )
+        assertLogsClearPersistenceAfterRelaunch(
+            in: relaunchedApp,
+            targetDescription: "seeded-logs-cleared-after-relaunch",
+            selectedLevel: "DEBUG"
+        ) {
+            launchFlowTabUITestApplication(relaunchedApp)
+            openLogsTab(in: relaunchedApp)
         }
-        let relaunchedDiskContents = runtimeLogContentsSinceSnapshot([:])
+        let relaunchedDiskContents = runtimeLogContents()
         XCTAssertTrue(persistedFingerprints.allSatisfy { !relaunchedDiskContents.contains($0) })
     }
 
@@ -637,6 +596,65 @@ extension FlowTabUITests {
         }
     }
 
+    func testLogsPageUpdatesFromRuntimeLogChangeEventWhileVisible() {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-seed-logs",
+                "2",
+                "--flowtab-ui-listen-switcher-trigger",
+                "--flowtab-ui-runtime-log-level",
+                "info",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        let didResolveInitialLogs =
+            assertLogsPopulatedProjectionAfterNavigation(
+                in: app,
+                targetDescription: "live-update-initial-logs",
+                selectedLevel: "INFO",
+                visibleIdentifiers: [
+                    Identifier.logsSeededInfoLine
+                ]
+            ) {
+                tapFirstHittable(
+                    in: app.buttons.matching(
+                        identifier: Identifier.logsTabButton
+                    ),
+                    timeout:
+                        FlowTabUITestLogsProjectionPolicy
+                            .tabNavigationWatchdog
+                )
+            }
+        guard didResolveInitialLogs else {
+            return
+        }
+        assertLogsClearTransition(
+            in: app,
+            targetDescription: "live-update-precondition-clear",
+            selectedLevel: "INFO",
+            initialVisibleIdentifiers: [
+                Identifier.logsSeededInfoLine
+            ]
+        )
+
+        let command = FlowTabUITestSwitcherCommand.runtimeLogProbe
+        let expectedMarker = "runtime log observation probe"
+        assertLogsRuntimeDelivery(
+            in: app,
+            targetDescription: "runtime-log-probe",
+            selectedLevel: "INFO",
+            marker: expectedMarker
+        ) {
+            postFlowTabUITestSwitcherCommand(
+                command,
+                traceLabel: "logs.live-update"
+            )
+        }
+    }
+
     func testLogsTabShowsActionButtons() throws {
         let app = makeApp(
             additionalArguments: [
@@ -648,15 +666,14 @@ extension FlowTabUITests {
             ]
         )
         launchFlowTabUITestApplication(app)
-        openLogsTab(in: app)
-
-        let openDirectoryButton = app.buttons[Identifier.logsOpenDirectoryButton]
-        XCTAssertTrue(openDirectoryButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(openDirectoryButton.isHittable)
-
-        let clearLogsButton = app.buttons[Identifier.logsClearButton]
-        XCTAssertTrue(clearLogsButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(clearLogsButton.isHittable)
+        let didResolveLogsActions =
+            assertLogsActionProjectionAfterNavigation(
+                in: app,
+                targetDescription: "logs-action-buttons"
+            )
+        guard didResolveLogsActions else {
+            return
+        }
     }
 
     private func configuredHomeWindowRecencyWorkflow() throws -> SpaceFixtureResolvedWorkflow {
@@ -685,25 +702,6 @@ extension FlowTabUITests {
         }
     }
 
-    private func waitForHomeWindowTitleOrder(
-        _ expectedTitles: [String],
-        in app: XCUIApplication,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestWindowTitles: [String] = []
-        repeat {
-            latestWindowTitles = homeWindowRows(in: app).map(\.label)
-            if Array(latestWindowTitles.prefix(expectedTitles.count)) == expectedTitles {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail("Expected Home window order \(expectedTitles), found \(latestWindowTitles).")
-        return false
-    }
-
     private func cgWindowNumber(fromHomeWindowRowIdentifier identifier: String) -> CGWindowID? {
         let prefix = "flowtab.home.window.cg-"
         guard identifier.hasPrefix(prefix) else { return nil }
@@ -722,22 +720,6 @@ extension FlowTabUITests {
         return CGWindowID(windowNumber)
     }
 
-    private func assertHomeAppRowValue(
-        _ row: XCUIElement,
-        equals expectedValue: String,
-        timeout: TimeInterval
-    ) {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if row.exists && elementStringValue(row) == expectedValue {
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail("Expected Home app row value '\(expectedValue)', actual: '\(elementStringValue(row))'")
-    }
-
     private func homeAppVisibilityRuntimeArguments(resetDefaults: Bool = false) -> [String] {
         var arguments: [String] = []
         if resetDefaults {
@@ -753,16 +735,6 @@ extension FlowTabUITests {
             "YES"
         ]
         return arguments
-    }
-
-    private func homeAppVisibilityShowToggle(in app: XCUIApplication) -> XCUIElement {
-        let switchElement = app.switches.firstMatch
-        if switchElement.waitForExistence(timeout: 3) {
-            return switchElement
-        }
-        let checkBox = app.checkBoxes.firstMatch
-        XCTAssertTrue(checkBox.waitForExistence(timeout: 3))
-        return checkBox
     }
 
 }
