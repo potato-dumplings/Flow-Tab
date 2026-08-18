@@ -380,6 +380,7 @@
 		F0D100063D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0D100053D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift */; };
 		A6F100043E11000100B0D737 /* FlowTabTests+HotkeyConflictSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F100033E11000100B0D737 /* FlowTabTests+HotkeyConflictSettings.swift */; };
 		BEEF01043F01000100B0D737 /* FlowTabTests+ShortcutRecording.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF00043F01000100B0D737 /* FlowTabTests+ShortcutRecording.swift */; };
+		A7C100023F02000100B0D737 /* FlowTabTests+ShortcutRecorderInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C100013F02000100B0D737 /* FlowTabTests+ShortcutRecorderInteraction.swift */; };
 		BEEF01093F01000100B0D737 /* FlowTabTests+ChordHotkeyRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF00093F01000100B0D737 /* FlowTabTests+ChordHotkeyRouting.swift */; };
 		F1D100023D1F000100B0D737 /* ModifierReleaseObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D100013D1F000100B0D737 /* ModifierReleaseObservation.swift */; };
 		F1D100043D1F000100B0D737 /* SwitcherPanelController+ModifierReleaseObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D100033D1F000100B0D737 /* SwitcherPanelController+ModifierReleaseObservation.swift */; };
@@ -786,6 +787,7 @@
 		F0D100053D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HotkeyRegistrationObservation.swift"; sourceTree = "<group>"; };
 		A6F100033E11000100B0D737 /* FlowTabTests+HotkeyConflictSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HotkeyConflictSettings.swift"; sourceTree = "<group>"; };
 		BEEF00043F01000100B0D737 /* FlowTabTests+ShortcutRecording.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+ShortcutRecording.swift"; sourceTree = "<group>"; };
+		A7C100013F02000100B0D737 /* FlowTabTests+ShortcutRecorderInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+ShortcutRecorderInteraction.swift"; sourceTree = "<group>"; };
 		BEEF00093F01000100B0D737 /* FlowTabTests+ChordHotkeyRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+ChordHotkeyRouting.swift"; sourceTree = "<group>"; };
 		F1D100013D1F000100B0D737 /* ModifierReleaseObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierReleaseObservation.swift; sourceTree = "<group>"; };
 		F1D100033D1F000100B0D737 /* SwitcherPanelController+ModifierReleaseObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+ModifierReleaseObservation.swift"; sourceTree = "<group>"; };
@@ -1440,6 +1442,7 @@
 				F0D100053D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift */,
 				A6F100033E11000100B0D737 /* FlowTabTests+HotkeyConflictSettings.swift */,
 				BEEF00043F01000100B0D737 /* FlowTabTests+ShortcutRecording.swift */,
+				A7C100013F02000100B0D737 /* FlowTabTests+ShortcutRecorderInteraction.swift */,
 				BEEF00093F01000100B0D737 /* FlowTabTests+ChordHotkeyRouting.swift */,
 				F1D100053D1F000100B0D737 /* FlowTabTests+ModifierReleaseObservation.swift */,
 				F2D100033D20000100B0D737 /* FlowTabTests+HotkeyInputEvidence.swift */,
@@ -2620,6 +2623,7 @@
 				F0D100063D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift in Sources */,
 				A6F100043E11000100B0D737 /* FlowTabTests+HotkeyConflictSettings.swift in Sources */,
 				BEEF01043F01000100B0D737 /* FlowTabTests+ShortcutRecording.swift in Sources */,
+				A7C100023F02000100B0D737 /* FlowTabTests+ShortcutRecorderInteraction.swift in Sources */,
 				BEEF01093F01000100B0D737 /* FlowTabTests+ChordHotkeyRouting.swift in Sources */,
 				F1D100063D1F000100B0D737 /* FlowTabTests+ModifierReleaseObservation.swift in Sources */,
 				F2D100043D20000100B0D737 /* FlowTabTests+HotkeyInputEvidence.swift in Sources */,

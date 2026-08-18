@@ -81,6 +81,7 @@ enum AppStringKey: String {
     case hotkeyRowInAppReverseModifiers
     case hotkeyRecorderPrompt
     case hotkeyRecorderModifierRequired
+    case hotkeyRecorderEditHint
     case settingsPageTitle
     case settingsPageSubtitle
     case settingsCardAppearanceTitle
@@ -243,6 +244,7 @@ enum AppStrings {
             .hotkeyRowInAppReverseModifiers: "应用内反向修饰键",
             .hotkeyRecorderPrompt: "请按下快捷键",
             .hotkeyRecorderModifierRequired: "请至少按下一个按键",
+            .hotkeyRecorderEditHint: "点击修改快捷键",
             .settingsPageTitle: "设置",
             .settingsPageSubtitle: "基础显示设置、快捷键与权限",
             .settingsCardAppearanceTitle: "外观",
@@ -400,6 +402,7 @@ enum AppStrings {
             .hotkeyRowInAppReverseModifiers: "In-app reverse modifiers",
             .hotkeyRecorderPrompt: "Press shortcut",
             .hotkeyRecorderModifierRequired: "Press at least one key",
+            .hotkeyRecorderEditHint: "Click to edit shortcut",
             .settingsPageTitle: "Settings",
             .settingsPageSubtitle: "Display, hotkeys, and permissions",
             .settingsCardAppearanceTitle: "Appearance",

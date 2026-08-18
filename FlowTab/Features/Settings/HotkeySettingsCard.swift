@@ -187,6 +187,10 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
             .hotkeyRecorderModifierRequired,
             language: state.language
         )
+        let editHint = AppStrings.text(
+            .hotkeyRecorderEditHint,
+            language: state.language
+        )
 
         mainModifiersRecorder.update(
             keys: mainConfiguration.baseKeys,
@@ -195,7 +199,8 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
             accessibilityLabel: AppStrings.text(
                 .hotkeyRowMainModifiers,
                 language: state.language
-            )
+            ),
+            editHint: editHint
         )
         mainReverseModifiersRecorder.update(
             keys: mainConfiguration.reverseKeys,
@@ -204,7 +209,8 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
             accessibilityLabel: AppStrings.text(
                 .hotkeyRowMainReverseModifiers,
                 language: state.language
-            )
+            ),
+            editHint: editHint
         )
         mainKeyRecorder.update(
             keys: mainConfiguration.mainKeys,
@@ -213,7 +219,8 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
             accessibilityLabel: AppStrings.text(
                 .hotkeyRowMainKey,
                 language: state.language
-            )
+            ),
+            editHint: editHint
         )
         quitKeyRecorder.update(
             keys: mainConfiguration.quitKeys,
@@ -222,7 +229,8 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
             accessibilityLabel: AppStrings.text(
                 .hotkeyRowQuitKey,
                 language: state.language
-            )
+            ),
+            editHint: editHint
         )
         inAppShortcutRecorder.update(
             keys: inAppConfiguration.baseKeys,
@@ -231,7 +239,8 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
             accessibilityLabel: AppStrings.text(
                 .hotkeyRowInAppShortcut,
                 language: state.language
-            )
+            ),
+            editHint: editHint
         )
         inAppReverseModifiersRecorder.update(
             keys: inAppConfiguration.reverseKeys,
@@ -240,7 +249,8 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
             accessibilityLabel: AppStrings.text(
                 .hotkeyRowInAppReverseModifiers,
                 language: state.language
-            )
+            ),
+            editHint: editHint
         )
 
         mainSummaryLabel.stringValue = state.mainSummaryText

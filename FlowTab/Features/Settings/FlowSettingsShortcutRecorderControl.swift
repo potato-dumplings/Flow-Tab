@@ -13,12 +13,16 @@ final class FlowSettingsShortcutRecorderControl:
     private(set) var isRecording = false
 
     private let valueLabel = NSTextField(labelWithString: "")
+    private let editIndicator = NSImageView()
     private let style = FlowSettingsSelectStyle.preset(.formSelect)
     private var recordingPrompt = ""
     private var keyRequiredPrompt = ""
     private var pressedKeys = SwitcherHotkeyKeySet()
     private var pendingKeys = SwitcherHotkeyKeySet()
     private var recordingEventMonitor: Any?
+    private var windowResignKeyObserver: NSObjectProtocol?
+    private var hoverTrackingArea: NSTrackingArea?
+    private var isHovering = false
     private var targetAppearance =
         FlowSettingsStyleResolver.defaultAppearance
     private var heightConstraint: NSLayoutConstraint?
@@ -32,6 +36,7 @@ final class FlowSettingsShortcutRecorderControl:
     override var isEnabled: Bool {
         didSet {
             if !isEnabled {
+                isHovering = false
                 endRecording()
             }
             refreshStyle()
@@ -49,18 +54,20 @@ final class FlowSettingsShortcutRecorderControl:
     }
 
     deinit {
-        removeRecordingEventMonitor()
+        removeRecordingObservers()
     }
 
     func update(
         keys: SwitcherHotkeyKeySet,
         recordingPrompt: String,
         keyRequiredPrompt: String,
-        accessibilityLabel: String
+        accessibilityLabel: String,
+        editHint: String = ""
     ) {
         recordedKeys = keys
         self.recordingPrompt = recordingPrompt
         self.keyRequiredPrompt = keyRequiredPrompt
+        toolTip = editHint
         setAccessibilityLabel(accessibilityLabel)
         if !isRecording {
             updateDisplayedValue(currentDisplayValue)
@@ -72,6 +79,7 @@ final class FlowSettingsShortcutRecorderControl:
         targetAppearance = appearance
         self.appearance = appearance
         valueLabel.appearance = appearance
+        editIndicator.appearance = appearance
         refreshStyle()
     }
 
@@ -82,6 +90,8 @@ final class FlowSettingsShortcutRecorderControl:
             state = .disabled
         } else if isRecording || window?.firstResponder === self {
             state = .focused
+        } else if isHovering {
+            state = .hovered
         } else {
             state = .normal
         }
@@ -102,6 +112,17 @@ final class FlowSettingsShortcutRecorderControl:
             valueLabel.alignment = text.alignment
             valueLabel.lineBreakMode = text.lineBreakMode
         }
+        let indicatorColor: FlowSettingsColorToken
+        switch state {
+        case .hovered, .focused, .expanded:
+            indicatorColor = .controlAccent(alpha: 0.92)
+        case .normal, .disabled:
+            indicatorColor = .semantic(.secondaryLabel, alpha: 0.72)
+        }
+        editIndicator.contentTintColor = FlowSettingsStyleResolver.color(
+            indicatorColor,
+            appearance: targetAppearance
+        )
         alphaValue = isEnabled ? 1 : 0.55
         heightConstraint?.constant = style.metrics.height
         needsLayout = true
@@ -119,7 +140,40 @@ final class FlowSettingsShortcutRecorderControl:
     }
 
     override func resetCursorRects() {
+        super.resetCursorRects()
         addCursorRect(bounds, cursor: isEnabled ? .pointingHand : .arrow)
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        super.hitTest(point) == nil ? nil : self
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverTrackingArea {
+            removeTrackingArea(hoverTrackingArea)
+        }
+        let trackingArea = NSTrackingArea(
+            rect: bounds,
+            options: [.activeInKeyWindow, .mouseEnteredAndExited, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(trackingArea)
+        hoverTrackingArea = trackingArea
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        guard isEnabled else { return }
+        isHovering = true
+        refreshStyle()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        isHovering = false
+        refreshStyle()
     }
 
     override func mouseDown(with _: NSEvent) {
@@ -206,7 +260,21 @@ final class FlowSettingsShortcutRecorderControl:
 
         valueLabel.translatesAutoresizingMaskIntoConstraints = false
         valueLabel.maximumNumberOfLines = 1
+        valueLabel.setAccessibilityElement(false)
         addSubview(valueLabel)
+
+        editIndicator.translatesAutoresizingMaskIntoConstraints = false
+        editIndicator.image = NSImage(
+            systemSymbolName: "pencil",
+            accessibilityDescription: nil
+        )
+        editIndicator.symbolConfiguration = NSImage.SymbolConfiguration(
+            pointSize: 11,
+            weight: .medium
+        )
+        editIndicator.imageScaling = .scaleProportionallyDown
+        editIndicator.setAccessibilityElement(false)
+        addSubview(editIndicator)
 
         let heightConstraint = heightAnchor.constraint(
             equalToConstant: style.metrics.height
@@ -217,12 +285,21 @@ final class FlowSettingsShortcutRecorderControl:
             valueLabel.leadingAnchor.constraint(
                 equalTo: leadingAnchor,
                 constant: style.metrics.horizontalPadding
+                    + style.metrics.iconSpacing
             ),
             valueLabel.trailingAnchor.constraint(
                 equalTo: trailingAnchor,
                 constant: -style.metrics.horizontalPadding
+                    - style.metrics.iconSpacing
             ),
-            valueLabel.centerYAnchor.constraint(equalTo: centerYAnchor)
+            valueLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
+            editIndicator.trailingAnchor.constraint(
+                equalTo: trailingAnchor,
+                constant: -style.metrics.horizontalPadding
+            ),
+            editIndicator.centerYAnchor.constraint(equalTo: centerYAnchor),
+            editIndicator.widthAnchor.constraint(equalToConstant: 12),
+            editIndicator.heightAnchor.constraint(equalToConstant: 12)
         ])
 
         setAccessibilityElement(true)
@@ -237,13 +314,13 @@ final class FlowSettingsShortcutRecorderControl:
         isRecording = true
         pressedKeys = SwitcherHotkeyKeySet()
         pendingKeys = SwitcherHotkeyKeySet()
-        installRecordingEventMonitor()
+        installRecordingObservers()
         updateDisplayedValue(recordingPrompt)
         refreshStyle()
     }
 
     private func endRecording() {
-        removeRecordingEventMonitor()
+        removeRecordingObservers()
         guard isRecording else { return }
         isRecording = false
         pressedKeys = SwitcherHotkeyKeySet()
@@ -282,10 +359,17 @@ final class FlowSettingsShortcutRecorderControl:
         observeCurrentPressedKeys()
     }
 
-    private func installRecordingEventMonitor() {
-        removeRecordingEventMonitor()
+    private func installRecordingObservers() {
+        removeRecordingObservers()
         recordingEventMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.keyDown, .keyUp, .flagsChanged]
+            matching: [
+                .keyDown,
+                .keyUp,
+                .flagsChanged,
+                .leftMouseDown,
+                .rightMouseDown,
+                .otherMouseDown
+            ]
         ) { [weak self] event in
             guard let self, self.isRecording else { return event }
             switch event.type {
@@ -295,17 +379,51 @@ final class FlowSettingsShortcutRecorderControl:
                 self.recordKeyUp(event)
             case .flagsChanged:
                 self.recordFlagsChanged(event)
+            case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+                if !self.containsMouseEvent(event) {
+                    self.cancelRecording()
+                }
+                return event
             default:
                 break
             }
             return nil
         }
+        if let window {
+            windowResignKeyObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.didResignKeyNotification,
+                object: window,
+                queue: .main
+            ) { [weak self] _ in
+                self?.cancelRecording()
+            }
+        }
     }
 
-    private func removeRecordingEventMonitor() {
-        guard let recordingEventMonitor else { return }
-        NSEvent.removeMonitor(recordingEventMonitor)
-        self.recordingEventMonitor = nil
+    private func removeRecordingObservers() {
+        if let recordingEventMonitor {
+            NSEvent.removeMonitor(recordingEventMonitor)
+            self.recordingEventMonitor = nil
+        }
+        if let windowResignKeyObserver {
+            NotificationCenter.default.removeObserver(windowResignKeyObserver)
+            self.windowResignKeyObserver = nil
+        }
+    }
+
+    private func containsMouseEvent(_ event: NSEvent) -> Bool {
+        guard event.window === window else { return false }
+        return bounds.contains(convert(event.locationInWindow, from: nil))
+    }
+
+    private func cancelRecording() {
+        guard isRecording else { return }
+        if window?.firstResponder === self,
+            window?.makeFirstResponder(nil) == true
+        {
+            return
+        }
+        endRecording()
     }
 
     private func observeCurrentPressedKeys() {
@@ -322,7 +440,7 @@ final class FlowSettingsShortcutRecorderControl:
     }
 
     private func commit(keys: SwitcherHotkeyKeySet) {
-        removeRecordingEventMonitor()
+        removeRecordingObservers()
         recordedKeys = keys
         isRecording = false
         pressedKeys = SwitcherHotkeyKeySet()

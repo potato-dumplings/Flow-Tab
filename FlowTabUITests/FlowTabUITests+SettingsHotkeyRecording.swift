@@ -3,6 +3,54 @@ import CoreGraphics
 import XCTest
 
 extension FlowTabUITests {
+    func testSettingsShortcutRecorderTransfersAndDismissesAfterOutsideClick() throws {
+        let app = makeApp(
+            additionalArguments: hotkeyEffectArguments(resetDefaults: true)
+        )
+        launchFlowTabUITestApplication(app)
+        defer { app.terminate() }
+        openSettingsTab(in: app)
+
+        let mainModifiers = element(
+            in: app,
+            identifier: Identifier.settingsHotkeyMainModifiers
+        )
+        let mainKey = element(
+            in: app,
+            identifier: Identifier.settingsHotkeyMainKey
+        )
+        let settingsContent = element(
+            in: app,
+            identifier: Identifier.settingsTabContent
+        )
+        XCTAssertTrue(mainModifiers.waitForExistence(timeout: 5))
+        XCTAssertTrue(mainKey.waitForExistence(timeout: 5))
+        XCTAssertTrue(settingsContent.waitForExistence(timeout: 5))
+        assertValue(of: mainModifiers, equals: "Option")
+        assertValue(of: mainKey, equals: "Tab")
+
+        assertTriggerMakesValue(
+            of: mainModifiers,
+            equals: "请按下快捷键",
+            trigger: { self.tapElement(mainModifiers) }
+        )
+        assertTriggerMakesValue(
+            of: mainModifiers,
+            equals: "Option",
+            trigger: { self.tapElement(mainKey) }
+        )
+        assertValue(of: mainKey, equals: "请按下快捷键")
+        assertTriggerMakesValue(
+            of: mainKey,
+            equals: "Tab",
+            trigger: {
+                settingsContent.coordinate(
+                    withNormalizedOffset: CGVector(dx: 0.98, dy: 0.98)
+                ).tap()
+            }
+        )
+    }
+
     func testOptionWTabGlobalChordCanOpenMainSwitcherRepeatedly() throws {
         let app = makeApp(
             additionalArguments: hotkeyEffectArguments(
