@@ -1,7 +1,7 @@
 interface:
   display_name: "FlowTab Engineering"
-  short_description: "FlowTab engineering, transient validation, and handoff"
-  default_prompt: "Use $flowtab-engineering to apply FlowTab engineering, transient full-validation asset lifecycle, architecture, validation, and handoff rules to this task."
+  short_description: "FlowTab engineering, release identity, validation, and handoff"
+  default_prompt: "Use $flowtab-engineering to apply FlowTab engineering, release code-identity continuity, transient full-validation asset lifecycle, architecture, validation, and handoff rules to this task."
 
 policy:
   allow_implicit_invocation: true

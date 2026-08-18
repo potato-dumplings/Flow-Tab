@@ -1,6 +1,6 @@
 ---
 name: flowtab-engineering
-description: "Use for FlowTab repository engineering work including implementation, code review, bug triage, architecture, UI appearance and typography, transient full-validation test-asset handling, test strategy, performance analysis, and validated change delivery. Apply FlowTab module boundaries, evidence-first debugging, risk-calibrated validation layers, canonical test tooling, and task-specific handoff requirements."
+description: "Use for FlowTab repository engineering work including implementation, code review, bug triage, architecture, release packaging and privacy-identity continuity, UI appearance and typography, transient full-validation test-asset handling, test strategy, performance analysis, and validated change delivery. Apply FlowTab module boundaries, stable release identity, evidence-first debugging, risk-calibrated validation layers, canonical test tooling, and task-specific handoff requirements."
 ---
 
 # FlowTab Engineering
@@ -49,6 +49,9 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 13. Apply the shared appearance and typography contract.
     Route production fonts through `FlowTypography` tokens or audited named exceptions. Read `references/appearance-typography.md` before changing fonts, text measurement, visual-font metrics, shared component styling or typography audit inputs, then run the canonical typography audit.
 
+14. Preserve release code identity across upgrades.
+    Read `references/release-identity-workflow.md` before building a release archive, local upgrade package, signing migration or permission-preserving delivery. Require a certificate-signed final App and evidence against the actual preceding distributed App. Reject ad-hoc fallback, distinguish Apple Development test artifacts from notarized Developer ID distribution, and keep TCC-resetting install paths outside permission-continuity validation.
+
 ## Reference Routing
 
 - Feature work: read `references/feature-workflow.md`.
@@ -60,6 +63,7 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 - Build and validation commands: read `references/validation-command-cookbook.md`.
 - App unit or behavior validation: read `references/flowtabtests-workflow.md`.
 - UI automation, permission, or code-identity setup: read `references/ui-automation-prerequisites.md`.
+- Release packaging, signing, notarization, upgrade permission continuity, or a release identity migration: read `references/release-identity-workflow.md`.
 - Pressure Requiredness and performance evidence: read `references/performance-pressure-workflow.md`.
 - Architecture and file placement: read `references/module-boundaries.md`.
 - Timing, waiting, retry, polling, deadline, or test-synchronization decisions: read `references/evidence-driven-synchronization.md`.
@@ -76,8 +80,9 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 5. When tracked test definitions may change, apply the semantic guard and inspect their Git diff as defined by `references/test-asset-contract.md`.
 6. Implement within the owning module without one-off production behavior.
 7. Run the required runtime and pressure commands. When full validation generates canonical test-asset data, run its complete entry through `scripts/test_asset_workspace.py`.
-8. During an active audit Campaign, publish current observations through the selected `$flowtab-test-audit` stage.
-9. When closing or transferring the engineering task, read `references/handoff-contract.md` and report runtime validation separately from process/tooling validation.
+8. For release delivery, apply the identity-continuity gate to the actual preceding artifact and the final mounted candidate; never replace a verified artifact with an unproven fallback.
+9. During an active audit Campaign, publish current observations through the selected `$flowtab-test-audit` stage.
+10. When closing or transferring the engineering task, read `references/handoff-contract.md` and report runtime validation separately from process/tooling validation.
 
 ## Bundled Resources
 
@@ -95,6 +100,7 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 - `references/validation-command-cookbook.md`
 - `references/flowtabtests-workflow.md`
 - `references/ui-automation-prerequisites.md`
+- `references/release-identity-workflow.md`
 - `references/performance-pressure-workflow.md`
 - `references/module-boundaries.md`
 - `references/evidence-driven-synchronization.md`
@@ -110,4 +116,6 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 - `scripts/test_asset_workspace.py`
 - `scripts/test_asset_selftest.py`
 - `scripts/typography_audit.py`
+- `scripts/release_identity_audit.py`
+- `scripts/release_identity_audit_tests.py`
 - `scripts/validate-skill.py`
