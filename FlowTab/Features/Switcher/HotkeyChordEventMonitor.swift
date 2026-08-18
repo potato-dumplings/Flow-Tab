@@ -8,16 +8,6 @@ struct HotkeyChordTransition: Equatable, Sendable {
     let isBackward: Bool
 }
 
-enum HotkeyMonitoringBackendPolicy {
-    static func requiresCoordinatedChordEventMonitoring(
-        mainConfiguration: SwitcherHotkeyConfiguration,
-        inAppWindowConfiguration: SwitcherHotkeyConfiguration
-    ) -> Bool {
-        !mainConfiguration.supportsCarbonRegistration
-            || !inAppWindowConfiguration.supportsCarbonRegistration
-    }
-}
-
 enum HotkeyChordEventTapMode: String, Equatable, Sendable {
     case accessibility
     case inputMonitoring
@@ -38,16 +28,14 @@ struct HotkeyChordEventAccessSnapshot: Equatable, Sendable {
 
     static func current() -> HotkeyChordEventAccessSnapshot {
         HotkeyChordEventAccessSnapshot(
-            accessibilityTrusted: AXIsProcessTrusted(),
+            accessibilityTrusted: AccessibilityPermissionChecker.isTrusted(),
             inputMonitoringTrusted: CGPreflightListenEventAccess()
         )
     }
 
     var availableTapModes: [HotkeyChordEventTapMode] {
-        var modes: [HotkeyChordEventTapMode] = []
-        if accessibilityTrusted {
-            modes.append(.accessibility)
-        }
+        guard accessibilityTrusted else { return [] }
+        var modes: [HotkeyChordEventTapMode] = [.accessibility]
         if inputMonitoringTrusted {
             modes.append(.inputMonitoring)
         }

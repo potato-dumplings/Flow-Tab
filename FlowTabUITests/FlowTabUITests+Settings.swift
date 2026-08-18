@@ -523,7 +523,8 @@ extension FlowTabUITests {
 
     func hotkeyEffectArguments(
         resetDefaults: Bool = false,
-        usesSystemAccessibilityPermission: Bool = false
+        usesSystemAccessibilityPermission: Bool = false,
+        accessibilityTrusted: Bool = true
     ) -> [String] {
         var arguments: [String] = []
         if resetDefaults {
@@ -543,7 +544,7 @@ extension FlowTabUITests {
         if !usesSystemAccessibilityPermission {
             arguments += [
                 "--flowtab-ui-ax-trusted",
-                "YES"
+                accessibilityTrusted ? "YES" : "NO"
             ]
         }
         return arguments

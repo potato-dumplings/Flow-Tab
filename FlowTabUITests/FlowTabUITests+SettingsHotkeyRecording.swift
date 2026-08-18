@@ -371,4 +371,274 @@ extension FlowTabUITests {
         )
         XCTAssertTrue(inAppConflictStatus.waitForExistence(timeout: 5))
     }
+
+    func testSettingsRejectsArbitraryMainHotkeyWithoutAccessibility() throws {
+        let app = makeApp(
+            additionalArguments: hotkeyEffectArguments(
+                resetDefaults: true,
+                accessibilityTrusted: false
+            ) + [
+                "--flowtab-ui-enable-shortcut-event-injection"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        defer { app.terminate() }
+        openSettingsTab(in: app)
+
+        enterKeySet(
+            in: app,
+            controlIdentifier: Identifier.settingsHotkeyMainModifiers,
+            keyCodes: [CGKeyCode(kVK_ANSI_W)],
+            modifierFlags: .control
+        )
+
+        assertValue(
+            of: element(
+                in: app,
+                identifier: Identifier.settingsHotkeyMainModifiers
+            ),
+            equals: "Option"
+        )
+        assertHotkeyStatus(
+            in: app,
+            identifier: Identifier.settingsHotkeyConflictStatus(
+                for: Identifier.settingsHotkeyMainModifiers
+            ),
+            text: "未授权时仅支持修饰键"
+        )
+    }
+
+    func testSettingsRetainsArbitraryMainHotkeyWhenAccessibilityIsUnavailable() throws {
+        let trustedApp = makeApp(
+            additionalArguments: hotkeyEffectArguments(
+                resetDefaults: true
+            ) + [
+                "--flowtab-ui-enable-shortcut-event-injection"
+            ]
+        )
+        launchFlowTabUITestApplication(trustedApp)
+        openSettingsTab(in: trustedApp)
+        recordShortcut(
+            in: trustedApp,
+            .keySet(
+                controlIdentifier: Identifier.settingsHotkeyMainModifiers,
+                keyCodes: [CGKeyCode(kVK_ANSI_W)],
+                modifierFlags: .control,
+                expectedValue: "Control + W"
+            )
+        )
+        trustedApp.terminate()
+
+        let deniedApp = makeApp(
+            additionalArguments: hotkeyEffectArguments(
+                accessibilityTrusted: false
+            )
+        )
+        launchFlowTabUITestApplication(deniedApp)
+        defer { deniedApp.terminate() }
+        openSettingsTab(in: deniedApp)
+
+        assertValue(
+            of: element(
+                in: deniedApp,
+                identifier: Identifier.settingsHotkeyMainModifiers
+            ),
+            equals: "Control + W"
+        )
+        assertHotkeyStatus(
+            in: deniedApp,
+            identifier: Identifier.settingsHotkeyConflictStatus(
+                for: Identifier.settingsHotkeyMainModifiers
+            ),
+            text: "未授权时仅支持修饰键"
+        )
+        XCTAssertFalse(
+            element(
+                in: deniedApp,
+                identifier:
+                    "flowtab.settings.hotkey.main-accessibility-status"
+            ).exists
+        )
+    }
+
+    func testSettingsRepairsDeniedArbitraryHotkeysFieldByField() throws {
+        let trustedApp = makeApp(
+            additionalArguments: hotkeyEffectArguments(
+                resetDefaults: true
+            ) + [
+                "--flowtab-ui-enable-shortcut-event-injection"
+            ]
+        )
+        launchFlowTabUITestApplication(trustedApp)
+        openSettingsTab(in: trustedApp)
+        for recording in [
+            FlowTabUITestShortcutRecording.keySet(
+                controlIdentifier: Identifier.settingsHotkeyMainModifiers,
+                keyCodes: [CGKeyCode(kVK_ANSI_W)],
+                modifierFlags: .option,
+                expectedValue: "Option + W"
+            ),
+            .keySet(
+                controlIdentifier:
+                    Identifier.settingsHotkeyMainReverseModifiers,
+                keyCodes: [CGKeyCode(kVK_ANSI_C)],
+                modifierFlags: .shift,
+                expectedValue: "Shift + C"
+            ),
+            .keySet(
+                controlIdentifier: Identifier.settingsHotkeyMainKey,
+                keyCodes: [
+                    CGKeyCode(kVK_ANSI_E),
+                    CGKeyCode(kVK_Tab)
+                ],
+                expectedValue: "E + Tab"
+            ),
+            .keySet(
+                controlIdentifier: Identifier.settingsHotkeyQuitKey,
+                keyCodes: [
+                    CGKeyCode(kVK_ANSI_R),
+                    CGKeyCode(kVK_ANSI_T),
+                    CGKeyCode(kVK_ANSI_4)
+                ],
+                expectedValue: "R + T + 4"
+            )
+        ] {
+            recordShortcut(in: trustedApp, recording)
+        }
+        trustedApp.terminate()
+
+        let deniedApp = makeApp(
+            additionalArguments: hotkeyEffectArguments(
+                accessibilityTrusted: false
+            )
+        )
+        launchFlowTabUITestApplication(deniedApp)
+        defer { deniedApp.terminate() }
+        openSettingsTab(in: deniedApp)
+
+        assertHotkeyStatus(
+            in: deniedApp,
+            identifier: Identifier.settingsHotkeyConflictStatus(
+                for: Identifier.settingsHotkeyMainModifiers
+            ),
+            text: "未授权时仅支持修饰键"
+        )
+        assertHotkeyStatus(
+            in: deniedApp,
+            identifier: Identifier.settingsHotkeyConflictStatus(
+                for: Identifier.settingsHotkeyMainReverseModifiers
+            ),
+            text: "未授权时仅支持修饰键"
+        )
+        assertHotkeyStatus(
+            in: deniedApp,
+            identifier: Identifier.settingsHotkeyConflictStatus(
+                for: Identifier.settingsHotkeyMainKey
+            ),
+            text: "未授权时仅支持任意修饰键加一个普通键或功能键"
+        )
+        XCTAssertFalse(
+            element(
+                in: deniedApp,
+                identifier:
+                    "flowtab.settings.hotkey.main-accessibility-status"
+            ).exists
+        )
+
+        let registrationBaseline = makeRuntimeLogFileSnapshot()
+        enterShortcut(
+            in: deniedApp,
+            controlIdentifier: Identifier.settingsHotkeyMainKey,
+            key: "tab",
+            modifierFlags: []
+        )
+        assertValue(
+            of: element(
+                in: deniedApp,
+                identifier: Identifier.settingsHotkeyMainKey
+            ),
+            equals: "Tab"
+        )
+        assertHotkeyStatusAbsent(
+            in: deniedApp,
+            identifier: Identifier.settingsHotkeyConflictStatus(
+                for: Identifier.settingsHotkeyMainKey
+            )
+        )
+        for identifier in [
+            Identifier.settingsHotkeyMainModifiers,
+            Identifier.settingsHotkeyMainReverseModifiers
+        ] {
+            assertHotkeyStatus(
+                in: deniedApp,
+                identifier: Identifier.settingsHotkeyConflictStatus(
+                    for: identifier
+                ),
+                text: "未授权时仅支持修饰键"
+            )
+        }
+
+        enterModifiers(
+            in: deniedApp,
+            controlIdentifier: Identifier.settingsHotkeyMainModifiers,
+            modifierFlags: .option
+        )
+        enterModifiers(
+            in: deniedApp,
+            controlIdentifier:
+                Identifier.settingsHotkeyMainReverseModifiers,
+            modifierFlags: .shift
+        )
+
+        for identifier in [
+            Identifier.settingsHotkeyMainModifiers,
+            Identifier.settingsHotkeyMainReverseModifiers,
+            Identifier.settingsHotkeyMainKey
+        ] {
+            assertHotkeyStatusAbsent(
+                in: deniedApp,
+                identifier: Identifier.settingsHotkeyConflictStatus(
+                    for: identifier
+                )
+            )
+        }
+        waitForRuntimeLogFiles(
+            containing: ["mainRoute=carbon"],
+            since: registrationBaseline
+        )
+    }
+
+    private func assertHotkeyStatus(
+        in app: XCUIApplication,
+        identifier: String,
+        text: String
+    ) {
+        let status = app.descendants(matching: .any)
+            .matching(
+                NSPredicate(
+                    format:
+                        "identifier == %@ AND (label CONTAINS %@ OR value CONTAINS %@)",
+                    identifier,
+                    text,
+                    text
+                )
+            )
+            .firstMatch
+        XCTAssertTrue(
+            status.waitForExistence(timeout: 5),
+            "Expected hotkey status text: \(text)"
+        )
+    }
+
+    private func assertHotkeyStatusAbsent(
+        in app: XCUIApplication,
+        identifier: String
+    ) {
+        XCTAssertFalse(
+            app.descendants(matching: .any)
+                .matching(identifier: identifier)
+                .firstMatch.exists,
+            "Expected hotkey status to be absent: \(identifier)"
+        )
+    }
 }

@@ -448,6 +448,10 @@ struct SwitcherHotkeyShortcut: Equatable, Hashable, Sendable {
             modifiers: modifiers.carbonModifiers
         )
     }
+
+    var supportsPermissionlessGlobalRegistration: Bool {
+        !modifiers.isEmpty && keys.nonModifierKeys.count == 1
+    }
 }
 
 struct SwitcherHotkeyConfiguration: Equatable, Sendable {
@@ -496,6 +500,11 @@ struct SwitcherHotkeyConfiguration: Equatable, Sendable {
     var supportsCarbonRegistration: Bool {
         mainShortcut.carbonRegistration != nil
             && backwardShortcut.carbonRegistration != nil
+    }
+
+    var supportsPermissionlessGlobalSwitching: Bool {
+        mainShortcut.supportsPermissionlessGlobalRegistration
+            && backwardShortcut.supportsPermissionlessGlobalRegistration
     }
 
     var mainFamilyHasDuplicateKeys: Bool {

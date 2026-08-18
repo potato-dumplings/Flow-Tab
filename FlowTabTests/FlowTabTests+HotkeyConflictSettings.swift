@@ -287,6 +287,325 @@ extension FlowTabTests {
         )
     }
 
+    func testPermissionlessGlobalSwitchingCompatibilityUsesFinalShortcuts() {
+        let cases: [(SwitcherHotkeyConfiguration, Bool)] = [
+            (
+                SwitcherHotkeyConfiguration(
+                    baseKeys: [.option],
+                    reverseKeys: [.shift],
+                    mainKeys: [.tab],
+                    quitKeys: [.q]
+                ),
+                true
+            ),
+            (
+                SwitcherHotkeyConfiguration(
+                    baseKeys: [.command, .control, .option],
+                    reverseKeys: [.shift],
+                    mainKeys: [.f6],
+                    quitKeys: [.q, .w]
+                ),
+                true
+            ),
+            (
+                SwitcherHotkeyConfiguration(
+                    baseKeys: [.control, .w],
+                    reverseKeys: [.shift],
+                    mainKeys: [.tab],
+                    quitKeys: [.q]
+                ),
+                false
+            ),
+            (
+                SwitcherHotkeyConfiguration(
+                    baseKeys: [.tab],
+                    reverseKeys: [.shift],
+                    mainKeys: [],
+                    quitKeys: [.q]
+                ),
+                false
+            ),
+            (
+                SwitcherHotkeyConfiguration(
+                    baseKeys: [.control],
+                    reverseKeys: [.shift, .w],
+                    mainKeys: [.tab],
+                    quitKeys: [.q]
+                ),
+                false
+            )
+        ]
+
+        for (configuration, expected) in cases {
+            XCTAssertEqual(
+                configuration.supportsPermissionlessGlobalSwitching,
+                expected,
+                configuration.mainShortcutText
+                    + " / "
+                    + configuration.backwardShortcutText
+            )
+        }
+    }
+
+    func testHotkeySettingsChangeTransactionAppliesAccessibilityTierAtomically() {
+        let arbitraryValues = AppKitSettingsHotkeyRawValues(
+            hotkeyPrimaryModifierRaw: "control+w",
+            hotkeyReverseModifiersRaw: "shift",
+            hotkeyMainKeyRaw: "tab",
+            hotkeyQuitKeyRaw: "q",
+            inAppWindowHotkeyShortcutKeysRaw: "option+space",
+            inAppWindowHotkeyReverseKeysRaw: "shift"
+        )
+        let candidate = HotkeySettingsChangeCandidate(
+            field: .mainModifiers,
+            values: arbitraryValues
+        )
+        var deniedCommit: HotkeyRegistrationRequest?
+
+        XCTAssertEqual(
+            HotkeySettingsChangeTransaction.apply(
+                candidate,
+                accessibilityTrusted: false
+            ) { deniedCommit = $0 },
+            .accessibilityRequired
+        )
+        XCTAssertNil(deniedCommit)
+
+        var trustedCommit: HotkeyRegistrationRequest?
+        let trustedResult = HotkeySettingsChangeTransaction.apply(
+            candidate,
+            accessibilityTrusted: true
+        ) { trustedCommit = $0 }
+        guard case let .applied(request) = trustedResult else {
+            return XCTFail("Expected trusted arbitrary key set to commit")
+        }
+        XCTAssertEqual(request.mainConfiguration.baseKeys, [.control, .w])
+        XCTAssertEqual(trustedCommit, request)
+    }
+
+    func testHotkeySettingsChangeTransactionKeepsQuitArbitraryWithoutAccessibility() {
+        let candidate = HotkeySettingsChangeCandidate(
+            field: .quitKey,
+            values: AppKitSettingsHotkeyRawValues(
+                hotkeyPrimaryModifierRaw: "option",
+                hotkeyReverseModifiersRaw: "shift",
+                hotkeyMainKeyRaw: "tab",
+                hotkeyQuitKeyRaw: "q+w",
+                inAppWindowHotkeyShortcutKeysRaw: "control+space",
+                inAppWindowHotkeyReverseKeysRaw: "shift"
+            )
+        )
+        var committed: HotkeyRegistrationRequest?
+
+        let result = HotkeySettingsChangeTransaction.apply(
+            candidate,
+            accessibilityTrusted: false
+        ) { committed = $0 }
+
+        guard case let .applied(request) = result else {
+            return XCTFail("Expected panel-local quit shortcut to commit")
+        }
+        XCTAssertEqual(request.mainConfiguration.quitKeys, [.q, .w])
+        XCTAssertEqual(committed, request)
+    }
+
+    func testHotkeySettingsChangeTransactionKeepsConflictPrecedence() {
+        let candidate = HotkeySettingsChangeCandidate(
+            field: .mainModifiers,
+            values: AppKitSettingsHotkeyRawValues(
+                hotkeyPrimaryModifierRaw: "option+shift+w",
+                hotkeyReverseModifiersRaw: "shift",
+                hotkeyMainKeyRaw: "tab",
+                hotkeyQuitKeyRaw: "q",
+                inAppWindowHotkeyShortcutKeysRaw: "control+space",
+                inAppWindowHotkeyReverseKeysRaw: "shift"
+            )
+        )
+
+        XCTAssertEqual(
+            HotkeySettingsChangeTransaction.apply(
+                candidate,
+                accessibilityTrusted: false,
+                commit: { _ in XCTFail("Conflict must not commit") }
+            ),
+            .conflict(.mainAndReverseModifier)
+        )
+    }
+
+    @MainActor
+    func testHotkeySettingsCardShowsRejectedModifierFieldValidation() throws {
+        let state = HotkeySettingsCardState(
+            hotkeyPrimaryModifierRaw: "option",
+            hotkeyMainKeyRaw: "tab",
+            hotkeyQuitKeyRaw: "q",
+            inAppWindowHotkeyShortcutKeysRaw: "control+tab",
+            commandTabTakeoverRegistrationState: .inactive,
+            accessibilityTrusted: false,
+            appLanguageRaw: AppLanguage.simplifiedChinese.rawValue,
+            hotkeyPermissionRequirement:
+                HotkeySettingsPermissionPresentation(
+                    field: .mainModifiers
+                )
+        )
+        let view = HotkeySettingsCardAppKitView()
+        view.update(with: state)
+        let validationLabel: NSTextField = try XCTUnwrap(
+            hotkeyConflictDescendant(
+                in: view,
+                identifier:
+                    "flowtab.settings.hotkey.main-modifiers.conflict-status"
+            )
+        )
+        let mainRecorder: FlowSettingsShortcutRecorderControl = try XCTUnwrap(
+            hotkeyConflictDescendant(
+                in: view,
+                identifier: "flowtab.settings.hotkey.main-modifiers"
+            )
+        )
+
+        XCTAssertEqual(
+            validationLabel.stringValue,
+            AppStrings.text(.hotkeyModifierPermissionlessRequirement)
+        )
+        XCTAssertEqual(
+            mainRecorder.accessibilityHelp(),
+            AppStrings.text(.hotkeyModifierPermissionlessRequirement)
+        )
+        XCTAssertEqual(mainRecorder.recordedKeys, [.option])
+    }
+
+    func testDeniedHotkeyTransactionValidatesOnlyEditedField() {
+        let screenshotQuitKeys = SwitcherHotkeyKeySet([
+            .r,
+            .t,
+            SwitcherHotkeyKey(keyCode: 21)
+        ])
+        let screenshotValues = AppKitSettingsHotkeyRawValues(
+            hotkeyPrimaryModifierRaw: "option+w",
+            hotkeyReverseModifiersRaw: "shift+c",
+            hotkeyMainKeyRaw: "e+tab",
+            hotkeyQuitKeyRaw: screenshotQuitKeys.rawValue,
+            inAppWindowHotkeyShortcutKeysRaw: "control+space",
+            inAppWindowHotkeyReverseKeysRaw: "command"
+        )
+        let mainKeyCandidate = HotkeySettingsChangeCandidate(
+            field: .mainKey,
+            values: AppKitSettingsHotkeyRawValues(
+                hotkeyPrimaryModifierRaw:
+                    screenshotValues.hotkeyPrimaryModifierRaw,
+                hotkeyReverseModifiersRaw:
+                    screenshotValues.hotkeyReverseModifiersRaw,
+                hotkeyMainKeyRaw: "tab",
+                hotkeyQuitKeyRaw: screenshotValues.hotkeyQuitKeyRaw,
+                inAppWindowHotkeyShortcutKeysRaw:
+                    screenshotValues.inAppWindowHotkeyShortcutKeysRaw,
+                inAppWindowHotkeyReverseKeysRaw:
+                    screenshotValues.inAppWindowHotkeyReverseKeysRaw
+            )
+        )
+        var committed: HotkeyRegistrationRequest?
+
+        let result = HotkeySettingsChangeTransaction.apply(
+            mainKeyCandidate,
+            accessibilityTrusted: false
+        ) { committed = $0 }
+
+        guard case let .applied(request) = result else {
+            return XCTFail(
+                "Expected a valid main-key field to commit independently"
+            )
+        }
+        XCTAssertEqual(request.mainConfiguration.mainKeys, [.tab])
+        XCTAssertEqual(request.mainConfiguration.baseKeys, [.option, .w])
+        XCTAssertEqual(request.mainConfiguration.reverseKeys, [.shift, .c])
+        XCTAssertEqual(request.mainConfiguration.quitKeys, screenshotQuitKeys)
+        XCTAssertEqual(committed, request)
+    }
+
+    func testPermissionlessHotkeyFieldPolicyMatchesFieldRoles() {
+        let cases: [(
+            HotkeySettingsField,
+            SwitcherHotkeyKeySet,
+            Bool
+        )] = [
+            (.mainModifiers, [.option], true),
+            (.mainModifiers, [.command, .control, .option], true),
+            (.mainModifiers, [.control, .w], false),
+            (.mainModifiers, SwitcherHotkeyKeySet(), false),
+            (.mainReverseModifiers, [.shift], true),
+            (.mainReverseModifiers, [.shift, .c], false),
+            (.mainKey, [.tab], true),
+            (.mainKey, [.control, .w], true),
+            (.mainKey, [.command, .option, .f6], true),
+            (.mainKey, [.e, .tab], false),
+            (.mainKey, [.shift], false),
+            (.quitKey, [.r, .t, SwitcherHotkeyKey(keyCode: 21)], true)
+        ]
+
+        for (field, keys, expected) in cases {
+            XCTAssertEqual(
+                HotkeySettingsPermissionlessFieldPolicy
+                    .allows(keys: keys, for: field),
+                expected,
+                "field=\(field.rawValue) keys=\(keys.rawValue)"
+            )
+        }
+    }
+
+    @MainActor
+    func testDeniedHotkeyCardMarksEveryInvalidFieldWithoutGroupStatus() throws {
+        let screenshotQuitKeys = SwitcherHotkeyKeySet([
+            .r,
+            .t,
+            SwitcherHotkeyKey(keyCode: 21)
+        ])
+        let state = HotkeySettingsCardState(
+            hotkeyPrimaryModifierRaw: "option+w",
+            hotkeyReverseModifiersRaw: "shift+c",
+            hotkeyMainKeyRaw: "e+tab",
+            hotkeyQuitKeyRaw: screenshotQuitKeys.rawValue,
+            inAppWindowHotkeyShortcutKeysRaw: "control+space",
+            commandTabTakeoverRegistrationState: .inactive,
+            accessibilityTrusted: false,
+            appLanguageRaw: AppLanguage.simplifiedChinese.rawValue
+        )
+        let view = HotkeySettingsCardAppKitView()
+        view.update(with: state)
+
+        for fieldIdentifier in [
+            "flowtab.settings.hotkey.main-modifiers",
+            "flowtab.settings.hotkey.main-reverse-modifiers"
+        ] {
+            let label: NSTextField = try XCTUnwrap(
+                hotkeyConflictDescendant(
+                    in: view,
+                    identifier: "\(fieldIdentifier).conflict-status"
+                )
+            )
+            XCTAssertFalse(label.isHidden)
+            XCTAssertEqual(label.stringValue, "未授权时仅支持修饰键")
+        }
+        let mainKeyLabel: NSTextField = try XCTUnwrap(
+            hotkeyConflictDescendant(
+                in: view,
+                identifier:
+                    "flowtab.settings.hotkey.main-key.conflict-status"
+            )
+        )
+        XCTAssertFalse(mainKeyLabel.isHidden)
+        XCTAssertEqual(
+            mainKeyLabel.stringValue,
+            "未授权时仅支持任意修饰键加一个普通键或功能键"
+        )
+        XCTAssertNil(
+            hotkeyConflictDescendant(
+                in: view,
+                identifier: "flowtab.settings.hotkey.main-accessibility-status",
+                as: NSTextField.self
+            ) as NSTextField?
+        )
+    }
+
     private func hotkeyValues(
         mainModifier: SwitcherHotkeyKey,
         mainKey: SwitcherHotkeyKey,

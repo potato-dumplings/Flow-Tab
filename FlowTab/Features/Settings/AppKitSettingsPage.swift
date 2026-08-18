@@ -28,6 +28,8 @@ struct AppKitSettingsPageState: Equatable {
     let screenCaptureTrusted: Bool
     let targetNSAppearanceName: NSAppearance.Name
     var hotkeyConflict: HotkeySettingsConflictPresentation? = nil
+    var hotkeyPermissionRequirement:
+        HotkeySettingsPermissionPresentation? = nil
 }
 
 struct AppKitSettingsHotkeyRawValues: Equatable {
@@ -475,7 +477,9 @@ final class AppKitSettingsPageView: NSView {
             commandTabTakeoverRegistrationState: state.commandTabTakeoverRegistrationState,
             accessibilityTrusted: state.accessibilityTrusted,
             appLanguageRaw: state.appLanguageRaw,
-            hotkeyConflict: state.hotkeyConflict
+            hotkeyConflict: state.hotkeyConflict,
+            hotkeyPermissionRequirement:
+                state.hotkeyPermissionRequirement
         )
     }
 

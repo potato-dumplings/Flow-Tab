@@ -15,6 +15,8 @@ struct HotkeySettingsCardState: Equatable {
     let accessibilityTrusted: Bool
     let appLanguageRaw: String
     var hotkeyConflict: HotkeySettingsConflictPresentation? = nil
+    var hotkeyPermissionRequirement:
+        HotkeySettingsPermissionPresentation? = nil
 
     var language: AppLanguage {
         AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
@@ -43,6 +45,12 @@ struct HotkeySettingsCardState: Equatable {
 
     var inAppUsesCommandTab: Bool {
         inAppWindowHotkeyConfiguration.usesCommandTab
+    }
+
+    var fieldsRequiringAccessibility: Set<HotkeySettingsField> {
+        guard !accessibilityTrusted else { return [] }
+        return HotkeySettingsPermissionlessFieldPolicy
+            .fieldsRequiringAccessibility(in: hotkeyConfiguration)
     }
 
     var mainSummaryText: String {
@@ -237,7 +245,7 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
 
         mainSummaryLabel.stringValue = state.mainSummaryText
         updateMainTakeoverStatus(with: state)
-        updateConflictStatus(with: state)
+        updateValidationStatus(with: state)
 
         inAppRowsContainer.alphaValue = state.accessibilityTrusted ? 1 : 0.55
         inAppShortcutRecorder.isEnabled = state.accessibilityTrusted
@@ -372,12 +380,48 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         )
     }
 
-    private func updateConflictStatus(with state: HotkeySettingsCardState) {
-        let message = AppStrings.text(.hotkeyConflict, language: state.language)
+    private func updateValidationStatus(with state: HotkeySettingsCardState) {
+        let conflictMessage = AppStrings.text(
+            .hotkeyConflict,
+            language: state.language
+        )
         for field in HotkeySettingsField.allCases {
+            let message: String?
+            if state.hotkeyConflict?.field == field {
+                message = conflictMessage
+            } else if state.hotkeyPermissionRequirement?.field == field
+                || state.fieldsRequiringAccessibility.contains(field)
+            {
+                message = permissionMessage(
+                    for: field,
+                    language: state.language
+                )
+            } else {
+                message = nil
+            }
             row(for: field).updateValidationMessage(
-                state.hotkeyConflict?.field == field ? message : nil
+                message
             )
+        }
+    }
+
+    private func permissionMessage(
+        for field: HotkeySettingsField,
+        language: AppLanguage
+    ) -> String? {
+        switch field {
+        case .mainModifiers, .mainReverseModifiers:
+            return AppStrings.text(
+                .hotkeyModifierPermissionlessRequirement,
+                language: language
+            )
+        case .mainKey:
+            return AppStrings.text(
+                .hotkeyMainKeyPermissionlessRequirement,
+                language: language
+            )
+        case .quitKey, .inAppShortcut, .inAppReverseModifiers:
+            return nil
         }
     }
 

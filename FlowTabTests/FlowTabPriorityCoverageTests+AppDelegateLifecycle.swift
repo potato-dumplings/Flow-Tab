@@ -87,7 +87,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(HomeTabState.shared.selectedTab, .home)
         XCTAssertTrue(delegate?.hasPanelControllerForTesting == true)
         XCTAssertTrue(delegate?.hasMainHotkeyMonitorForTesting == true)
-        XCTAssertTrue(delegate?.hasInAppHotkeyMonitorForTesting == true)
+        XCTAssertFalse(delegate?.hasInAppHotkeyMonitorForTesting == true)
         XCTAssertTrue(delegate?.hasHotkeyObserverForTesting == true)
         XCTAssertTrue(delegate?.hasAppVisibilityObserverForTesting == true)
         XCTAssertTrue(delegate?.hasLanguageObserverForTesting == true)
@@ -97,9 +97,18 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(userDefaults.bool(forKey: AppPreferenceKeys.hasPromptedAccessibilityPermission))
         XCTAssertEqual(stressRunner.startCallCount, 1)
         XCTAssertEqual(takeoverController.reconcileCalls, [false])
-        XCTAssertEqual(hotkeyFactory.records.map(\.signature), [0x46544142, 0x4654574E])
-        XCTAssertEqual(hotkeyFactory.records.map(\.forwardHotkeyID), [1, 101])
-        XCTAssertEqual(hotkeyFactory.records.map(\.backwardHotkeyID), [2, 102])
+        XCTAssertEqual(hotkeyFactory.records.map(\.signature), [0x46544142])
+        XCTAssertEqual(hotkeyFactory.records.map(\.forwardHotkeyID), [1])
+        XCTAssertEqual(hotkeyFactory.records.map(\.backwardHotkeyID), [2])
+        XCTAssertEqual(
+            delegate?.latestHotkeyRegistrationEvidence?.mainRouteState,
+            .carbon
+        )
+        XCTAssertEqual(
+            delegate?.latestHotkeyRegistrationEvidence?
+                .inAppWindowRouteState,
+            .pausedAccessibility
+        )
 
         delegate?.applicationWillTerminate(
             Notification(

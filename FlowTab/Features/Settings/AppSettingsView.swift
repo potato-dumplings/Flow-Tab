@@ -64,6 +64,8 @@ struct AppSettingsView: View {
     @State private var isApplyingLaunchAtLoginPreference = false
     @State private var lastNotifiedHotkeySignature = ""
     @State private var hotkeyConflict: HotkeySettingsConflictPresentation?
+    @State private var hotkeyPermissionRequirement:
+        HotkeySettingsPermissionPresentation?
     @State private var hiddenAppCount = AppVisibilityPreferencesStore.loadHiddenAppIDs().count
     @State private var showsAppVisibilityManager = false
 
@@ -186,6 +188,8 @@ struct AppSettingsView: View {
                     $inAppWindowHotkeyReverseKeysRaw,
                 commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
                 hotkeyConflict: hotkeyConflict,
+                hotkeyPermissionRequirement:
+                    hotkeyPermissionRequirement,
                 accessibilityTrusted: accessibilityTrusted,
                 screenCaptureTrusted: screenCaptureTrusted,
                 onWindowLayerAutoEnterDelayTextChanged: applyWindowLayerAutoEnterDelayText,
@@ -194,10 +198,10 @@ struct AppSettingsView: View {
                     isWindowLayerAutoEnterDelayEditing = $0
                 },
                 onHotkeyChanged: handleHotkeyChanged,
-                onDismissHotkeyConflict: dismissHotkeyConflict,
+                onDismissHotkeyConflict: dismissHotkeyValidation,
                 onLaunchAtLoginChanged: handleLaunchAtLoginChanged,
                 onManageAppVisibility: {
-                    dismissHotkeyConflict()
+                    dismissHotkeyValidation()
                     refreshHiddenAppCount()
                     withAnimation(appVisibilityNavigationAnimation) {
                         showsAppVisibilityManager = true
@@ -282,7 +286,7 @@ struct AppSettingsView: View {
         .onReceive(NotificationCenter.default.publisher(
             for: NSApplication.didResignActiveNotification
         )) { _ in
-            dismissHotkeyConflict()
+            dismissHotkeyValidation()
         }
         .onReceive(NotificationCenter.default.publisher(
             for: UserDefaults.didChangeNotification
@@ -296,7 +300,7 @@ struct AppSettingsView: View {
             refreshHiddenAppCount()
         }
         .onDisappear {
-            dismissHotkeyConflict()
+            dismissHotkeyValidation()
             cancelPermissionObservation()
             hotkeyRegistrationObservationOwner.stop()
         }
@@ -307,7 +311,7 @@ struct AppSettingsView: View {
     @MainActor
     private func handleVisibilityChanged(_ active: Bool) {
         guard active else {
-            dismissHotkeyConflict()
+            dismissHotkeyValidation()
             cancelPermissionObservation()
             hotkeyRegistrationObservationOwner.stop()
             return
@@ -415,6 +419,9 @@ struct AppSettingsView: View {
 
     private func refreshAccessibilityStatus() {
         accessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
+        if accessibilityTrusted {
+            hotkeyPermissionRequirement = nil
+        }
     }
 
     private func refreshScreenCaptureStatus() {
@@ -503,14 +510,18 @@ struct AppSettingsView: View {
 
     @MainActor
     private func handleHotkeyChanged(_ candidate: HotkeySettingsChangeCandidate) {
-        let result = HotkeySettingsChangeTransaction.apply(candidate.values) { request in
+        let result = HotkeySettingsChangeTransaction.apply(
+            candidate,
+            accessibilityTrusted: accessibilityTrusted
+        ) { request in
             applyNormalizedHotkeyValues(from: request)
             notifyHotkeyConfigChanged(using: request)
         }
         switch result {
         case .applied:
-            dismissHotkeyConflict()
+            dismissHotkeyValidation()
         case let .conflict(conflict):
+            hotkeyPermissionRequirement = nil
             hotkeyConflict = HotkeySettingsConflictPresentation(
                 field: candidate.field,
                 conflict: conflict
@@ -519,12 +530,23 @@ struct AppSettingsView: View {
                 .hotKey,
                 "settings conflict=\(conflict.rawValue) field=\(candidate.field.rawValue) action=rejected"
             )
+        case .accessibilityRequired:
+            hotkeyConflict = nil
+            hotkeyPermissionRequirement =
+                HotkeySettingsPermissionPresentation(
+                    field: candidate.field
+                )
+            RuntimeLog.warning(
+                .hotKey,
+                "settings accessibilityRequired field=\(candidate.field.rawValue) action=rejected"
+            )
         }
     }
 
     @MainActor
-    private func dismissHotkeyConflict() {
+    private func dismissHotkeyValidation() {
         hotkeyConflict = nil
+        hotkeyPermissionRequirement = nil
     }
 
     @MainActor
@@ -737,6 +759,9 @@ struct AppSettingsView: View {
         switch evidence.target {
         case .accessibility:
             accessibilityTrusted = evidence.isGranted
+            if evidence.isGranted {
+                hotkeyPermissionRequirement = nil
+            }
         case .screenCapture:
             screenCaptureTrusted = evidence.isGranted
             if evidence.isGranted {

@@ -24,6 +24,8 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
     @Binding var inAppWindowHotkeyReverseKeysRaw: String
     let commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
     let hotkeyConflict: HotkeySettingsConflictPresentation?
+    var hotkeyPermissionRequirement:
+        HotkeySettingsPermissionPresentation? = nil
     let accessibilityTrusted: Bool
     let screenCaptureTrusted: Bool
     let onWindowLayerAutoEnterDelayTextChanged: (String) -> Void
@@ -198,7 +200,9 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
                 accessibilityTrusted: accessibilityTrusted,
                 screenCaptureTrusted: screenCaptureTrusted,
                 targetNSAppearanceName: presentationContext.targetNSAppearanceName,
-                hotkeyConflict: hotkeyConflict
+                hotkeyConflict: hotkeyConflict,
+                hotkeyPermissionRequirement:
+                    hotkeyPermissionRequirement
             ),
             isActive: isActive
         )

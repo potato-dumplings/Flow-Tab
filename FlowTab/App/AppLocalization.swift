@@ -66,6 +66,8 @@ enum AppStringKey: String {
     case hotkeyCommandTabTakeoverActive
     case hotkeyCommandTabTakeoverInactive
     case hotkeyConflict
+    case hotkeyModifierPermissionlessRequirement
+    case hotkeyMainKeyPermissionlessRequirement
     case hotkeyMainSummary
     case hotkeyInAppSummary
     case hotkeySummaryReverseLabel
@@ -226,6 +228,8 @@ enum AppStrings {
             .hotkeyCommandTabTakeoverActive: "已接管系统 Command + Tab / Command + Shift + Tab，退出 FlowTab 后会自动恢复。",
             .hotkeyCommandTabTakeoverInactive: "检测到 Command + Tab 组合：FlowTab 会自动尝试接管系统 Command + Tab / Command + Shift + Tab。",
             .hotkeyConflict: "已被使用",
+            .hotkeyModifierPermissionlessRequirement: "未授权时仅支持修饰键",
+            .hotkeyMainKeyPermissionlessRequirement: "未授权时仅支持任意修饰键加一个普通键或功能键",
             .hotkeyMainSummary: "当前：{main}（{reverseLabel}：{reverse}），{quitLabel}：{quit}",
             .hotkeyInAppSummary: "{inAppLabel}：{main}（{reverseLabel}：{reverse}）",
             .hotkeySummaryReverseLabel: "反向",
@@ -381,6 +385,8 @@ enum AppStrings {
             .hotkeyCommandTabTakeoverActive: "System Command + Tab / Command + Shift + Tab is now taken over and will be restored after FlowTab exits.",
             .hotkeyCommandTabTakeoverInactive: "Command + Tab combination detected: FlowTab will try to take over system Command + Tab / Command + Shift + Tab.",
             .hotkeyConflict: "Already in use",
+            .hotkeyModifierPermissionlessRequirement: "Only modifier keys are supported without Accessibility permission",
+            .hotkeyMainKeyPermissionlessRequirement: "Use any modifiers with exactly one ordinary or function key without Accessibility permission",
             .hotkeyMainSummary: "Current: {main} ({reverseLabel}: {reverse}), {quitLabel}: {quit}",
             .hotkeyInAppSummary: "{inAppLabel}: {main} ({reverseLabel}: {reverse})",
             .hotkeySummaryReverseLabel: "Reverse",

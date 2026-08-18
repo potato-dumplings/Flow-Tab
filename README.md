@@ -37,7 +37,7 @@ Uninstall steps:
 
 For full functionality, grant:
 
-- Accessibility: required for window switching, activation, and shortcuts containing multiple ordinary keys
+- Accessibility: required for window switching, activation, in-app shortcut monitoring, and arbitrary global key sets
 - Screen Recording: required for window previews (switching still works without it)
 - Terminal content preview: FlowTab uses Apple Events to read only the currently selected tab in the target Terminal window and renders the preview in memory; tab content is not written to preferences, logs, or files, and is not sent over the network
 
@@ -60,6 +60,14 @@ the complete set is released. The first four fields are pairwise disjoint, as
 are the two in-app fields. Partial reuse across those two families is allowed,
 while the five resulting action chords must remain distinct. Invalid input is
 rejected with field-level red feedback and the saved value is retained.
+Without Accessibility permission, the primary and reverse modifier fields
+accept non-empty modifier sets, while the main-key field accepts zero or more
+modifiers plus exactly one ordinary or function key. Each valid field edit is
+saved independently; remaining incompatible fields keep their field-level
+requirement messages. Carbon monitoring resumes automatically after all three
+fields form compatible forward and reverse chords. The panel-local quit
+shortcut keeps arbitrary key-set support. Previously saved arbitrary main
+chords remain stored and resume after Accessibility permission is granted.
 
 ## FAQ
 
