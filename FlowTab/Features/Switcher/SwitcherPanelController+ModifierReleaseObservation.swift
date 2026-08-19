@@ -38,7 +38,7 @@ extension SwitcherPanelController {
             readback: { [weak self] _, _ in
                 guard let self else { return nil }
                 return sessionKinds.contains { sessionKind in
-                    self.isHotkeyHoldSetPressedInHardwareState(
+                    self.isHotkeyHoldSetPressed(
                         for: sessionKind
                     )
                         || self.isSessionMainKeySetPressedInHardwareState(
@@ -78,7 +78,10 @@ extension SwitcherPanelController {
         )
     }
 
-    func scheduleModifierReleaseConfirmation(trigger: String) {
+    func scheduleModifierReleaseConfirmation(
+        trigger: String,
+        holdSetPressedEvidence: Bool? = nil
+    ) {
         guard !suppressModifierReleaseConfirmationForTesting else {
             modifierReleaseState = .canceled(
                 reason: .suppressedForTesting,
@@ -90,11 +93,15 @@ extension SwitcherPanelController {
             return
         }
         if hasPendingModifierReleaseConfirmation {
-            logInputTrace(
-                "releaseConfirm alreadyRunning trigger=\(trigger) action=readback nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
-            )
-            modifierReleaseObservationOwner.observeInputTransition()
-            return
+            if holdSetPressedEvidence == false {
+                cancelPendingModifierReleaseConfirmation()
+            } else {
+                logInputTrace(
+                    "releaseConfirm alreadyRunning trigger=\(trigger) action=readback nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+                )
+                modifierReleaseObservationOwner.observeInputTransition()
+                return
+            }
         }
         logInputTrace(
             "releaseConfirm start trigger=\(trigger) nowMs=\(formatMilliseconds(monotonicMilliseconds())) intervalMs=\(formatMilliseconds(modifierReleaseConfirmationSampleInterval * 1_000)) samples=\(modifierReleaseConfirmationSampleCount)"
@@ -140,7 +147,8 @@ extension SwitcherPanelController {
                     )
                     return nil
                 }
-                return self.isHotkeyHoldSetLikelyPressed()
+                return holdSetPressedEvidence
+                    ?? self.isHotkeyHoldSetLikelyPressed()
             },
             onStarted: { [weak self] generation in
                 self?.modifierReleaseState = .releaseObserved(
@@ -211,13 +219,20 @@ extension SwitcherPanelController {
             && activeHotkeyHoldKeys().contains(key)
     }
 
-    func isHotkeyHoldSetPressedInHardwareState() -> Bool {
-        isHotkeyHoldSetPressedInHardwareState(
+    func isHotkeyHoldSetPressed() -> Bool {
+        isHotkeyHoldSetPressed(
             for: activeHotkeySessionKind ?? .globalAppSwitcher
         )
     }
 
-    func isHotkeyHoldSetPressedInHardwareState(
+    func isHotkeyHoldSetPressed(
+        _ receipt: SwitcherHotkeyInputReceipt
+    ) -> Bool {
+        receipt.event.holdSetPressedEvidence
+            ?? isHotkeyHoldSetPressed()
+    }
+
+    func isHotkeyHoldSetPressed(
         for sessionKind: HotkeySessionKind
     ) -> Bool {
         switch sessionKind {
@@ -256,7 +271,7 @@ extension SwitcherPanelController {
     }
 
     func isHotkeyHoldSetLikelyPressed(event: NSEvent? = nil) -> Bool {
-        if isHotkeyHoldSetPressedInHardwareState() {
+        if isHotkeyHoldSetPressed() {
             return true
         }
         guard let event else { return false }

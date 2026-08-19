@@ -1,3 +1,5 @@
+import Carbon
+import CoreGraphics
 import XCTest
 
 private enum FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy {
@@ -144,6 +146,7 @@ extension FlowTabUITests {
                 "--flowtab-ui-frontmost-bundle-id",
                 FlowTabUITestAppIdentity.configured().bundleIdentifier,
                 "--flowtab-ui-enable-mock-hotkey-effects",
+                "--flowtab-ui-enable-shortcut-event-injection",
                 "--flowtab-ui-listen-switcher-trigger",
                 "--flowtab-ui-runtime-log-level",
                 "DEBUG",
@@ -169,57 +172,71 @@ extension FlowTabUITests {
         defer { secondaryPreviewObservation.cancel() }
         let logSnapshot = makeRuntimeLogFileSnapshot()
         defer { logSnapshot.cancel() }
+        defer {
+            setRuntimePressedKeySet(
+                in: app,
+                keyCodes: [],
+                modifierFlags: []
+            )
+        }
 
         app.activate()
-        XCUIElement.perform(withKeyModifiers: .control) {
-            let cards = performAndWaitForSwitcherWindowCards(
-                in: app,
-                expectedTitles: ["Current Primary", "Current Secondary"],
-                requiresEmptyInitialSnapshot: true,
-                timeout: FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy.controlTabWindowCards,
-                trigger: {
-                    XCTAssertTrue(
-                        performAndWaitForSwitcherDiagnostics(
-                            [
-                                FlowTabUITestSwitcherDiagnosticsExpectation(
-                                    key: "selectedWindow",
-                                    expectedValue:
-                                        "mock-current-secondary"
-                                ),
-                                FlowTabUITestSwitcherDiagnosticsExpectation(
-                                    key: "previewImages",
-                                    expectedValue: "2"
-                                )
-                            ],
-                            in: diagnosticsSummary,
-                            timeout:
-                                FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy
-                                    .controlTabDiagnostics,
-                            trigger: {
-                                app.typeKey(.tab, modifierFlags: .control)
-                            }
-                        ),
-                        "The first physical Control+Tab gesture should select the next current-app window with both previews."
-                    )
-                    assertElementExistsAfterTrigger(
-                        secondaryPreviewObservation,
-                        timeout: FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy.controlTabSelectedPreview,
-                        description: "Selected Control+Tab window preview"
-                    )
-                }
-            )
-            let cardBounds = cards.map(\.frame).reduce(CGRect.null) { $0.union($1) }
-            XCTAssertGreaterThan(
-                cardBounds.width,
-                800,
-                "Control+Tab should use the large window-preview canvas."
-            )
-            XCTAssertTrue(cards.allSatisfy(\.hasImage))
-            let screenshot = XCTAttachment(screenshot: app.screenshot())
-            screenshot.name = "Control Tab first physical gesture"
-            screenshot.lifetime = .keepAlways
-            add(screenshot)
-        }
+        let cards = performAndWaitForSwitcherWindowCards(
+            in: app,
+            expectedTitles: ["Current Primary", "Current Secondary"],
+            requiresEmptyInitialSnapshot: true,
+            timeout: FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy.controlTabWindowCards,
+            trigger: {
+                XCTAssertTrue(
+                    performAndWaitForSwitcherDiagnostics(
+                        [
+                            FlowTabUITestSwitcherDiagnosticsExpectation(
+                                key: "selectedWindow",
+                                expectedValue: "mock-current-secondary"
+                            ),
+                            FlowTabUITestSwitcherDiagnosticsExpectation(
+                                key: "previewImages",
+                                expectedValue: "2"
+                            )
+                        ],
+                        in: diagnosticsSummary,
+                        timeout:
+                            FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy
+                                .controlTabDiagnostics,
+                        trigger: {
+                            setRuntimePressedKeySet(
+                                in: app,
+                                keyCodes: [CGKeyCode(kVK_Tab)],
+                                modifierFlags: .control
+                            )
+                        }
+                    ),
+                    "The first in-app shortcut chord should select the next current-app window with both previews."
+                )
+                assertElementExistsAfterTrigger(
+                    secondaryPreviewObservation,
+                    timeout: FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy.controlTabSelectedPreview,
+                    description: "Selected in-app shortcut window preview"
+                )
+            }
+        )
+        let cardBounds = cards.map(\.frame).reduce(CGRect.null) { $0.union($1) }
+        XCTAssertGreaterThan(
+            cardBounds.width,
+            800,
+            "The in-app shortcut should use the large window-preview canvas."
+        )
+        XCTAssertTrue(cards.allSatisfy(\.hasImage))
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "First in-app shortcut gesture"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+
+        setRuntimePressedKeySet(
+            in: app,
+            keyCodes: [],
+            modifierFlags: []
+        )
 
         waitForRuntimeLogFiles(
             containing: [
@@ -228,6 +245,8 @@ extension FlowTabUITests {
                 "inAppHotkeyPressed dir=forward panelVisible=0 action=show",
                 "show kind=inApp action=initialAdvance key=tabForward",
                 "initial window-only panel revealed reason=preview_batch_completed previewsReady=1",
+                "inAppHotkeyReleased panelVisible=1 action=scheduleReleaseConfirm",
+                "releaseConfirm confirmed trigger=in_app_hotkey_released action=finishSelection",
             ],
             since: logSnapshot
         )

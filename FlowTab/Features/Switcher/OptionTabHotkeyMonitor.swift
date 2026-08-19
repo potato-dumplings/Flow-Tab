@@ -556,7 +556,9 @@ final class OptionTabHotkeyMonitor {
         let inputEvent = HotkeyInputEvent(
             identity: nextInputEventIdentity(),
             phase: transition.phase,
-            isBackward: transition.isBackward
+            isBackward: transition.isBackward,
+            holdSetPressedEvidence:
+                transition.isHoldSetPressed
         )
         let phase = transition.phase == .pressed
             ? "pressed" : "released"
@@ -565,6 +567,8 @@ final class OptionTabHotkeyMonitor {
         RuntimeLog.debug(
             .hotKey,
             "dispatch chord phase=\(phase) dir=\(direction) "
+                + "holdSetPressed="
+                + "\(transition.isHoldSetPressed ? 1 : 0) "
                 + "source=\(inputSourceID.rawValue.uuidString) "
                 + "sequence=\(inputEvent.identity.sequence)"
         )

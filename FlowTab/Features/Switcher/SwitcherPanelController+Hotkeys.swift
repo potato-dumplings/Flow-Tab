@@ -78,7 +78,7 @@ extension SwitcherPanelController {
                 )
                 return
             }
-            guard isHotkeyHoldSetLikelyPressed() else {
+            guard isHotkeyHoldSetPressed(receipt) else {
                 logInputTrace(
                     "hotkeyPressed dir=\(directionText) panelVisible=1 modifierPressed=0 action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(nowMs))"
                 )
@@ -113,12 +113,15 @@ extension SwitcherPanelController {
         // Carbon hotkey "released" also fires when the main key (for example Tab) is released
         // while the modifier is still held. Ignore those events to avoid repeatedly spinning up
         // release-confirmation work during rapid cycling.
-        guard !isHotkeyHoldSetPressedInHardwareState() else { return }
+        guard !isHotkeyHoldSetPressed(receipt) else { return }
         let nowMs = monotonicMilliseconds()
         logInputTrace(
             "hotkeyReleased panelVisible=1 action=scheduleReleaseConfirm \(hotkeyInputEvidenceFields(receipt)) nowMs=\(formatMilliseconds(nowMs))"
         )
-        scheduleModifierReleaseConfirmation(trigger: "hotkey_released")
+        scheduleModifierReleaseConfirmation(
+            trigger: "hotkey_released",
+            holdSetPressedEvidence: receipt.event.holdSetPressedEvidence
+        )
     }
 
     private func handleInAppWindowHotkeyPressed(
@@ -136,7 +139,7 @@ extension SwitcherPanelController {
         }
         if isPanelPresented {
             guard activeHotkeySessionKind == .inAppWindowSwitcher else { return }
-            guard isHotkeyHoldSetLikelyPressed() else {
+            guard isHotkeyHoldSetPressed(receipt) else {
                 logInputTrace(
                     "inAppHotkeyPressed dir=\(directionText) panelVisible=1 modifierPressed=0 action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(nowMs))"
                 )
@@ -180,12 +183,15 @@ extension SwitcherPanelController {
         }
         guard isPanelPresented else { return }
         guard activeHotkeySessionKind == .inAppWindowSwitcher else { return }
-        guard !isHotkeyHoldSetPressedInHardwareState() else { return }
+        guard !isHotkeyHoldSetPressed(receipt) else { return }
         let nowMs = monotonicMilliseconds()
         logInputTrace(
             "inAppHotkeyReleased panelVisible=1 action=scheduleReleaseConfirm \(hotkeyInputEvidenceFields(receipt)) nowMs=\(formatMilliseconds(nowMs))"
         )
-        scheduleModifierReleaseConfirmation(trigger: "in_app_hotkey_released")
+        scheduleModifierReleaseConfirmation(
+            trigger: "in_app_hotkey_released",
+            holdSetPressedEvidence: receipt.event.holdSetPressedEvidence
+        )
     }
 
     private func acceptHotkeyInput(
@@ -211,9 +217,7 @@ extension SwitcherPanelController {
         }
     }
 
-    private func hotkeyInputRoute(
-        for sessionKind: HotkeySessionKind
-    ) -> SwitcherHotkeyInputRoute {
+    private func hotkeyInputRoute(for sessionKind: HotkeySessionKind) -> SwitcherHotkeyInputRoute {
         switch sessionKind {
         case .globalAppSwitcher:
             return .globalAppSwitcher

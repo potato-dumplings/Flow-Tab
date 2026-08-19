@@ -56,7 +56,8 @@ extension FlowTabTests {
     func testHotkeyChordStateMachineRequiresFullReleaseBeforeDirectionChange() {
         var stateMachine = HotkeyChordStateMachine(
             forwardKeys: [.option, .a, .tab, .b],
-            backwardKeys: [.option, .a, .shift, .c, .tab, .b]
+            backwardKeys: [.option, .a, .shift, .c, .tab, .b],
+            holdKeys: [.option, .a]
         )
 
         XCTAssertEqual(
@@ -85,6 +86,93 @@ extension FlowTabTests {
             ),
             [HotkeyChordTransition(phase: .pressed, isBackward: true)]
         )
+    }
+
+    func testHotkeyChordStateMachineReportsBaseReleaseAfterMainKeyRelease() {
+        var stateMachine = HotkeyChordStateMachine(
+            forwardKeys: [.option, .w, .tab],
+            backwardKeys: [.option, .shift, .w, .tab],
+            holdKeys: [.option, .w]
+        )
+
+        XCTAssertEqual(
+            stateMachine.update(
+                pressedKeys: [.option, .w, .tab]
+            ),
+            [HotkeyChordTransition(phase: .pressed, isBackward: false)]
+        )
+        XCTAssertEqual(
+            stateMachine.update(pressedKeys: [.option, .w]),
+            [HotkeyChordTransition(phase: .released, isBackward: false)]
+        )
+        XCTAssertEqual(
+            stateMachine.update(pressedKeys: [.option]),
+            [
+                HotkeyChordTransition(
+                    phase: .released,
+                    isBackward: false,
+                    isHoldSetPressed: false
+                )
+            ]
+        )
+    }
+
+    func testHotkeyChordStateMachineHoldSetPressurePreservesTransitions() {
+        var stateMachine = HotkeyChordStateMachine(
+            forwardKeys: [.option, .w, .tab],
+            backwardKeys: [.option, .shift, .w, .tab],
+            holdKeys: [.option, .w]
+        )
+        let pressed = [
+            HotkeyChordTransition(
+                phase: .pressed,
+                isBackward: false
+            )
+        ]
+        let mainReleased = [
+            HotkeyChordTransition(
+                phase: .released,
+                isBackward: false
+            )
+        ]
+        let baseReleased = [
+            HotkeyChordTransition(
+                phase: .released,
+                isBackward: false,
+                isHoldSetPressed: false
+            )
+        ]
+
+        for _ in 0..<1_000 {
+            XCTAssertEqual(
+                stateMachine.update(
+                    pressedKeys: [.option, .w, .tab]
+                ),
+                pressed
+            )
+            XCTAssertEqual(
+                stateMachine.update(
+                    pressedKeys: [.option, .w]
+                ),
+                mainReleased
+            )
+            XCTAssertEqual(
+                stateMachine.update(
+                    pressedKeys: [.option, .w, .tab]
+                ),
+                pressed
+            )
+            XCTAssertEqual(
+                stateMachine.update(
+                    pressedKeys: [.option, .w]
+                ),
+                mainReleased
+            )
+            XCTAssertEqual(
+                stateMachine.update(pressedKeys: [.option]),
+                baseReleased
+            )
+        }
     }
 
     func testArbitraryKeyMonitorSelectsChordEventBackend() {

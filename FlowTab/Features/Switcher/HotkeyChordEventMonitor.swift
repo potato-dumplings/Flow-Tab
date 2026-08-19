@@ -6,6 +6,17 @@ import FlowTabCore
 struct HotkeyChordTransition: Equatable, Sendable {
     let phase: HotkeyInputEvent.Phase
     let isBackward: Bool
+    let isHoldSetPressed: Bool
+
+    init(
+        phase: HotkeyInputEvent.Phase,
+        isBackward: Bool,
+        isHoldSetPressed: Bool = true
+    ) {
+        self.phase = phase
+        self.isBackward = isBackward
+        self.isHoldSetPressed = isHoldSetPressed
+    }
 }
 
 enum HotkeyChordEventTapMode: String, Equatable, Sendable {
@@ -48,18 +59,30 @@ struct HotkeyChordEventAccessSnapshot: Equatable, Sendable {
 }
 
 struct HotkeyChordStateMachine: Sendable {
+    private enum InteractionState: Sendable {
+        case idle
+        case active(isBackward: Bool)
+        case holdingBaseKeys(lastDirectionIsBackward: Bool)
+    }
+
     let forwardKeys: SwitcherHotkeyKeySet
     let backwardKeys: SwitcherHotkeyKeySet
+    let holdKeys: SwitcherHotkeyKeySet
 
-    private var activeDirection: Bool?
+    private var interactionState: InteractionState = .idle
     private var isArmed = true
 
     init(
         forwardKeys: SwitcherHotkeyKeySet,
-        backwardKeys: SwitcherHotkeyKeySet
+        backwardKeys: SwitcherHotkeyKeySet,
+        holdKeys: SwitcherHotkeyKeySet
     ) {
+        precondition(!holdKeys.isEmpty, "Hold keys must not be empty")
+        precondition(holdKeys.isSubset(of: forwardKeys))
+        precondition(holdKeys.isSubset(of: backwardKeys))
         self.forwardKeys = forwardKeys
         self.backwardKeys = backwardKeys
+        self.holdKeys = holdKeys
     }
 
     mutating func update(
@@ -69,18 +92,41 @@ struct HotkeyChordStateMachine: Sendable {
             pressedKeys: pressedKeys
         )
 
-        if let activeDirection {
-            let activeKeys = activeDirection ? backwardKeys : forwardKeys
+        switch interactionState {
+        case .active(let isBackward):
+            let activeKeys = isBackward ? backwardKeys : forwardKeys
             guard !activeKeys.isSubset(of: pressedKeys) else { return [] }
 
-            self.activeDirection = nil
+            let isHoldSetPressed = holdKeys.isSubset(
+                of: pressedKeys
+            )
+            interactionState = isHoldSetPressed
+                ? .holdingBaseKeys(
+                    lastDirectionIsBackward: isBackward
+                )
+                : .idle
             isArmed = selectedDirection == nil
             return [
                 HotkeyChordTransition(
                     phase: .released,
-                    isBackward: activeDirection
+                    isBackward: isBackward,
+                    isHoldSetPressed: isHoldSetPressed
                 )
             ]
+        case .holdingBaseKeys(let lastDirectionIsBackward):
+            guard holdKeys.isSubset(of: pressedKeys) else {
+                interactionState = .idle
+                isArmed = selectedDirection == nil
+                return [
+                    HotkeyChordTransition(
+                        phase: .released,
+                        isBackward: lastDirectionIsBackward,
+                        isHoldSetPressed: false
+                    )
+                ]
+            }
+        case .idle:
+            break
         }
 
         guard let selectedDirection else {
@@ -89,7 +135,7 @@ struct HotkeyChordStateMachine: Sendable {
         }
         guard isArmed else { return [] }
 
-        activeDirection = selectedDirection
+        interactionState = .active(isBackward: selectedDirection)
         isArmed = false
         return [
             HotkeyChordTransition(
@@ -100,7 +146,7 @@ struct HotkeyChordStateMachine: Sendable {
     }
 
     mutating func reset() {
-        activeDirection = nil
+        interactionState = .idle
         isArmed = true
     }
 
@@ -198,7 +244,8 @@ final class HotkeyChordEventMonitor {
     ) {
         stateMachine = HotkeyChordStateMachine(
             forwardKeys: configuration.mainShortcut.keys,
-            backwardKeys: configuration.backwardShortcut.keys
+            backwardKeys: configuration.backwardShortcut.keys,
+            holdKeys: configuration.baseKeys
         )
         self.accessSnapshotProvider = accessSnapshotProvider
         self.transitionDispatcher = transitionDispatcher

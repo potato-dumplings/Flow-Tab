@@ -22,6 +22,19 @@ struct HotkeyInputEvent: Equatable, Sendable {
     let identity: HotkeyInputEventIdentity
     let phase: Phase
     let isBackward: Bool
+    let holdSetPressedEvidence: Bool?
+
+    init(
+        identity: HotkeyInputEventIdentity,
+        phase: Phase,
+        isBackward: Bool,
+        holdSetPressedEvidence: Bool? = nil
+    ) {
+        self.identity = identity
+        self.phase = phase
+        self.isBackward = isBackward
+        self.holdSetPressedEvidence = holdSetPressedEvidence
+    }
 }
 
 enum SwitcherHotkeyInputRoute: String, Equatable, Hashable, Sendable {
@@ -204,4 +217,5 @@ final class SwitcherHotkeyInputOwner {
     ) -> HotkeyInputEvent.Phase? {
         routeStates[route]?.latestPhase
     }
+
 }

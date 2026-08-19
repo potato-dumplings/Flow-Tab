@@ -148,11 +148,13 @@ extension FlowTabTests {
         ]
         var globalStateMachine = HotkeyChordStateMachine(
             forwardKeys: [.control, .w, .tab],
-            backwardKeys: [.control, .shift, .w, .tab]
+            backwardKeys: [.control, .shift, .w, .tab],
+            holdKeys: [.control, .w]
         )
         var inAppStateMachine = HotkeyChordStateMachine(
             forwardKeys: [.control, .tab],
-            backwardKeys: [.control, .shift, .tab]
+            backwardKeys: [.control, .shift, .tab],
+            holdKeys: [.control, .tab]
         )
 
         XCTAssertEqual(

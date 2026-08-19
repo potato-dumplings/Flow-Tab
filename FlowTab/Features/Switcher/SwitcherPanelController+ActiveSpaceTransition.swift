@@ -214,7 +214,7 @@ extension SwitcherPanelController {
             return
         }
         let shouldKeepSessionVisible = model.isSearchActive
-            || isHotkeyHoldSetPressedInHardwareState(for: sessionKind)
+            || isHotkeyHoldSetPressed(for: sessionKind)
         guard shouldKeepSessionVisible else {
             logSearchTrace(
                 "systemInterruption trigger=\(trigger) action=cancel reason=modifierReleased transitionReason=\(reason) generation=\(observationGeneration) presentationGeneration=\(presentationGeneration) source=\(source) evidence{\(snapshot.logFields)} \(searchTraceStateSummary())"

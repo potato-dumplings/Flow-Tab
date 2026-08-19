@@ -22,6 +22,8 @@ private enum FlowTabUITestShortcutEventInjectionTransport {
 private final class FlowTabUITestShortcutEventInjectionObserver {
     private let center: DistributedNotificationCenter
     private var token: NSObjectProtocol?
+    private var runtimePressedKeyCodes: Set<UInt16> = []
+    private var runtimeModifierFlags: NSEvent.ModifierFlags = []
 
     init(center: DistributedNotificationCenter = .default()) {
         self.center = center
@@ -72,10 +74,18 @@ private final class FlowTabUITestShortcutEventInjectionObserver {
         let modifierFlags = NSEvent.ModifierFlags(
             rawValue: modifierFlagsRawValue
         )
-        if userInfo?[
+        let mode = userInfo?[
             FlowTabUITestShortcutEventInjectionTransport
                 .UserInfoKey.mode
-        ] as? String == "runtime" {
+        ] as? String
+        if mode == "runtime-state" {
+            applyRuntimePressedState(
+                keyCodes: Set(keyCodes),
+                modifierFlags: modifierFlags
+            )
+            return
+        }
+        if mode == "runtime" {
             injectRuntimeShortcutEvents(
                 keyCodes: keyCodes,
                 modifierFlags: modifierFlags,
@@ -127,6 +137,57 @@ private final class FlowTabUITestShortcutEventInjectionObserver {
            ) {
             recorder.flagsChanged(with: modifierRelease)
         }
+    }
+
+    private func applyRuntimePressedState(
+        keyCodes: Set<UInt16>,
+        modifierFlags: NSEvent.ModifierFlags
+    ) {
+        var currentModifiers = runtimeModifierFlags
+        let releasedKeyCodes = runtimePressedKeyCodes
+            .subtracting(keyCodes)
+            .sorted(by: >)
+        for keyCode in releasedKeyCodes {
+            postKeyEvent(
+                keyCode: keyCode,
+                keyDown: false,
+                flags: cgEventFlags(for: currentModifiers)
+            )
+        }
+
+        for binding in runtimeModifierBindings.reversed()
+        where currentModifiers.contains(binding.eventFlag)
+            && !modifierFlags.contains(binding.eventFlag)
+        {
+            currentModifiers.remove(binding.eventFlag)
+            postFlagsChanged(
+                keyCode: binding.keyCode,
+                flags: cgEventFlags(for: currentModifiers)
+            )
+        }
+        for binding in runtimeModifierBindings
+        where !currentModifiers.contains(binding.eventFlag)
+            && modifierFlags.contains(binding.eventFlag)
+        {
+            currentModifiers.insert(binding.eventFlag)
+            postFlagsChanged(
+                keyCode: binding.keyCode,
+                flags: cgEventFlags(for: currentModifiers)
+            )
+        }
+
+        let pressedKeyCodes = keyCodes
+            .subtracting(runtimePressedKeyCodes)
+            .sorted()
+        for keyCode in pressedKeyCodes {
+            postKeyEvent(
+                keyCode: keyCode,
+                keyDown: true,
+                flags: cgEventFlags(for: currentModifiers)
+            )
+        }
+        runtimePressedKeyCodes = keyCodes
+        runtimeModifierFlags = modifierFlags
     }
 
     private func injectRuntimeShortcutEvents(
@@ -235,6 +296,20 @@ private final class FlowTabUITestShortcutEventInjectionObserver {
             return UInt16(kVK_Shift)
         }
         return nil
+    }
+
+    private var runtimeModifierBindings: [
+        (
+            eventFlag: NSEvent.ModifierFlags,
+            keyCode: UInt16
+        )
+    ] {
+        [
+            (.command, UInt16(kVK_Command)),
+            (.control, UInt16(kVK_Control)),
+            (.option, UInt16(kVK_Option)),
+            (.shift, UInt16(kVK_Shift))
+        ]
     }
 
     private func event(

@@ -202,23 +202,17 @@ extension FlowTabUITests {
         )
         tapElement(control)
 
-        let bundleIdentifier = FlowTabUITestAppIdentity.configured().bundleIdentifier
-        guard let processID = NSRunningApplication.runningApplications(
-            withBundleIdentifier: bundleIdentifier
-        ).first(where: \.isActive)?.processIdentifier else {
-            XCTFail(
-                "Missing active app process for key-set recorder",
-                file: file,
-                line: line
-            )
+        guard let processID = activeFlowTabProcessID(
+            in: app,
+            description: "key-set recorder",
+            file: file,
+            line: line
+        ) else {
             return control
         }
-        DistributedNotificationCenter.default().postNotificationName(
-            FlowTabUITestShortcutEventInjectionTransport.notificationName,
-            object: nil,
+        postShortcutEventInjection(
+            targetProcessID: processID,
             userInfo: [
-                FlowTabUITestShortcutEventInjectionTransport.UserInfoKey
-                    .targetProcessID: NSNumber(value: processID),
                 FlowTabUITestShortcutEventInjectionTransport.UserInfoKey
                     .keyCodes: keyCodes.map(NSNumber.init(value:)),
                 FlowTabUITestShortcutEventInjectionTransport.UserInfoKey
@@ -227,8 +221,7 @@ extension FlowTabUITests {
                     ),
                 FlowTabUITestShortcutEventInjectionTransport.UserInfoKey
                     .mode: "recorder"
-            ],
-            deliverImmediately: true
+            ]
         )
         return control
     }
@@ -241,24 +234,17 @@ extension FlowTabUITests {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let bundleIdentifier =
-            FlowTabUITestAppIdentity.configured().bundleIdentifier
-        guard let processID = NSRunningApplication.runningApplications(
-            withBundleIdentifier: bundleIdentifier
-        ).first(where: \.isActive)?.processIdentifier else {
-            XCTFail(
-                "Missing active app process for runtime key injection",
-                file: file,
-                line: line
-            )
+        guard let processID = activeFlowTabProcessID(
+            in: app,
+            description: "runtime key injection",
+            file: file,
+            line: line
+        ) else {
             return
         }
-        DistributedNotificationCenter.default().postNotificationName(
-            FlowTabUITestShortcutEventInjectionTransport.notificationName,
-            object: nil,
+        postShortcutEventInjection(
+            targetProcessID: processID,
             userInfo: [
-                FlowTabUITestShortcutEventInjectionTransport.UserInfoKey
-                    .targetProcessID: NSNumber(value: processID),
                 FlowTabUITestShortcutEventInjectionTransport.UserInfoKey
                     .keyCodes: keyCodes.map(NSNumber.init(value:)),
                 FlowTabUITestShortcutEventInjectionTransport.UserInfoKey
@@ -269,7 +255,76 @@ extension FlowTabUITests {
                     .mode: "runtime",
                 FlowTabUITestShortcutEventInjectionTransport.UserInfoKey
                     .phase: phase
-            ],
+            ]
+        )
+    }
+
+    func setRuntimePressedKeySet(
+        in app: XCUIApplication,
+        keyCodes: [CGKeyCode],
+        modifierFlags: XCUIElement.KeyModifierFlags,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard let processID = activeFlowTabProcessID(
+            in: app,
+            description: "runtime pressed-key state",
+            file: file,
+            line: line
+        ) else {
+            return
+        }
+        postShortcutEventInjection(
+            targetProcessID: processID,
+            userInfo: [
+                FlowTabUITestShortcutEventInjectionTransport.UserInfoKey
+                    .keyCodes: keyCodes.map(NSNumber.init(value:)),
+                FlowTabUITestShortcutEventInjectionTransport.UserInfoKey
+                    .modifierFlags: NSNumber(
+                        value: recorderModifierFlags(
+                            for: modifierFlags
+                        ).rawValue
+                    ),
+                FlowTabUITestShortcutEventInjectionTransport.UserInfoKey
+                    .mode: "runtime-state"
+            ]
+        )
+    }
+
+    private func activeFlowTabProcessID(
+        in _: XCUIApplication,
+        description: String,
+        file: StaticString,
+        line: UInt
+    ) -> pid_t? {
+        let bundleIdentifier =
+            FlowTabUITestAppIdentity.configured().bundleIdentifier
+        guard let processID = NSRunningApplication.runningApplications(
+            withBundleIdentifier: bundleIdentifier
+        ).first(where: \.isActive)?.processIdentifier else {
+            XCTFail(
+                "Missing active app process for \(description)",
+                file: file,
+                line: line
+            )
+            return nil
+        }
+        return processID
+    }
+
+    private func postShortcutEventInjection(
+        targetProcessID: pid_t,
+        userInfo: [String: Any]
+    ) {
+        var payload = userInfo
+        payload[
+            FlowTabUITestShortcutEventInjectionTransport.UserInfoKey
+                .targetProcessID
+        ] = NSNumber(value: targetProcessID)
+        DistributedNotificationCenter.default().postNotificationName(
+            FlowTabUITestShortcutEventInjectionTransport.notificationName,
+            object: nil,
+            userInfo: payload,
             deliverImmediately: true
         )
     }

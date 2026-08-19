@@ -85,17 +85,22 @@ extension FlowTabUITests {
             since: registrationLogSnapshot
         )
 
+        let baseKeyCodes = [CGKeyCode(kVK_ANSI_W)]
+        let completeChordKeyCodes = baseKeyCodes + [CGKeyCode(kVK_Tab)]
+        defer {
+            setRuntimePressedKeySet(
+                in: app,
+                keyCodes: [],
+                modifierFlags: []
+            )
+        }
+
         let triggerLogSnapshot = makeRuntimeLogFileSnapshot()
         app.activate()
-        let firstReleaseLogSnapshot = makeRuntimeLogFileSnapshot()
-        injectRuntimeKeySet(
+        setRuntimePressedKeySet(
             in: app,
-            keyCodes: [
-                CGKeyCode(kVK_ANSI_W),
-                CGKeyCode(kVK_Tab)
-            ],
-            modifierFlags: .option,
-            phase: "press"
+            keyCodes: completeChordKeyCodes,
+            modifierFlags: .option
         )
 
         waitForRuntimeLogFiles(
@@ -108,64 +113,79 @@ extension FlowTabUITests {
             since: triggerLogSnapshot
         )
 
-        injectRuntimeKeySet(
+        let firstMainKeyReleaseLogSnapshot =
+            makeRuntimeLogFileSnapshot()
+        setRuntimePressedKeySet(
             in: app,
-            keyCodes: [
-                CGKeyCode(kVK_ANSI_W),
-                CGKeyCode(kVK_Tab)
-            ],
-            modifierFlags: .option,
-            phase: "release"
+            keyCodes: baseKeyCodes,
+            modifierFlags: .option
         )
         waitForRuntimeLogFiles(
             containing: [
                 "dispatch chord phase=released dir=forward",
-                "HotKey Forward Released",
-                "releaseConfirm confirmed",
-                "hotkeyReplaySuppression end "
-                    + "trigger=selection_end:finishSelection"
+                "HotKey Forward Released"
             ],
-            since: firstReleaseLogSnapshot
+            since: firstMainKeyReleaseLogSnapshot
         )
 
-        let secondTriggerLogSnapshot = makeRuntimeLogFileSnapshot()
-        app.activate()
-        injectRuntimeKeySet(
+        let repeatedAdvanceLogSnapshot = makeRuntimeLogFileSnapshot()
+        setRuntimePressedKeySet(
             in: app,
-            keyCodes: [
-                CGKeyCode(kVK_ANSI_W),
-                CGKeyCode(kVK_Tab)
-            ],
-            modifierFlags: .option,
-            phase: "press"
+            keyCodes: completeChordKeyCodes,
+            modifierFlags: .option
         )
         waitForRuntimeLogFiles(
             containing: [
                 "dispatch chord phase=pressed dir=forward",
-                "hotkeyPressed dir=forward panelVisible=0 action=show",
-                "show kind=global result=presented",
+                "hotkeyPressed dir=forward panelVisible=1 "
+                    + "modifierPressed=1 action=advance",
                 "HotKey Forward"
             ],
-            since: secondTriggerLogSnapshot
+            since: repeatedAdvanceLogSnapshot
         )
 
-        let secondReleaseLogSnapshot = makeRuntimeLogFileSnapshot()
-        injectRuntimeKeySet(
+        let secondMainKeyReleaseLogSnapshot =
+            makeRuntimeLogFileSnapshot()
+        setRuntimePressedKeySet(
             in: app,
-            keyCodes: [
-                CGKeyCode(kVK_ANSI_W),
-                CGKeyCode(kVK_Tab)
-            ],
-            modifierFlags: .option,
-            phase: "release"
+            keyCodes: baseKeyCodes,
+            modifierFlags: .option
         )
         waitForRuntimeLogFiles(
             containing: [
                 "dispatch chord phase=released dir=forward",
+                "HotKey Forward Released"
+            ],
+            since: secondMainKeyReleaseLogSnapshot
+        )
+
+        let baseKeyReleaseLogSnapshot = makeRuntimeLogFileSnapshot()
+        setRuntimePressedKeySet(
+            in: app,
+            keyCodes: [],
+            modifierFlags: .option
+        )
+        waitForRuntimeLogFiles(
+            containing: [
+                "dispatch chord phase=released dir=forward",
+                "hotkeyReleased panelVisible=1 "
+                    + "action=scheduleReleaseConfirm",
+                "releaseConfirm confirmed trigger=hotkey_released "
+                    + "action=finishSelection"
+            ],
+            since: baseKeyReleaseLogSnapshot
+        )
+        setRuntimePressedKeySet(
+            in: app,
+            keyCodes: [],
+            modifierFlags: []
+        )
+        waitForRuntimeLogFiles(
+            containing: [
                 "hotkeyReplaySuppression end "
                     + "trigger=selection_end:finishSelection"
             ],
-            since: secondReleaseLogSnapshot
+            since: baseKeyReleaseLogSnapshot
         )
     }
 
