@@ -309,7 +309,7 @@ extension FlowTabUITests {
         XCTAssertTrue(owner.diagnosticSummary.contains("pid=43009"))
         XCTAssertTrue(
             owner.diagnosticSummary.contains(
-                "waitResult=XCTWaiterResult"
+                "waitResult=timedOut"
             )
         )
     }
