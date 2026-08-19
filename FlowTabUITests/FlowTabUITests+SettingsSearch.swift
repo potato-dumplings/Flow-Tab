@@ -376,15 +376,40 @@ extension FlowTabUITests {
         )
 
         let switcherApp = makeApp(
-            additionalArguments: appVisibilityRuntimeArguments(opensSwitcher: true)
+            additionalArguments:
+                appVisibilityRuntimeArguments()
+                + ["--flowtab-ui-listen-switcher-trigger"]
+                + FlowTabUITestSearchInputReadinessPolicy.applicationEvidenceLaunchArguments
         )
-        guard assertInitialSwitcherAppProjectionAfterLaunch(
+        launchFlowTabUITestApplication(switcherApp)
+        let switcherBecameForeground =
+            waitForFlowTabUITestApplicationToBecomeReady(
+                switcherApp,
+                timeout:
+                    FlowTabUITestSettingsSearchWatchdogPolicy
+                        .applicationForeground,
+                traceLabel:
+                    "settings-app-visibility-hidden-switcher-readiness"
+            )
+        guard switcherBecameForeground else {
+            XCTFail(
+                "Hidden-App Switcher application readiness watchdog "
+                    + "expired. expectedState=runningForeground "
+                    + "finalState=\(String(describing: switcherApp.state))"
+            )
+            return
+        }
+        guard performAndWaitForVisibleSwitcherAppProjection(
             in: switcherApp,
             requiredBundleIdentifiers: ["com.flowtab.mock.browser"],
             excludedBundleIdentifiers: ["com.flowtab.mock.mail"],
             targetDescription: "hidden-App Switcher relaunch projection",
             trigger: {
-                launchFlowTabUITestApplication(switcherApp)
+                postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                    .global,
+                    traceLabel:
+                        "settings-app-visibility-hidden-switcher"
+                )
             }
         ) else {
             return
@@ -400,7 +425,10 @@ extension FlowTabUITests {
         )
 
         let searchApp = makeApp(
-            additionalArguments: appVisibilityRuntimeArguments(opensSearch: true)
+            additionalArguments:
+                appVisibilityRuntimeArguments()
+                + ["--flowtab-ui-listen-switcher-trigger"]
+                + FlowTabUITestSearchInputReadinessPolicy.applicationEvidenceLaunchArguments
         )
         let searchReadiness =
             prepareInitialFlowTabSearchInputReadiness()
@@ -422,6 +450,11 @@ extension FlowTabUITests {
             )
             return
         }
+        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+            .search,
+            traceLabel:
+                "settings-app-visibility-hidden-search"
+        )
         _ = requireInitialFlowTabSearchInput(
             in: searchApp,
             observedBy: searchReadiness
@@ -664,7 +697,7 @@ extension FlowTabUITests {
                 + "finalState=\(String(describing: app.state))"
         )
         XCTAssertTrue(
-            assertInitialSwitcherAppProjectionAfterLaunch(
+            performAndWaitForVisibleSwitcherAppProjection(
                 in: app,
                 requiredBundleIdentifiers: [
                     "com.flowtab.mock.mail"
@@ -672,7 +705,7 @@ extension FlowTabUITests {
                 excludedBundleIdentifiers: [],
                 targetDescription:
                     "Settings Search user-path Switcher",
-                timeout:
+                watchdog:
                     FlowTabUITestSettingsSearchWatchdogPolicy
                         .userTriggeredAppProjection,
                 trigger: {
@@ -740,8 +773,6 @@ extension FlowTabUITests {
 
     private func appVisibilityRuntimeArguments(
         resetDefaults: Bool = false,
-        opensSwitcher: Bool = false,
-        opensSearch: Bool = false,
         mockRuntimeVariant: String? = nil
     ) -> [String] {
         var arguments: [String] = []
@@ -757,14 +788,6 @@ extension FlowTabUITests {
             "--flowtab-ui-screen-trusted",
             "YES"
         ]
-        if opensSearch {
-            arguments.append("--flowtab-ui-open-switcher-search")
-            arguments +=
-                FlowTabUITestSearchInputReadinessPolicy
-                    .applicationEvidenceLaunchArguments
-        } else if opensSwitcher {
-            arguments.append("--flowtab-ui-open-switcher")
-        }
         if let mockRuntimeVariant {
             arguments += [
                 "--flowtab-ui-mock-runtime-variant",

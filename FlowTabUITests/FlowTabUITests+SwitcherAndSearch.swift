@@ -690,36 +690,16 @@ extension FlowTabUITests {
         app.activate()
         XCUIElement.perform(withKeyModifiers: .option) {
             XCTAssertTrue(
-                assertInitialSwitcherAppProjectionAfterLaunch(
+                performAndWaitForVisibleSwitcherAppProjection(
                     in: app,
                     requiredBundleIdentifiers: ["com.tencent.xinWeChat", "com.flowtab.mock.top-level-zero-window"],
                     excludedBundleIdentifiers: ["com.tencent.flue.WeChatAppEx", "com.tencent.flue.WeApp"],
                     targetDescription: "Option+Tab nested-topology App rows",
-                    timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.nestedTopologyAppProjection,
+                    watchdog: FlowTabUITestSwitcherAndSearchWatchdogPolicy.nestedTopologyAppProjection,
                     trigger: { app.typeKey(.tab, modifierFlags: .option) }
                 ),
                 "Option+Tab should publish the exact nested-topology "
                     + "App-row projection."
-            )
-            let switcherAppIdentifiers = Set(
-                app.descendants(matching: .any)
-                    .matching(NSPredicate(format: "identifier BEGINSWITH %@", "flowtab.switcher.app."))
-                    .allElementsBoundByIndex
-                    .map(\.identifier)
-            )
-            XCTAssertFalse(
-                switcherAppIdentifiers.contains(Identifier.switcherAppNestedWeChatAppEx),
-                """
-                The switcher app layer should hide zero-window helper apps nested in a visible host app bundle.
-                Switcher app identifiers: \(switcherAppIdentifiers.sorted())
-                """
-            )
-            XCTAssertFalse(
-                switcherAppIdentifiers.contains(Identifier.switcherAppNestedMiniProgram),
-                """
-                The switcher app layer should hide deeper zero-window helper apps nested in a visible host app bundle.
-                Switcher app identifiers: \(switcherAppIdentifiers.sorted())
-                """
             )
 
             _ = performAndWaitForSwitcherWindowCards(
@@ -756,19 +736,25 @@ extension FlowTabUITests {
                 "--flowtab-ui-mock-window-previews",
                 "--flowtab-ui-enable-mock-hotkey-effects",
                 "--flowtab-ui-mock-runtime-variant", "single-app-many-windows",
-                "--flowtab-ui-open-switcher",
                 "--flowtab-ui-listen-switcher-trigger",
                 "--flowtab-ui-runtime-log-level", "DEBUG",
                 "--flowtab-ui-enable-verbose-logs", "-showPermissionReminder", "NO"
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         )
-        XCTAssertTrue(assertInitialSwitcherAppProjectionAfterLaunch(
+        launchFlowTabUITestApplication(app)
+        assertSwitcherAndSearchApplicationIsForegroundReady(app)
+        XCTAssertTrue(performAndWaitForVisibleSwitcherAppProjection(
             in: app, requiredBundleIdentifiers: ["com.flowtab.mock.many-windows"],
-            excludedBundleIdentifiers: [], projectionExpectation: .exactEntry("com.flowtab.mock.many-windows:100"),
-            targetDescription: "many-window pagination initial App projection", timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.manyWindowInitialAppProjection
+            excludedBundleIdentifiers: [], appProjectionExpectation: .exactEntry("com.flowtab.mock.many-windows:100"),
+            targetDescription: "many-window pagination initial App projection",
+            watchdog:
+                FlowTabUITestSwitcherAndSearchWatchdogPolicy
+                    .manyWindowInitialAppProjection
         ) {
-            launchFlowTabUITestApplication(app)
-            assertSwitcherAndSearchApplicationIsForegroundReady(app)
+            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                .global,
+                traceLabel: "many-window-initial-projection"
+            )
         })
         let firstWindowObservation = startElementExistenceObservation(in: app, identifier: "flowtab.switcher.window.\("mock-many-window-00".flowTabUITestAccessibilityIdentifierComponent)", requiresInitialAbsence: true)
         defer { firstWindowObservation.cancel() }
