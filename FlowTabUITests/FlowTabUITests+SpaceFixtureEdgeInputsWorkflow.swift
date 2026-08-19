@@ -21,6 +21,39 @@ private enum SpaceFixtureEdgeInputsWorkflowDefaults {
 }
 
 extension FlowTabUITests {
+    func testHomePageKeepsIdenticalRealWorkflowWindowsDistinct() throws {
+        let workflow = try configuredSwitcherEdgeInputsWorkflow()
+        let sharedTitle =
+            SpaceFixtureEdgeInputsWorkflowDefaults.sharedWindowTitle
+        let targetApp = try XCTUnwrap(
+            workflow.apps.first {
+                $0.expectedWindowTitles.filter { $0 == sharedTitle }.count
+                    == 2
+            },
+            "Edge workflow must include one app with duplicate same-title windows."
+        )
+
+        try runRealSpaceFixtureEdgeInputsWorkflow(
+            workflow,
+            flowTabAdditionalArguments: []
+        ) { _, app in
+            _ = openHomeTabAndSelectSpaceFixtureApp(
+                in: app,
+                identity: targetApp.identity,
+                expectedValue: "2w"
+            )
+            assertHomeWindowRowLabelPrefix(
+                [sharedTitle, sharedTitle],
+                in: app,
+                timeout:
+                    FlowTabUITestSpaceFixtureHomeProjectionPolicy
+                        .defaultAppRowProjectionWatchdog,
+                message:
+                    "Home collapsed duplicate same-title fixture windows"
+            )
+        }
+    }
+
     func testSwitcherPanelPreviewKeepsIdenticalRealWorkflowWindowsDistinct() throws {
         let workflow = try configuredSwitcherEdgeInputsWorkflow()
         let targetApp = try XCTUnwrap(

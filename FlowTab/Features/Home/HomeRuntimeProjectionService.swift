@@ -90,6 +90,38 @@ enum HomeProjectionEvidenceTransitionResolver {
     }
 }
 
+struct HomeSelectedAppRefreshExpectation: Equatable {
+    let processIdentifier: pid_t
+    let windowCount: Int
+}
+
+enum HomeSelectedAppSummaryRefreshDecision: Equatable {
+    case noRequest
+    case clearOutstanding
+    case request(HomeSelectedAppRefreshExpectation)
+}
+
+enum HomeSelectedAppSummaryRefreshPolicy {
+    static func decision(
+        summaryProcessIdentifier: pid_t,
+        summaryWindowCount: Int,
+        cachedWindowCount: Int?,
+        outstandingExpectation: HomeSelectedAppRefreshExpectation?
+    ) -> HomeSelectedAppSummaryRefreshDecision {
+        guard cachedWindowCount != summaryWindowCount else {
+            return .clearOutstanding
+        }
+        let expectation = HomeSelectedAppRefreshExpectation(
+            processIdentifier: summaryProcessIdentifier,
+            windowCount: summaryWindowCount
+        )
+        guard outstandingExpectation != expectation else {
+            return .noRequest
+        }
+        return .request(expectation)
+    }
+}
+
 struct HomeAppSummaryProjectionRead: Equatable {
     let summaries: [RuntimeHomeAppSummary]
     let freshness: RuntimeProjectionFreshness?

@@ -81,6 +81,215 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testHomeDoesNotRepeatSelectedDetailRepairFromIncompleteSummaryCommit() {
+        let notificationCenter = NotificationCenter()
+        let appID = "com.example.home-detail-feedback"
+        let mainPID: pid_t = 6_520
+        let transientPID: pid_t = 83_885
+
+        func makeFreshness(
+            pid: pid_t,
+            generation: UInt64,
+            isCompleteForScope: Bool
+        ) -> RuntimeProjectionFreshness {
+            RuntimeProjectionFreshness(
+                generatedAt: TimeInterval(generation),
+                sourceGeneration:
+                    RuntimeReadModelGeneration(projection: generation),
+                dirtyAppIDs: isCompleteForScope ? [] : [appID],
+                dirtyPIDs: isCompleteForScope ? [] : [pid],
+                dirtyCGWindowIDs: [],
+                pendingRepairScopes:
+                    isCompleteForScope
+                    ? []
+                    : ["currentApp:\(appID)"],
+                isCompleteForScope: isCompleteForScope
+            )
+        }
+
+        func makeDetailProjection(
+            pid: pid_t,
+            generation: UInt64,
+            windowIDs: [String],
+            isCompleteForScope: Bool
+        ) -> RuntimeHomeAppDetailProjection {
+            let windows = windowIDs.map { windowID in
+                WindowCandidate(
+                    id: windowID,
+                    title: windowID,
+                    isMinimized: false,
+                    lastActiveAt: TimeInterval(generation)
+                )
+            }
+            let contextsByID = Dictionary(
+                uniqueKeysWithValues: windows.map { window in
+                    (
+                        window.id,
+                        RuntimeWindowContext(
+                            id: window.id,
+                            title: window.title,
+                            isMinimized: false,
+                            ownerPID: pid
+                        )
+                    )
+                }
+            )
+            let summary = RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: "Home Detail Feedback",
+                groupID: "home-detail-feedback",
+                lastActiveAt: TimeInterval(generation),
+                windowCount: windows.count,
+                pid: pid
+            )
+            return RuntimeHomeAppDetailProjection(
+                summary: summary,
+                candidate: AppSwitchCandidate(
+                    id: appID,
+                    displayName: summary.displayName,
+                    groupID: summary.groupID,
+                    lastActiveAt: summary.lastActiveAt,
+                    windows: windows
+                ),
+                context: RuntimeAppContext(
+                    appID: appID,
+                    runningApp: .current,
+                    ownerPID: pid,
+                    windowsByID: contextsByID
+                ),
+                freshness: makeFreshness(
+                    pid: pid,
+                    generation: generation,
+                    isCompleteForScope: isCompleteForScope
+                )
+            )
+        }
+
+        func makeSummaryProjection(
+            pid: pid_t,
+            generation: UInt64,
+            windowCount: Int,
+            isCompleteForScope: Bool
+        ) -> RuntimeHomeSummaryProjection {
+            RuntimeHomeSummaryProjection(
+                summaries: [
+                    RuntimeHomeAppSummary(
+                        appID: appID,
+                        displayName: "Home Detail Feedback",
+                        groupID: "home-detail-feedback",
+                        lastActiveAt: TimeInterval(generation),
+                        windowCount: windowCount,
+                        pid: pid
+                    )
+                ],
+                freshness: makeFreshness(
+                    pid: pid,
+                    generation: generation,
+                    isCompleteForScope: isCompleteForScope
+                )
+            )
+        }
+
+        let initialDetail = makeDetailProjection(
+            pid: mainPID,
+            generation: 1,
+            windowIDs: ["feedback-main"],
+            isCompleteForScope: true
+        )
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            homeSummaryProjection: makeSummaryProjection(
+                pid: mainPID,
+                generation: 1,
+                windowCount: 1,
+                isCompleteForScope: true
+            ),
+            homeDetailProjectionsByAppID: [appID: initialDetail]
+        )
+        let detailOwner = HomeAppDetailProjectionObservationOwner(
+            runtimeProjectionService: runtimeProjectionService,
+            notificationCenter: notificationCenter
+        )
+        let hostedView = makeHomeDetailBehaviorHost(
+            isActive: true,
+            runtimeProjectionService: runtimeProjectionService,
+            detailOwner: detailOwner,
+            notificationCenter: notificationCenter
+        )
+        let baselineSignalCount = runtimeProjectionService
+            .selectedCurrentAppWindowChangeSignalsRecorded()
+            .count
+        runtimeProjectionService
+            .setSelectedCurrentAppWindowChangeSignalHandler { _, _ in
+                guard runtimeProjectionService
+                    .selectedCurrentAppWindowChangeSignalsRecorded()
+                    .count == baselineSignalCount + 1
+                else {
+                    return
+                }
+                runtimeProjectionService.setHomeDetailProjection(
+                    makeDetailProjection(
+                        pid: transientPID,
+                        generation: 3,
+                        windowIDs: [],
+                        isCompleteForScope: true
+                    ),
+                    appID: appID
+                )
+                notificationCenter.post(
+                    name: .runtimeCurrentAppWindowProjectionDidUpdate,
+                    object: runtimeProjectionService,
+                    userInfo: [
+                        RuntimeProjectionNotificationUserInfoKey.appID:
+                            appID
+                    ]
+                )
+                runtimeProjectionService.setHomeSummaryProjection(
+                    makeSummaryProjection(
+                        pid: transientPID,
+                        generation: 3,
+                        windowCount: 2,
+                        isCompleteForScope: false
+                    )
+                )
+                notificationCenter.post(
+                    name: .runtimeAppSwitcherProjectionDidUpdate,
+                    object: runtimeProjectionService
+                )
+            }
+        runtimeProjectionService.setHomeSummaryProjection(
+            makeSummaryProjection(
+                pid: transientPID,
+                generation: 2,
+                windowCount: 2,
+                isCompleteForScope: false
+            )
+        )
+        notificationCenter.post(
+            name: .runtimeAppSwitcherProjectionDidUpdate,
+            object: runtimeProjectionService
+        )
+
+        let signals = Array(runtimeProjectionService
+            .selectedCurrentAppWindowChangeSignalsRecorded()
+            .dropFirst(baselineSignalCount))
+        XCTAssertEqual(signals.first?.appID, appID)
+        XCTAssertEqual(signals.first?.pid, transientPID)
+        XCTAssertEqual(
+            signals.count,
+            1,
+            "A selected-app repair must not retrigger itself from its own incomplete summary commit"
+        )
+
+        hostedView.rootView = makeHomeDetailBehaviorView(
+            isActive: false,
+            runtimeProjectionService: runtimeProjectionService,
+            detailOwner: detailOwner,
+            notificationCenter: notificationCenter
+        )
+        hostedView.layoutSubtreeIfNeeded()
+    }
+
+    @MainActor
     func testHomeInactiveCancelsPendingDetailObservation() {
         let notificationCenter = NotificationCenter()
         let appID = "com.example.home-detail-cancel"

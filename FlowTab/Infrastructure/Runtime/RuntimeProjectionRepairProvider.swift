@@ -153,6 +153,7 @@ extension RuntimeProjectionRepairProvider {
         let policyFacts = repairFactSource.collectRepairAppLayerPolicyFacts()
         let selectionFacts = repairFactSource.collectFocusedCurrentAppSelectionFacts(
             for: app,
+            in: runningApps,
             windowFacts: windowFacts,
             policyFacts: policyFacts
         )
@@ -166,6 +167,7 @@ extension RuntimeProjectionRepairProvider {
                     ("result", "minimizedOnly"),
                     ("appID", appID),
                     ("pid", "\(pid)"),
+                    ("selectedPID", "\(selectionFacts.app.processIdentifier)"),
                     ("windows", "\(selectionFacts.windows.count)"),
                     ("knownApps", "\(runningApps.count)"),
                     ("axApps", "\(selectionFacts.appGroup.count)"),
@@ -203,6 +205,7 @@ extension RuntimeProjectionRepairProvider {
                 ("result", currentAppWindowPayloadWasEmpty ? "empty" : "ready"),
                 ("appID", appID),
                 ("pid", "\(pid)"),
+                ("selectedPID", "\(selectionFacts.app.processIdentifier)"),
                 ("windows", "\(selectionFacts.windows.count)"),
                 ("knownApps", "\(runningApps.count)"),
                 ("axApps", "\(selectionFacts.appGroup.count)"),

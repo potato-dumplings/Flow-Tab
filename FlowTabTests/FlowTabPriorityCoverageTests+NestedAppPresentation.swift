@@ -317,6 +317,36 @@ extension FlowTabPriorityCoverageTests {
             ["com.example.visible"]
         )
     }
+
+    func testFocusedRepairScopesCollectionToEveryRunningPIDWithTheSameAppIdentity() {
+        let mainApp = FakeRunningApplication(
+            pid: 6_520,
+            bundleIdentifier: "com.example.multi-process",
+            localizedName: "Multi Process",
+            bundlePath: "/Applications/Multi Process.app"
+        )
+        let transientApp = FakeRunningApplication(
+            pid: 83_885,
+            bundleIdentifier: "com.example.multi-process",
+            localizedName: "Multi Process Helper",
+            bundlePath:
+                "/Applications/Multi Process.app/Contents/Helpers/Helper.app"
+        )
+        let unrelatedApp = FakeRunningApplication(
+            pid: 56_956,
+            bundleIdentifier: "com.example.unrelated",
+            localizedName: "Unrelated",
+            bundlePath: "/Applications/Unrelated.app"
+        )
+
+        XCTAssertEqual(
+            RuntimeProjectionRepairFactSource.focusedAppGroup(
+                for: transientApp,
+                in: [unrelatedApp, transientApp, mainApp]
+            ).map(\.processIdentifier),
+            [transientApp.processIdentifier, mainApp.processIdentifier]
+        )
+    }
 }
 
 private final class FakeRunningApplication: NSRunningApplication {

@@ -181,6 +181,19 @@ extension RuntimeWindowPresentationFilter {
         guard RuntimeWindowTopologyClassifier.isDesktopOnlySpaceWindow(spaceIDs: cgWindow.spaceIDs) else {
             return false
         }
+        let hasCurrentActivationHandle = entry.activationHandleID != nil
+            || entry.axWindow != nil
+        if hasExactBinding,
+           hasCurrentActivationHandle,
+           entry.isOnscreen,
+           !entryLooksLikeDesktopFullscreenSiblingSurface(
+                entry,
+                knownCGWindowsByID: knownCGWindowsByID,
+                appName: appName
+           )
+        {
+            return true
+        }
         guard boundsLookLikeNormalWindowSurface(cgWindow.bounds) else { return false }
         if hasExactBinding || entry.lastConfirmationSource == .desktopSiblingBinding {
             return true

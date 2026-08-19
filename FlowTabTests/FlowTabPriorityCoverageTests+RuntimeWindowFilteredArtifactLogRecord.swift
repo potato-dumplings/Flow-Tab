@@ -73,6 +73,58 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRepeatedFullscreenTitleFilterKeepsExactCurrentDesktopWindowsWithoutSiblingTopology() {
+        let processIdentifier: pid_t = 6_520
+        let frame = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let firstWindowID = CGWindowID(107_289)
+        let secondWindowID = CGWindowID(84_479)
+        let entries = [firstWindowID, secondWindowID].enumerated().map {
+            index,
+            windowID in
+            RuntimeWindowListEntry(
+                windowID: "cg:\(processIdentifier):\(windowID)",
+                title: "Shared Window Title",
+                isMinimized: false,
+                ownerPID: processIdentifier,
+                cgWindowID: windowID,
+                activationHandleID: "ax:\(processIdentifier):\(index)",
+                frame: frame.offsetBy(dx: CGFloat(index), dy: CGFloat(index)),
+                spaceIDs: [1],
+                isOnscreen: true,
+                lastConfirmationSource: .privateExactBridge
+            )
+        }
+        let knownCGWindowsByID = Dictionary(
+            uniqueKeysWithValues: entries.compactMap { entry in
+                entry.cgWindowID.map { windowID in
+                    (
+                        windowID,
+                        RuntimeCGWindowEntry(
+                            id: windowID,
+                            title: entry.title,
+                            bounds: entry.frame,
+                            isOnscreen: true,
+                            alpha: 1,
+                            storeType: 1,
+                            spaceIDs: [1]
+                        )
+                    )
+                }
+            }
+        )
+
+        let filtered = RuntimeWindowPresentationFilter
+            .filterRepeatedFullscreenPresentationTitles(
+                entries,
+                knownCGWindowsByID: knownCGWindowsByID,
+                appName: "Multi Window App",
+                hasFullscreenTopology: false,
+                stage: "unit"
+            )
+
+        XCTAssertEqual(filtered.map(\.windowID), entries.map(\.windowID))
+    }
+
     private func filteredArtifactEntry(
         processIdentifier: pid_t,
         windowNumber: CGWindowID

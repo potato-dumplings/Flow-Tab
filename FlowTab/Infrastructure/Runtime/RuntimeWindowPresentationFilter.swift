@@ -381,7 +381,7 @@ enum RuntimeWindowPresentationFilter {
         )
     }
 
-    private static func entryLooksLikeDesktopFullscreenSiblingSurface(
+    static func entryLooksLikeDesktopFullscreenSiblingSurface(
         _ entry: RuntimeWindowListEntry,
         knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
         appName: String

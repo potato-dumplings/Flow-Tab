@@ -308,6 +308,23 @@ extension FlowTabUITests {
         }
     }
 
+    func assertHomeWindowRowLabelPrefix(
+        _ titles: [String],
+        in app: XCUIApplication,
+        timeout: TimeInterval = 12,
+        message: String
+    ) {
+        let resolution = observeHomeWindowProjection(
+            in: app,
+            expectation: .rowLabelPrefix(titles),
+            timeout: timeout
+        )
+        guard resolution.evidence != nil else {
+            XCTFail(message + ". " + resolution.diagnosticSummary)
+            return
+        }
+    }
+
     func assertHomeWindowTitlesAbsent(
         _ titles: [String],
         in app: XCUIApplication,
