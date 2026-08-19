@@ -47,6 +47,7 @@ struct RuntimeAppWindowReconciliationResult {
     let affectedCGWindowIDs: Set<CGWindowID>
     let knownAffectedCGWindowIDs: Set<CGWindowID>
     let exactAffectedCGWindowIDs: Set<CGWindowID>
+    let pendingDestroyedCGWindowIDs: Set<CGWindowID>
     let currentAppRepairEvidence: RuntimeCurrentAppRepairEvidence?
     let isTransientEmptyCurrentAppWindowPayload: Bool
 }
@@ -93,8 +94,10 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
     ) -> [RuntimeReconciliationRequest]
     func startReconciliationRequest(id: UInt64) -> RuntimeReconciliationRequest?
     func completeReconciliationRequest(id: UInt64)
-    func deferReconciliationRequestAfterTransientEmptyCurrentAppWindowPayload(
+    func deferReconciliationRequestAfterIncompleteEvidence(
         id: UInt64,
+        requirements:
+            Set<RuntimeReconciliationEvidenceRequirement>,
         now: TimeInterval
     ) -> RuntimeReconciliationRequest?
     func resumeDeferredReconciliationRequestForConditionReadback(

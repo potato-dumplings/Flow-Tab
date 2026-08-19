@@ -82,6 +82,56 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(finalExecutionCount, 2)
         XCTAssertFalse(coordinator.hasPendingRequests())
     }
+
+    func testRuntimeProjectionServiceDestroyedWindowEvidenceActivelyRequestsReadback() {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let scheduler = ManualTransientRepairObservationScheduler()
+        let lock = NSLock()
+        var executionCount = 0
+        let service = makeTransientRepairObservationService(
+            coordinator: coordinator,
+            scheduler: scheduler
+        ) { _, _ in
+            lock.lock()
+            executionCount += 1
+            let currentCount = executionCount
+            lock.unlock()
+            return currentCount == 1
+                ? .waitingForEvidence([
+                    .destroyedWindowResolution
+                ])
+                : .completed
+        }
+        let dirty = coordinator.markAppDirty(
+            appID: "com.example.destroyed-window-readback",
+            pid: 18_426,
+            reason: .axNotification,
+            affectedCGWindowIDs: [250_010],
+            now: 10
+        )
+
+        XCTAssertEqual(
+            service.drainReadyReconciliationRequestsSynchronouslyForTesting(
+                now: 10
+            ).map(\.id),
+            [dirty.id]
+        )
+        XCTAssertEqual(
+            scheduler.entries.map(\.interval),
+            [30, 0.1]
+        )
+        XCTAssertTrue(coordinator.readyRequests().isEmpty)
+
+        scheduler.fireFirstEntry(after: 0.1)
+        service.waitForMaintenanceQueueForTesting()
+
+        lock.lock()
+        let finalExecutionCount = executionCount
+        lock.unlock()
+        XCTAssertEqual(finalExecutionCount, 2)
+        XCTAssertFalse(coordinator.hasPendingRequests())
+    }
+
     func testRuntimeProjectionServiceWindowEvidenceCancelsPollAndRequestsReadbackImmediately() {
         let coordinator = RuntimeReconciliationCoordinator()
         let scheduler = ManualTransientRepairObservationScheduler()

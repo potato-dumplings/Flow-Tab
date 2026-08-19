@@ -50,6 +50,11 @@ enum RuntimeReconciliationState: String, Equatable {
     case waitingForEvidence
 }
 
+enum RuntimeReconciliationEvidenceRequirement: String, Hashable {
+    case currentAppWindowPayloadNonEmpty
+    case destroyedWindowResolution
+}
+
 struct RuntimeReconciliationRequest: Equatable, Identifiable {
     let id: UInt64
     let target: RuntimeReconciliationTarget
@@ -60,6 +65,8 @@ struct RuntimeReconciliationRequest: Equatable, Identifiable {
     var state: RuntimeReconciliationState
     var attempt: Int
     var lastObservedAt: TimeInterval
+    var evidenceRequirements:
+        Set<RuntimeReconciliationEvidenceRequirement>
 }
 
 final class RuntimeReconciliationCoordinator {
@@ -201,7 +208,30 @@ final class RuntimeReconciliationCoordinator {
             return nil
         }
         requestsByTarget[target]?.state = .inFlight
+        requestsByTarget[target]?.evidenceRequirements = []
         return requestsByTarget[target]
+    }
+
+    @discardableResult
+    func deferRequestAfterIncompleteEvidence(
+        id: UInt64,
+        requirements:
+            Set<RuntimeReconciliationEvidenceRequirement>,
+        now: TimeInterval
+    ) -> RuntimeReconciliationRequest? {
+        guard let target = target(for: id),
+              var request = requestsByTarget[target],
+              request.state == .inFlight,
+              !requirements.isEmpty
+        else {
+            return nil
+        }
+        request.attempt += 1
+        request.lastObservedAt = now
+        request.state = .waitingForEvidence
+        request.evidenceRequirements = requirements
+        requestsByTarget[target] = request
+        return request
     }
 
     @discardableResult
@@ -209,17 +239,11 @@ final class RuntimeReconciliationCoordinator {
         id: UInt64,
         now: TimeInterval
     ) -> RuntimeReconciliationRequest? {
-        guard let target = target(for: id),
-              var request = requestsByTarget[target],
-              request.state == .inFlight
-        else {
-            return nil
-        }
-        request.attempt += 1
-        request.lastObservedAt = now
-        request.state = .waitingForEvidence
-        requestsByTarget[target] = request
-        return request
+        deferRequestAfterIncompleteEvidence(
+            id: id,
+            requirements: [.currentAppWindowPayloadNonEmpty],
+            now: now
+        )
     }
 
     @discardableResult
@@ -300,7 +324,8 @@ final class RuntimeReconciliationCoordinator {
                 affectedCGWindowIDs: [],
                 state: .pending,
                 attempt: 0,
-                lastObservedAt: now
+                lastObservedAt: now,
+                evidenceRequirements: []
             )
             nextRequestID += 1
         }
@@ -311,6 +336,7 @@ final class RuntimeReconciliationCoordinator {
         request.priority = max(request.priority, incomingPriority)
         request.affectedCGWindowIDs.formUnion(affectedCGWindowIDs)
         request.lastObservedAt = now
+        request.evidenceRequirements = []
         if promoted {
             request.attempt = 0
         }

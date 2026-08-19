@@ -6,6 +6,9 @@ enum RuntimeProjectionReconciliationExecutionOutcome {
     case completedWithFullRepairEvidence(RuntimeFullRepairEvidence)
     case completedWithCurrentAppRepairEvidence([RuntimeCurrentAppRepairEvidence])
     case transientEmptyCurrentAppWindowPayload
+    case waitingForEvidence(
+        Set<RuntimeReconciliationEvidenceRequirement>
+    )
 
     var currentAppRepairEvidence: [RuntimeCurrentAppRepairEvidence] {
         switch self {
@@ -13,8 +16,24 @@ enum RuntimeProjectionReconciliationExecutionOutcome {
             []
         case let .completedWithCurrentAppRepairEvidence(evidence):
             evidence
-        case .transientEmptyCurrentAppWindowPayload:
+        case .transientEmptyCurrentAppWindowPayload,
+             .waitingForEvidence:
             []
+        }
+    }
+
+    var evidenceRequirements:
+        Set<RuntimeReconciliationEvidenceRequirement>
+    {
+        switch self {
+        case .completed,
+             .completedWithFullRepairEvidence,
+             .completedWithCurrentAppRepairEvidence:
+            []
+        case .transientEmptyCurrentAppWindowPayload:
+            [.currentAppWindowPayloadNonEmpty]
+        case .waitingForEvidence(let requirements):
+            requirements
         }
     }
 }
@@ -81,10 +100,13 @@ struct RuntimeProjectionReconciliationDrainer {
                 result.currentAppRepairEvidence.append(
                     contentsOf: outcome.currentAppRepairEvidence
                 )
-            case .transientEmptyCurrentAppWindowPayload:
+            case .transientEmptyCurrentAppWindowPayload,
+                 .waitingForEvidence:
                 if let deferredRequest =
-                    repairProvider.deferReconciliationRequestAfterTransientEmptyCurrentAppWindowPayload(
+                    repairProvider.deferReconciliationRequestAfterIncompleteEvidence(
                         id: startedRequest.id,
+                        requirements:
+                            outcome.evidenceRequirements,
                         now: now
                     ) {
                     result.deferredRequests.append(deferredRequest)
@@ -105,8 +127,20 @@ func runtimeProjectionDefaultReconciliationExecutor(
             processIdentifier: pid,
             affectedCGWindowIDs: request.affectedCGWindowIDs
         )
+        var evidenceRequirements:
+            Set<RuntimeReconciliationEvidenceRequirement> = []
         if result.isTransientEmptyCurrentAppWindowPayload {
-            return .transientEmptyCurrentAppWindowPayload
+            evidenceRequirements.insert(
+                .currentAppWindowPayloadNonEmpty
+            )
+        }
+        if !result.pendingDestroyedCGWindowIDs.isEmpty {
+            evidenceRequirements.insert(
+                .destroyedWindowResolution
+            )
+        }
+        if !evidenceRequirements.isEmpty {
+            return .waitingForEvidence(evidenceRequirements)
         }
         if let evidence = result.currentAppRepairEvidence {
             return .completedWithCurrentAppRepairEvidence([evidence])

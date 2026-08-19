@@ -2,6 +2,87 @@ import ApplicationServices
 import AppKit
 import Foundation
 
+struct RuntimeWindowRecordDerivedIndexes: Equatable {
+    let currentAXToCG: [String: CGWindowID]
+    let validCGWindowIDs: Set<CGWindowID>
+    let lastAXWindowIDs: Set<String>
+
+    var currentCGToAX: [CGWindowID: String] {
+        Dictionary(
+            uniqueKeysWithValues:
+                currentAXToCG.map { ($1, $0) }
+        )
+    }
+}
+
+struct RuntimeWindowRecordAffectedEvidence: Equatable {
+    let knownAffectedCGWindowIDs: Set<CGWindowID>
+    let exactAffectedCGWindowIDs: Set<CGWindowID>
+    let pendingDestroyedCGWindowIDs: Set<CGWindowID>
+
+    static let empty = RuntimeWindowRecordAffectedEvidence(
+        knownAffectedCGWindowIDs: [],
+        exactAffectedCGWindowIDs: [],
+        pendingDestroyedCGWindowIDs: []
+    )
+}
+
+struct RuntimeStickyBindingResolution {
+    let exactMatchesByAXWindowID: [String: CGWindowID]
+    let assignedAXWindowIDs: Set<String>
+    let bindingDiagnostics: [WindowBindingDiagnostic]
+}
+
+struct RuntimeWindowMappingResolution {
+    let exactMatchesByAXWindowID: [String: CGWindowID]
+    let windowRecordsByCGWindowID:
+        [CGWindowID: RuntimeWindowRecord]
+    let validCGWindows: [RuntimeCGWindowEntry]
+    let allowSpaceOneWithoutCurrentAXHandle: Bool
+    let bindingDiagnostics: [WindowBindingDiagnostic]
+
+    var knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry] {
+        RuntimeWindowRecord.knownCGWindowsByID(
+            windowRecordsByCGWindowID: windowRecordsByCGWindowID,
+            validCGWindows: validCGWindows
+        )
+    }
+
+    var windowLayerCGWindows: [RuntimeCGWindowEntry] {
+        RuntimeWindowRecord.windowLayerCGWindows(
+            windowRecordsByCGWindowID: windowRecordsByCGWindowID,
+            validCGWindows: validCGWindows
+        )
+    }
+}
+
+enum RuntimeWindowRecordLifecycleDecision: Equatable {
+    case keep
+    case delete
+}
+
+struct RuntimeWindowRecordLifecyclePolicy: Equatable {
+    let evidenceGraceInterval: TimeInterval
+
+    static let runtimeDefault = RuntimeWindowRecordLifecyclePolicy(
+        evidenceGraceInterval: 1.0
+    )
+}
+
+extension RuntimeWindowRecord {
+    func exactMatchClearsPendingDestroyedEvidence(
+        _ axWindow: RuntimeAXWindowEntry
+    ) -> Bool {
+        guard let pendingDestroyedAXWindowID else { return false }
+        if pendingDestroyedAXWindowID != axWindow.id {
+            return true
+        }
+        return lastExactAXWindow.map {
+            !CFEqual($0, axWindow.window)
+        } ?? false
+    }
+}
+
 final class RuntimeWindowRecordStore {
     private var mappingStatesByPID: [pid_t: RuntimeWindowMappingState]
 

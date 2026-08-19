@@ -151,6 +151,7 @@ final class RuntimeTransientRepairObservationDriver {
                 "attempt=\(request.attempt)",
                 "cadenceSeconds=\(interval)",
                 "watchdogSeconds=\(policy.watchdogInterval)",
+                "unmetConditions=\(request.evidenceRequirements.logValue)",
                 "lastObservedAt=\(request.lastObservedAt)"
             ].joined(separator: " ")
         )
@@ -187,6 +188,7 @@ final class RuntimeTransientRepairObservationDriver {
                 "target=\(target.logValue)",
                 "attempt=\(pending.request.attempt)",
                 "cadenceSeconds=\(pending.interval)",
+                "unmetConditions=\(pending.request.evidenceRequirements.logValue)",
                 "reason=\(reason)",
                 "lastObservedAt=\(pending.request.lastObservedAt)"
             ].joined(separator: " ")
@@ -234,6 +236,7 @@ final class RuntimeTransientRepairObservationDriver {
                 "requestID=\(requestID)",
                 "target=\(target.logValue)",
                 "attempt=\(attempt)",
+                "unmetConditions=\(pending.request.evidenceRequirements.logValue)",
                 "lastObservedAt=\(pending.request.lastObservedAt)"
             ].joined(separator: " ")
         )
@@ -264,8 +267,7 @@ final class RuntimeTransientRepairObservationDriver {
             [
                 "transientRepairObservation",
                 "state=watchdogExpired",
-                "unmetCondition=currentAppWindowPayloadNonEmpty",
-                "lastPayload=transientEmptyCurrentAppWindowPayload",
+                "unmetConditions=\(pending.request.evidenceRequirements.logValue)",
                 "requestID=\(requestID)",
                 "target=\(target.logValue)",
                 "appID=\(pending.request.appID ?? "nil")",
@@ -275,6 +277,13 @@ final class RuntimeTransientRepairObservationDriver {
             ].joined(separator: " ")
         )
         onWatchdogExpired(pending.request)
+    }
+}
+
+private extension Set
+where Element == RuntimeReconciliationEvidenceRequirement {
+    var logValue: String {
+        map(\.rawValue).sorted().joined(separator: ",")
     }
 }
 

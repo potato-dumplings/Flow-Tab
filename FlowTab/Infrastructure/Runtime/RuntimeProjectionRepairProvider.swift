@@ -367,12 +367,15 @@ extension RuntimeProjectionRepairProvider {
     }
 
     @discardableResult
-    func deferReconciliationRequestAfterTransientEmptyCurrentAppWindowPayload(
+    func deferReconciliationRequestAfterIncompleteEvidence(
         id: UInt64,
+        requirements:
+            Set<RuntimeReconciliationEvidenceRequirement>,
         now: TimeInterval
     ) -> RuntimeReconciliationRequest? {
-        reconciliationCoordinator.deferRequestAfterTransientEmptyCurrentAppWindowPayload(
+        reconciliationCoordinator.deferRequestAfterIncompleteEvidence(
             id: id,
+            requirements: requirements,
             now: now
         )
     }
@@ -417,6 +420,8 @@ extension RuntimeProjectionRepairProvider {
             affectedCGWindowIDs: affectedCGWindowIDs,
             knownAffectedCGWindowIDs: affectedWindowEvidence.knownAffectedCGWindowIDs,
             exactAffectedCGWindowIDs: affectedWindowEvidence.exactAffectedCGWindowIDs,
+            pendingDestroyedCGWindowIDs:
+                affectedWindowEvidence.pendingDestroyedCGWindowIDs,
             currentAppRepairEvidence: focusedRepairEvidence.repairEvidence,
             isTransientEmptyCurrentAppWindowPayload: mappingState?
                 .isTransientEmptyCurrentAppWindowPayload(
