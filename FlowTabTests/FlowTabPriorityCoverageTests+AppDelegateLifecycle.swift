@@ -189,13 +189,17 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(hotkeyFactory.records[0].configuration.mainKeys, [.tab])
         XCTAssertEqual(
             hotkeyFactory.records[1].configuration.baseKeys,
-            [.option, .tab]
+            [.option]
+        )
+        XCTAssertEqual(
+            hotkeyFactory.records[1].configuration.mainKeys,
+            [.tab]
         )
         XCTAssertEqual(
             userDefaults.string(
-                forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+                forKey: AppPreferenceKeys.inAppWindowHotkeyBaseKeys
             ),
-            SwitcherHotkeyKeySet([.option, .tab]).rawValue
+            SwitcherHotkeyKeySet([.option]).rawValue
         )
     }
 
@@ -457,8 +461,9 @@ extension FlowTabPriorityCoverageTests {
                 quitKeys: [.q]
             ),
             inAppWindowConfiguration: .inApp(
-                shortcutKeys: [.option, .grave],
-                reverseKeys: [.shift]
+                baseKeys: [.option],
+                reverseKeys: [.shift],
+                mainKeys: [.grave]
             )
         )
         let evidence = appDelegate.requestHotkeyReload(
@@ -481,7 +486,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(
             newRecords.contains {
                 $0.signature == 0x4654574E
-                    && $0.configuration.baseKeys == [.option, .grave]
+                    && $0.configuration.baseKeys == [.option]
+                    && $0.configuration.mainKeys == [.grave]
             }
         )
         XCTAssertEqual(takeoverController.reconcileCalls.last, true)
@@ -510,7 +516,9 @@ extension FlowTabPriorityCoverageTests {
             AppPreferenceKeys.hotkeyPrimaryModifier,
             AppPreferenceKeys.hotkeyMainKey,
             AppPreferenceKeys.hotkeyQuitKey,
-            AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+            AppPreferenceKeys.inAppWindowHotkeyBaseKeys,
+            AppPreferenceKeys.inAppWindowHotkeyReverseKeys,
+            AppPreferenceKeys.inAppWindowHotkeyMainKeys
         ]
         let previousPreferenceValues = Dictionary(
             uniqueKeysWithValues: preferenceKeys.map { key in
@@ -629,8 +637,9 @@ extension FlowTabPriorityCoverageTests {
                 quitKeys: [.z]
             ),
             inAppWindowConfiguration: .inApp(
-                shortcutKeys: [.command, .a],
-                reverseKeys: [.shift]
+                baseKeys: [.command],
+                reverseKeys: [.shift],
+                mainKeys: [.a]
             )
         )
         standardDefaults.set(
@@ -647,7 +656,15 @@ extension FlowTabPriorityCoverageTests {
         )
         standardDefaults.set(
             request.inAppWindowConfiguration.baseKeys.rawValue,
-            forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+            forKey: AppPreferenceKeys.inAppWindowHotkeyBaseKeys
+        )
+        standardDefaults.set(
+            request.inAppWindowConfiguration.reverseKeys.rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyReverseKeys
+        )
+        standardDefaults.set(
+            request.inAppWindowConfiguration.mainKeys.rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyMainKeys
         )
 
         appDelegate.requestHotkeyReload(using: request, source: "test_settings_reload")
@@ -715,7 +732,8 @@ extension FlowTabPriorityCoverageTests {
             XCTFail("Expected reloaded in-app window hotkey monitor")
             return
         }
-        XCTAssertEqual(inAppRecord.configuration.baseKeys, [.command, .a])
+        XCTAssertEqual(inAppRecord.configuration.baseKeys, [.command])
+        XCTAssertEqual(inAppRecord.configuration.mainKeys, [.a])
         XCTAssertEqual(inAppRecord.monitor.startCallCount, 1)
         XCTAssertEqual(
             inAppRecord.configuration.mainShortcut.carbonRegistration?.keyCode,
@@ -806,13 +824,17 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(hotkeyFactory.records.last?.signature, 0x4654574E)
         XCTAssertEqual(
             hotkeyFactory.records.last?.configuration.baseKeys,
-            [.control, .tab]
+            [.control]
+        )
+        XCTAssertEqual(
+            hotkeyFactory.records.last?.configuration.mainKeys,
+            [.tab]
         )
         XCTAssertEqual(
             userDefaults.string(
-                forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+                forKey: AppPreferenceKeys.inAppWindowHotkeyBaseKeys
             ),
-            SwitcherHotkeyKeySet([.control, .tab]).rawValue
+            SwitcherHotkeyKeySet([.control]).rawValue
         )
     }
 

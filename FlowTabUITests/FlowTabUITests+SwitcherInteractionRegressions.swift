@@ -23,6 +23,110 @@ private enum FlowTabUITestDelayedWindowLayerEntryEvidence {
 }
 
 extension FlowTabUITests {
+    func testInAppWindowSwitcherKeepsPanelWhileControlRemainsPressed() {
+        let app = makeApp(
+            additionalArguments: hotkeyEffectArguments(
+                resetDefaults: true,
+                usesSystemAccessibilityPermission: true
+            ) + [
+                "--flowtab-ui-enable-shortcut-event-injection",
+                "--flowtab-ui-listen-switcher-trigger",
+                "--flowtab-ui-mock-runtime-variant",
+                "focused-current-app",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        defer { app.terminate() }
+        defer {
+            setRuntimePressedKeySet(
+                in: app,
+                keyCodes: [],
+                modifierFlags: []
+            )
+        }
+        XCTAssertTrue(
+            waitForFlowTabUITestApplicationToBecomeReady(
+                app,
+                timeout:
+                    FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy
+                        .foregroundReadiness,
+                traceLabel: "inAppWindowSwitcher.holdKeys.readiness"
+            )
+        )
+
+        let summary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        let firstPress = makeRuntimeLogFileSnapshot()
+        setRuntimePressedKeySet(
+            in: app,
+            keyCodes: [CGKeyCode(kVK_Tab)],
+            modifierFlags: .control
+        )
+        waitForRuntimeLogFiles(
+            containing: [
+                "inAppHotkeyPressed dir=forward panelVisible=0 action=show",
+                "show kind=inApp result=presented"
+            ],
+            since: firstPress
+        )
+        XCTAssertTrue(summary.waitForExistence(timeout: 5))
+
+        let tabRelease = makeRuntimeLogFileSnapshot()
+        setRuntimePressedKeySet(
+            in: app,
+            keyCodes: [],
+            modifierFlags: .control
+        )
+        waitForRuntimeLogFiles(
+            containing: [
+                "hotkeyInput route=inAppWindowSwitcher "
+                    + "phase=released action=accepted",
+                "InApp Window Forward Released"
+            ],
+            since: tabRelease
+        )
+        XCTAssertTrue(summary.exists)
+
+        let repeatedPress = makeRuntimeLogFileSnapshot()
+        setRuntimePressedKeySet(
+            in: app,
+            keyCodes: [CGKeyCode(kVK_Tab)],
+            modifierFlags: .control
+        )
+        waitForRuntimeLogFiles(
+            containing: [
+                "inAppHotkeyPressed dir=forward panelVisible=1 "
+                    + "modifierPressed=1 action=advance"
+            ],
+            since: repeatedPress
+        )
+
+        setRuntimePressedKeySet(
+            in: app,
+            keyCodes: [],
+            modifierFlags: .control
+        )
+        let baseRelease = makeRuntimeLogFileSnapshot()
+        setRuntimePressedKeySet(
+            in: app,
+            keyCodes: [],
+            modifierFlags: []
+        )
+        waitForRuntimeLogFiles(
+            containing: [
+                "action=finishSelection generation=",
+                "presentationSession trigger=endPresentationSession "
+                    + "action=invalidate"
+            ],
+            since: baseRelease
+        )
+        XCTAssertTrue(waitForNonExistence(summary, timeout: 5))
+    }
+
     func testSwitcherInteractionRegressionWatchdogPolicyPreservesCompatibleBound() {
         let policies = FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy.compatibleBounds
         XCTAssertEqual(policies, [10, 5, 5, 5, 5])

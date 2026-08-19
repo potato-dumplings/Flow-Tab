@@ -8,9 +8,10 @@ struct HotkeySettingsCardState: Equatable {
         SwitcherHotkeyPreferencesStore.defaultReverseKeys.rawValue
     let hotkeyMainKeyRaw: String
     let hotkeyQuitKeyRaw: String
-    let inAppWindowHotkeyShortcutKeysRaw: String
+    let inAppWindowHotkeyBaseKeysRaw: String
     var inAppWindowHotkeyReverseKeysRaw =
         InAppWindowHotkeyPreferencesStore.defaultReverseKeys.rawValue
+    let inAppWindowHotkeyMainKeysRaw: String
     let commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
     let accessibilityTrusted: Bool
     let appLanguageRaw: String
@@ -33,8 +34,9 @@ struct HotkeySettingsCardState: Equatable {
 
     var inAppWindowHotkeyConfiguration: SwitcherHotkeyConfiguration {
         let resolved = InAppWindowHotkeyPreferencesStore.resolve(
-            shortcutKeysRaw: inAppWindowHotkeyShortcutKeysRaw,
-            reverseKeysRaw: inAppWindowHotkeyReverseKeysRaw
+            baseKeysRaw: inAppWindowHotkeyBaseKeysRaw,
+            reverseKeysRaw: inAppWindowHotkeyReverseKeysRaw,
+            mainKeysRaw: inAppWindowHotkeyMainKeysRaw
         )
         return resolved.configuration
     }
@@ -86,8 +88,9 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
     var onMainReverseModifiersChanged: ((SwitcherHotkeyKeySet) -> Void)?
     var onMainKeyChanged: ((SwitcherHotkeyKeySet) -> Void)?
     var onQuitKeyChanged: ((SwitcherHotkeyKeySet) -> Void)?
-    var onInAppShortcutChanged: ((SwitcherHotkeyKeySet) -> Void)?
+    var onInAppBaseKeysChanged: ((SwitcherHotkeyKeySet) -> Void)?
     var onInAppReverseModifiersChanged: ((SwitcherHotkeyKeySet) -> Void)?
+    var onInAppMainKeysChanged: ((SwitcherHotkeyKeySet) -> Void)?
     var onInteraction: (() -> Void)?
 
     private let stackView = NSStackView()
@@ -96,9 +99,10 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         FlowSettingsShortcutRecorderControl(frame: .zero)
     private let mainKeyRecorder = FlowSettingsShortcutRecorderControl(frame: .zero)
     private let quitKeyRecorder = FlowSettingsShortcutRecorderControl(frame: .zero)
-    private let inAppShortcutRecorder = FlowSettingsShortcutRecorderControl(frame: .zero)
+    private let inAppBaseKeysRecorder = FlowSettingsShortcutRecorderControl(frame: .zero)
     private let inAppReverseModifiersRecorder =
         FlowSettingsShortcutRecorderControl(frame: .zero)
+    private let inAppMainKeysRecorder = FlowSettingsShortcutRecorderControl(frame: .zero)
     private let mainSummaryLabel = HotkeySettingsCardAppKitView.makeSecondaryLabel()
     private let mainTakeoverStatusLabel = HotkeySettingsCardAppKitView.makeStatusLabel()
     private let divider = NSBox()
@@ -122,13 +126,17 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         control: quitKeyRecorder,
         field: .quitKey
     )
-    private lazy var inAppShortcutRow = makeControlRow(
-        control: inAppShortcutRecorder,
-        field: .inAppShortcut
+    private lazy var inAppBaseKeysRow = makeControlRow(
+        control: inAppBaseKeysRecorder,
+        field: .inAppBaseKeys
     )
     private lazy var inAppReverseModifiersRow = makeControlRow(
         control: inAppReverseModifiersRecorder,
         field: .inAppReverseModifiers
+    )
+    private lazy var inAppMainKeysRow = makeControlRow(
+        control: inAppMainKeysRecorder,
+        field: .inAppMainKeys
     )
     private var currentState: HotkeySettingsCardState?
 
@@ -172,11 +180,13 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
                     != mainConfiguration.mainKeys
                 || quitKeyRecorder.recordedKeys
                     != mainConfiguration.quitKeys
-                || inAppShortcutRecorder.recordedKeys
+                || inAppBaseKeysRecorder.recordedKeys
                     != inAppConfiguration.baseKeys
                 || inAppReverseModifiersRecorder.recordedKeys
                     != inAppConfiguration.reverseKeys
-                || inAppShortcutRecorder.isEnabled != state.accessibilityTrusted
+                || inAppMainKeysRecorder.recordedKeys
+                    != inAppConfiguration.mainKeys
+                || inAppBaseKeysRecorder.isEnabled != state.accessibilityTrusted
         else {
             return
         }
@@ -232,12 +242,12 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
             ),
             editHint: editHint
         )
-        inAppShortcutRecorder.update(
+        inAppBaseKeysRecorder.update(
             keys: inAppConfiguration.baseKeys,
             recordingPrompt: recordingPrompt,
             keyRequiredPrompt: modifierRequiredPrompt,
             accessibilityLabel: AppStrings.text(
-                .hotkeyRowInAppShortcut,
+                .hotkeyRowInAppBaseKeys,
                 language: state.language
             ),
             editHint: editHint
@@ -252,14 +262,25 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
             ),
             editHint: editHint
         )
+        inAppMainKeysRecorder.update(
+            keys: inAppConfiguration.mainKeys,
+            recordingPrompt: recordingPrompt,
+            keyRequiredPrompt: modifierRequiredPrompt,
+            accessibilityLabel: AppStrings.text(
+                .hotkeyRowInAppMainKeys,
+                language: state.language
+            ),
+            editHint: editHint
+        )
 
         mainSummaryLabel.stringValue = state.mainSummaryText
         updateMainTakeoverStatus(with: state)
         updateValidationStatus(with: state)
 
         inAppRowsContainer.alphaValue = state.accessibilityTrusted ? 1 : 0.55
-        inAppShortcutRecorder.isEnabled = state.accessibilityTrusted
+        inAppBaseKeysRecorder.isEnabled = state.accessibilityTrusted
         inAppReverseModifiersRecorder.isEnabled = state.accessibilityTrusted
+        inAppMainKeysRecorder.isEnabled = state.accessibilityTrusted
         inAppSummaryLabel.stringValue = state.inAppSummaryText
         updateInAppTakeoverStatus(with: state)
         updateLocalizedRows(language: state.language)
@@ -300,11 +321,14 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         configureKeyRecorder(quitKeyRecorder) { [weak self] keys in
             self?.onQuitKeyChanged?(keys)
         }
-        configureKeyRecorder(inAppShortcutRecorder) { [weak self] keys in
-            self?.onInAppShortcutChanged?(keys)
+        configureKeyRecorder(inAppBaseKeysRecorder) { [weak self] keys in
+            self?.onInAppBaseKeysChanged?(keys)
         }
         configureKeyRecorder(inAppReverseModifiersRecorder) { [weak self] keys in
             self?.onInAppReverseModifiersChanged?(keys)
+        }
+        configureKeyRecorder(inAppMainKeysRecorder) { [weak self] keys in
+            self?.onInAppMainKeysChanged?(keys)
         }
 
         for field in HotkeySettingsField.allCases {
@@ -344,11 +368,12 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         inAppRowsContainer.translatesAutoresizingMaskIntoConstraints = false
         inAppRowsContainer.setContentHuggingPriority(.required, for: .vertical)
         inAppRowsContainer.setContentCompressionResistancePriority(.required, for: .vertical)
-        addFullWidthArrangedSubview(inAppShortcutRow, to: inAppRowsContainer)
+        addFullWidthArrangedSubview(inAppBaseKeysRow, to: inAppRowsContainer)
         addFullWidthArrangedSubview(
             inAppReverseModifiersRow,
             to: inAppRowsContainer
         )
+        addFullWidthArrangedSubview(inAppMainKeysRow, to: inAppRowsContainer)
 
         stackView.addArrangedSubview(inAppRowsContainer)
         stackView.addArrangedSubview(inAppSummaryLabel)
@@ -430,7 +455,8 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
                 .hotkeyMainKeyPermissionlessRequirement,
                 language: language
             )
-        case .quitKey, .inAppShortcut, .inAppReverseModifiers:
+        case .quitKey, .inAppBaseKeys, .inAppReverseModifiers,
+             .inAppMainKeys:
             return nil
         }
     }
@@ -445,10 +471,12 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
             return mainKeyRow
         case .quitKey:
             return quitKeyRow
-        case .inAppShortcut:
-            return inAppShortcutRow
+        case .inAppBaseKeys:
+            return inAppBaseKeysRow
         case .inAppReverseModifiers:
             return inAppReverseModifiersRow
+        case .inAppMainKeys:
+            return inAppMainKeysRow
         }
     }
 
@@ -464,10 +492,12 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
             return mainKeyRecorder
         case .quitKey:
             return quitKeyRecorder
-        case .inAppShortcut:
-            return inAppShortcutRecorder
+        case .inAppBaseKeys:
+            return inAppBaseKeysRecorder
         case .inAppReverseModifiers:
             return inAppReverseModifiersRecorder
+        case .inAppMainKeys:
+            return inAppMainKeysRecorder
         }
     }
 
@@ -521,11 +551,14 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         quitKeyRow.updateTitle(
             AppStrings.text(.hotkeyRowQuitKey, language: language)
         )
-        inAppShortcutRow.updateTitle(
-            AppStrings.text(.hotkeyRowInAppShortcut, language: language)
+        inAppBaseKeysRow.updateTitle(
+            AppStrings.text(.hotkeyRowInAppBaseKeys, language: language)
         )
         inAppReverseModifiersRow.updateTitle(
             AppStrings.text(.hotkeyRowInAppReverseModifiers, language: language)
+        )
+        inAppMainKeysRow.updateTitle(
+            AppStrings.text(.hotkeyRowInAppMainKeys, language: language)
         )
     }
 
@@ -580,10 +613,12 @@ private extension HotkeySettingsField {
             return "flowtab.settings.hotkey.main-key"
         case .quitKey:
             return "flowtab.settings.hotkey.quit-key"
-        case .inAppShortcut:
-            return "flowtab.settings.hotkey.in-app-shortcut"
+        case .inAppBaseKeys:
+            return "flowtab.settings.hotkey.in-app-base-keys"
         case .inAppReverseModifiers:
             return "flowtab.settings.hotkey.in-app-reverse-modifiers"
+        case .inAppMainKeys:
+            return "flowtab.settings.hotkey.in-app-main-keys"
         }
     }
 

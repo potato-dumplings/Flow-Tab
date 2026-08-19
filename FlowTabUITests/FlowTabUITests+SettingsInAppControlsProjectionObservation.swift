@@ -8,35 +8,42 @@ enum FlowTabUITestSettingsInAppControlsProjectionPolicy {
 struct FlowTabUITestSettingsInAppControlsProjectionSnapshot: Equatable {
     let appState: XCUIApplication.State
     let settingsContentExists: Bool
-    let shortcutExists: Bool
-    let shortcutEnabled: Bool?
+    let baseKeysExists: Bool
+    let baseKeysEnabled: Bool?
     let reverseModifiersExists: Bool
     let reverseModifiersEnabled: Bool?
+    let mainKeysExists: Bool
+    let mainKeysEnabled: Bool?
 
     var isDisabledProjection: Bool {
         appState == .runningForeground
             && settingsContentExists
-            && shortcutExists
-            && shortcutEnabled == false
+            && baseKeysExists
+            && baseKeysEnabled == false
             && reverseModifiersExists
             && reverseModifiersEnabled == false
+            && mainKeysExists
+            && mainKeysEnabled == false
     }
 
     var diagnosticSummary: String {
         "isDisabledProjection=\(isDisabledProjection) "
             + "appState=\(String(describing: appState)) "
             + "settingsContentExists=\(settingsContentExists) "
-            + "shortcutExists=\(shortcutExists) "
-            + "shortcutEnabled=\(String(describing: shortcutEnabled)) "
+            + "baseKeysExists=\(baseKeysExists) "
+            + "baseKeysEnabled=\(String(describing: baseKeysEnabled)) "
             + "reverseModifiersExists=\(reverseModifiersExists) "
             + "reverseModifiersEnabled="
-            + "\(String(describing: reverseModifiersEnabled))"
+            + "\(String(describing: reverseModifiersEnabled)) "
+            + "mainKeysExists=\(mainKeysExists) "
+            + "mainKeysEnabled=\(String(describing: mainKeysEnabled))"
     }
 }
 
 struct FlowTabUITestSettingsInAppControls {
-    let shortcut: XCUIElement
+    let baseKeys: XCUIElement
     let reverseModifiers: XCUIElement
+    let mainKeys: XCUIElement
 }
 
 final class FlowTabUITestSettingsInAppControlsProjectionObservationOwner {
@@ -177,10 +184,12 @@ extension FlowTabUITests {
         else {
             XCTFail(
                 "Settings in-app controls projection watchdog expired. "
-                    + "shortcutIdentifier="
-                    + "\(Identifier.settingsHotkeyInAppShortcut) "
+                    + "baseKeysIdentifier="
+                    + "\(Identifier.settingsHotkeyInAppBaseKeys) "
                     + "reverseModifiersIdentifier="
                     + "\(Identifier.settingsHotkeyInAppReverseModifiers) "
+                    + "mainKeysIdentifier="
+                    + "\(Identifier.settingsHotkeyInAppMainKeys) "
                     + owner.diagnosticSummary,
                 file: file,
                 line: line
@@ -199,14 +208,18 @@ extension FlowTabUITests {
                 identifier: Identifier.settingsTabContent
             ),
             controls: FlowTabUITestSettingsInAppControls(
-                shortcut: element(
+                baseKeys: element(
                     in: app,
-                    identifier: Identifier.settingsHotkeyInAppShortcut
+                    identifier: Identifier.settingsHotkeyInAppBaseKeys
                 ),
                 reverseModifiers: element(
                     in: app,
                     identifier:
                         Identifier.settingsHotkeyInAppReverseModifiers
+                ),
+                mainKeys: element(
+                    in: app,
+                    identifier: Identifier.settingsHotkeyInAppMainKeys
                 )
             )
         )
@@ -217,21 +230,27 @@ extension FlowTabUITests {
         elements: FlowTabUITestSettingsInAppProjectionElements
     ) -> () -> FlowTabUITestSettingsInAppControlsProjectionSnapshot {
         {
-            let shortcutExists = elements.controls.shortcut.exists
+            let baseKeysExists = elements.controls.baseKeys.exists
             let reverseModifiersExists =
                 elements.controls.reverseModifiers.exists
+            let mainKeysExists = elements.controls.mainKeys.exists
             return FlowTabUITestSettingsInAppControlsProjectionSnapshot(
                 appState: app.state,
                 settingsContentExists: elements.settingsContent.exists,
-                shortcutExists: shortcutExists,
-                shortcutEnabled:
-                    shortcutExists
-                        ? elements.controls.shortcut.isEnabled
+                baseKeysExists: baseKeysExists,
+                baseKeysEnabled:
+                    baseKeysExists
+                        ? elements.controls.baseKeys.isEnabled
                         : nil,
                 reverseModifiersExists: reverseModifiersExists,
                 reverseModifiersEnabled:
                     reverseModifiersExists
                         ? elements.controls.reverseModifiers.isEnabled
+                        : nil,
+                mainKeysExists: mainKeysExists,
+                mainKeysEnabled:
+                    mainKeysExists
+                        ? elements.controls.mainKeys.isEnabled
                         : nil
             )
         }

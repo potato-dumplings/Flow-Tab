@@ -77,8 +77,9 @@ enum AppStringKey: String {
     case hotkeyRowMainReverseModifiers
     case hotkeyRowMainKey
     case hotkeyRowQuitKey
-    case hotkeyRowInAppShortcut
+    case hotkeyRowInAppBaseKeys
     case hotkeyRowInAppReverseModifiers
+    case hotkeyRowInAppMainKeys
     case hotkeyRecorderPrompt
     case hotkeyRecorderModifierRequired
     case hotkeyRecorderEditHint
@@ -240,8 +241,9 @@ enum AppStrings {
             .hotkeyRowMainReverseModifiers: "反向修饰键",
             .hotkeyRowMainKey: "主切换按键",
             .hotkeyRowQuitKey: "结束应用按键",
-            .hotkeyRowInAppShortcut: "应用内窗口",
+            .hotkeyRowInAppBaseKeys: "应用内保持按键",
             .hotkeyRowInAppReverseModifiers: "应用内反向修饰键",
+            .hotkeyRowInAppMainKeys: "应用内切换按键",
             .hotkeyRecorderPrompt: "请按下快捷键",
             .hotkeyRecorderModifierRequired: "请至少按下一个按键",
             .hotkeyRecorderEditHint: "点击修改快捷键",
@@ -258,7 +260,7 @@ enum AppStrings {
             .settingsCardAppVisibilityTitle: "应用可见性",
             .settingsCardAppVisibilitySubtitle: "管理不出现在切换器中的应用",
             .settingsCardHotkeyTitle: "快捷键",
-            .settingsCardHotkeySubtitle: "主切换与结束应用按键",
+            .settingsCardHotkeySubtitle: "主切换、应用内窗口与结束应用按键",
             .appearanceDescription: "关闭后，当前应用将仅作为菜单栏辅助应用运行。",
             .appearanceShowShortcutHint: "显示快捷键提示",
             .appearanceShowAppWindow: "像普通应用一样显示",
@@ -398,8 +400,9 @@ enum AppStrings {
             .hotkeyRowMainReverseModifiers: "Reverse modifiers",
             .hotkeyRowMainKey: "Main switch key",
             .hotkeyRowQuitKey: "Quit app key",
-            .hotkeyRowInAppShortcut: "In-app windows",
+            .hotkeyRowInAppBaseKeys: "In-app hold keys",
             .hotkeyRowInAppReverseModifiers: "In-app reverse modifiers",
+            .hotkeyRowInAppMainKeys: "In-app switch keys",
             .hotkeyRecorderPrompt: "Press shortcut",
             .hotkeyRecorderModifierRequired: "Press at least one key",
             .hotkeyRecorderEditHint: "Click to edit shortcut",
@@ -416,7 +419,7 @@ enum AppStrings {
             .settingsCardAppVisibilityTitle: "App Visibility",
             .settingsCardAppVisibilitySubtitle: "Manage apps hidden from the switcher",
             .settingsCardHotkeyTitle: "Hotkeys",
-            .settingsCardHotkeySubtitle: "Main switch and quit app keys",
+            .settingsCardHotkeySubtitle: "Main switch, in-app windows, and quit app keys",
             .appearanceDescription: "When turned off, this app runs only as a menu bar helper.",
             .appearanceShowShortcutHint: "Show shortcut hint",
             .appearanceShowAppWindow: "Show like a regular app",

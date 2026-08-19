@@ -540,13 +540,14 @@ struct SwitcherHotkeyConfiguration: Equatable, Sendable {
     }
 
     static func inApp(
-        shortcutKeys: SwitcherHotkeyKeySet,
-        reverseKeys: SwitcherHotkeyKeySet
+        baseKeys: SwitcherHotkeyKeySet,
+        reverseKeys: SwitcherHotkeyKeySet,
+        mainKeys: SwitcherHotkeyKeySet
     ) -> Self {
         Self(
-            baseKeys: shortcutKeys,
+            baseKeys: baseKeys,
             reverseKeys: reverseKeys,
-            mainKeys: [],
+            mainKeys: mainKeys,
             quitKeys: [.q]
         )
     }

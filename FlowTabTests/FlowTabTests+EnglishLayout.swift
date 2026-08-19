@@ -212,8 +212,9 @@ extension FlowTabTests {
             "反向修饰键",
             "主切换按键",
             "结束应用按键",
-            "应用内窗口",
-            "应用内反向修饰键"
+            "应用内保持按键",
+            "应用内反向修饰键",
+            "应用内切换按键"
         ] {
             try assertTextFieldIsVisiblyLaidOut(label, in: hotkeyCard)
         }
@@ -222,8 +223,9 @@ extension FlowTabTests {
             "flowtab.settings.hotkey.main-reverse-modifiers",
             "flowtab.settings.hotkey.main-key",
             "flowtab.settings.hotkey.quit-key",
-            "flowtab.settings.hotkey.in-app-shortcut",
-            "flowtab.settings.hotkey.in-app-reverse-modifiers"
+            "flowtab.settings.hotkey.in-app-base-keys",
+            "flowtab.settings.hotkey.in-app-reverse-modifiers",
+            "flowtab.settings.hotkey.in-app-main-keys"
         ] {
             try assertControlIsVisiblyLaidOut(
                 identifier: identifier,
@@ -412,7 +414,8 @@ extension FlowTabTests {
             hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.option.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
-            inAppWindowHotkeyShortcutKeysRaw: "control+tab",
+            inAppWindowHotkeyBaseKeysRaw: "control",
+            inAppWindowHotkeyMainKeysRaw: "tab",
             commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: accessibilityTrusted,
             screenCaptureTrusted: screenCaptureTrusted,

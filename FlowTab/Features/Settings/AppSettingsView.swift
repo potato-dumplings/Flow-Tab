@@ -43,12 +43,13 @@ struct AppSettingsView: View {
     private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKeys.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyQuitKey)
     private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKeys.rawValue
-    @AppStorage(AppPreferenceKeys.inAppWindowHotkeyShortcutKeys)
-    private var inAppWindowHotkeyShortcutKeysRaw =
-        InAppWindowHotkeyPreferencesStore.defaultShortcutKeys.rawValue
+    @AppStorage(AppPreferenceKeys.inAppWindowHotkeyBaseKeys)
+    private var inAppWindowHotkeyBaseKeysRaw = InAppWindowHotkeyPreferencesStore.defaultBaseKeys.rawValue
     @AppStorage(AppPreferenceKeys.inAppWindowHotkeyReverseKeys)
     private var inAppWindowHotkeyReverseKeysRaw =
         InAppWindowHotkeyPreferencesStore.defaultReverseKeys.rawValue
+    @AppStorage(AppPreferenceKeys.inAppWindowHotkeyMainKeys)
+    private var inAppWindowHotkeyMainKeysRaw = InAppWindowHotkeyPreferencesStore.defaultMainKeys.rawValue
     @AppStorage(AppPreferenceKeys.windowLayerAutoEnterDelay)
     private var windowLayerAutoEnterDelayRaw = WindowLayerPreferencesStore.defaultAutoEnterDelay
     @State private var accessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
@@ -95,8 +96,9 @@ struct AppSettingsView: View {
 
     private var inAppWindowHotkeyConfiguration: SwitcherHotkeyConfiguration {
         let resolved = InAppWindowHotkeyPreferencesStore.resolve(
-            shortcutKeysRaw: inAppWindowHotkeyShortcutKeysRaw,
-            reverseKeysRaw: inAppWindowHotkeyReverseKeysRaw
+            baseKeysRaw: inAppWindowHotkeyBaseKeysRaw,
+            reverseKeysRaw: inAppWindowHotkeyReverseKeysRaw,
+            mainKeysRaw: inAppWindowHotkeyMainKeysRaw
         )
         return resolved.configuration
     }
@@ -182,10 +184,10 @@ struct AppSettingsView: View {
                 hotkeyReverseModifiersRaw: $hotkeyReverseModifiersRaw,
                 hotkeyMainKeyRaw: $hotkeyMainKeyRaw,
                 hotkeyQuitKeyRaw: $hotkeyQuitKeyRaw,
-                inAppWindowHotkeyShortcutKeysRaw:
-                    $inAppWindowHotkeyShortcutKeysRaw,
+                inAppWindowHotkeyBaseKeysRaw: $inAppWindowHotkeyBaseKeysRaw,
                 inAppWindowHotkeyReverseKeysRaw:
                     $inAppWindowHotkeyReverseKeysRaw,
+                inAppWindowHotkeyMainKeysRaw: $inAppWindowHotkeyMainKeysRaw,
                 commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
                 hotkeyConflict: hotkeyConflict,
                 hotkeyPermissionRequirement:
@@ -270,12 +272,9 @@ struct AppSettingsView: View {
         .onChange(of: hotkeyQuitKeyRaw) { _ in
             handleStoredMainHotkeyChanged()
         }
-        .onChange(of: inAppWindowHotkeyShortcutKeysRaw) { _ in
-            handleStoredInAppWindowHotkeyChanged()
-        }
-        .onChange(of: inAppWindowHotkeyReverseKeysRaw) { _ in
-            handleStoredInAppWindowHotkeyChanged()
-        }
+        .onChange(of: inAppWindowHotkeyBaseKeysRaw) { _ in handleStoredInAppWindowHotkeyChanged() }
+        .onChange(of: inAppWindowHotkeyReverseKeysRaw) { _ in handleStoredInAppWindowHotkeyChanged() }
+        .onChange(of: inAppWindowHotkeyMainKeysRaw) { _ in handleStoredInAppWindowHotkeyChanged() }
         .onReceive(NotificationCenter.default.publisher(
             for: NSApplication.didBecomeActiveNotification
         )) { _ in
@@ -493,18 +492,22 @@ struct AppSettingsView: View {
 
     private func enforceInAppWindowHotkeyConsistency() {
         let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
-            shortcutKeysRaw: inAppWindowHotkeyShortcutKeysRaw,
+            baseKeysRaw: inAppWindowHotkeyBaseKeysRaw,
             reverseKeysRaw: inAppWindowHotkeyReverseKeysRaw,
+            mainKeysRaw: inAppWindowHotkeyMainKeysRaw,
             switcherConfiguration: hotkeyConfiguration
         )
-        if inAppWindowHotkeyShortcutKeysRaw != resolved.shortcutKeys.rawValue {
-            inAppWindowHotkeyShortcutKeysRaw = resolved.shortcutKeys.rawValue
+        if inAppWindowHotkeyBaseKeysRaw != resolved.baseKeys.rawValue {
+            inAppWindowHotkeyBaseKeysRaw = resolved.baseKeys.rawValue
         }
         if inAppWindowHotkeyReverseKeysRaw
             != resolved.reverseKeys.rawValue
         {
             inAppWindowHotkeyReverseKeysRaw =
                 resolved.reverseKeys.rawValue
+        }
+        if inAppWindowHotkeyMainKeysRaw != resolved.mainKeys.rawValue {
+            inAppWindowHotkeyMainKeysRaw = resolved.mainKeys.rawValue
         }
     }
 
@@ -583,17 +586,17 @@ struct AppSettingsView: View {
         if hotkeyQuitKeyRaw != request.mainConfiguration.quitKeys.rawValue {
             hotkeyQuitKeyRaw = request.mainConfiguration.quitKeys.rawValue
         }
-        if inAppWindowHotkeyShortcutKeysRaw
-            != request.inAppWindowConfiguration.baseKeys.rawValue
-        {
-            inAppWindowHotkeyShortcutKeysRaw =
-                request.inAppWindowConfiguration.baseKeys.rawValue
+        if inAppWindowHotkeyBaseKeysRaw != request.inAppWindowConfiguration.baseKeys.rawValue {
+            inAppWindowHotkeyBaseKeysRaw = request.inAppWindowConfiguration.baseKeys.rawValue
         }
         if inAppWindowHotkeyReverseKeysRaw
             != request.inAppWindowConfiguration.reverseKeys.rawValue
         {
             inAppWindowHotkeyReverseKeysRaw =
                 request.inAppWindowConfiguration.reverseKeys.rawValue
+        }
+        if inAppWindowHotkeyMainKeysRaw != request.inAppWindowConfiguration.mainKeys.rawValue {
+            inAppWindowHotkeyMainKeysRaw = request.inAppWindowConfiguration.mainKeys.rawValue
         }
     }
 
@@ -664,11 +667,15 @@ struct AppSettingsView: View {
         userDefaults.set(request.mainConfiguration.quitKeys.rawValue, forKey: AppPreferenceKeys.hotkeyQuitKey)
         userDefaults.set(
             request.inAppWindowConfiguration.baseKeys.rawValue,
-            forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+            forKey: AppPreferenceKeys.inAppWindowHotkeyBaseKeys
         )
         userDefaults.set(
             request.inAppWindowConfiguration.reverseKeys.rawValue,
             forKey: AppPreferenceKeys.inAppWindowHotkeyReverseKeys
+        )
+        userDefaults.set(
+            request.inAppWindowConfiguration.mainKeys.rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyMainKeys
         )
     }
 

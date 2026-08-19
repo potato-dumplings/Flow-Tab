@@ -40,8 +40,9 @@ extension FlowTabTests {
             quitKeys: [.q, .w]
         )
         let inApp = SwitcherHotkeyConfiguration.inApp(
-            shortcutKeys: [.control, .tab, .a, .b],
-            reverseKeys: [.shift, .option, .f8]
+            baseKeys: [.control],
+            reverseKeys: [.shift, .option, .f8],
+            mainKeys: [.tab, .a, .b]
         )
 
         XCTAssertEqual(main.mainShortcut.keys.count, 6)
@@ -359,8 +360,9 @@ extension FlowTabTests {
                     hotkeyReverseModifiersRaw: "shift",
                     hotkeyMainKeyRaw: "tab",
                     hotkeyQuitKeyRaw: "q",
-                    inAppWindowHotkeyShortcutKeysRaw: "control+tab",
-                    inAppWindowHotkeyReverseKeysRaw: "shift"
+                    inAppWindowHotkeyBaseKeysRaw: "control",
+                    inAppWindowHotkeyReverseKeysRaw: "shift",
+                    inAppWindowHotkeyMainKeysRaw: "tab"
                 ),
                 .mainAndReverseModifier
             ),
@@ -370,10 +372,11 @@ extension FlowTabTests {
                     hotkeyReverseModifiersRaw: "shift",
                     hotkeyMainKeyRaw: "tab",
                     hotkeyQuitKeyRaw: "q",
-                    inAppWindowHotkeyShortcutKeysRaw: "control+shift+tab",
-                    inAppWindowHotkeyReverseKeysRaw: "shift"
+                    inAppWindowHotkeyBaseKeysRaw: "control",
+                    inAppWindowHotkeyReverseKeysRaw: "shift",
+                    inAppWindowHotkeyMainKeysRaw: "shift+tab"
             ),
-                .inAppAndReverseModifier
+                .inAppFamilyDuplicateKey
             ),
             (
                 AppKitSettingsHotkeyRawValues(
@@ -381,8 +384,9 @@ extension FlowTabTests {
                     hotkeyReverseModifiersRaw: "shift+b",
                     hotkeyMainKeyRaw: "tab+a",
                     hotkeyQuitKeyRaw: "q+w",
-                    inAppWindowHotkeyShortcutKeysRaw: "control+tab",
-                    inAppWindowHotkeyReverseKeysRaw: "shift"
+                    inAppWindowHotkeyBaseKeysRaw: "control",
+                    inAppWindowHotkeyReverseKeysRaw: "shift",
+                    inAppWindowHotkeyMainKeysRaw: "tab"
                 ),
                 .mainFamilyDuplicateKey
             ),
@@ -392,8 +396,9 @@ extension FlowTabTests {
                     hotkeyReverseModifiersRaw: "shift+b",
                     hotkeyMainKeyRaw: "tab+q",
                     hotkeyQuitKeyRaw: "q+w",
-                    inAppWindowHotkeyShortcutKeysRaw: "control+tab",
-                    inAppWindowHotkeyReverseKeysRaw: "shift"
+                    inAppWindowHotkeyBaseKeysRaw: "control",
+                    inAppWindowHotkeyReverseKeysRaw: "shift",
+                    inAppWindowHotkeyMainKeysRaw: "tab"
                 ),
                 .mainAndQuit
             )
@@ -407,7 +412,7 @@ extension FlowTabTests {
         }
     }
 
-    func testHotkeyStoresExposeSixDefaultRecordedValues() {
+    func testHotkeyStoresExposeSevenDefaultRecordedValues() {
         let main = SwitcherHotkeyPreferencesStore.resolve(
             baseKeysRaw: "invalid",
             reverseKeysRaw: nil,
@@ -415,16 +420,60 @@ extension FlowTabTests {
             quitKeysRaw: "invalid"
         )
         let inApp = InAppWindowHotkeyPreferencesStore.resolve(
-            shortcutKeysRaw: "invalid",
-            reverseKeysRaw: nil
+            baseKeysRaw: "invalid",
+            reverseKeysRaw: nil,
+            mainKeysRaw: "invalid"
         )
 
         XCTAssertEqual(main.baseKeys, [.option])
         XCTAssertEqual(main.reverseKeys, [.shift])
         XCTAssertEqual(main.mainKeys, [.tab])
         XCTAssertEqual(main.quitKeys, [.q])
-        XCTAssertEqual(inApp.shortcutKeys, [.control, .tab])
+        XCTAssertEqual(inApp.baseKeys, [.control])
         XCTAssertEqual(inApp.reverseKeys, [.shift])
+        XCTAssertEqual(inApp.mainKeys, [.tab])
+    }
+
+    func testInAppShortcutSeparatesHoldAndMainKeySets() {
+        let resolved = InAppWindowHotkeyPreferencesStore.resolve(
+            baseKeysRaw: "control",
+            reverseKeysRaw: "shift",
+            mainKeysRaw: "tab+w"
+        )
+        let configuration = resolved.configuration
+
+        XCTAssertEqual(configuration.baseKeys, [.control])
+        XCTAssertEqual(configuration.mainKeys, [.tab, .w])
+        XCTAssertEqual(
+            configuration.mainShortcut.keys,
+            [.control, .tab, .w]
+        )
+        XCTAssertEqual(
+            configuration.backwardShortcut.keys,
+            [.control, .shift, .tab, .w]
+        )
+
+        var stateMachine = HotkeyChordStateMachine(
+            forwardKeys: configuration.mainShortcut.keys,
+            backwardKeys: configuration.backwardShortcut.keys,
+            holdKeys: configuration.baseKeys
+        )
+        XCTAssertEqual(
+            stateMachine.update(
+                pressedKeys: [.control, .tab, .w]
+            ),
+            [HotkeyChordTransition(phase: .pressed, isBackward: false)]
+        )
+        XCTAssertEqual(
+            stateMachine.update(pressedKeys: [.control]),
+            [
+                HotkeyChordTransition(
+                    phase: .released,
+                    isBackward: false,
+                    isHoldSetPressed: true
+                )
+            ]
+        )
     }
 
     func testCommandTabFallbackKeepsModifierSetsDisjoint() {
@@ -454,8 +503,9 @@ extension FlowTabTests {
             quitKeys: [.q, .w]
         )
         let inApp = SwitcherHotkeyConfiguration.inApp(
-            shortcutKeys: [.control, .tab, .a, .b],
-            reverseKeys: [.shift, .option, .f8]
+            baseKeys: [.control],
+            reverseKeys: [.shift, .option, .f8],
+            mainKeys: [.tab, .a, .b]
         )
         let request = HotkeyRegistrationRequest(
             mainConfiguration: main,
@@ -487,8 +537,9 @@ extension FlowTabTests {
             quitKeys: [.q, .w]
         )
         let inApp = SwitcherHotkeyConfiguration.inApp(
-            shortcutKeys: [.control, .tab, .a, .b],
-            reverseKeys: [.shift, .option, .f8]
+            baseKeys: [.control],
+            reverseKeys: [.shift, .option, .f8],
+            mainKeys: [.tab, .a, .b]
         )
         userDefaults.set(
             main.baseKeys.rawValue,
@@ -508,11 +559,15 @@ extension FlowTabTests {
         )
         userDefaults.set(
             inApp.baseKeys.rawValue,
-            forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+            forKey: AppPreferenceKeys.inAppWindowHotkeyBaseKeys
         )
         userDefaults.set(
             inApp.reverseKeys.rawValue,
             forKey: AppPreferenceKeys.inAppWindowHotkeyReverseKeys
+        )
+        userDefaults.set(
+            inApp.mainKeys.rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyMainKeys
         )
 
         XCTAssertEqual(

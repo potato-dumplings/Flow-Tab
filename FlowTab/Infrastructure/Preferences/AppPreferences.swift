@@ -12,6 +12,8 @@ enum AppPreferenceKeys {
     static let hotkeyReverseModifiers = "hotkeyReverseModifiers"
     static let hotkeyMainKey = "hotkeyMainKey"
     static let hotkeyQuitKey = "hotkeyQuitKey"
+    static let inAppWindowHotkeyBaseKeys = "inAppWindowHotkeyBaseKeys"
+    static let inAppWindowHotkeyMainKeys = "inAppWindowHotkeyMainKeys"
     static let inAppWindowHotkeyShortcutKeys = "inAppWindowHotkeyShortcutKeys"
     static let inAppWindowHotkeyReverseKeys = "inAppWindowHotkeyReverseKeys"
     static let windowLayerAutoEnterDelay = "windowLayerAutoEnterDelay"
@@ -34,6 +36,8 @@ enum AppPreferenceKeys {
         hotkeyReverseModifiers,
         hotkeyMainKey,
         hotkeyQuitKey,
+        inAppWindowHotkeyBaseKeys,
+        inAppWindowHotkeyMainKeys,
         inAppWindowHotkeyShortcutKeys,
         inAppWindowHotkeyReverseKeys,
         windowLayerAutoEnterDelay,
@@ -128,6 +132,8 @@ struct HotkeyRegistrationRequest: Equatable, Sendable {
         static let mainReverseKeys = "mainReverseKeys"
         static let mainKeys = "mainKeys"
         static let quitKeys = "quitKeys"
+        static let inAppBaseKeys = "inAppBaseKeys"
+        static let inAppMainKeys = "inAppMainKeys"
         static let inAppShortcutKeys = "inAppShortcutKeys"
         static let inAppReverseKeys = "inAppReverseKeys"
     }
@@ -143,7 +149,8 @@ struct HotkeyRegistrationRequest: Equatable, Sendable {
             mainConfiguration.mainKeys.rawValue,
             mainConfiguration.quitKeys.rawValue,
             inAppWindowConfiguration.baseKeys.rawValue,
-            inAppWindowConfiguration.reverseKeys.rawValue
+            inAppWindowConfiguration.reverseKeys.rawValue,
+            inAppWindowConfiguration.mainKeys.rawValue
         ].joined(separator: "|")
     }
 
@@ -154,8 +161,9 @@ struct HotkeyRegistrationRequest: Equatable, Sendable {
     ) {
         let resolvedInAppWindowConfiguration =
             InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
-                shortcutKeysRaw: inAppWindowConfiguration.baseKeys.rawValue,
+                baseKeysRaw: inAppWindowConfiguration.baseKeys.rawValue,
                 reverseKeysRaw: inAppWindowConfiguration.reverseKeys.rawValue,
+                mainKeysRaw: inAppWindowConfiguration.mainKeys.rawValue,
                 switcherConfiguration: mainConfiguration
             )
         self.requestID = requestID
@@ -177,20 +185,31 @@ struct HotkeyRegistrationRequest: Equatable, Sendable {
         let quitKeysRaw = userDefaults.string(
             forKey: AppPreferenceKeys.hotkeyQuitKey
         ) ?? SwitcherHotkeyPreferencesStore.defaultQuitKeys.rawValue
-        let inAppShortcutKeysRaw = userDefaults.string(
-            forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
-        ) ?? InAppWindowHotkeyPreferencesStore.defaultShortcutKeys.rawValue
         let inAppReverseKeysRaw = userDefaults.string(
             forKey: AppPreferenceKeys.inAppWindowHotkeyReverseKeys
         ) ?? InAppWindowHotkeyPreferencesStore.defaultReverseKeys.rawValue
+        let shouldPersistInAppSplitFields =
+            userDefaults.object(
+                forKey: AppPreferenceKeys.inAppWindowHotkeyBaseKeys
+            ) != nil
+            || userDefaults.object(
+                forKey: AppPreferenceKeys.inAppWindowHotkeyMainKeys
+            ) != nil
+            || userDefaults.object(
+                forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+            ) != nil
+        let inAppConfiguration = InAppWindowHotkeyPreferencesStore.load(
+            userDefaults: userDefaults
+        )
 
-        let request = HotkeyRegistrationRequest.normalized(
-            mainBaseKeysRaw: mainBaseKeysRaw,
-            mainReverseKeysRaw: mainReverseKeysRaw,
-            mainKeysRaw: mainKeysRaw,
-            quitKeysRaw: quitKeysRaw,
-            inAppShortcutKeysRaw: inAppShortcutKeysRaw,
-            inAppReverseKeysRaw: inAppReverseKeysRaw
+        let request = HotkeyRegistrationRequest(
+            mainConfiguration: SwitcherHotkeyPreferencesStore.resolve(
+                baseKeysRaw: mainBaseKeysRaw,
+                reverseKeysRaw: mainReverseKeysRaw,
+                mainKeysRaw: mainKeysRaw,
+                quitKeysRaw: quitKeysRaw
+            ),
+            inAppWindowConfiguration: inAppConfiguration
         )
         persistNormalizedValue(
             request.mainConfiguration.baseKeys.rawValue,
@@ -216,18 +235,32 @@ struct HotkeyRegistrationRequest: Equatable, Sendable {
             forKey: AppPreferenceKeys.hotkeyQuitKey,
             userDefaults: userDefaults
         )
-        persistNormalizedValue(
-            request.inAppWindowConfiguration.baseKeys.rawValue,
-            rawValue: inAppShortcutKeysRaw,
-            forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys,
-            userDefaults: userDefaults
-        )
+        if shouldPersistInAppSplitFields {
+            persistNormalizedValue(
+                request.inAppWindowConfiguration.baseKeys.rawValue,
+                rawValue: userDefaults.string(
+                    forKey: AppPreferenceKeys.inAppWindowHotkeyBaseKeys
+                ) ?? "",
+                forKey: AppPreferenceKeys.inAppWindowHotkeyBaseKeys,
+                userDefaults: userDefaults
+            )
+        }
         persistNormalizedValue(
             request.inAppWindowConfiguration.reverseKeys.rawValue,
             rawValue: inAppReverseKeysRaw,
             forKey: AppPreferenceKeys.inAppWindowHotkeyReverseKeys,
             userDefaults: userDefaults
         )
+        if shouldPersistInAppSplitFields {
+            persistNormalizedValue(
+                request.inAppWindowConfiguration.mainKeys.rawValue,
+                rawValue: userDefaults.string(
+                    forKey: AppPreferenceKeys.inAppWindowHotkeyMainKeys
+                ) ?? "",
+                forKey: AppPreferenceKeys.inAppWindowHotkeyMainKeys,
+                userDefaults: userDefaults
+            )
+        }
         return request
     }
 
@@ -236,7 +269,8 @@ struct HotkeyRegistrationRequest: Equatable, Sendable {
         mainReverseKeysRaw: String? = nil,
         mainKeysRaw: String,
         quitKeysRaw: String,
-        inAppShortcutKeysRaw: String,
+        inAppBaseKeysRaw: String,
+        inAppMainKeysRaw: String,
         inAppReverseKeysRaw: String? = nil
     ) -> HotkeyRegistrationRequest {
         let mainConfiguration = SwitcherHotkeyPreferencesStore.resolve(
@@ -247,8 +281,9 @@ struct HotkeyRegistrationRequest: Equatable, Sendable {
         )
         let resolvedInAppWindowConfiguration =
             InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
-                shortcutKeysRaw: inAppShortcutKeysRaw,
+                baseKeysRaw: inAppBaseKeysRaw,
                 reverseKeysRaw: inAppReverseKeysRaw,
+                mainKeysRaw: inAppMainKeysRaw,
                 switcherConfiguration: mainConfiguration
             )
         let inAppWindowConfiguration =
@@ -281,18 +316,45 @@ struct HotkeyRegistrationRequest: Equatable, Sendable {
                 notificationUserInfo[NotificationUserInfoKey.mainKeys] as? String,
             let quitKeysRaw =
                 notificationUserInfo[NotificationUserInfoKey.quitKeys] as? String,
-            let inAppShortcutKeysRaw =
-                notificationUserInfo[NotificationUserInfoKey.inAppShortcutKeys] as? String,
             let inAppReverseKeysRaw =
                 notificationUserInfo[NotificationUserInfoKey.inAppReverseKeys] as? String
         else {
             return nil
         }
 
-        let resolvedInAppWindowConfiguration = InAppWindowHotkeyPreferencesStore.resolve(
-            shortcutKeysRaw: inAppShortcutKeysRaw,
-            reverseKeysRaw: inAppReverseKeysRaw
-        )
+        let resolvedInAppWindowConfiguration: InAppWindowHotkeyResolution
+        if let inAppBaseKeysRaw =
+                notificationUserInfo[NotificationUserInfoKey.inAppBaseKeys]
+                    as? String,
+           let inAppMainKeysRaw =
+                notificationUserInfo[NotificationUserInfoKey.inAppMainKeys]
+                    as? String
+        {
+            resolvedInAppWindowConfiguration =
+                InAppWindowHotkeyPreferencesStore.resolve(
+                    baseKeysRaw: inAppBaseKeysRaw,
+                    reverseKeysRaw: inAppReverseKeysRaw,
+                    mainKeysRaw: inAppMainKeysRaw
+                )
+        } else if let legacyShortcutKeysRaw =
+                    notificationUserInfo[
+                        NotificationUserInfoKey.inAppShortcutKeys
+                    ] as? String,
+                  let migration =
+                    InAppWindowHotkeyPreferencesStore
+                        .migratedLegacyShortcut(
+                            rawValue: legacyShortcutKeysRaw
+                        )
+        {
+            resolvedInAppWindowConfiguration =
+                InAppWindowHotkeyPreferencesStore.resolve(
+                    baseKeysRaw: migration.baseKeys.rawValue,
+                    reverseKeysRaw: inAppReverseKeysRaw,
+                    mainKeysRaw: migration.mainKeys.rawValue
+                )
+        } else {
+            return nil
+        }
         self.init(
             requestID: UUID(uuidString: requestIDRaw) ?? UUID(),
             mainConfiguration: SwitcherHotkeyPreferencesStore.resolve(
@@ -317,8 +379,12 @@ struct HotkeyRegistrationRequest: Equatable, Sendable {
                 mainConfiguration.mainKeys.rawValue,
             NotificationUserInfoKey.quitKeys:
                 mainConfiguration.quitKeys.rawValue,
-            NotificationUserInfoKey.inAppShortcutKeys:
+            NotificationUserInfoKey.inAppBaseKeys:
                 inAppWindowConfiguration.baseKeys.rawValue,
+            NotificationUserInfoKey.inAppMainKeys:
+                inAppWindowConfiguration.mainKeys.rawValue,
+            NotificationUserInfoKey.inAppShortcutKeys:
+                inAppWindowConfiguration.mainShortcut.keys.rawValue,
             NotificationUserInfoKey.inAppReverseKeys:
                 inAppWindowConfiguration.reverseKeys.rawValue
         ]

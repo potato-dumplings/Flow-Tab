@@ -20,8 +20,9 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
     @Binding var hotkeyReverseModifiersRaw: String
     @Binding var hotkeyMainKeyRaw: String
     @Binding var hotkeyQuitKeyRaw: String
-    @Binding var inAppWindowHotkeyShortcutKeysRaw: String
+    @Binding var inAppWindowHotkeyBaseKeysRaw: String
     @Binding var inAppWindowHotkeyReverseKeysRaw: String
+    @Binding var inAppWindowHotkeyMainKeysRaw: String
     let commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
     let hotkeyConflict: HotkeySettingsConflictPresentation?
     var hotkeyPermissionRequirement:
@@ -57,10 +58,12 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
         let hotkeyReverseModifiersRaw = $hotkeyReverseModifiersRaw
         let hotkeyMainKeyRaw = $hotkeyMainKeyRaw
         let hotkeyQuitKeyRaw = $hotkeyQuitKeyRaw
-        let inAppWindowHotkeyShortcutKeysRaw =
-            $inAppWindowHotkeyShortcutKeysRaw
+        let inAppWindowHotkeyBaseKeysRaw =
+            $inAppWindowHotkeyBaseKeysRaw
         let inAppWindowHotkeyReverseKeysRaw =
             $inAppWindowHotkeyReverseKeysRaw
+        let inAppWindowHotkeyMainKeysRaw =
+            $inAppWindowHotkeyMainKeysRaw
         let pageView = nsView.pageView
         let currentHotkeyValues = {
             AppKitSettingsHotkeyRawValues(
@@ -68,10 +71,12 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
                 hotkeyReverseModifiersRaw: hotkeyReverseModifiersRaw.wrappedValue,
                 hotkeyMainKeyRaw: hotkeyMainKeyRaw.wrappedValue,
                 hotkeyQuitKeyRaw: hotkeyQuitKeyRaw.wrappedValue,
-                inAppWindowHotkeyShortcutKeysRaw:
-                    inAppWindowHotkeyShortcutKeysRaw.wrappedValue,
+                inAppWindowHotkeyBaseKeysRaw:
+                    inAppWindowHotkeyBaseKeysRaw.wrappedValue,
                 inAppWindowHotkeyReverseKeysRaw:
-                    inAppWindowHotkeyReverseKeysRaw.wrappedValue
+                    inAppWindowHotkeyReverseKeysRaw.wrappedValue,
+                inAppWindowHotkeyMainKeysRaw:
+                    inAppWindowHotkeyMainKeysRaw.wrappedValue
             )
         }
         let updateHotkeyContent = { [weak pageView] in
@@ -143,12 +148,12 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
             )
             updateHotkeyContent()
         }
-        pageView.onInAppShortcutChanged = {
+        pageView.onInAppBaseKeysChanged = {
             onHotkeyChanged(
                 HotkeySettingsChangeCandidate(
-                    field: .inAppShortcut,
+                    field: .inAppBaseKeys,
                     values: currentHotkeyValues().replacing(
-                        .inAppShortcut,
+                        .inAppBaseKeys,
                         with: $0.rawValue
                     )
                 )
@@ -161,6 +166,18 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
                     field: .inAppReverseModifiers,
                     values: currentHotkeyValues().replacing(
                         .inAppReverseModifiers,
+                        with: $0.rawValue
+                    )
+                )
+            )
+            updateHotkeyContent()
+        }
+        pageView.onInAppMainKeysChanged = {
+            onHotkeyChanged(
+                HotkeySettingsChangeCandidate(
+                    field: .inAppMainKeys,
+                    values: currentHotkeyValues().replacing(
+                        .inAppMainKeys,
                         with: $0.rawValue
                     )
                 )
@@ -192,10 +209,12 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
                 hotkeyReverseModifiersRaw: hotkeyReverseModifiersRaw.wrappedValue,
                 hotkeyMainKeyRaw: hotkeyMainKeyRaw.wrappedValue,
                 hotkeyQuitKeyRaw: hotkeyQuitKeyRaw.wrappedValue,
-                inAppWindowHotkeyShortcutKeysRaw:
-                    inAppWindowHotkeyShortcutKeysRaw.wrappedValue,
+                inAppWindowHotkeyBaseKeysRaw:
+                    inAppWindowHotkeyBaseKeysRaw.wrappedValue,
                 inAppWindowHotkeyReverseKeysRaw:
                     inAppWindowHotkeyReverseKeysRaw.wrappedValue,
+                inAppWindowHotkeyMainKeysRaw:
+                    inAppWindowHotkeyMainKeysRaw.wrappedValue,
                 commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
                 accessibilityTrusted: accessibilityTrusted,
                 screenCaptureTrusted: screenCaptureTrusted,
@@ -221,12 +240,15 @@ private extension AppKitSettingsHotkeyRawValues {
                 ? rawValue : hotkeyReverseModifiersRaw,
             hotkeyMainKeyRaw: field == .mainKey ? rawValue : hotkeyMainKeyRaw,
             hotkeyQuitKeyRaw: field == .quitKey ? rawValue : hotkeyQuitKeyRaw,
-            inAppWindowHotkeyShortcutKeysRaw:
-                field == .inAppShortcut
-                ? rawValue : inAppWindowHotkeyShortcutKeysRaw,
+            inAppWindowHotkeyBaseKeysRaw:
+                field == .inAppBaseKeys
+                ? rawValue : inAppWindowHotkeyBaseKeysRaw,
             inAppWindowHotkeyReverseKeysRaw:
                 field == .inAppReverseModifiers
-                ? rawValue : inAppWindowHotkeyReverseKeysRaw
+                ? rawValue : inAppWindowHotkeyReverseKeysRaw,
+            inAppWindowHotkeyMainKeysRaw:
+                field == .inAppMainKeys
+                ? rawValue : inAppWindowHotkeyMainKeysRaw
         )
     }
 }

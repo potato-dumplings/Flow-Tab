@@ -20,9 +20,10 @@ struct AppKitSettingsPageState: Equatable {
         SwitcherHotkeyPreferencesStore.defaultReverseKeys.rawValue
     let hotkeyMainKeyRaw: String
     let hotkeyQuitKeyRaw: String
-    let inAppWindowHotkeyShortcutKeysRaw: String
+    let inAppWindowHotkeyBaseKeysRaw: String
     var inAppWindowHotkeyReverseKeysRaw =
         InAppWindowHotkeyPreferencesStore.defaultReverseKeys.rawValue
+    let inAppWindowHotkeyMainKeysRaw: String
     let commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
     let accessibilityTrusted: Bool
     let screenCaptureTrusted: Bool
@@ -38,9 +39,10 @@ struct AppKitSettingsHotkeyRawValues: Equatable {
         SwitcherHotkeyPreferencesStore.defaultReverseKeys.rawValue
     let hotkeyMainKeyRaw: String
     let hotkeyQuitKeyRaw: String
-    let inAppWindowHotkeyShortcutKeysRaw: String
+    let inAppWindowHotkeyBaseKeysRaw: String
     var inAppWindowHotkeyReverseKeysRaw =
         InAppWindowHotkeyPreferencesStore.defaultReverseKeys.rawValue
+    let inAppWindowHotkeyMainKeysRaw: String
 }
 
 final class AppKitFlippedDocumentView: NSView {
@@ -257,8 +259,9 @@ final class AppKitSettingsPageView: NSView {
     var onMainReverseModifiersChanged: ((SwitcherHotkeyKeySet) -> Void)?
     var onMainKeyChanged: ((SwitcherHotkeyKeySet) -> Void)?
     var onQuitKeyChanged: ((SwitcherHotkeyKeySet) -> Void)?
-    var onInAppShortcutChanged: ((SwitcherHotkeyKeySet) -> Void)?
+    var onInAppBaseKeysChanged: ((SwitcherHotkeyKeySet) -> Void)?
     var onInAppReverseModifiersChanged: ((SwitcherHotkeyKeySet) -> Void)?
+    var onInAppMainKeysChanged: ((SwitcherHotkeyKeySet) -> Void)?
     var onDismissHotkeyConflict: (() -> Void)?
     var onShowPermissionReminderChanged: ((Bool) -> Void)?
     var onAllowLaunchAtLoginChanged: ((Bool) -> Void)?
@@ -272,6 +275,7 @@ final class AppKitSettingsPageView: NSView {
     private let columnsStack = NSStackView()
     private let leftColumn = NSStackView()
     private let rightColumn = NSStackView()
+    private let columnFlexibleSpacers = [NSView(), NSView()]
     private let dismissEditingClickRecognizer = NSClickGestureRecognizer()
 
     private let appearanceContent = AppearanceSettingsCardAppKitView()
@@ -468,12 +472,15 @@ final class AppKitSettingsPageView: NSView {
                 ?? state.hotkeyMainKeyRaw,
             hotkeyQuitKeyRaw: values?.hotkeyQuitKeyRaw
                 ?? state.hotkeyQuitKeyRaw,
-            inAppWindowHotkeyShortcutKeysRaw:
-                values?.inAppWindowHotkeyShortcutKeysRaw
-                ?? state.inAppWindowHotkeyShortcutKeysRaw,
+            inAppWindowHotkeyBaseKeysRaw:
+                values?.inAppWindowHotkeyBaseKeysRaw
+                ?? state.inAppWindowHotkeyBaseKeysRaw,
             inAppWindowHotkeyReverseKeysRaw:
                 values?.inAppWindowHotkeyReverseKeysRaw
                 ?? state.inAppWindowHotkeyReverseKeysRaw,
+            inAppWindowHotkeyMainKeysRaw:
+                values?.inAppWindowHotkeyMainKeysRaw
+                ?? state.inAppWindowHotkeyMainKeysRaw,
             commandTabTakeoverRegistrationState: state.commandTabTakeoverRegistrationState,
             accessibilityTrusted: state.accessibilityTrusted,
             appLanguageRaw: state.appLanguageRaw,
@@ -597,6 +604,15 @@ final class AppKitSettingsPageView: NSView {
         addCard(searchCard, to: rightColumn)
         addCard(appVisibilityCard, to: rightColumn)
         addCard(hotkeyCard, to: rightColumn)
+        for (column, spacer) in zip(
+            [leftColumn, rightColumn],
+            columnFlexibleSpacers
+        ) {
+            spacer.setContentHuggingPriority(.defaultLow, for: .vertical)
+            column.addArrangedSubview(spacer)
+        }
+        leftColumn.setCustomSpacing(0, after: permissionCard)
+        rightColumn.setCustomSpacing(0, after: hotkeyCard)
 
         NSLayoutConstraint.activate([
             contentStack.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -677,13 +693,17 @@ final class AppKitSettingsPageView: NSView {
             self?.notifyPageInteraction()
             self?.onQuitKeyChanged?($0)
         }
-        hotkeyContent.onInAppShortcutChanged = { [weak self] in
+        hotkeyContent.onInAppBaseKeysChanged = { [weak self] in
             self?.notifyPageInteraction()
-            self?.onInAppShortcutChanged?($0)
+            self?.onInAppBaseKeysChanged?($0)
         }
         hotkeyContent.onInAppReverseModifiersChanged = { [weak self] in
             self?.notifyPageInteraction()
             self?.onInAppReverseModifiersChanged?($0)
+        }
+        hotkeyContent.onInAppMainKeysChanged = { [weak self] in
+            self?.notifyPageInteraction()
+            self?.onInAppMainKeysChanged?($0)
         }
 
         permissionContent.onShowPermissionReminderChanged = { [weak self] in
@@ -741,7 +761,10 @@ final class AppKitSettingsPageView: NSView {
     }
 
     private func preferredColumnHeight(_ stackView: NSStackView) -> CGFloat {
-        let visibleSubviews = stackView.arrangedSubviews.filter { !$0.isHidden }
+        let visibleSubviews = stackView.arrangedSubviews.filter { view in
+            !view.isHidden
+                && !columnFlexibleSpacers.contains { $0 === view }
+        }
         guard !visibleSubviews.isEmpty else { return 0 }
         let contentHeight = visibleSubviews
             .map { preferredHeight(for: $0) }

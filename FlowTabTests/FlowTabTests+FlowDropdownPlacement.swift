@@ -254,8 +254,9 @@ extension FlowTabTests {
             "flowtab.settings.hotkey.main-reverse-modifiers",
             "flowtab.settings.hotkey.main-key",
             "flowtab.settings.hotkey.quit-key",
-            "flowtab.settings.hotkey.in-app-shortcut",
-            "flowtab.settings.hotkey.in-app-reverse-modifiers"
+            "flowtab.settings.hotkey.in-app-base-keys",
+            "flowtab.settings.hotkey.in-app-reverse-modifiers",
+            "flowtab.settings.hotkey.in-app-main-keys"
         ] {
             let recorder = try XCTUnwrap(descendant(
                 in: view,
