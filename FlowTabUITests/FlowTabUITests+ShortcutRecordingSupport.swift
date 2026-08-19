@@ -124,15 +124,16 @@ extension FlowTabUITests {
                 modifierFlags: mainReverseModifiers,
                 expectedValue: mainReverseModifiersText
             ),
-            .key(
-                controlIdentifier: Identifier.settingsHotkeyMainKey,
-                key: mainKey,
-                expectedValue: shortcutKeyDisplayName(mainKey)
-            ),
+            // Release the ending-app key before the switch key can reuse it.
             .key(
                 controlIdentifier: Identifier.settingsHotkeyQuitKey,
                 key: quitKey,
                 expectedValue: shortcutKeyDisplayName(quitKey)
+            ),
+            .key(
+                controlIdentifier: Identifier.settingsHotkeyMainKey,
+                key: mainKey,
+                expectedValue: shortcutKeyDisplayName(mainKey)
             )
         ]
     }
@@ -398,7 +399,15 @@ extension FlowTabUITests {
             recordShortcut(in: app, recording)
         }
         waitForRuntimeLogFiles(containing: expectedLogMarkers, since: logSnapshot)
-        app.terminate()
+        let termination = terminateFlowTabUITestApplication(
+            app,
+            targetDescription: "shortcut Settings configuration"
+        )
+        XCTAssertTrue(
+            termination.isSatisfied,
+            "Shortcut Settings termination failed. "
+                + termination.diagnosticSummary
+        )
     }
 
     func typeShortcutKey(

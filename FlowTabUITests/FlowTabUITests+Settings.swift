@@ -400,6 +400,7 @@ extension FlowTabUITests {
     func testSettingsQuitHotkeyExplicitMatrixTerminatesSelectedApp() throws {
         let cases: [(
             recordings: [FlowTabUITestShortcutRecording],
+            expectedMainShortcut: String,
             triggerKey: String,
             expectedQuitShortcut: String
         )] = [
@@ -413,6 +414,7 @@ extension FlowTabUITests {
                     inAppShortcutText: "Option + B",
                     inAppKey: "b"
                 ),
+                "Option + Space",
                 "z",
                 "Option + Z"
             ),
@@ -426,6 +428,7 @@ extension FlowTabUITests {
                     inAppShortcutText: "Control + B",
                     inAppKey: "b"
                 ),
+                "Option + Q",
                 "w",
                 "Option + W"
             )
@@ -440,32 +443,81 @@ extension FlowTabUITests {
                 ]
             )
 
-            guard let launch = try
-                launchFlowTabUITestApplicationResolvingInitialPresentation(
-                    additionalArguments:
-                        hotkeyEffectArguments() + [
-                            "--flowtab-ui-open-switcher"
-                        ],
-                    expectation:
-                        FlowTabUITestInitialPresentationResolutionExpectation(
-                            requiredItemIDs: [
-                                "com.flowtab.mock.browser"
-                            ],
-                            excludedItemIDs: [],
-                            searchFeatureEnabled: true,
-                            searchIsActive: false,
-                            searchActivationIsPending: false
-                        ),
+            let registrationBaseline = makeRuntimeLogFileSnapshot()
+            defer { registrationBaseline.cancel() }
+            let app = makeApp(
+                additionalArguments:
+                    hotkeyEffectArguments() + [
+                        "--flowtab-ui-listen-switcher-trigger"
+                    ]
+            )
+            defer {
+                let termination = terminateFlowTabUITestApplication(
+                    app,
                     targetDescription:
-                        "settings quit hotkey "
+                        "settings end-app shortcut "
                             + item.expectedQuitShortcut
                 )
-            else {
+                XCTAssertTrue(
+                    termination.isSatisfied,
+                    "End-app shortcut application termination failed. "
+                        + termination.diagnosticSummary
+                )
+            }
+            launchFlowTabUITestApplication(app)
+            waitForRuntimeLogFiles(
+                containing: [
+                    "register main=\(item.expectedMainShortcut) backward=",
+                    "registration evidence generation=1"
+                ],
+                since: registrationBaseline
+            )
+            registrationBaseline.cancel()
+            guard waitForFlowTabUITestApplicationToBecomeReady(
+                app,
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .foregroundActivation,
+                traceLabel:
+                    "settings.endAppHotkey."
+                        + "\(item.triggerKey).inputReadiness"
+            ) else {
+                XCTFail(
+                    "Expected foreground input readiness for "
+                        + "\(item.expectedQuitShortcut); "
+                        + "finalState=\(String(describing: app.state))"
+                )
                 continue
             }
-            let app = launch.application
-            defer { app.terminate() }
-            let selectedAppID = launch.resolution.selectedAppID
+
+            let selectedAppID = "com.flowtab.mock.browser"
+            let diagnosticsSummary = element(
+                in: app,
+                identifier: Identifier.switcherSummary
+            )
+            app.activate()
+            guard performAndWaitForSwitcherDiagnostics(
+                [
+                    FlowTabUITestSwitcherDiagnosticsExpectation(
+                        key: "selected",
+                        expectedValue: selectedAppID
+                    )
+                ],
+                in: diagnosticsSummary,
+                timeout:
+                    FlowTabUITestSettingsQuitHotkeyWatchdogPolicy
+                        .runtimeCompletion,
+                trigger: {
+                    postFlowTabUITestSwitcherTrigger(
+                        .global,
+                        traceLabel:
+                            "settings.endAppHotkey.open."
+                                + item.triggerKey
+                    )
+                }
+            ) else {
+                continue
+            }
             let selectedRowIdentifier =
                 switcherAppRowIdentifier(selectedAppID)
             let selectedTile = element(
