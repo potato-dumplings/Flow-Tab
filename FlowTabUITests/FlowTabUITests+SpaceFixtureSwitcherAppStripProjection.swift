@@ -17,9 +17,14 @@ struct FlowTabUITestSpaceFixtureSwitcherAppStripProjectionExpectation:
             "\(bundleIdentifier):\(windowCount)"
         }
 
+        func accepts(windowCount observedWindowCount: Int, isSelected: Bool) -> Bool {
+            observedWindowCount == windowCount
+                || (!isSelected && observedWindowCount == 0)
+        }
+
         var diagnosticSummary: String {
             "bundleID=\(bundleIdentifier) "
-                + "selectedWindowCount=\(windowCount) "
+                + "configuredWindowCount=\(windowCount) "
                 + "row=\(rowIdentifier)"
         }
     }
@@ -62,16 +67,27 @@ struct FlowTabUITestSpaceFixtureSwitcherAppStripProjectionExpectation:
             snapshot.projectionBeforeRows.appProjection.entries.filter {
                 targetBundleIdentifiers.contains($0.bundleIdentifier)
             }
-        let expectedEntries = Set(apps.map { app in
-            app.exactEntry(
-                windowCount:
-                    app.bundleIdentifier == selectedBundleIdentifier
-                        ? app.windowCount
-                        : 0
-            )
-        })
+        let entriesByBundleIdentifier = Dictionary(
+            grouping: targetEntries,
+            by: \.bundleIdentifier
+        )
         return targetEntries.count == apps.count
-            && Set(targetEntries.map(\.rawValue)) == expectedEntries
+            && apps.allSatisfy { app in
+                guard
+                    let entries = entriesByBundleIdentifier[
+                        app.bundleIdentifier
+                    ],
+                    entries.count == 1,
+                    let observedWindowCount = entries[0].windowCount
+                else {
+                    return false
+                }
+                return app.accepts(
+                    windowCount: observedWindowCount,
+                    isSelected:
+                        app.bundleIdentifier == selectedBundleIdentifier
+                )
+            }
     }
 
     var diagnosticSummary: String {

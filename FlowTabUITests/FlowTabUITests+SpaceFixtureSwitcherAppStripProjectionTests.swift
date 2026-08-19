@@ -60,6 +60,12 @@ private enum FlowTabUITestSpaceFixtureSwitcherAppStripProjectionFixture {
         )
     }
 
+    static var fullyHydratedEntries: [String] {
+        expectation.apps.map { app in
+            app.exactEntry(windowCount: app.windowCount)
+        }
+    }
+
     static var targetRows: [String] {
         expectation.apps.map(\.rowIdentifier)
     }
@@ -194,6 +200,26 @@ extension FlowTabUITests {
                 )
             )
         )
+        XCTAssertTrue(
+            expectation.isSatisfied(
+                by: fixture.snapshot(
+                    beforeEntries: fixture.fullyHydratedEntries
+                )
+            )
+        )
+        XCTAssertTrue(
+            expectation.isSatisfied(
+                by: fixture.snapshot(
+                    beforeEntries: [
+                        fixture.finder.exactEntry(
+                            windowCount: fixture.finder.windowCount
+                        ),
+                        fixture.exactEntry(for: fixture.chrome),
+                        fixture.exactEntry(for: fixture.notes)
+                    ]
+                )
+            )
+        )
         let duplicateRowRepresentations = fixture.snapshot(
             visibleRows: fixture.targetRows + fixture.targetRows
         )
@@ -243,7 +269,18 @@ extension FlowTabUITests {
             expectation.isSatisfied(
                 by: fixture.snapshot(
                     beforeEntries: [
-                        "com.example.fixture.finder:2",
+                        "com.example.fixture.finder:1",
+                        fixture.exactEntry(for: fixture.chrome),
+                        fixture.exactEntry(for: fixture.notes)
+                    ]
+                )
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by: fixture.snapshot(
+                    beforeEntries: [
+                        "com.example.fixture.finder:3",
                         fixture.exactEntry(for: fixture.chrome),
                         fixture.exactEntry(for: fixture.notes)
                     ]

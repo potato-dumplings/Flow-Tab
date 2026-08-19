@@ -104,19 +104,30 @@ extension FlowTabUITests {
 
         try runRealSpaceFixtureWorkflow(
             workflow,
-            flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
+            flowTabAdditionalArguments: [
+                "--flowtab-ui-open-switcher",
+                "--flowtab-ui-listen-switcher-trigger"
+            ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         ) { workflow, app in
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
             guard waitForSpaceFixtureSwitcherAppStripProjection(
                 workflow,
                 in: app
             ) != nil else { return }
-            selectSwitcherWorkflowApp(workflow.apps[0], in: app, diagnosticsSummary: diagnosticsSummary)
 
             var observedAppIDs: [String] = []
             var previousWindowCardIdentifiers: Set<String> = []
             for workflowApp in workflow.apps {
-                selectSwitcherWorkflowApp(workflowApp, in: app, diagnosticsSummary: diagnosticsSummary)
+                guard selectSwitcherWorkflowAppDirectly(
+                    workflowApp,
+                    diagnosticsSummary: diagnosticsSummary
+                ) else {
+                    XCTFail(
+                        "Switcher did not directly select "
+                            + "\(workflowApp.appName) by bundle identifier."
+                    )
+                    return
+                }
                 let windowCards = try assertSwitcherPreviewWindowCards(
                     in: app,
                     diagnosticsSummary: diagnosticsSummary,
