@@ -92,6 +92,7 @@ struct RuntimeAppWindowProjectionSeed {
     let activationHandleID: String?
     let axWindow: AXUIElement?
     let frame: CGRect?
+    let isOnscreen: Bool
     let allowsPublicAXRecovery: Bool
     let hasStickyBinding: Bool
     let lastConfirmationSource: WindowBindingConfirmationSource?
@@ -111,6 +112,7 @@ struct RuntimeAppWindowProjectionSeed {
         activationHandleID: String? = nil,
         axWindow: AXUIElement? = nil,
         frame: CGRect? = nil,
+        isOnscreen: Bool = false,
         allowsPublicAXRecovery: Bool = false,
         hasStickyBinding: Bool = false,
         lastConfirmationSource: WindowBindingConfirmationSource? = nil,
@@ -129,6 +131,7 @@ struct RuntimeAppWindowProjectionSeed {
         self.activationHandleID = activationHandleID
         self.axWindow = axWindow
         self.frame = frame
+        self.isOnscreen = isOnscreen
         self.allowsPublicAXRecovery = allowsPublicAXRecovery
         self.hasStickyBinding = hasStickyBinding
         self.lastConfirmationSource = lastConfirmationSource
@@ -159,6 +162,7 @@ struct RuntimeAppWindowProjectionSeed {
             activationHandleID: activationHandleID,
             axWindow: axWindow,
             frame: frame,
+            isOnscreen: isOnscreen,
             allowsPublicAXRecovery: allowsPublicAXRecovery,
             hasStickyBinding: hasStickyBinding,
             lastConfirmationSource: lastConfirmationSource,
@@ -183,6 +187,7 @@ extension RuntimeWindowListEntry {
             activationHandleID: activationHandleID,
             axWindow: axWindow,
             frame: frame,
+            isOnscreen: isOnscreen,
             allowsPublicAXRecovery: allowsPublicAXRecovery,
             hasStickyBinding: hasStickyBinding,
             lastConfirmationSource: lastConfirmationSource,

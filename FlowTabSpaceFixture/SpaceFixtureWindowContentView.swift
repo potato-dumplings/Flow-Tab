@@ -30,7 +30,7 @@ final class SpaceFixtureWindowContentView: NSView {
 
         let arrangedViews: [NSView] = [
             makeLabel(
-                text: plan.title,
+                text: plan.contentTitle,
                 font: .systemFont(ofSize: 30, weight: .semibold),
                 textColor: .labelColor,
                 identifier: plan.titleAccessibilityIdentifier

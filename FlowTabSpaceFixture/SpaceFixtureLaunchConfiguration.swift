@@ -9,7 +9,9 @@ struct SpaceFixtureConfiguredTab: Equatable {
 struct SpaceFixtureConfiguredWindow: Equatable {
     let configuredTitle: String
     let windowTitle: String
+    let contentTitle: String
     let mode: SpaceFixtureWindowMode
+    let frameMode: SpaceFixtureWindowFrameMode
     let tabs: [SpaceFixtureConfiguredTab]
     let noisyCGSiblings: Bool
     let publishesApplicationAXWindow: Bool
@@ -26,11 +28,15 @@ struct SpaceFixtureConfiguredWindow: Equatable {
         publishesApplicationAXWindow: Bool = true,
         suppressesWindowAccessibilityExposure: Bool = false,
         startupState: SpaceFixtureWindowStartupState = .normal,
-        kind: SpaceFixtureWindowKind = .standard
+        kind: SpaceFixtureWindowKind = .standard,
+        contentTitle: String? = nil,
+        frameMode: SpaceFixtureWindowFrameMode = .standard
     ) {
         self.configuredTitle = configuredTitle
         self.windowTitle = windowTitle
+        self.contentTitle = contentTitle ?? windowTitle
         self.mode = mode
+        self.frameMode = frameMode
         self.tabs = tabs
         self.noisyCGSiblings = noisyCGSiblings
         self.publishesApplicationAXWindow = publishesApplicationAXWindow
@@ -373,6 +379,10 @@ extension SpaceFixtureLaunchConfiguration {
                 fallback: "Window \(offset + 1)"
             )
             let windowTitle = normalizedTabs.first(where: \.isSelected)?.title ?? configuredTitle
+            let contentTitle = normalizedTitle(
+                window.contentTitle,
+                fallback: windowTitle
+            )
             return SpaceFixtureConfiguredWindow(
                 configuredTitle: configuredTitle,
                 windowTitle: windowTitle,
@@ -382,7 +392,9 @@ extension SpaceFixtureLaunchConfiguration {
                 publishesApplicationAXWindow: window.publishesApplicationAXWindow,
                 suppressesWindowAccessibilityExposure: window.suppressesWindowAccessibilityExposure,
                 startupState: window.startupState,
-                kind: window.kind
+                kind: window.kind,
+                contentTitle: contentTitle,
+                frameMode: window.frameMode
             )
         }
     }

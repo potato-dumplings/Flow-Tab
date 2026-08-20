@@ -1280,4 +1280,13 @@ Phase 7 completion-audit ledger: [RUNTIME_PROJECTION_COMPLETION_AUDIT.md](RUNTIM
 - non-registry focused AX readback 的真实系统形态仍需 UI/E2E proof；本轮已让生产日志可通过 `verifiedFocusFallbackAX=1` 精确判读自然触发，但尚未把真实 occurrence 标记完成。
 - public AX main/minimized tie-breaker 仍需真实 UI occurrence 与 real-world 状态组合 proof；focused target-app tie-breaker 已由 real edge-input UI/log oracle 覆盖，focused/main/minimized deterministic matcher 和 priority-order permutation proof 已齐。
 - 多显示器 fullscreen 组合、真实逐路径提交与非曝光证明仍需补覆盖。
+
 - AX-destroyed WindowRecord lifecycle 现在由精确事件身份和后续读回证据闭环：`RuntimeWindowRecord` 持有 `pendingDestroyedAXWindowID`，`RuntimeWindowMappingState` 优先使用当前 `AX -> CG` 索引，并在通知晚于 AX collection 更新时回溯唯一 `lastExactAXWindowID`；当前 CG 仍存在时 reconciliation 进入 `destroyedWindowResolution` 条件观察，同一个已销毁 AX 元素的滞后读回继续保持待确认，新的 AX 身份或元素会恢复原记录，后续权威 all-CG 读回不再包含目标 `CGWindowID` 时删除记录并提交新 projection。Required Unit/Behavior 覆盖包括首次 CG 残留、后续 AX/CG 缺失、唯一与歧义历史映射、滞后同元素读回、精确重绑和主动 condition readback；完整 `FlowTabTests` 通过 1,163 tests。最终 Fixed-path UI 通过 `testSwitcherPanelRefreshesOpenFullscreenWorkflowAppWindowLayerAfterTargetWindowCloses`（1 test，0 failures，20.019s），相邻 `testSwitcherPanelKeepsWindowLayerWhenSelectedFixtureWindowCloses` 通过（1 test，0 failures，10.424s）。最终候选 runtime-topology pressure 通过，18 个 0.5s identity-matched samples 的 CPU avg/p95/max 为 104.44/187.60/187.60，RSS avg/p95/max 为 170.83/239.55/239.55MB，与最近同机 19-sample baseline 的 100.66/177.00/177.00 与 176.78/230.73/230.73MB 同量级。条件观察 cadence 只影响读回延迟，窗口删除结果只来自精确 AX/CG evidence；Search freshness contract 不变，bounded barrier 成功提交新 generation 前只能是 `missingCommittedIndex` 或 degraded/stale committed result。
+
+## Sticky 私有桥接刷新不变量（2026-08-20）
+
+- 粘性复用阶段会对当前 AX 元素读取一次私有 `AX -> CGWindowID` 桥接。桥接指向当前有效 CG 集合中的历史窗口时，本轮记录继续使用 `privateExactBridge` 与 exact 置信度。
+- 桥接无结果或指向当前 CG 集合之外时，本轮使用 `stickyBinding`；桥接指向另一个当前有效 CG 窗口时，沿用冲突诊断、隔离与后续精确重映射流程。
+- 该不变量只依赖 AX/CG 窗口身份。标题过滤、全屏几何判定、冲突隔离顺序以及 AX/CG 占用集合保持既有规则。
+- 永久回归覆盖系统标题等于应用名、CG 标题为空、两个接近全屏窗口的连续两次解析；真实 Space Fixture 额外分离系统标题与内容标题，并用 `visibleFrame` 验证第二次映射、Home `2w` 与 Switcher 唯一窗口身份。
+- 最终验证通过完整 `FlowTabTests` 1,195/1,195、fixed-path 代表性 UI 4/4，以及 canonical noisy fullscreen/off-Space pressure 1/1。压力采样的 20 次 PID/签名身份检查全部匹配；CPU avg/p95/max 为 95.84/163.40/173.80%，RSS avg/p95/max 为 146.02/179.67/179.81 MB。相对最近同机同路径基线，CPU 分别变化 +0.13/-10.10/-7.50 个百分点，RSS 分别变化 -21.90/-39.08/-51.83 MB。

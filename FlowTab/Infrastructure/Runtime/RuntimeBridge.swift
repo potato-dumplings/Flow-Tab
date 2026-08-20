@@ -139,6 +139,7 @@ struct RuntimeWindowContext {
     var activationHandleID: String?
     var axWindow: AXUIElement? = nil
     let frame: CGRect?
+    let isOnscreen: Bool
     let allowsPublicAXRecovery: Bool
     let hasStickyBinding: Bool
     let lastConfirmationSource: WindowBindingConfirmationSource?
@@ -188,6 +189,7 @@ struct RuntimeWindowContext {
         activationHandleID: String? = nil,
         axWindow: AXUIElement? = nil,
         frame: CGRect? = nil,
+        isOnscreen: Bool = false,
         allowsPublicAXRecovery: Bool = false,
         hasStickyBinding: Bool = false,
         lastConfirmationSource: WindowBindingConfirmationSource? = nil,
@@ -207,6 +209,7 @@ struct RuntimeWindowContext {
         self.activationHandleID = activationHandleID
         self.axWindow = axWindow
         self.frame = frame
+        self.isOnscreen = isOnscreen
         self.allowsPublicAXRecovery = allowsPublicAXRecovery
         self.hasStickyBinding = hasStickyBinding
         self.lastConfirmationSource = lastConfirmationSource

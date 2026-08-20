@@ -206,7 +206,12 @@ struct SpaceFixtureResolvedWorkflow: Equatable {
                     launchOrder: app.launchOrder,
                     windowCount: app.windows.count,
                     expectedWindowTitles: app.windows.map(\.resolvedTitle),
+                    expectedContentTitles: app.windows.map(\.resolvedContentTitle),
                     expectedHomeWindowTitles: app.windows.compactMap(\.homeResolvedTitle),
+                    visibleFrameWindowIndices:
+                        app.windows.enumerated().compactMap { index, window in
+                            window.frameMode == .visibleFrame ? index + 1 : nil
+                        },
                     fullscreenWindowIndex:
                         fullscreenWindowIndices.first,
                     fullscreenWindowIndices:
@@ -300,9 +305,16 @@ enum SpaceFixtureResolvedWorkflowWindowMode: String, Codable {
     case fullscreen
 }
 
+enum SpaceFixtureResolvedWorkflowWindowFrameMode: String, Codable {
+    case standard
+    case visibleFrame
+}
+
 struct SpaceFixtureResolvedWorkflowWindowDocument: Codable {
     let title: String
+    let contentTitle: String?
     let mode: SpaceFixtureResolvedWorkflowWindowMode
+    let frameMode: SpaceFixtureResolvedWorkflowWindowFrameMode?
     let tabs: [SpaceFixtureResolvedWorkflowTabDocument]
     let noisyCGSiblings: Bool?
     let publishesApplicationAXWindow: Bool?
@@ -317,6 +329,14 @@ struct SpaceFixtureResolvedWorkflowWindowDocument: Codable {
             return firstTabTitle
         }
         return title.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var resolvedContentTitle: String {
+        let trimmedContentTitle = contentTitle?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedContentTitle?.isEmpty == false
+            ? trimmedContentTitle!
+            : resolvedTitle
     }
 
     var homeResolvedTitle: String? {

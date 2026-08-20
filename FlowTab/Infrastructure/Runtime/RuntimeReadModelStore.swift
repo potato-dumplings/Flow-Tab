@@ -752,7 +752,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 axWindow: windowContext.axWindow,
                 frame: windowContext.frame,
                 spaceIDs: windowContext.spaceIDs,
-                isOnscreen: false,
+                isOnscreen: windowContext.isOnscreen,
                 allowsPublicAXRecovery: windowContext.allowsPublicAXRecovery,
                 hasStickyBinding: windowContext.hasStickyBinding,
                 lastConfirmationSource: windowContext.lastConfirmationSource,

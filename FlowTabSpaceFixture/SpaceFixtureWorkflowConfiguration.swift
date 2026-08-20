@@ -5,6 +5,11 @@ enum SpaceFixtureWindowMode: String, Codable, Equatable {
     case fullscreen
 }
 
+enum SpaceFixtureWindowFrameMode: String, Codable, Equatable {
+    case standard
+    case visibleFrame
+}
+
 enum SpaceFixtureWindowStartupState: String, Codable, Equatable {
     case normal
     case minimized
@@ -136,7 +141,9 @@ struct SpaceFixtureWorkflowAppConfiguration: Codable, Equatable {
 
 struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
     let title: String
+    let contentTitle: String?
     let mode: SpaceFixtureWindowMode
+    let frameMode: SpaceFixtureWindowFrameMode
     let tabs: [SpaceFixtureWorkflowTabConfiguration]
     let noisyCGSiblings: Bool
     let publishesApplicationAXWindow: Bool
@@ -146,7 +153,9 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case title
+        case contentTitle
         case mode
+        case frameMode
         case tabs
         case noisyCGSiblings
         case publishesApplicationAXWindow
@@ -163,10 +172,14 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
         publishesApplicationAXWindow: Bool = true,
         suppressesWindowAccessibilityExposure: Bool = false,
         startupState: SpaceFixtureWindowStartupState = .normal,
-        kind: SpaceFixtureWindowKind = .standard
+        kind: SpaceFixtureWindowKind = .standard,
+        contentTitle: String? = nil,
+        frameMode: SpaceFixtureWindowFrameMode = .standard
     ) {
         self.title = title
+        self.contentTitle = contentTitle
         self.mode = mode
+        self.frameMode = frameMode
         self.tabs = tabs
         self.noisyCGSiblings = noisyCGSiblings
         self.publishesApplicationAXWindow = publishesApplicationAXWindow
@@ -197,6 +210,11 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
             kind: try container.decodeIfPresent(
                 SpaceFixtureWindowKind.self,
                 forKey: .kind
+            ) ?? .standard,
+            contentTitle: try container.decodeIfPresent(String.self, forKey: .contentTitle),
+            frameMode: try container.decodeIfPresent(
+                SpaceFixtureWindowFrameMode.self,
+                forKey: .frameMode
             ) ?? .standard
         )
     }

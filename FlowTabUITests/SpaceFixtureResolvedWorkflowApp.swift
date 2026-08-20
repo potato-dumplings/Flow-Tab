@@ -8,7 +8,9 @@ extension SpaceFixtureResolvedWorkflow {
         let launchOrder: Int
         let windowCount: Int
         let expectedWindowTitles: [String]
+        let expectedContentTitles: [String]
         var expectedHomeWindowTitles: [String] = []
+        let visibleFrameWindowIndices: [Int]
         let fullscreenWindowIndices: [Int]
         let fullscreenWindowTitles: [String]
 
@@ -23,7 +25,9 @@ extension SpaceFixtureResolvedWorkflow {
             launchOrder: Int,
             windowCount: Int,
             expectedWindowTitles: [String],
+            expectedContentTitles: [String]? = nil,
             expectedHomeWindowTitles: [String] = [],
+            visibleFrameWindowIndices: [Int] = [],
             fullscreenWindowIndex: Int?,
             fullscreenWindowIndices: [Int]? = nil,
             fullscreenWindowTitles: [String]? = nil
@@ -48,6 +52,15 @@ extension SpaceFixtureResolvedWorkflow {
                     || fullscreenWindowIndex
                         == resolvedFullscreenWindowIndices.first
             )
+            precondition(
+                visibleFrameWindowIndices
+                    == Array(Set(visibleFrameWindowIndices)).sorted()
+            )
+            precondition(
+                visibleFrameWindowIndices.allSatisfy {
+                    $0 > 0 && $0 <= windowCount
+                }
+            )
 
             self.appID = appID
             self.appName = appName
@@ -55,8 +68,12 @@ extension SpaceFixtureResolvedWorkflow {
             self.launchOrder = launchOrder
             self.windowCount = windowCount
             self.expectedWindowTitles = expectedWindowTitles
+            self.expectedContentTitles =
+                expectedContentTitles ?? expectedWindowTitles
             self.expectedHomeWindowTitles =
                 expectedHomeWindowTitles
+            self.visibleFrameWindowIndices =
+                visibleFrameWindowIndices
             self.fullscreenWindowIndices =
                 resolvedFullscreenWindowIndices
             if let fullscreenWindowTitles {

@@ -191,6 +191,35 @@ enum RuntimeWindowMappingTestSupport {
         ).map(Self.resolvedEntry)
     }
 
+    static func resolveWindowEntriesAcrossRefreshes(
+        axWindows: [RuntimeAXWindowEntry],
+        cgWindows: [RuntimeCGWindowEntry],
+        exactBridgeMatches: [String: CGWindowID] = [:],
+        refreshCount: Int,
+        pid: pid_t = 100,
+        appName: String = "FlowTab Test"
+    ) -> [[ResolvedEntry]] {
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let previousExactBridgeOverride = AXWindowInspector.cgWindowIDOverrideForTesting
+        AXWindowInspector.cgWindowIDOverrideForTesting = exactBridgeOverride(
+            axEntries: axWindows,
+            requestedWindowIDsByAXWindowID: exactBridgeMatches
+        )
+        defer {
+            AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
+        }
+
+        return (0..<max(0, refreshCount)).map { _ in
+            RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+                windowRecordStore: windowRecordStore,
+                axWindows: axWindows,
+                cgWindows: cgWindows,
+                pid: pid,
+                appName: appName
+            ).map(Self.resolvedEntry)
+        }
+    }
+
     static func resolveWindowEntriesAndProjectedEntries(
         axWindows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry],

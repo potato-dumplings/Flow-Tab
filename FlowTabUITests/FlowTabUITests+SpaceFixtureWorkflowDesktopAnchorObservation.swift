@@ -236,7 +236,7 @@ extension FlowTabUITests {
                     readinessEvidence.identity
                         .processIdentifier,
                 windows:
-                    workflowApp.expectedWindowTitles
+                    workflowApp.expectedContentTitles
                         .enumerated()
                         .map { index, title in
                             let planIndex = index + 1
@@ -247,7 +247,9 @@ extension FlowTabUITests {
                                     "flowtab.spacefixture.window.title."
                                     + String(planIndex)
                             )
-                        }
+                        },
+                fullscreenSizedDesktopWindowPlanIndices:
+                    Set(workflowApp.visibleFrameWindowIndices)
             )
         XCTAssertEqual(
             readinessEvidence.identity.bundleIdentifier,
@@ -290,9 +292,10 @@ extension FlowTabUITests {
                     evidence.snapshot.topmostCGWindowFrame
                 )
         )
-        XCTAssertFalse(
+        XCTAssertTrue(
             evidence.snapshot
-                .topmostCGWindowIsFullscreenSpaceSized
+                .unmetConditions(expectation: expectation)
+                .isEmpty
         )
         return evidence
     }
