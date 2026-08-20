@@ -202,6 +202,7 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
         let homeSummaries = Self.homeSummariesFromApplicationDirectory(
             appDirectoryEntries,
             windowsByPID: windowsByPID,
+            windowStatsByPID: windowStatsByPID,
             rankByPID: rankByPID
         )
 
@@ -265,12 +266,13 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
     private static func homeSummariesFromApplicationDirectory(
         _ entries: [RuntimeAppDirectoryEntry],
         windowsByPID: [pid_t: [RuntimeWindowListEntry]],
+        windowStatsByPID: [pid_t: RuntimeAppWindowStats],
         rankByPID: [pid_t: Int]
     ) -> [RuntimeHomeAppSummary] {
         let entriesByAppID = RuntimeAppDirectory.groupedEntriesByAppID(entries)
         let primaryEntries = RuntimeAppDirectory.selectPrimaryEntries(
             from: entries,
-            windowStatsByPID: [:],
+            windowStatsByPID: windowStatsByPID,
             rankByPID: rankByPID
         )
         return sortedEntriesForProjection(

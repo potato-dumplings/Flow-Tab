@@ -110,6 +110,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     func commitCurrentAppWindowProjection(
         _ payload: RuntimeCurrentAppWindowPayload,
         clearsDirtyState: Bool = false,
+        clearsDirtyPIDs: Set<pid_t> = [],
         authoritativeCGWindowIDs: Set<CGWindowID>? = nil,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) {
@@ -125,6 +126,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         markProjectionCommittedLocked()
         if clearsDirtyState {
             clearDirtyStateForAppLocked(appID: committedPayload.summary.appID, pid: committedPayload.summary.pid)
+            dirtyPIDs.subtract(clearsDirtyPIDs)
             clearDirtyStateForProjectedCGWindowsLocked(in: committedPayload)
         }
         currentAppWindowProjectionsByAppID[committedPayload.summary.appID] = RuntimeCurrentAppWindowProjection(
@@ -556,7 +558,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         _ requestedCGWindowIDs: Set<CGWindowID>,
         hasCompleteWindowCoverage: Bool
     ) {
-        guard hasCompleteWindowCoverage, !requestedCGWindowIDs.isEmpty else { return }
+        guard hasCompleteWindowCoverage else { return }
         dirtyCGWindowIDs.subtract(requestedCGWindowIDs)
         if dirtyCGWindowIDs.isEmpty {
             pendingRepairScopes.remove("spaceTopology")

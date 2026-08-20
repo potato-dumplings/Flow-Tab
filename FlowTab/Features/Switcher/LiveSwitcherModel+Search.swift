@@ -349,9 +349,13 @@ extension LiveSwitcherModel {
         guard var session else { return false }
         flushCurrentSearchComputationForCommit()
         guard let selected = searchViewState.selectedResult else { return false }
+        let selectedAppID: String
+        let selectedWindowID: String?
 
         switch selected.kind {
         case .app(let appID):
+            selectedAppID = appID
+            selectedWindowID = nil
             if !session.selectApp(withID: appID) {
                 guard let committedApp = committedSearchAppsByID[appID] else { return false }
                 session = Self.sessionByApplyingCommittedSearchTarget(
@@ -361,6 +365,8 @@ extension LiveSwitcherModel {
                 guard session.selectApp(withID: appID) else { return false }
             }
         case .window(let appID, let windowID):
+            selectedAppID = appID
+            selectedWindowID = windowID
             if !session.selectWindow(appID: appID, windowID: windowID) {
                 guard
                     let committedApp = committedSearchAppsByID[appID],
@@ -377,6 +383,10 @@ extension LiveSwitcherModel {
                 }
             }
         }
+        hydrateRuntimeContextForSearchSelectionIfNeeded(
+            appID: selectedAppID,
+            windowID: selectedWindowID
+        )
 
         autoEnterSuppressedAppID = nil
         cancelPendingSearchComputation()
@@ -385,6 +395,26 @@ extension LiveSwitcherModel {
         _ = searchCoordinator.exit()
         publishSearchStateIfNeeded()
         return true
+    }
+
+    private func hydrateRuntimeContextForSearchSelectionIfNeeded(
+        appID: String,
+        windowID: String?
+    ) {
+        if let windowID {
+            guard runtimeContextsByID[appID]?.windowsByID[windowID] == nil else { return }
+        } else {
+            guard runtimeContextsByID[appID] == nil else { return }
+        }
+        guard
+            let context = runtimeProjectionService
+                .readAppSwitcherProjection()?
+                .contextsByID[appID],
+            windowID.map({ context.windowsByID[$0] != nil }) ?? true
+        else {
+            return
+        }
+        runtimeContextsByID[appID] = context
     }
 
     private static func sessionByApplyingCommittedSearchTarget(
