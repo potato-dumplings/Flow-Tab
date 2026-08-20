@@ -357,6 +357,15 @@ extension SwitcherPanelController {
             isHotkeyHoldModifierFlagsEvent(event)
         guard isHotkeyHoldModifierEvent else { return }
         guard isPanelPresented else { return }
+        let sessionKind =
+            activeHotkeySessionKind ?? .globalAppSwitcher
+        updateHotkeyHoldSetPressedEvidence(
+            isHotkeyKeySetPressedInHardwareState(
+                hotkeyHoldKeys(for: sessionKind),
+                eventModifierFlags: event.modifierFlags
+            ),
+            for: sessionKind
+        )
         guard !model.isSearchActive else { return }
         logInputTrace(
             "flagsChanged keyCode=\(event.keyCode) action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(monotonicMilliseconds()))"

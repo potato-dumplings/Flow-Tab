@@ -1,5 +1,6 @@
 import AppKit
 import Carbon
+import FlowTabCore
 import Foundation
 import Darwin
 
@@ -188,6 +189,7 @@ final class OptionTabHotkeyMonitor {
     private let chordEventMonitorStarterOverride:
         ((SwitcherHotkeyConfiguration) -> Bool)?
     private let chordEventMonitorStopperOverride: (() -> Void)?
+    private let currentEventModifiersProvider: () -> KeyModifier
 
     private(set) var isEventHandlerInstalledForTesting = false
     private var isChordEventMonitorInstalledForTesting = false
@@ -208,7 +210,14 @@ final class OptionTabHotkeyMonitor {
         eventHandlerRemoverOverride: (() -> Void)? = nil,
         chordEventMonitorStarterOverride:
             ((SwitcherHotkeyConfiguration) -> Bool)? = nil,
-        chordEventMonitorStopperOverride: (() -> Void)? = nil
+        chordEventMonitorStopperOverride: (() -> Void)? = nil,
+        currentEventModifiersProvider: @escaping
+            () -> KeyModifier = {
+                KeyModifier(
+                    carbonModifiers:
+                        GetCurrentEventKeyModifiers()
+                )
+            }
     ) {
         self.hotkeyConfiguration = configuration
         self.signature = signature
@@ -222,6 +231,8 @@ final class OptionTabHotkeyMonitor {
             chordEventMonitorStarterOverride
         self.chordEventMonitorStopperOverride =
             chordEventMonitorStopperOverride
+        self.currentEventModifiersProvider =
+            currentEventModifiersProvider
         guard startsMonitoring else { return }
         start()
     }
@@ -522,7 +533,12 @@ final class OptionTabHotkeyMonitor {
         let inputEvent = HotkeyInputEvent(
             identity: nextInputEventIdentity(),
             phase: phase,
-            isBackward: isBackward
+            isBackward: isBackward,
+            holdSetPressedEvidence: phase == .pressed
+                || hotkeyConfiguration.baseKeys.modifiers
+                    .isSubset(
+                        of: currentEventModifiersProvider()
+                    )
         )
         let phaseText = phase == .pressed ? "pressed" : "released"
         RuntimeLog.debug(

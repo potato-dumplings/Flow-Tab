@@ -81,6 +81,61 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(events.map(\.identity.sequence), [1, 2, 3, 4])
     }
 
+    func testOptionTabHotkeyMonitorCarbonEventsPublishHoldSetEvidence() {
+        var currentEventModifiers: KeyModifier = .option
+        let monitor = OptionTabHotkeyMonitor(
+            configuration: SwitcherHotkeyPreferencesStore.resolve(
+                baseKeysRaw: SwitcherHotkeyKey.option.rawValue,
+                mainKeysRaw: SwitcherHotkeyKey.tab.rawValue,
+                quitKeysRaw: SwitcherHotkeyKey.q.rawValue
+            ),
+            signature: 0x54455354,
+            forwardHotkeyID: 11,
+            backwardHotkeyID: 22,
+            startsMonitoring: false,
+            currentEventModifiersProvider: {
+                currentEventModifiers
+            }
+        )
+        var events: [HotkeyInputEvent] = []
+        monitor.onHotkeyEvent = { events.append($0) }
+
+        XCTAssertEqual(
+            monitor.dispatchHotkeyEventForTesting(
+                id: 11,
+                phase: .pressed
+            ),
+            noErr
+        )
+        XCTAssertEqual(
+            monitor.dispatchHotkeyEventForTesting(
+                id: 11,
+                phase: .released
+            ),
+            noErr
+        )
+        currentEventModifiers = []
+        XCTAssertEqual(
+            monitor.dispatchHotkeyEventForTesting(
+                id: 11,
+                phase: .pressed
+            ),
+            noErr
+        )
+        XCTAssertEqual(
+            monitor.dispatchHotkeyEventForTesting(
+                id: 11,
+                phase: .released
+            ),
+            noErr
+        )
+
+        XCTAssertEqual(
+            events.map(\.holdSetPressedEvidence),
+            [true, true, true, false]
+        )
+    }
+
     func testOptionTabHotkeyMonitorPassesThroughUnrelatedEvents() {
         let monitor = OptionTabHotkeyMonitor(signature: 0x54455354, startsMonitoring: false)
         var callbackCount = 0

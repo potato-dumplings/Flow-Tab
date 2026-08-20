@@ -173,6 +173,72 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testHotkeyInputOwnerRetainsExplicitHoldEvidenceUntilUpdated() {
+        let owner = SwitcherHotkeyInputOwner()
+        let sourceID = HotkeyInputSourceID()
+        owner.register(
+            sourceID: sourceID,
+            for: .globalAppSwitcher
+        )
+        let pressed = HotkeyInputEvent(
+            identity: HotkeyInputEventIdentity(
+                sourceID: sourceID,
+                sequence: 1
+            ),
+            phase: .pressed,
+            isBackward: false,
+            holdSetPressedEvidence: true
+        )
+        let mainKeyReleased = HotkeyInputEvent(
+            identity: HotkeyInputEventIdentity(
+                sourceID: sourceID,
+                sequence: 2
+            ),
+            phase: .released,
+            isBackward: false
+        )
+
+        _ = owner.observe(
+            pressed,
+            route: .globalAppSwitcher,
+            presentationSessionGeneration: 1
+        )
+        _ = owner.observe(
+            mainKeyReleased,
+            route: .globalAppSwitcher,
+            presentationSessionGeneration: 1
+        )
+
+        XCTAssertEqual(
+            owner.latestHoldSetPressedEvidence(
+                for: .globalAppSwitcher
+            ),
+            true
+        )
+
+        owner.updateHoldSetPressedEvidence(
+            false,
+            for: .globalAppSwitcher
+        )
+        XCTAssertEqual(
+            owner.latestHoldSetPressedEvidence(
+                for: .globalAppSwitcher
+            ),
+            false
+        )
+
+        owner.register(
+            sourceID: HotkeyInputSourceID(),
+            for: .globalAppSwitcher
+        )
+        XCTAssertNil(
+            owner.latestHoldSetPressedEvidence(
+                for: .globalAppSwitcher
+            )
+        )
+    }
+
+    @MainActor
     func testHotkeyInputOwnerSourceReplacementRejectsQueuedOldSource() {
         let owner = SwitcherHotkeyInputOwner()
         let firstSourceID = HotkeyInputSourceID()

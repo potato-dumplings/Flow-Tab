@@ -246,6 +246,14 @@ extension SwitcherPanelController {
             }
         }
 
+        if let inputEvidence =
+            latestHotkeyHoldSetPressedEvidence(
+                for: sessionKind
+            )
+        {
+            return inputEvidence
+        }
+
         return isHotkeyKeySetPressedInHardwareState(
             hotkeyHoldKeys(for: sessionKind)
         )

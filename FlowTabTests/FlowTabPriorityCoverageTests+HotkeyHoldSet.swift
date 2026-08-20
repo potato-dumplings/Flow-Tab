@@ -1,9 +1,89 @@
 import AppKit
+import Carbon
 import XCTest
 @testable import FlowTab
 import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
+    @MainActor
+    func testGlobalCarbonMainKeyReleaseKeepsSessionUntilModifierRelease() {
+        let configuration = SwitcherHotkeyPreferencesStore.resolve(
+            baseKeysRaw: "option",
+            reverseKeysRaw: "shift",
+            mainKeysRaw: "tab",
+            quitKeysRaw: "q"
+        )
+        let restoreConfiguration =
+            installTemporarySwitcherHotkeyConfiguration(configuration)
+        defer { restoreConfiguration() }
+
+        let releaseScheduler =
+            ManualModifierReleaseObservationScheduler()
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                runtimeProjectionService:
+                    RecordingRuntimeProjectionService(
+                        appSwitcherApps: searchScenarioApps()
+                    )
+            ),
+            modifierReleaseObservationScheduler:
+                releaseScheduler,
+            modifierReleaseEventSource:
+                ManualModifierReleaseEventSource()
+        )
+        controller.modelForTesting.activationOverride = { _, _ in }
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+
+        let inputSource = ManualHotkeyInputSource()
+        inputSource.register(on: controller, for: .globalAppSwitcher)
+        inputSource.deliver(
+            HotkeyInputEvent(
+                identity: HotkeyInputEventIdentity(
+                    sourceID: inputSource.sourceID,
+                    sequence: 1
+                ),
+                phase: .pressed,
+                isBackward: false,
+                holdSetPressedEvidence: true
+            ),
+            to: controller,
+            for: .globalAppSwitcher
+        )
+        controller
+            .scheduleModifierReleaseConfirmationAfterRecoveredPresentationIfNeeded(
+                trigger: "global_show"
+            )
+        XCTAssertFalse(controller.hasPendingModifierReleaseConfirmation)
+
+        inputSource.deliver(
+            HotkeyInputEvent(
+                identity: HotkeyInputEventIdentity(
+                    sourceID: inputSource.sourceID,
+                    sequence: 2
+                ),
+                phase: .released,
+                isBackward: false,
+                holdSetPressedEvidence: true
+            ),
+            to: controller,
+            for: .globalAppSwitcher
+        )
+
+        XCTAssertNotNil(controller.modelForTesting.session)
+        XCTAssertFalse(controller.hasPendingModifierReleaseConfirmation)
+
+        controller.handleFlagsChangedForTesting(
+            Self.makeFlagsChangedEvent(
+                keyCode: UInt16(kVK_Option),
+                modifierFlags: []
+            )
+        )
+        XCTAssertTrue(controller.hasPendingModifierReleaseConfirmation)
+        releaseScheduler.fireNext()
+
+        XCTAssertNil(controller.modelForTesting.session)
+    }
+
     @MainActor
     func testInAppMainKeyReleaseKeepsSessionUntilBaseKeysRelease() throws {
         let runningApp = NSRunningApplication.current

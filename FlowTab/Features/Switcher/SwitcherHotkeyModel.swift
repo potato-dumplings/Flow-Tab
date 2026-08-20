@@ -4,6 +4,23 @@ import FlowTabCore
 import Foundation
 
 extension KeyModifier {
+    init(carbonModifiers: UInt32) {
+        var modifiers: KeyModifier = []
+        if carbonModifiers & UInt32(cmdKey) != 0 {
+            modifiers.insert(.command)
+        }
+        if carbonModifiers & UInt32(controlKey) != 0 {
+            modifiers.insert(.control)
+        }
+        if carbonModifiers & UInt32(optionKey) != 0 {
+            modifiers.insert(.option)
+        }
+        if carbonModifiers & UInt32(shiftKey) != 0 {
+            modifiers.insert(.shift)
+        }
+        self = modifiers
+    }
+
     init(eventModifierFlags: NSEvent.ModifierFlags) {
         var modifiers: KeyModifier = []
         if eventModifierFlags.contains(.command) {

@@ -226,6 +226,24 @@ extension SwitcherPanelController {
         }
     }
 
+    func latestHotkeyHoldSetPressedEvidence(
+        for sessionKind: HotkeySessionKind
+    ) -> Bool? {
+        hotkeyInputOwner.latestHoldSetPressedEvidence(
+            for: hotkeyInputRoute(for: sessionKind)
+        )
+    }
+
+    func updateHotkeyHoldSetPressedEvidence(
+        _ evidence: Bool,
+        for sessionKind: HotkeySessionKind
+    ) {
+        hotkeyInputOwner.updateHoldSetPressedEvidence(
+            evidence,
+            for: hotkeyInputRoute(for: sessionKind)
+        )
+    }
+
     private func hotkeyInputEvidenceFields(
         _ receipt: SwitcherHotkeyInputReceipt
     ) -> String {

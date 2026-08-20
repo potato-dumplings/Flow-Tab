@@ -11,6 +11,10 @@ private enum FlowTabUITestSwitcherInteractionRegressionWatchdogPolicy {
     static let compatibleBounds = [foregroundReadiness, controlTabDiagnostics, controlTabSelectedPreview, controlTabWindowCards, delayedPresentationDismissal]
 }
 
+private enum FlowTabUITestMainHotkeySearchWatchdogPolicy {
+    static let panelPresentation: TimeInterval = 5
+}
+
 private enum FlowTabUITestDelayedWindowLayerEntryEvidence {
     static let prewarmBeforeEntryPattern =
         #"\[AutoEnter\] pending targetAppID="#
@@ -23,6 +27,229 @@ private enum FlowTabUITestDelayedWindowLayerEntryEvidence {
 }
 
 extension FlowTabUITests {
+    func testMainSwitcherPrimaryChordReloadKeepsUpArrowSearchEntry() {
+        let launchLogSnapshot = makeRuntimeLogFileSnapshot()
+        defer { launchLogSnapshot.cancel() }
+        let app = makeApp(
+            additionalArguments: hotkeyEffectArguments(
+                resetDefaults: true,
+                usesSystemAccessibilityPermission: true
+            ) + [
+                "--flowtab-ui-enable-shortcut-event-injection",
+                "--flowtab-ui-listen-switcher-trigger",
+                "-hotkeyPrimaryModifier",
+                "option+w",
+                "-searchDefaultScope",
+                "app",
+                "-windowLayerAutoEnterDelay",
+                "30.0",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        defer { app.terminate() }
+        defer {
+            setRuntimePressedKeySet(
+                in: app,
+                keyCodes: [],
+                modifierFlags: []
+            )
+        }
+        assertSwitcherInteractionApplicationIsForegroundReady(
+            app,
+            scenario: "Option+W main shortcut Up Arrow Search entry"
+        )
+
+        waitForRuntimeLogFiles(
+            containing: [
+                "chord event monitor active mode=accessibility "
+                    + "forward=Option + W + Tab",
+                "mainRoute=accessibilityChord"
+            ],
+            since: launchLogSnapshot
+        )
+
+        let primaryChordKeyCodes = [CGKeyCode(kVK_ANSI_W)]
+        let completeShortcutKeyCodes =
+            primaryChordKeyCodes + [CGKeyCode(kVK_Tab)]
+        let searchReadiness =
+            prepareInitialFlowTabSearchInputReadiness()
+        let summary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        let pressLogSnapshot = makeRuntimeLogFileSnapshot()
+        defer { pressLogSnapshot.cancel() }
+
+        app.activate()
+        setRuntimePressedKeySet(
+            in: app,
+            keyCodes: completeShortcutKeyCodes,
+            modifierFlags: .option
+        )
+        waitForRuntimeLogFiles(
+            containing: [
+                "dispatch chord phase=pressed dir=forward",
+                "hotkeyPressed dir=forward panelVisible=0 action=show",
+                "show kind=global result=presented",
+                "HotKey Forward"
+            ],
+            since: pressLogSnapshot
+        )
+        XCTAssertTrue(
+            summary.waitForExistence(
+                timeout:
+                    FlowTabUITestMainHotkeySearchWatchdogPolicy
+                        .panelPresentation
+            ),
+            "Option+W+Tab did not publish the global switcher panel."
+        )
+
+        let mainKeyReleaseLogSnapshot =
+            makeRuntimeLogFileSnapshot()
+        defer { mainKeyReleaseLogSnapshot.cancel() }
+        setRuntimePressedKeySet(
+            in: app,
+            keyCodes: primaryChordKeyCodes,
+            modifierFlags: .option
+        )
+        waitForRuntimeLogFiles(
+            containing: [
+                "dispatch chord phase=released dir=forward",
+                "HotKey Forward Released"
+            ],
+            since: mainKeyReleaseLogSnapshot
+        )
+        XCTAssertTrue(
+            summary.exists,
+            "The switcher panel closed while Option+W remained pressed."
+        )
+
+        setRuntimePressedKeySet(
+            in: app,
+            keyCodes:
+                primaryChordKeyCodes
+                + [CGKeyCode(kVK_UpArrow)],
+            modifierFlags: .option
+        )
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: searchReadiness
+        )
+
+        setRuntimePressedKeySet(
+            in: app,
+            keyCodes: [],
+            modifierFlags: []
+        )
+        assertElementDoesNotExistAfterTrigger(
+            summary,
+            timeout:
+                FlowTabUITestMainHotkeySearchWatchdogPolicy
+                    .panelPresentation,
+            description: "Option+W Search presentation dismissal",
+            trigger: {
+                app.typeKey(.escape, modifierFlags: [])
+                app.typeKey(.escape, modifierFlags: [])
+            }
+        )
+
+        let optionRegistrationLogSnapshot =
+            makeRuntimeLogFileSnapshot()
+        defer { optionRegistrationLogSnapshot.cancel() }
+        openSettingsTab(in: app)
+        app.activate()
+        assertSwitcherInteractionApplicationIsForegroundReady(
+            app,
+            scenario: "Option shortcut restoration"
+        )
+        recordShortcut(
+            in: app,
+            .modifiers(
+                controlIdentifier:
+                    Identifier.settingsHotkeyMainModifiers,
+                modifierFlags: .option,
+                expectedValue: "Option"
+            )
+        )
+        waitForRuntimeLogFiles(
+            containing: [
+                "updated main=Option + Tab",
+                "mainRoute=carbon"
+            ],
+            since: optionRegistrationLogSnapshot
+        )
+
+        let reloadedSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        let optionSearchReadiness =
+            prepareInitialFlowTabSearchInputReadiness()
+        let optionPressLogSnapshot =
+            makeRuntimeLogFileSnapshot()
+        defer { optionPressLogSnapshot.cancel() }
+        app.activate()
+        setRuntimePressedKeySet(
+            in: app,
+            keyCodes: [CGKeyCode(kVK_Tab)],
+            modifierFlags: .option
+        )
+        waitForRuntimeLogFiles(
+            containing: [
+                "dispatch phase=pressed dir=forward",
+                "hotkeyPressed dir=forward panelVisible=0 action=show",
+                "show kind=global result=presented",
+                "HotKey Forward"
+            ],
+            since: optionPressLogSnapshot
+        )
+        let reloadedPanelAppeared =
+            reloadedSummary.waitForExistence(
+                timeout:
+                    FlowTabUITestMainHotkeySearchWatchdogPolicy
+                        .panelPresentation
+            )
+
+        let optionMainKeyReleaseLogSnapshot =
+            makeRuntimeLogFileSnapshot()
+        defer { optionMainKeyReleaseLogSnapshot.cancel() }
+        setRuntimePressedKeySet(
+            in: app,
+            keyCodes: [],
+            modifierFlags: .option
+        )
+        waitForRuntimeLogFiles(
+            containing: [
+                "dispatch phase=released dir=forward",
+                "HotKey Forward Released"
+            ],
+            since: optionMainKeyReleaseLogSnapshot
+        )
+        let reloadedPanelRemainedPresented =
+            reloadedSummary.exists
+
+        setRuntimePressedKeySet(
+            in: app,
+            keyCodes: [CGKeyCode(kVK_UpArrow)],
+            modifierFlags: .option
+        )
+        _ = requireInitialFlowTabSearchInput(
+            in: app,
+            observedBy: optionSearchReadiness
+        )
+        XCTAssertTrue(
+            reloadedPanelAppeared,
+            "Option+Tab did not publish the global switcher panel "
+                + "after the shortcut reload."
+        )
+        XCTAssertTrue(
+            reloadedPanelRemainedPresented,
+            "The reloaded switcher panel closed while Option remained pressed."
+        )
+    }
+
     func testInAppWindowSwitcherKeepsPanelWhileControlRemainsPressed() {
         let app = makeApp(
             additionalArguments: hotkeyEffectArguments(
