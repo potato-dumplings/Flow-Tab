@@ -353,6 +353,7 @@
 		E3D100023D11000100B0D737 /* RuntimeTransientRepairObservationDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3D100013D11000100B0D737 /* RuntimeTransientRepairObservationDriver.swift */; };
 		E4D100023D12000100B0D737 /* RuntimeAXWindowChangeDeliveryCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4D100013D12000100B0D737 /* RuntimeAXWindowChangeDeliveryCoordinator.swift */; };
 		E6D100023D14000100B0D737 /* RuntimeActivator+FocusRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D100013D14000100B0D737 /* RuntimeActivator+FocusRecovery.swift */; };
+		D7A4C1023E20000100B0D737 /* RuntimeActivator+ApplicationActivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A4C1013E20000100B0D737 /* RuntimeActivator+ApplicationActivation.swift */; };
 		E6D100043D14000100B0D737 /* RuntimeFocusRecoveryCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D100033D14000100B0D737 /* RuntimeFocusRecoveryCoordinator.swift */; };
 		E6D100063D14000100B0D737 /* RuntimeFocusRecoveryPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D100053D14000100B0D737 /* RuntimeFocusRecoveryPolicy.swift */; };
 		E6D1000E3D14000100B0D737 /* RuntimeFocusRecoveryDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D1000D3D14000100B0D737 /* RuntimeFocusRecoveryDiagnostics.swift */; };
@@ -558,6 +559,7 @@
 		B24D12012FC3000100B0D737 /* FlowTabUITests+SwitcherAppSelectionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24D02012FC3000100B0D737 /* FlowTabUITests+SwitcherAppSelectionObservation.swift */; };
 		B24E12012FC3000100B0D737 /* FlowTabUITests+SwitcherAppSelectionObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24E02012FC3000100B0D737 /* FlowTabUITests+SwitcherAppSelectionObservationTests.swift */; };
 		B25012012FC4000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabSpaceBacked.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25002012FC4000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabSpaceBacked.swift */; };
+		B25112012FC5000100B0D737 /* FlowTabUITests+SpaceFixtureAppCycleActivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25102012FC5000100B0D737 /* FlowTabUITests+SpaceFixtureAppCycleActivation.swift */; };
 		B1C2D3E42F74000100B0D737 /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E32F74000100B0D737 /* AppLocalization.swift */; };
 		C20000012FBD000100B0D737 /* HomeWindowActivationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000112FBD000100B0D737 /* HomeWindowActivationController.swift */; };
 		C20000022FBD000100B0D737 /* HomeWindowRowButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000122FBD000100B0D737 /* HomeWindowRowButton.swift */; };
@@ -763,6 +765,7 @@
 		E3D100013D11000100B0D737 /* RuntimeTransientRepairObservationDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeTransientRepairObservationDriver.swift; sourceTree = "<group>"; };
 		E4D100013D12000100B0D737 /* RuntimeAXWindowChangeDeliveryCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAXWindowChangeDeliveryCoordinator.swift; sourceTree = "<group>"; };
 		E6D100013D14000100B0D737 /* RuntimeActivator+FocusRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeActivator+FocusRecovery.swift"; sourceTree = "<group>"; };
+		D7A4C1013E20000100B0D737 /* RuntimeActivator+ApplicationActivation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeActivator+ApplicationActivation.swift"; sourceTree = "<group>"; };
 		E6D100033D14000100B0D737 /* RuntimeFocusRecoveryCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeFocusRecoveryCoordinator.swift; sourceTree = "<group>"; };
 		E6D100053D14000100B0D737 /* RuntimeFocusRecoveryPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeFocusRecoveryPolicy.swift; sourceTree = "<group>"; };
 		E6D1000D3D14000100B0D737 /* RuntimeFocusRecoveryDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeFocusRecoveryDiagnostics.swift; sourceTree = "<group>"; };
@@ -990,6 +993,7 @@
 		B24D02012FC3000100B0D737 /* FlowTabUITests+SwitcherAppSelectionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherAppSelectionObservation.swift"; sourceTree = "<group>"; };
 		B24E02012FC3000100B0D737 /* FlowTabUITests+SwitcherAppSelectionObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherAppSelectionObservationTests.swift"; sourceTree = "<group>"; };
 		B25002012FC4000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabSpaceBacked.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureOptionTabSpaceBacked.swift"; sourceTree = "<group>"; };
+		B25102012FC5000100B0D737 /* FlowTabUITests+SpaceFixtureAppCycleActivation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureAppCycleActivation.swift"; sourceTree = "<group>"; };
 		B1C2D3E32F74000100B0D737 /* AppLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocalization.swift; sourceTree = "<group>"; };
 		C20000112FBD000100B0D737 /* HomeWindowActivationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeWindowActivationController.swift; sourceTree = "<group>"; };
 		C20000122FBD000100B0D737 /* HomeWindowRowButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeWindowRowButton.swift; sourceTree = "<group>"; };
@@ -1845,6 +1849,7 @@
 				B24D02012FC3000100B0D737 /* FlowTabUITests+SwitcherAppSelectionObservation.swift */,
 				B24E02012FC3000100B0D737 /* FlowTabUITests+SwitcherAppSelectionObservationTests.swift */,
 				B25002012FC4000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabSpaceBacked.swift */,
+				B25102012FC5000100B0D737 /* FlowTabUITests+SpaceFixtureAppCycleActivation.swift */,
 				F50000172FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift */,
 				F50000182FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsAssertions.swift */,
 				F50000142F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift */,
@@ -2017,6 +2022,7 @@
 				F6E7A8BB35AC000100B0D737 /* RuntimeWindowSpaceClassification.swift */,
 				D43000122FFD000100B0D737 /* RuntimeAXWindowChangeMonitor.swift */,
 				A1B2C4342F73000100B0D737 /* RuntimeActivator.swift */,
+				D7A4C1013E20000100B0D737 /* RuntimeActivator+ApplicationActivation.swift */,
 				E6D100013D14000100B0D737 /* RuntimeActivator+FocusRecovery.swift */,
 				A1B2C4352F73000100B0D737 /* AXLiveWindowRegistry.swift */,
 				A1B2C4362F73000100B0D737 /* AXWindowInspector.swift */,
@@ -2514,6 +2520,7 @@
 				F6E7A8C235AC000100B0D737 /* RuntimeWindowFocusRequest.swift in Sources */,
 				F6E7A8BC35AC000100B0D737 /* RuntimeWindowSpaceClassification.swift in Sources */,
 				A1B2C43D2F73000100B0D737 /* RuntimeActivator.swift in Sources */,
+				D7A4C1023E20000100B0D737 /* RuntimeActivator+ApplicationActivation.swift in Sources */,
 				E6D100023D14000100B0D737 /* RuntimeActivator+FocusRecovery.swift in Sources */,
 				A1B2C43E2F73000100B0D737 /* AXLiveWindowRegistry.swift in Sources */,
 				A1B2C43F2F73000100B0D737 /* AXWindowInspector.swift in Sources */,
@@ -3040,6 +3047,7 @@
 				B24D12012FC3000100B0D737 /* FlowTabUITests+SwitcherAppSelectionObservation.swift in Sources */,
 				B24E12012FC3000100B0D737 /* FlowTabUITests+SwitcherAppSelectionObservationTests.swift in Sources */,
 				B25012012FC4000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabSpaceBacked.swift in Sources */,
+				B25112012FC5000100B0D737 /* FlowTabUITests+SpaceFixtureAppCycleActivation.swift in Sources */,
 				F50001162FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift in Sources */,
 				F50001172FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsAssertions.swift in Sources */,
 				F50001132F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift in Sources */,

@@ -118,6 +118,59 @@ struct RuntimeWindowFocusReadbackEvidence {
     let focusedCGWindowID: CGWindowID?
 }
 
+struct RuntimeExactWindowFocusState {
+    let targetCGWindowID: CGWindowID?
+    let targetIsVisible: Bool
+    let activationReadbackMatchesTarget: Bool
+    let focusedCGWindowID: CGWindowID?
+    let frontmostCGWindowID: CGWindowID?
+    let visibleCGWindowIDs: [CGWindowID]
+
+    init(
+        targetCGWindowID: CGWindowID?,
+        currentWindows: [RuntimeCGWindowEntry],
+        focusReadback: RuntimeWindowFocusReadbackEvidence
+    ) {
+        self.targetCGWindowID = targetCGWindowID
+        focusedCGWindowID = focusReadback.focusedCGWindowID
+        visibleCGWindowIDs = currentWindows.compactMap { window in
+            guard window.isOnscreen else { return nil }
+            guard RuntimeCGWindowFacts.passesValidityConstraints(window) else {
+                return nil
+            }
+            return window.id
+        }
+        frontmostCGWindowID = visibleCGWindowIDs.first
+
+        guard let targetCGWindowID else {
+            targetIsVisible = true
+            activationReadbackMatchesTarget = true
+            return
+        }
+        targetIsVisible = visibleCGWindowIDs.contains(targetCGWindowID)
+        activationReadbackMatchesTarget =
+            focusedCGWindowID == targetCGWindowID
+            || (focusedCGWindowID == nil
+                && frontmostCGWindowID == targetCGWindowID)
+    }
+
+    var isVerified: Bool {
+        targetIsVisible && activationReadbackMatchesTarget
+    }
+
+    var mismatchReason: WindowBindingReadbackMismatchReason? {
+        guard let targetCGWindowID else { return nil }
+        guard targetIsVisible else { return .targetCGNotVisible }
+        if let focusedCGWindowID, focusedCGWindowID != targetCGWindowID {
+            return .focusedAXCGWindowMismatch
+        }
+        guard activationReadbackMatchesTarget else {
+            return .frontmostCGWindowMismatch
+        }
+        return nil
+    }
+}
+
 extension RuntimeActivator {
     func focusedAXWindowCGWindowID(in app: NSRunningApplication) -> CGWindowID? {
         currentWindowFocusReadbackEvidence(in: app).focusedCGWindowID

@@ -192,10 +192,12 @@ final class SwitcherSessionTests: XCTestCase {
         let target: ActivationTarget? = secondSession.commitSelection()
         XCTAssertEqual(
             target,
-            ActivationTarget.window(
+            ActivationTarget.app(
                 appID: "com.apple.Terminal",
-                windowID: "term-1",
-                restoreIfMinimized: true
+                fallback: AppActivationFallback(
+                    windowID: "term-1",
+                    restoreIfMinimized: true
+                )
             )
         )
     }

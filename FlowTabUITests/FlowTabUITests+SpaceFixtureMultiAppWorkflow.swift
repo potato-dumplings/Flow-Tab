@@ -842,7 +842,7 @@ extension FlowTabUITests {
         try assertions(workflow, app)
     }
 
-    private func configuredFullscreenOnlySpaceFixtureWorkflow(
+    func configuredFullscreenOnlySpaceFixtureWorkflow(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) throws -> SpaceFixtureResolvedWorkflow {
         let installedWorkflow = try SpaceFixtureResolvedWorkflow.configured(environment: environment)
@@ -924,7 +924,7 @@ extension FlowTabUITests {
         }
     }
 
-    private func validateMultiAppHomeFullscreenOnlyWorkflow(
+    func validateMultiAppHomeFullscreenOnlyWorkflow(
         _ workflow: SpaceFixtureResolvedWorkflow
     ) throws {
         guard workflow.apps.count == 2 else {

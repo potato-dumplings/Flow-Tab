@@ -33,7 +33,13 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(model.isSearchActive)
         XCTAssertEqual(
             activatedTarget,
-            .window(appID: "com.example.code", windowID: "code-1", restoreIfMinimized: false)
+            .app(
+                appID: "com.example.code",
+                fallback: AppActivationFallback(
+                    windowID: "code-1",
+                    restoreIfMinimized: false
+                )
+            )
         )
         XCTAssertTrue(activatedContexts.isEmpty)
     }
@@ -302,7 +308,13 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(
             activatedTarget,
-            .window(appID: "com.example.browser", windowID: "browser-1", restoreIfMinimized: false)
+            .app(
+                appID: "com.example.browser",
+                fallback: AppActivationFallback(
+                    windowID: "browser-1",
+                    restoreIfMinimized: false
+                )
+            )
         )
         XCTAssertNil(controller.modelForTesting.session)
         XCTAssertFalse(controller.modelForTesting.isSearchActive)
@@ -368,7 +380,13 @@ extension FlowTabPriorityCoverageTests {
 
             XCTAssertEqual(
                 activatedTarget,
-                .window(appID: "com.example.browser", windowID: "browser-1", restoreIfMinimized: false)
+                .app(
+                    appID: "com.example.browser",
+                    fallback: AppActivationFallback(
+                        windowID: "browser-1",
+                        restoreIfMinimized: false
+                    )
+                )
             )
             XCTAssertNil(controller.modelForTesting.session)
             XCTAssertFalse(controller.modelForTesting.isSearchActive)

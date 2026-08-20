@@ -253,14 +253,14 @@ Search 是更强约束：Search surface 只能读取 `committedSearchIndex`。�
 
 ### private activation fallback
 
-私有 `CGWindowID` 激活只能用于明确的用户提交路径：
+私有 `CGWindowID` 激活只能用于明确的用户提交恢复路径：
 
-1. 用户选择一个窗口。
-2. 当前没有可靠 AX activation handle。
+1. 用户提交精确窗口，或应用目标携带会话选出的有效首选窗口 fallback。
+2. 精确窗口当前没有可靠 AX activation handle，或应用公开激活完成后没有任一 runtime 已知有效窗口 onscreen。
 3. record 有明确 target `CGWindowID` 和恢复证据。
 4. 执行私有 fallback。
-5. 立刻回读 focused AX/CG。
-6. 用 readback 重新写入 exact evidence。
+5. 立刻回读目标可见性与 focused AX/CG。
+6. 目标 onscreen 且 readback 命中同一 `CGWindowID` 后写入 exact evidence。
 
 被动采样、projection 构建、Home 刷新、Search index rebuild 不能做有副作用的激活探测。
 
@@ -605,21 +605,31 @@ fullscreen -> normal 通常表现为：
 
 activation 是唯一允许有副作用恢复探测的路径。
 
+应用提交顺序：
+
+1. `appCycle`、`groupCycle` 和 app-scope search 提交应用主目标，并可携带最近活跃/记住选择策略产生的首选窗口 fallback。
+2. 使用 `NSWorkspace.openApplication` 与 `activates = true` 请求公开应用激活。
+3. 完成回调读取当前前台 PID 和目标进程的已知有效 CG 窗口；目标进程在前台且任一已知窗口 onscreen 时完成。
+4. 没有已知窗口 onscreen 且 fallback 仍属于当前 runtime context 时，构造统一 `WindowFocusRequest` 进入精确窗口恢复链。
+5. 新 activation generation 使旧 completion 及其 fallback 失效；应用退出、fallback window 消失或 context 缺失时记录诊断并停止该 generation。
+
 窗口提交顺序：
 
 1. 如果当前 exact AX handle 可用，优先 AX activation。
 2. 如果 public AX recovery 可行，尝试 public recovery。
 3. 如果 record 是 space-backed，先恢复目标 Space，再尝试 AX recovery。
 4. 如果没有 AX handle 但 record 具备明确 `CGWindowID` 和 fallback eligibility，执行 private CG activation fallback。
-5. 提交后读取 focused AX/CG。
-6. 如果 readback target 与提交目标一致，写入 `.verifiedFocusReadback` exact evidence。
-7. 如果 readback 不一致，标记 target/readback scopes dirty，并降级该 activation route confidence。
+5. 提交后读取目标 `CGWindowID` 的 onscreen 状态与 focused AX/CG 或 frontmost CG。
+6. 目标 onscreen 且 readback target 与提交目标一致时，写入 `.verifiedFocusReadback` exact evidence。
+7. 目标离屏时报告 `targetCGNotVisible` 并继续恢复；其余 readback mismatch 标记 target/readback scopes dirty，并降级该 activation route confidence。
 
 成功条件：
 
 - 不能只看“命令执行成功”。
-- 必须用 focused readback 或可等价证明确认目标窗口真的成为当前窗口。
+- 存在目标 `CGWindowID` 时，必须同时确认该窗口 onscreen，并用 focused AX/CG 或 frontmost CG readback 证明同一窗口真的成为当前窗口。
 - readback 不能解析到 registry 中既有 AX handle 时，也要能基于 pid + focused `CGWindowID` seed exact record。
+
+2026-08-20 应用公开激活与精确窗口可见性契约验证记录：FlowTabCore 50/50、完整 `FlowTabTests` 1189/1189 通过；appCycle 跨 Space 公开激活、fullscreen 精确窗口成功和 Space-backed 离屏保持 unverified 三条真实 UI 路径最终 3/3 通过。500ms 采样的 canonical noisy fullscreen/off-Space pressure 1/1 通过，20 次 PID/签名身份检查全部匹配；CPU average/p95/max 为 95.71/173.50/181.30%，RSS average/p95/max 为 167.92/218.75/231.64 MB。相对当日最近同机同路径基线，CPU 分别变化 -4.44/-5.80/-3.90 个百分点，RSS 分别变化 +36.90/+30.92/+38.84 MB；本次结果位于当日三次既有同路径样本的资源波动包络内。
 
 ## Snapshot 的新位置
 

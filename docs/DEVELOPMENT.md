@@ -45,6 +45,9 @@ FlowTab 当前有三种面板：
 - 在应用面板放开主按键集合中的任一按键：确认当前高亮应用，并激活该应用。
 - 在应用面板中的窗口面板放开主按键集合中的任一按键：确认当前高亮窗口，并将该窗口切到前台。
 - 在独立窗口面板放开应用内保持按键集合中的任一按键：确认当前高亮窗口，并将该窗口切到前台。
+- 应用面板、分组应用选择和 app-scope search 统一提交应用主目标，并携带会话按最近活跃/上次选择策略确定的首选窗口 fallback；关闭自动恢复最小化时，最小化窗口不会成为 fallback。
+- 应用目标先通过 `NSWorkspace.openApplication` 的 activating configuration 激活。完成回调确认目标进程已在前台且任一 runtime 已知有效窗口 onscreen 后即完成；公开激活没有产生可见窗口时，才提交首选窗口 fallback。
+- 窗口面板、window-scope search、Home 窗口卡片和独立窗口切换继续提交精确窗口目标。存在目标 `CGWindowID` 时，完成条件是目标窗口 onscreen 且 focused/frontmost readback 命中同一窗口。
 
 ### 2.3) 窗口候选列表排序契约
 
@@ -254,7 +257,7 @@ FlowTab/
 - `OptionTabHotkeyMonitor`：按用户偏好注册全局主切换热键
 - `SwitcherPanelController` + `LiveSwitcherModel`：面板交互、按键处理、会话推进、面板内结束应用快捷键
 - `RuntimeSnapshotProvider`：运行中应用与窗口快照
-- `RuntimeActivator`：应用/窗口激活
+- `RuntimeActivator`：精确窗口激活与验证；`RuntimeActivator+ApplicationActivation`：应用公开激活、generation 所有权和首选窗口 fallback
 - `RuntimeWindowPreviewProvider`：窗口预览抓图（`ScreenCaptureKit`）与窗口标题样式猜测
 - `AX/CG/Space` 窗口映射流程：见 [RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md](./RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md)
 - `FlowTab`：应用生命周期、首页、监控页、预览日志页、状态栏菜单
