@@ -161,7 +161,9 @@ extension FlowTabUITests {
                 "DEBUG",
                 "--flowtab-ui-enable-verbose-logs",
                 "--flowtab-ui-open-switcher",
-                "--flowtab-ui-listen-switcher-trigger"
+                "--flowtab-ui-listen-switcher-trigger",
+                "-windowLayerAutoEnterDelay",
+                "30.0"
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         ) { _, app in
             let targetPID = try targetProcessIdentifier(for: targetApp)
