@@ -38,7 +38,7 @@ extension SwitcherPanelController {
             readback: { [weak self] _, _ in
                 guard let self else { return nil }
                 return sessionKinds.contains { sessionKind in
-                    self.isHotkeyHoldSetPressed(
+                    self.isHotkeyHoldSetPressedInHardwareState(
                         for: sessionKind
                     )
                         || self.isSessionMainKeySetPressedInHardwareState(
@@ -108,15 +108,17 @@ extension SwitcherPanelController {
         )
 
         let sessionGeneration = presentationSessionGeneration
+        let sessionKind =
+            activeHotkeySessionKind ?? .globalAppSwitcher
         modifierReleaseObservationOwner.start(
             kind: .selectionConfirmation,
             relevantKeyCodes: modifierReleaseRelevantKeyCodes(
-                for: [activeHotkeySessionKind ?? .globalAppSwitcher]
+                for: [sessionKind]
             ),
             sampleInterval: modifierReleaseConfirmationSampleInterval,
             requiredReleasedSampleCount:
                 modifierReleaseConfirmationSampleCount,
-            readback: { [weak self] generation, _ in
+            readback: { [weak self] generation, source in
                 guard let self else { return nil }
                 guard self.isPresentationSessionGenerationCurrent(
                     sessionGeneration
@@ -147,8 +149,15 @@ extension SwitcherPanelController {
                     )
                     return nil
                 }
-                return holdSetPressedEvidence
-                    ?? self.isHotkeyHoldSetLikelyPressed()
+                // Event evidence seeds the first sample only. Stability must
+                // be confirmed from the current hardware state.
+                if source == .initialReadback,
+                   let holdSetPressedEvidence {
+                    return holdSetPressedEvidence
+                }
+                return self.isHotkeyHoldSetPressedInHardwareState(
+                    for: sessionKind
+                )
             },
             onStarted: { [weak self] generation in
                 self?.modifierReleaseState = .releaseObserved(
@@ -213,10 +222,18 @@ extension SwitcherPanelController {
         modifierReleaseObservationOwner.isGenerationCurrent(generation)
     }
 
-    func isHotkeyHoldModifierFlagsEvent(_ event: NSEvent) -> Bool {
+    func hotkeySessionKindsMatchingHoldModifierFlagsEvent(
+        _ event: NSEvent
+    ) -> [HotkeySessionKind] {
         let key = SwitcherHotkeyKey(keyCode: event.keyCode)
-        return key.modifier != nil
-            && activeHotkeyHoldKeys().contains(key)
+        guard key.modifier != nil else { return [] }
+        let knownSessionKinds: [HotkeySessionKind] = [
+            .globalAppSwitcher,
+            .inAppWindowSwitcher
+        ]
+        return knownSessionKinds.filter {
+            hotkeyHoldKeys(for: $0).contains(key)
+        }
     }
 
     func isHotkeyHoldSetPressed() -> Bool {
@@ -228,22 +245,30 @@ extension SwitcherPanelController {
     func isHotkeyHoldSetPressed(
         _ receipt: SwitcherHotkeyInputReceipt
     ) -> Bool {
-        receipt.event.holdSetPressedEvidence
-            ?? isHotkeyHoldSetPressed()
+        if let holdSetPressedEvidence =
+            receipt.event.holdSetPressedEvidence
+        {
+            return holdSetPressedEvidence
+        }
+        let sessionKind: HotkeySessionKind
+        switch receipt.route {
+        case .globalAppSwitcher:
+            sessionKind = .globalAppSwitcher
+        case .inAppWindowSwitcher:
+            sessionKind = .inAppWindowSwitcher
+        }
+        return isHotkeyHoldSetPressedInHardwareState(
+            for: sessionKind
+        )
     }
 
     func isHotkeyHoldSetPressed(
         for sessionKind: HotkeySessionKind
     ) -> Bool {
-        switch sessionKind {
-        case .globalAppSwitcher:
-            if let globalHotkeyHoldSetPressedOverride {
-                return globalHotkeyHoldSetPressedOverride
-            }
-        case .inAppWindowSwitcher:
-            if let inAppHotkeyHoldSetPressedOverride {
-                return inAppHotkeyHoldSetPressedOverride
-            }
+        if let override = hotkeyHoldSetPressedOverride(
+            for: sessionKind
+        ) {
+            return override
         }
 
         if let inputEvidence =
@@ -257,6 +282,30 @@ extension SwitcherPanelController {
         return isHotkeyKeySetPressedInHardwareState(
             hotkeyHoldKeys(for: sessionKind)
         )
+    }
+
+    func isHotkeyHoldSetPressedInHardwareState(
+        for sessionKind: HotkeySessionKind
+    ) -> Bool {
+        if let override = hotkeyHoldSetPressedOverride(
+            for: sessionKind
+        ) {
+            return override
+        }
+        return isHotkeyKeySetPressedInHardwareState(
+            hotkeyHoldKeys(for: sessionKind)
+        )
+    }
+
+    private func hotkeyHoldSetPressedOverride(
+        for sessionKind: HotkeySessionKind
+    ) -> Bool? {
+        switch sessionKind {
+        case .globalAppSwitcher:
+            return globalHotkeyHoldSetPressedOverride
+        case .inAppWindowSwitcher:
+            return inAppHotkeyHoldSetPressedOverride
+        }
     }
 
     func isSessionMainKeySetPressedInHardwareState(

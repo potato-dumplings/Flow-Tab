@@ -522,6 +522,7 @@
 		B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */; };
 		A47A00023D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A47A00013D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift */; };
 		C1F100023A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F100013A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift */; };
+		C1F200023A21000100B0D737 /* FlowTabUITests+HotkeyReleaseLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F200013A21000100B0D737 /* FlowTabUITests+HotkeyReleaseLifecycle.swift */; };
 		F8A1000236B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A1000136B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift */; };
 		B10012042F76000100B0D737 /* FlowTabUITests+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */; };
 		A4B600023D7D000100B0D737 /* FlowTabUITests+SupportWatchdogPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B600013D7D000100B0D737 /* FlowTabUITests+SupportWatchdogPolicy.swift */; };
@@ -953,6 +954,7 @@
 		B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherAndSearch.swift"; sourceTree = "<group>"; };
 		A47A00013D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SearchSelectionWrap.swift"; sourceTree = "<group>"; };
 		C1F100013A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherInteractionRegressions.swift"; sourceTree = "<group>"; };
+		C1F200013A21000100B0D737 /* FlowTabUITests+HotkeyReleaseLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HotkeyReleaseLifecycle.swift"; sourceTree = "<group>"; };
 		F8A1000136B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+RuntimeProjectionPublication.swift"; sourceTree = "<group>"; };
 		B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+Support.swift"; sourceTree = "<group>"; };
 		A4B600013D7D000100B0D737 /* FlowTabUITests+SupportWatchdogPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SupportWatchdogPolicy.swift"; sourceTree = "<group>"; };
@@ -1668,6 +1670,7 @@
 				A47A00013D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift */,
 				FFFB00083D3A000100B0D737 /* FlowTabUITests+TabSwitchStressEvidence.swift */,
 				C1F100013A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift */,
+				C1F200013A21000100B0D737 /* FlowTabUITests+HotkeyReleaseLifecycle.swift */,
 				A4D100053B20000100B0D737 /* FlowTabUITests+SystemAppMRU.swift */,
 				F8A1000136B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift */,
 				B31002012FF400100B0D737 /* FlowTabUITests+StatusItem.swift */,
@@ -2876,6 +2879,7 @@
 				A47A00023D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift in Sources */,
 				FFFB01083D3A000100B0D737 /* FlowTabUITests+TabSwitchStressEvidence.swift in Sources */,
 				C1F100023A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift in Sources */,
+				C1F200023A21000100B0D737 /* FlowTabUITests+HotkeyReleaseLifecycle.swift in Sources */,
 				A4D100063B20000100B0D737 /* FlowTabUITests+SystemAppMRU.swift in Sources */,
 				F8A1000236B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift in Sources */,
 				B31012012FF400100B0D737 /* FlowTabUITests+StatusItem.swift in Sources */,

@@ -189,7 +189,6 @@ final class OptionTabHotkeyMonitor {
     private let chordEventMonitorStarterOverride:
         ((SwitcherHotkeyConfiguration) -> Bool)?
     private let chordEventMonitorStopperOverride: (() -> Void)?
-    private let currentEventModifiersProvider: () -> KeyModifier
 
     private(set) var isEventHandlerInstalledForTesting = false
     private var isChordEventMonitorInstalledForTesting = false
@@ -210,14 +209,7 @@ final class OptionTabHotkeyMonitor {
         eventHandlerRemoverOverride: (() -> Void)? = nil,
         chordEventMonitorStarterOverride:
             ((SwitcherHotkeyConfiguration) -> Bool)? = nil,
-        chordEventMonitorStopperOverride: (() -> Void)? = nil,
-        currentEventModifiersProvider: @escaping
-            () -> KeyModifier = {
-                KeyModifier(
-                    carbonModifiers:
-                        GetCurrentEventKeyModifiers()
-                )
-            }
+        chordEventMonitorStopperOverride: (() -> Void)? = nil
     ) {
         self.hotkeyConfiguration = configuration
         self.signature = signature
@@ -231,8 +223,6 @@ final class OptionTabHotkeyMonitor {
             chordEventMonitorStarterOverride
         self.chordEventMonitorStopperOverride =
             chordEventMonitorStopperOverride
-        self.currentEventModifiersProvider =
-            currentEventModifiersProvider
         guard startsMonitoring else { return }
         start()
     }
@@ -534,11 +524,9 @@ final class OptionTabHotkeyMonitor {
             identity: nextInputEventIdentity(),
             phase: phase,
             isBackward: isBackward,
-            holdSetPressedEvidence: phase == .pressed
-                || hotkeyConfiguration.baseKeys.modifiers
-                    .isSubset(
-                        of: currentEventModifiersProvider()
-                    )
+            // Carbon only reports that the registered chord ended; the base
+            // keys may still be held when the main key is released.
+            holdSetPressedEvidence: phase == .pressed ? true : nil
         )
         let phaseText = phase == .pressed ? "pressed" : "released"
         RuntimeLog.debug(

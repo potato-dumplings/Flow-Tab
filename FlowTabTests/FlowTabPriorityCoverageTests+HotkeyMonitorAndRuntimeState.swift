@@ -82,7 +82,6 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testOptionTabHotkeyMonitorCarbonEventsPublishHoldSetEvidence() {
-        var currentEventModifiers: KeyModifier = .option
         let monitor = OptionTabHotkeyMonitor(
             configuration: SwitcherHotkeyPreferencesStore.resolve(
                 baseKeysRaw: SwitcherHotkeyKey.option.rawValue,
@@ -92,10 +91,7 @@ extension FlowTabPriorityCoverageTests {
             signature: 0x54455354,
             forwardHotkeyID: 11,
             backwardHotkeyID: 22,
-            startsMonitoring: false,
-            currentEventModifiersProvider: {
-                currentEventModifiers
-            }
+            startsMonitoring: false
         )
         var events: [HotkeyInputEvent] = []
         monitor.onHotkeyEvent = { events.append($0) }
@@ -114,7 +110,6 @@ extension FlowTabPriorityCoverageTests {
             ),
             noErr
         )
-        currentEventModifiers = []
         XCTAssertEqual(
             monitor.dispatchHotkeyEventForTesting(
                 id: 11,
@@ -132,7 +127,7 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(
             events.map(\.holdSetPressedEvidence),
-            [true, true, true, false]
+            [true, nil, true, nil]
         )
     }
 

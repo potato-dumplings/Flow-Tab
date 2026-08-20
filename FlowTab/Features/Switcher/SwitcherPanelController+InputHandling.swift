@@ -353,19 +353,25 @@ extension SwitcherPanelController {
             terminateSelectedApp()
             return
         }
-        let isHotkeyHoldModifierEvent =
-            isHotkeyHoldModifierFlagsEvent(event)
-        guard isHotkeyHoldModifierEvent else { return }
-        guard isPanelPresented else { return }
-        let sessionKind =
-            activeHotkeySessionKind ?? .globalAppSwitcher
-        updateHotkeyHoldSetPressedEvidence(
-            isHotkeyKeySetPressedInHardwareState(
-                hotkeyHoldKeys(for: sessionKind),
-                eventModifierFlags: event.modifierFlags
-            ),
-            for: sessionKind
-        )
+        let matchingSessionKinds =
+            hotkeySessionKindsMatchingHoldModifierFlagsEvent(event)
+        guard !matchingSessionKinds.isEmpty else { return }
+        for sessionKind in matchingSessionKinds {
+            updateHotkeyHoldSetPressedEvidence(
+                isHotkeyKeySetPressedInHardwareState(
+                    hotkeyHoldKeys(for: sessionKind),
+                    eventModifierFlags: event.modifierFlags
+                ),
+                for: sessionKind
+            )
+        }
+        guard isPanelPresented,
+              let activeHotkeySessionKind,
+              matchingSessionKinds.contains(activeHotkeySessionKind)
+        else {
+            modifierReleaseObservationOwner.observeInputTransition()
+            return
+        }
         guard !model.isSearchActive else { return }
         logInputTrace(
             "flagsChanged keyCode=\(event.keyCode) action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
