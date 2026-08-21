@@ -42,17 +42,6 @@ extension LiveSwitcherModel {
         previewWindowSnapshotsByAppID[appID] = app.windows
     }
 
-    func refreshFrozenPreviewOrderIfChanged(
-        for appID: String,
-        windows: [WindowCandidate]
-    ) {
-        guard let frozenWindows = previewWindowSnapshotsByAppID[appID] else { return }
-        guard frozenWindows.map(\.id) != windows.map(\.id) else { return }
-        previewWindowSnapshotsByAppID[appID] = windows
-        previewDeferredCaptureScheduledAppIDs.remove(appID)
-        lastWindowPreviewExposureLogSummary = nil
-    }
-
     func windowPreviewSnapshotForTesting(visibleRange: Range<Int>? = nil) -> [(
         id: String,
         title: String,

@@ -2,7 +2,7 @@ import AppKit
 import XCTest
 
 extension FlowTabUITests {
-    func testSwitcherPanelRefreshesOpenWindowLayerAfterRealFixtureWindowSetMutation() throws {
+    func testSwitcherPanelKeepsOpenWindowLayerSnapshotAfterRealFixtureWindowSetMutation() throws {
         let identity = spaceFixtureAppIdentity
 
         guard assertSpaceFixtureWorkflowPermissionsAvailable() else { return }
@@ -194,9 +194,13 @@ extension FlowTabUITests {
             return
         }
 
+        var acceptsPostCloseSnapshot = false
         let postCloseCards = makeSwitcherWindowTitleObservation(
             in: app,
-            expectedTitles: [allTitles[0]]
+            expectedTitles: allTitles,
+            acceptsResolution: {
+                acceptsPostCloseSnapshot
+            }
         )
         postCloseCards.start()
         defer { postCloseCards.cancel() }
@@ -276,17 +280,24 @@ extension FlowTabUITests {
             appliedClose.snapshot.remainingWindowPlanIndices,
             [1]
         )
-        guard postCloseCards.waitForResolution(
+        acceptsPostCloseSnapshot = true
+        postCloseCards.requestReadback(source: .triggerReadback)
+        guard let projectionEvidence = postCloseCards.waitForResolution(
             timeout:
                 FlowTabUITestSwitcherWindowTitleObservationPolicy
                     .openWindowMutationProjectionWatchdog
-        ) != nil else {
+        ) else {
             XCTFail(
                 "Open Mutation Window-card projection watchdog expired. "
                     + postCloseCards.diagnosticSummary
             )
             return
         }
+        XCTAssertEqual(projectionEvidence.value.cardCount, allTitles.count)
+        XCTAssertEqual(
+            projectionEvidence.value.titleCounts,
+            Dictionary(uniqueKeysWithValues: allTitles.map { ($0, 1) })
+        )
 
         guard
             runtimeReconciliation.waitForResolution(
@@ -304,17 +315,14 @@ extension FlowTabUITests {
         XCTAssertNotEqual(fixtureApp.state, .notRunning)
     }
 
-    func testSwitcherPanelRefreshesOpenWorkflowAppWindowLayerAfterMultiAppWindowSetMutation() throws {
+    func testSwitcherPanelKeepsOpenWorkflowAppWindowLayerSnapshotAfterMultiAppWindowSetMutation() throws {
         let workflow = try configuredSwitcherSpaceFixtureWorkflow()
         let targetApp = try XCTUnwrap(
             workflow.apps.first { $0.appID == "chrome" },
             "Switcher workflow must include the Chrome-style fixture app for multi-app mutation proof"
         )
-        let remainingTitles = Array(
-            targetApp.expectedWindowTitles.prefix(1)
-        )
-        XCTAssertEqual(targetApp.expectedWindowTitles.count, 2)
-        XCTAssertEqual(remainingTitles.count, 1)
+        let snapshotTitles = targetApp.expectedWindowTitles
+        XCTAssertEqual(snapshotTitles.count, 2)
 
         let windowCloseRoute =
             makeSpaceFixtureWindowCloseFaultRoute()
@@ -414,7 +422,7 @@ extension FlowTabUITests {
             let postCloseCards =
                 makeSwitcherWindowTitleObservation(
                     in: app,
-                    expectedTitles: remainingTitles,
+                    expectedTitles: snapshotTitles,
                     acceptsResolution: {
                         acceptsPostCloseProjection
                     }
@@ -518,10 +526,16 @@ extension FlowTabUITests {
                 )
                 return
             }
-            XCTAssertEqual(projectionEvidence.value.cardCount, 1)
+            XCTAssertEqual(
+                projectionEvidence.value.cardCount,
+                snapshotTitles.count
+            )
             XCTAssertEqual(
                 projectionEvidence.value.titleCounts,
-                [remainingTitles[0]: 1]
+                Dictionary(
+                    uniqueKeysWithValues:
+                        snapshotTitles.map { ($0, 1) }
+                )
             )
             guard requireActiveSwitcherPreview(
                 targetApp,

@@ -302,11 +302,9 @@ extension LiveSwitcherModel {
     }
 
     @discardableResult
-    func applyCurrentAppWindowProjectionIfReady(
-        appID: String,
-        restoringWindowCycleSelectedWindowID: String? = nil
-    ) -> Bool {
+    func applyCurrentAppWindowProjectionIfReady(appID: String) -> Bool {
         guard let currentSession = session else { return false }
+        guard !isPresentingWindowLayerSnapshot(currentSession) else { return false }
         guard currentSession.apps.contains(where: { $0.id == appID }) else { return false }
 
         let startMs = Self.monotonicMilliseconds()
@@ -324,7 +322,6 @@ extension LiveSwitcherModel {
         completeSelectedAppWindowProjection(
             payload,
             appID: appID,
-            restoringWindowCycleSelectedWindowID: restoringWindowCycleSelectedWindowID,
             generation: selectedAppWindowProjectionGeneration,
             startMs: startMs,
             projectionReadMs: Self.monotonicMilliseconds()
@@ -335,7 +332,6 @@ extension LiveSwitcherModel {
     func completeSelectedAppWindowProjection(
         _ currentAppWindowPayload: RuntimeCurrentAppWindowPayload?,
         appID: String,
-        restoringWindowCycleSelectedWindowID: String? = nil,
         generation: UInt64,
         startMs: Double,
         projectionReadMs: Double
@@ -378,6 +374,17 @@ extension LiveSwitcherModel {
             )
             return
         }
+        guard !isPresentingWindowLayerSnapshot(currentSession) else {
+            logSelectedAppWindowProjection(
+                result: "windowLayerSnapshot",
+                appID: appID,
+                currentAppWindowPayload: currentAppWindowPayload,
+                startMs: startMs,
+                projectionReadMs: projectionReadMs,
+                applyEndMs: Self.monotonicMilliseconds()
+            )
+            return
+        }
         guard let appIndex = currentSession.apps.firstIndex(where: { $0.id == appID }) else {
             logSelectedAppWindowProjection(
                 result: "missingSessionApp",
@@ -390,28 +397,13 @@ extension LiveSwitcherModel {
             return
         }
 
-        let currentSessionIsWindowLayerForApp: Bool
-        if case .windowCycle(let windowLayerAppID) = currentSession.mode, windowLayerAppID == appID {
-            currentSessionIsWindowLayerForApp = true
-        } else {
-            currentSessionIsWindowLayerForApp = false
-        }
-        let appliedPayload = currentSessionIsWindowLayerForApp
-            ? currentAppWindowPayloadByPreservingActiveWindowLayerOrder(
-                currentAppWindowPayload,
-                currentSession: currentSession
-            )
-            : currentAppWindowPayload
-
-        runtimeContextsByID[appID] = appliedPayload.context
-        if currentSession.apps[appIndex] == appliedPayload.candidate,
-           !currentSessionIsWindowLayerForApp,
-           restoringWindowCycleSelectedWindowID == nil,
+        runtimeContextsByID[appID] = currentAppWindowPayload.context
+        if currentSession.apps[appIndex] == currentAppWindowPayload.candidate,
            pendingManualWindowLayerEntryAppID != appID {
             logSelectedAppWindowProjection(
                 result: "unchanged",
                 appID: appID,
-                currentAppWindowPayload: appliedPayload,
+                currentAppWindowPayload: currentAppWindowPayload,
                 startMs: startMs,
                 projectionReadMs: projectionReadMs,
                 applyEndMs: Self.monotonicMilliseconds()
@@ -420,24 +412,8 @@ extension LiveSwitcherModel {
         }
 
         var apps = currentSession.apps
-        apps[appIndex] = appliedPayload.candidate
-        let restoringWindowCycle = restoringWindowCycleSelectedWindowID != nil
-        let preservesWindowLayerPreview: Bool
-        if currentSessionIsWindowLayerForApp {
-            preservesWindowLayerPreview = true
-        } else if restoringWindowCycle {
-            preservesWindowLayerPreview = true
-        } else {
-            preservesWindowLayerPreview = false
-        }
-        if !preservesWindowLayerPreview {
-            clearPreviewSnapshotState()
-        } else {
-            refreshFrozenPreviewOrderIfChanged(
-                for: appID,
-                windows: appliedPayload.candidate.windows
-            )
-        }
+        apps[appIndex] = currentAppWindowPayload.candidate
+        clearPreviewSnapshotState()
 
         var rebuiltSession = SwitcherSession(
             apps: apps,
@@ -446,16 +422,7 @@ extension LiveSwitcherModel {
             rememberedWindowIDByAppID: currentSession.rememberedWindowIDByAppID
         )
         _ = rebuiltSession.selectApp(withID: currentSession.selectedApp.id)
-        if currentSessionIsWindowLayerForApp || restoringWindowCycle {
-            if let selectedWindowID = currentSession.selectedWindow?.id ?? restoringWindowCycleSelectedWindowID {
-                if !rebuiltSession.selectWindow(appID: appID, windowID: selectedWindowID) {
-                    _ = rebuiltSession.selectApp(withID: appID)
-                    _ = rebuiltSession.enterWindowCycle(allowSingleWindow: true)
-                }
-            } else {
-                _ = rebuiltSession.enterWindowCycle(allowSingleWindow: true)
-            }
-        } else if pendingManualWindowLayerEntryAppID == appID {
+        if pendingManualWindowLayerEntryAppID == appID {
             let enteredWindowLayer = rebuiltSession.enterWindowCycle(allowSingleWindow: false)
             RuntimeLog.debug(
                 .projection,
@@ -468,53 +435,12 @@ extension LiveSwitcherModel {
         logSelectedAppWindowProjection(
             result: "applied",
             appID: appID,
-            currentAppWindowPayload: appliedPayload,
+            currentAppWindowPayload: currentAppWindowPayload,
             startMs: startMs,
             projectionReadMs: projectionReadMs,
             applyEndMs: applyEndMs
         )
         onSessionLayoutChanged?()
-    }
-
-    private func currentAppWindowPayloadByPreservingActiveWindowLayerOrder(
-        _ payload: RuntimeCurrentAppWindowPayload,
-        currentSession: SwitcherSession
-    ) -> RuntimeCurrentAppWindowPayload {
-        let currentWindows = currentSession.selectedApp.windows
-        guard !currentWindows.isEmpty else { return payload }
-        let currentWindowIDs = currentWindows.map(\.id)
-        let projectedWindowsByID = Dictionary(uniqueKeysWithValues: payload.candidate.windows.map { ($0.id, $0) })
-        let retainedWindows = currentWindowIDs.compactMap { projectedWindowsByID[$0] }
-        guard !retainedWindows.isEmpty else { return payload }
-        let retainedWindowIDs = Set(retainedWindows.map(\.id))
-        let appendedWindows = payload.candidate.windows.filter { !retainedWindowIDs.contains($0.id) }
-        let windows = retainedWindows + appendedWindows
-        guard windows.map(\.id) != payload.candidate.windows.map(\.id) else {
-            return payload
-        }
-        let candidate = AppSwitchCandidate(
-            id: payload.candidate.id,
-            displayName: payload.candidate.displayName,
-            groupID: payload.candidate.groupID,
-            lastActiveAt: payload.candidate.lastActiveAt,
-            windows: windows
-        )
-        let summary = RuntimeHomeAppSummary(
-            appID: payload.summary.appID,
-            displayName: payload.summary.displayName,
-            groupID: payload.summary.groupID,
-            lastActiveAt: payload.summary.lastActiveAt,
-            windowCount: windows.count,
-            pid: payload.summary.pid,
-            bundleIdentifier: payload.summary.bundleIdentifier,
-            bundleURL: payload.summary.bundleURL
-        )
-        return RuntimeCurrentAppWindowPayload(
-            summary: summary,
-            candidate: candidate,
-            context: payload.context,
-            appDirectoryEntries: payload.appDirectoryEntries
-        )
     }
 
     func invalidateSelectedAppWindowProjection(

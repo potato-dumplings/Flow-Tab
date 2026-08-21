@@ -5,7 +5,7 @@ import XCTest
 
 extension FlowTabPriorityCoverageTests {
     @MainActor
-    func testLiveSwitcherModelPreservesActiveWindowCycleAcrossDegradedAppProjectionRefresh() {
+    func testLiveSwitcherModelKeepsWindowLayerSnapshotAcrossDegradedAppProjectionCommit() {
         let appID = "com.example.degraded-window-cycle-refresh"
         let runningApp = NSRunningApplication.current
         let windows = [
@@ -105,7 +105,7 @@ extension FlowTabPriorityCoverageTests {
             generatedAt: 12
         )
 
-        XCTAssertTrue(model.handleAppSwitcherProjectionDidUpdate())
+        XCTAssertFalse(model.handleAppSwitcherProjectionDidUpdate())
         XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["window-one", "window-two"])
         XCTAssertEqual(model.session?.selectedWindow?.id, "window-two")
         XCTAssertEqual(
