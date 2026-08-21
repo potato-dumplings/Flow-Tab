@@ -72,9 +72,9 @@ extension SwitcherPanelController {
         }
         if isPanelPresented {
             guard activeHotkeySessionKind == .globalAppSwitcher else { return }
-            guard !model.isSearchActive else {
+            guard !hasActiveOrPendingSearchInteraction else {
                 logInputTrace(
-                    "hotkeyPressed dir=\(directionText) panelVisible=1 action=ignoredSearchMode nowMs=\(formatMilliseconds(nowMs))"
+                    "hotkeyPressed dir=\(directionText) panelVisible=1 action=ignoredSearchInteraction nowMs=\(formatMilliseconds(nowMs))"
                 )
                 return
             }
@@ -109,7 +109,7 @@ extension SwitcherPanelController {
         }
         guard isPanelPresented else { return }
         guard activeHotkeySessionKind == .globalAppSwitcher else { return }
-        guard !model.isSearchActive else { return }
+        guard !hasActiveOrPendingSearchInteraction else { return }
         // Carbon hotkey "released" also fires when the main key (for example Tab) is released
         // while the modifier is still held. Ignore those events to avoid repeatedly spinning up
         // release-confirmation work during rapid cycling.
@@ -251,9 +251,9 @@ extension SwitcherPanelController {
     }
 
     func advance(_ keyInput: KeyInput) {
-        guard !model.isSearchActive else {
+        guard !hasActiveOrPendingSearchInteraction else {
             logInputTrace(
-                "advance key=\(keyInput.debugName) dropped=searchActive nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+                "advance key=\(keyInput.debugName) dropped=searchInteraction nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
             )
             return
         }

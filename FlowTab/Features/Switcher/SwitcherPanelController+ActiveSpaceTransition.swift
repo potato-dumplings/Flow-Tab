@@ -213,7 +213,7 @@ extension SwitcherPanelController {
             cancelSelectionForSystemInterruption(trigger: trigger)
             return
         }
-        let shouldKeepSessionVisible = model.isSearchActive
+        let shouldKeepSessionVisible = hasActiveOrPendingSearchInteraction
             || isHotkeyHoldSetPressed(for: sessionKind)
         guard shouldKeepSessionVisible else {
             logSearchTrace(

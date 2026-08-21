@@ -7,6 +7,84 @@ private enum FlowTabUITestHotkeyReleaseLifecycleWatchdog {
 }
 
 extension FlowTabUITests {
+    func testPhysicalOptionTabUpArrowEntersSearchBeforeOptionRelease() {
+        let launchLogSnapshot = makeRuntimeLogFileSnapshot()
+        defer { launchLogSnapshot.cancel() }
+        let app = makeApp(
+            additionalArguments: hotkeyEffectArguments(
+                resetDefaults: true,
+                usesSystemAccessibilityPermission: true
+            ) + [
+                "--flowtab-ui-listen-switcher-trigger",
+                "-searchDefaultScope",
+                "app",
+                "-windowLayerAutoEnterDelay",
+                "30.0",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        defer { app.terminate() }
+
+        waitForRuntimeLogFiles(
+            containing: ["mainRoute=carbon"],
+            since: launchLogSnapshot
+        )
+        let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
+        assertTriggerMakesApplicationFrontmost(
+            "com.apple.finder",
+            timeout:
+                FlowTabUITestHotkeyReleaseLifecycleWatchdog
+                    .panelPresentation,
+            message: "Physical Option+Tab Search entry must begin from another application."
+        ) {
+            finder.activate()
+        }
+
+        let summary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        let searchReadiness = prepareInitialFlowTabSearchInputReadiness()
+
+        XCUIElement.perform(withKeyModifiers: .option) {
+            let pressLogSnapshot = makeRuntimeLogFileSnapshot()
+            defer { pressLogSnapshot.cancel() }
+            finder.typeKey(.tab, modifierFlags: .option)
+            waitForRuntimeLogFiles(
+                containing: [
+                    "dispatch phase=pressed dir=forward",
+                    "hotkeyPressed dir=forward panelVisible=0 action=show",
+                    "show kind=global result=presented"
+                ],
+                since: pressLogSnapshot
+            )
+            XCTAssertTrue(
+                summary.waitForExistence(
+                    timeout:
+                        FlowTabUITestHotkeyReleaseLifecycleWatchdog
+                            .panelPresentation
+                )
+            )
+
+            app.typeKey(.upArrow, modifierFlags: .option)
+            _ = requireInitialFlowTabSearchInput(
+                in: app,
+                observedBy: searchReadiness
+            )
+        }
+
+        let searchInput = element(
+            in: app,
+            identifier: Identifier.switcherSearchInput
+        )
+        XCTAssertTrue(searchInput.exists)
+        XCTAssertTrue(summary.exists)
+        app.typeKey(.escape, modifierFlags: [])
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
     func testPhysicalOptionTabMainKeyReleaseKeepsPanelUntilOptionRelease() {
         let launchLogSnapshot = makeRuntimeLogFileSnapshot()
         defer { launchLogSnapshot.cancel() }

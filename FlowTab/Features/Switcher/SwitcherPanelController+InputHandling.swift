@@ -4,6 +4,12 @@ import CoreGraphics
 import SwiftUI
 import FlowTabCore
 
+private enum SearchModeEntryOutcome {
+    case entered
+    case deferred
+    case unavailable
+}
+
 extension SwitcherPanelController {
     func installEventMonitors() {
         removeEventMonitors()
@@ -93,7 +99,7 @@ extension SwitcherPanelController {
         case 49:
             return true
         case 36, 76:
-            if !enterSearchModeIfPossible() {
+            if case .unavailable = attemptSearchModeEntry() {
                 finishSelection()
             }
             return true
@@ -116,7 +122,7 @@ extension SwitcherPanelController {
             advance(.downArrow)
             return true
         case 126:
-            if !enterSearchModeIfPossible() {
+            if case .unavailable = attemptSearchModeEntry() {
                 advance(.upArrow)
             }
             return true
@@ -246,21 +252,37 @@ extension SwitcherPanelController {
 
     @discardableResult
     func enterSearchModeIfPossible() -> Bool {
+        if case .entered = attemptSearchModeEntry() {
+            return true
+        }
+        return false
+    }
+
+    private func attemptSearchModeEntry() -> SearchModeEntryOutcome {
         logSearchTrace("enterSearchMode action=attempt \(searchTraceStateSummary())")
         guard searchFeatureEnabled else {
             logSearchTrace("enterSearchMode action=ignored reason=featureDisabled \(searchTraceStateSummary())")
-            return false
+            return .unavailable
         }
         guard model.enterSearchMode() else {
+            if model.pendingSearchActivationAfterFreshnessBarrier {
+                cancelPendingModifierReleaseConfirmation()
+                clearDelayedWindowLayerEntryState()
+                cancelManualWindowLayerEntryObservation()
+                logSearchTrace(
+                    "enterSearchMode action=deferred reason=awaitingCommittedSearchIndex \(searchTraceStateSummary())"
+                )
+                return .deferred
+            }
             logSearchTrace("enterSearchMode action=ignored reason=modelRejected \(searchTraceStateSummary())")
-            return false
+            return .unavailable
         }
         cancelPendingModifierReleaseConfirmation()
         resetPointerSelectionGate()
         updatePanelSize()
         RuntimeLog.info(.session, "enter search mode")
         logSearchTrace("enterSearchMode action=entered \(searchTraceStateSummary())")
-        return true
+        return .entered
     }
 
     @discardableResult
@@ -372,7 +394,7 @@ extension SwitcherPanelController {
             modifierReleaseObservationOwner.observeInputTransition()
             return
         }
-        guard !model.isSearchActive else { return }
+        guard !hasActiveOrPendingSearchInteraction else { return }
         logInputTrace(
             "flagsChanged keyCode=\(event.keyCode) action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
@@ -385,7 +407,7 @@ extension SwitcherPanelController {
 
     func handleGlobalMouseDown(at location: NSPoint) {
         guard isPanelPresented else { return }
-        guard model.isSearchActive else { return }
+        guard hasActiveOrPendingSearchInteraction else { return }
         let isInsidePanel = panelContainsPointOverride?(location) ?? panel.frame.contains(location)
         guard !isInsidePanel else { return }
         logInputTrace(
@@ -553,7 +575,7 @@ extension SwitcherPanelController {
             cancelSelectionForSystemInterruption(trigger: trigger)
             return
         }
-        let shouldKeepSessionVisible = model.isSearchActive
+        let shouldKeepSessionVisible = hasActiveOrPendingSearchInteraction
             || isHotkeyHoldSetPressed(for: sessionKind)
         guard shouldKeepSessionVisible else {
             logSearchTrace(

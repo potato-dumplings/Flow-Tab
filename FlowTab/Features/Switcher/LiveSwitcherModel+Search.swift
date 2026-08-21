@@ -35,12 +35,16 @@ extension LiveSwitcherModel {
         guard SearchInteractionPreferencesStore.loadIsEnabled() else { return false }
         guard overlayStyle == .appAndWindow else { return false }
         guard let session, case .appCycle = session.mode else { return false }
+        let freshnessBarrierWasPending = pendingSearchActivationAfterFreshnessBarrier
         cancelPendingSearchComputation()
         pendingSearchActivationAfterFreshnessBarrier = true
         sessionAppsByID = Dictionary(uniqueKeysWithValues: session.apps.map { ($0.id, $0) })
-        guard rebuildSearchIndexFromCommittedProjection(reason: "enterSearchMode") else {
-            pendingSearchActivationAfterFreshnessBarrier =
-                lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier == true
+        guard rebuildSearchIndexFromCommittedProjection(
+            reason: "enterSearchMode",
+            requestFreshnessBarrierIfNeeded: !freshnessBarrierWasPending
+        ) else {
+            pendingSearchActivationAfterFreshnessBarrier = freshnessBarrierWasPending
+                || lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier == true
             RuntimeLog.debug(
                 .searchModel,
                 "enterSearchMode changed=0 reason=noCommittedSearchIndex sessionAppCount=\(session.apps.count)"
@@ -148,13 +152,18 @@ extension LiveSwitcherModel {
     }
 
     @discardableResult
-    func rebuildSearchIndexFromCommittedProjection(reason: String) -> Bool {
+    func rebuildSearchIndexFromCommittedProjection(
+        reason: String,
+        requestFreshnessBarrierIfNeeded: Bool = true
+    ) -> Bool {
         let read = runtimeProjectionService.readCommittedSearchIndexForSearch()
+        let requestedFreshnessBarrier = read.shouldRequestFreshnessBarrier
+            && requestFreshnessBarrierIfNeeded
         guard let projection = read.projection else {
             committedSearchAppsByID = [:]
             searchCoordinator.resetIndex()
             publishSearchStateIfNeeded()
-            if read.shouldRequestFreshnessBarrier {
+            if requestedFreshnessBarrier {
                 runtimeProjectionService.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
             }
             lastSearchIndexReadDiagnostic = SearchIndexReadDiagnostic(
@@ -168,15 +177,15 @@ extension LiveSwitcherModel {
                 dirtyPIDCount: 0,
                 dirtyCGWindowIDCount: 0,
                 pendingRepairScopeCount: 0,
-                requestedFreshnessBarrier: read.shouldRequestFreshnessBarrier
+                requestedFreshnessBarrier: requestedFreshnessBarrier
             )
             RuntimeLog.debug(
                 .searchModel,
-                "searchIndexSource reason=\(reason) source=none readiness=\(read.readiness.rawValue) resultState=\(read.resultState.rawValue) freshnessBarrierRequested=\(read.shouldRequestFreshnessBarrier ? 1 : 0)"
+                "searchIndexSource reason=\(reason) source=none readiness=\(read.readiness.rawValue) resultState=\(read.resultState.rawValue) freshnessBarrierRequested=\(requestedFreshnessBarrier ? 1 : 0)"
             )
             return false
         }
-        if read.shouldRequestFreshnessBarrier {
+        if requestedFreshnessBarrier {
             runtimeProjectionService.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
         }
         let searchProjection = projection.filteringApps(

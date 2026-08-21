@@ -149,6 +149,9 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
+        if payload.hasCompleteWindowCoverage {
+            clearResolvedSpaceTopologyScopeLocked()
+        }
         guard deferredRequestCount == 0,
               !hasPendingRequests,
               payload.hasCompleteWindowCoverage,
@@ -560,20 +563,20 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     ) {
         guard hasCompleteWindowCoverage else { return }
         dirtyCGWindowIDs.subtract(requestedCGWindowIDs)
-        if dirtyCGWindowIDs.isEmpty {
-            pendingRepairScopes.remove("spaceTopology")
-            spaceTopologySignatureSummary = nil
-        }
+        clearResolvedSpaceTopologyScopeLocked()
     }
 
     private func clearDirtyStateForProjectedCGWindowsLocked(in payload: RuntimeCurrentAppWindowPayload) {
         let projectedCGWindowIDs = currentAppProjectedCGWindowIDs(in: payload)
         guard !projectedCGWindowIDs.isEmpty else { return }
         dirtyCGWindowIDs.subtract(projectedCGWindowIDs)
-        if dirtyCGWindowIDs.isEmpty {
-            pendingRepairScopes.remove("spaceTopology")
-            spaceTopologySignatureSummary = nil
-        }
+        clearResolvedSpaceTopologyScopeLocked()
+    }
+
+    private func clearResolvedSpaceTopologyScopeLocked() {
+        guard dirtyCGWindowIDs.isEmpty else { return }
+        pendingRepairScopes.remove("spaceTopology")
+        spaceTopologySignatureSummary = nil
     }
 
     private func currentAppWindowPayloadByApplyingActivationReadbackLocked(

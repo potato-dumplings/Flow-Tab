@@ -391,4 +391,41 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertTrue(store.diagnostics().pendingRepairScopes.isEmpty)
     }
+
+    func testSearchFreshnessBarrierCommitClearsEmptySpaceTopologyScope() {
+        let store = RuntimeReadModelStore()
+        let completePayload = RuntimeAppSwitcherProjectionPayload(
+            apps: [],
+            contextsByID: [:],
+            hasCompleteWindowCoverage: true
+        )
+        _ = store.commitMainTableAppSwitcherProjectionPayload(
+            completePayload,
+            generatedAt: 10
+        )
+        store.markSpaceTopologyDirty(
+            affectedCGWindowIDs: [],
+            signatureSummary: "empty-topology-transition",
+            pendingScope: "spaceTopology",
+            generatedAt: 11
+        )
+
+        let committedProjection = store.commitSearchFreshnessBarrierFromMainTablePayload(
+            RuntimeSearchIndexPayload(
+                appEntries: [],
+                windowEntries: [],
+                hasCompleteWindowCoverage: true
+            ),
+            deferredRequestCount: 0,
+            hasPendingRequests: false,
+            generatedAt: 12
+        )
+
+        XCTAssertNotNil(committedProjection)
+        XCTAssertTrue(store.diagnostics().pendingRepairScopes.isEmpty)
+        XCTAssertEqual(
+            store.readCommittedSearchIndexForSearch().readiness,
+            .committedGenerationValidated
+        )
+    }
 }

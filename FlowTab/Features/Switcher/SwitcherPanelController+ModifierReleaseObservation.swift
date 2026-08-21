@@ -140,9 +140,9 @@ extension SwitcherPanelController {
                     )
                     return nil
                 }
-                guard !self.model.isSearchActive else {
+                guard !self.hasActiveOrPendingSearchInteraction else {
                     self.recordModifierReleaseCancellation(
-                        .searchActive,
+                        .searchInteraction,
                         trigger: trigger,
                         generation: generation,
                         sessionGeneration: sessionGeneration
@@ -383,9 +383,9 @@ extension SwitcherPanelController {
         logInputTrace(
             "releaseConfirm stop trigger=\(trigger) reason=\(reason.rawValue) generation=\(generation) sessionGeneration=\(sessionGeneration) currentSessionGeneration=\(presentationSessionGeneration) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
-        if reason == .searchActive {
+        if reason == .searchInteraction {
             logSearchTrace(
-                "releaseConfirm trigger=\(trigger) action=stop reason=searchActive generation=\(generation) \(searchTraceStateSummary())"
+                "releaseConfirm trigger=\(trigger) action=stop reason=searchInteraction generation=\(generation) \(searchTraceStateSummary())"
             )
         }
     }
