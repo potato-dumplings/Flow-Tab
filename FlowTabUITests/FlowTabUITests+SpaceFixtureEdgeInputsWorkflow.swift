@@ -5,12 +5,24 @@ private enum SpaceFixtureEdgeInputsWorkflowDefaults {
     static let sharedWindowTitle = "Shared Docs"
     static let edgeWindowTitle =
         "报告 Docs: QA, punctuation & spaces - Long Title 2026 with extra searchable text for AX runtime coverage"
+    static let appNameFallbackSystemTitle = "Chrome Fixture"
+    static let appNameFallbackContentTitle = "Project Alpha"
+    static let appNameFallbackSiblingTitle = "Project Beta"
 
     static var workflowSourceURL: URL {
         repositoryRootURL
             .appendingPathComponent("docs", isDirectory: true)
             .appendingPathComponent("fixtures", isDirectory: true)
             .appendingPathComponent("space-fixture-switcher-edge-inputs-workflow.json")
+    }
+
+    static var appNameFallbackWorkflowSourceURL: URL {
+        repositoryRootURL
+            .appendingPathComponent("docs", isDirectory: true)
+            .appendingPathComponent("fixtures", isDirectory: true)
+            .appendingPathComponent(
+                "space-fixture-app-name-fallback-visible-frame-workflow.json"
+            )
     }
 
     private static var repositoryRootURL: URL {
@@ -21,6 +33,170 @@ private enum SpaceFixtureEdgeInputsWorkflowDefaults {
 }
 
 extension FlowTabUITests {
+    func testHomeAndSwitcherKeepAppNameFallbackVisibleFrameWindowsDistinctAfterRefresh() throws {
+        let workflow = try configuredAppNameFallbackVisibleFrameWorkflow()
+        let targetApp = try XCTUnwrap(workflow.apps.first)
+        let expectedTitles = [
+            SpaceFixtureEdgeInputsWorkflowDefaults.appNameFallbackSystemTitle,
+            SpaceFixtureEdgeInputsWorkflowDefaults.appNameFallbackSiblingTitle
+        ]
+
+        try runRealSpaceFixtureEdgeInputsWorkflow(
+            workflow,
+            flowTabAdditionalArguments: [
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs",
+                "--flowtab-ui-listen-switcher-trigger",
+                "-windowLayerAutoEnterDelay",
+                "30.0"
+            ] + FlowTabUITestSwitcherCommandPayload.launchArguments
+        ) { _, app in
+            let fixtureApp = makeEdgeWorkflowApplication(
+                for: targetApp.identity
+            )
+            let contentTitle = element(
+                in: fixtureApp,
+                identifier: "flowtab.spacefixture.window.title.1"
+            )
+            XCTAssertTrue(
+                contentTitle.waitForExistence(timeout: 5),
+                "Visible-frame fixture did not publish its first content title."
+            )
+            XCTAssertEqual(
+                contentTitle.label,
+                SpaceFixtureEdgeInputsWorkflowDefaults.appNameFallbackContentTitle
+            )
+
+            let targetPID = try targetProcessIdentifier(for: targetApp)
+            _ = openHomeTabAndSelectSpaceFixtureApp(
+                in: app,
+                identity: targetApp.identity,
+                expectedValue: "2w"
+            )
+            for title in expectedTitles {
+                assertHomeWindowTitle(
+                    title,
+                    in: app,
+                    message: "Home lost the visible-frame window titled \(title) on the initial mapping"
+                )
+            }
+
+            let secondMappingLogBaseline = makeRuntimeLogFileSnapshot()
+            defer { secondMappingLogBaseline.cancel() }
+            let refreshWindowRow = try XCTUnwrap(
+                waitForHomeWindowRow(
+                    in: app,
+                    title: SpaceFixtureEdgeInputsWorkflowDefaults.appNameFallbackSiblingTitle,
+                    timeout: 5
+                ),
+                "Home did not expose the second visible-frame window before refresh activation."
+            )
+            refreshWindowRow.coordinate(
+                withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+            ).tap()
+            XCTAssertTrue(
+                fixtureApp.wait(for: .runningForeground, timeout: 5),
+                "Visible-frame fixture did not become foreground before the second mapping."
+            )
+            app.activate()
+            assertRealSpaceFixtureFlowTabIsForegroundReadyAfterFixtureLaunch(
+                app,
+                targetDescription: "app-name-fallback-second-mapping"
+            )
+
+            let escapedAppName = NSRegularExpression.escapedPattern(
+                for: targetApp.appName
+            )
+            let escapedFallbackTitle = NSRegularExpression.escapedPattern(
+                for: SpaceFixtureEdgeInputsWorkflowDefaults.appNameFallbackSystemTitle
+            )
+            waitForRuntimeLogFiles(
+                matching:
+                    #"window-entries app=\#(escapedAppName) pid=\#(targetPID) ax=[1-9][0-9]* entries=2 [^\n]*detail=\[[^\n]*title=\#(escapedFallbackTitle):mode=[^,\n]*:source=privateExactBridge"#,
+                since: secondMappingLogBaseline,
+                description: "second mapping keeps the app-name fallback window private-exact"
+            )
+
+            _ = openHomeTabAndSelectSpaceFixtureApp(
+                in: app,
+                identity: targetApp.identity,
+                expectedValue: "2w"
+            )
+            for title in expectedTitles {
+                assertHomeWindowTitle(
+                    title,
+                    in: app,
+                    message: "Home lost the visible-frame window titled \(title) after the second mapping"
+                )
+            }
+
+            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                .global,
+                traceLabel: "appNameFallback.secondMapping.switcher"
+            )
+            guard assertCurrentSwitcherAppProjection(
+                in: app,
+                exactEntry: "\(targetApp.identity.bundleIdentifier):2",
+                timeout: FlowTabUITestSwitcherAppProjectionPolicy.edgeInputsInitialProjectionWatchdog
+            ) else { return }
+            XCTAssertTrue(
+                selectEdgeWorkflowAppInSwitcherAppLayer(
+                    targetApp,
+                    app: app
+                ),
+                "Switcher did not select the app-name fallback fixture."
+            )
+            let cards = performAndWaitForSwitcherWindowCards(
+                in: app,
+                expectedTitles: expectedTitles,
+                timeout: FlowTabUITestSwitcherWindowCardPolicy.edgeInputsProjectionWatchdog
+            ) {
+                app.typeKey(.downArrow, modifierFlags: [])
+            }
+
+            XCTAssertEqual(cards.count, 2)
+            XCTAssertEqual(Set(cards.map(\.identifier)).count, 2)
+            XCTAssertEqual(
+                edgeTitleCounts(cards.map(\.title)),
+                edgeTitleCounts(expectedTitles)
+            )
+        }
+    }
+
+    func testHomePageKeepsIdenticalRealWorkflowWindowsDistinct() throws {
+        let workflow = try configuredSwitcherEdgeInputsWorkflow()
+        let sharedTitle =
+            SpaceFixtureEdgeInputsWorkflowDefaults.sharedWindowTitle
+        let targetApp = try XCTUnwrap(
+            workflow.apps.first {
+                $0.expectedWindowTitles.filter { $0 == sharedTitle }.count
+                    == 2
+            },
+            "Edge workflow must include one app with duplicate same-title windows."
+        )
+
+        try runRealSpaceFixtureEdgeInputsWorkflow(
+            workflow,
+            flowTabAdditionalArguments: []
+        ) { _, app in
+            _ = openHomeTabAndSelectSpaceFixtureApp(
+                in: app,
+                identity: targetApp.identity,
+                expectedValue: "2w"
+            )
+            assertHomeWindowRowLabelPrefix(
+                [sharedTitle, sharedTitle],
+                in: app,
+                timeout:
+                    FlowTabUITestSpaceFixtureHomeProjectionPolicy
+                        .defaultAppRowProjectionWatchdog,
+                message:
+                    "Home collapsed duplicate same-title fixture windows"
+            )
+        }
+    }
+
     func testSwitcherPanelPreviewKeepsIdenticalRealWorkflowWindowsDistinct() throws {
         let workflow = try configuredSwitcherEdgeInputsWorkflow()
         let targetApp = try XCTUnwrap(
@@ -128,7 +304,9 @@ extension FlowTabUITests {
                 "DEBUG",
                 "--flowtab-ui-enable-verbose-logs",
                 "--flowtab-ui-open-switcher",
-                "--flowtab-ui-listen-switcher-trigger"
+                "--flowtab-ui-listen-switcher-trigger",
+                "-windowLayerAutoEnterDelay",
+                "30.0"
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         ) { _, app in
             let targetPID = try targetProcessIdentifier(for: targetApp)
@@ -333,6 +511,61 @@ extension FlowTabUITests {
                     multiAppWorkflowSetupMessage(
                         reason: error.localizedDescription,
                         scenarioSourceURL: SpaceFixtureEdgeInputsWorkflowDefaults.workflowSourceURL
+                    )
+                )
+            default:
+                XCTFail(error.localizedDescription)
+                throw error
+            }
+        } catch {
+            XCTFail(error.localizedDescription)
+            throw error
+        }
+    }
+
+    private func configuredAppNameFallbackVisibleFrameWorkflow(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) throws -> SpaceFixtureResolvedWorkflow {
+        let sourceURL =
+            SpaceFixtureEdgeInputsWorkflowDefaults
+            .appNameFallbackWorkflowSourceURL
+        do {
+            let installedWorkflow = try SpaceFixtureResolvedWorkflow.configured(
+                environment: environment
+            )
+            let workflow = try resolveSpaceFixtureWorkflowScenario(
+                sourceWorkflowURL: sourceURL,
+                using: installedWorkflow
+            )
+            let expectedTitles = [
+                SpaceFixtureEdgeInputsWorkflowDefaults.appNameFallbackSystemTitle,
+                SpaceFixtureEdgeInputsWorkflowDefaults.appNameFallbackSiblingTitle
+            ]
+            guard workflow.apps.count == 1,
+                  workflow.apps.first?.expectedWindowTitles == expectedTitles,
+                  workflow.apps.first?.expectedContentTitles == [
+                      SpaceFixtureEdgeInputsWorkflowDefaults.appNameFallbackContentTitle,
+                      SpaceFixtureEdgeInputsWorkflowDefaults.appNameFallbackSiblingTitle
+                  ],
+                  workflow.apps.first?.visibleFrameWindowIndices == [1, 2]
+            else {
+                throw XCTSkip(
+                    multiAppWorkflowSetupMessage(
+                        reason: "Resolved workflow does not contain the two app-name fallback windows.",
+                        scenarioSourceURL: sourceURL
+                    )
+                )
+            }
+            return workflow
+        } catch let error as SpaceFixtureMultiAppWorkflowError {
+            switch error {
+            case .missingWorkflowPath,
+                 .workflowScenarioMissingAppVariant,
+                 .workflowScenarioBundleIdentifierMismatch:
+                throw XCTSkip(
+                    multiAppWorkflowSetupMessage(
+                        reason: error.localizedDescription,
+                        scenarioSourceURL: sourceURL
                     )
                 )
             default:

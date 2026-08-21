@@ -401,6 +401,7 @@ struct RuntimeProjectionRepairFactSource {
         in runningApps: [NSRunningApplication]
     ) -> RuntimeFocusedCurrentAppWindowFacts {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let focusedApps = Self.focusedAppGroup(for: app, in: runningApps)
         AXLiveWindowRegistry.shared.prune(to: runningApps)
         let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let cgWindowsByPID = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff(
@@ -414,12 +415,12 @@ struct RuntimeProjectionRepairFactSource {
         ).windowsByPID
         let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         _ = runtimeFactProvider.collectAXWindowData(
-            for: [app],
+            for: focusedApps,
             cgWindowsByPID: cgWindowsByPID,
             allCGWindowsByPID: allCGWindowsByPID
         )
         let axReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let windowsByPID = projectedWindowEntriesByPID(for: [app])
+        let windowsByPID = projectedWindowEntriesByPID(for: focusedApps)
         return RuntimeFocusedCurrentAppWindowFacts(
             windowsByPID: windowsByPID,
             rankByPID: [:],
@@ -450,30 +451,43 @@ struct RuntimeProjectionRepairFactSource {
 
     func collectFocusedCurrentAppSelectionFacts(
         for app: NSRunningApplication,
+        in runningApps: [NSRunningApplication],
         windowFacts: RuntimeFocusedCurrentAppWindowFacts,
         policyFacts: RuntimeRepairAppLayerPolicyFacts
     ) -> RuntimeAppWindowSelectionFacts {
-        let focusedApps = [app]
-        let windowStatsByPID = RuntimeAppDirectory.windowStats(
+        let focusedApps = Self.focusedAppGroup(for: app, in: runningApps)
+        if let selectionFacts = collectCurrentAppSelectionFacts(
             for: focusedApps,
-            windowsByPID: windowFacts.windowsByPID,
-            isVisibleWindow: { !$0.isMinimized }
-        )
-        let windows = RuntimeAppDirectory(apps: focusedApps).mergedWindows(
-            for: focusedApps,
-            windowsByPID: windowFacts.windowsByPID,
-            windowStatsByPID: windowStatsByPID,
-            rankByPID: windowFacts.rankByPID
-        )
+            windowFacts: RuntimeCurrentAppWindowFacts(
+                windowsByPID: windowFacts.windowsByPID,
+                rankByPID: windowFacts.rankByPID
+            ),
+            policyFacts: policyFacts
+        ) {
+            return selectionFacts
+        }
         return RuntimeAppWindowSelectionFacts(
             app: app,
             appGroup: focusedApps,
-            windows: windows,
-            isIncludedInAppLayer: RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
-                hasWindows: !windows.isEmpty,
-                hasVisibleWindow: windows.contains { !$0.isMinimized },
-                hideMinimizedAppsFromAppLayer: policyFacts.hideMinimizedAppsFromAppLayer
-            )
+            windows: [],
+            isIncludedInAppLayer:
+                RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
+                    hasWindows: false,
+                    hasVisibleWindow: false,
+                    hideMinimizedAppsFromAppLayer:
+                        policyFacts.hideMinimizedAppsFromAppLayer
+                )
         )
+    }
+
+    static func focusedAppGroup(
+        for app: NSRunningApplication,
+        in runningApps: [NSRunningApplication]
+    ) -> [NSRunningApplication] {
+        let appID = RuntimeAppIdentity.appID(for: app)
+        let matchingApps = runningApps.filter {
+            RuntimeAppIdentity.appID(for: $0) == appID
+        }
+        return matchingApps.isEmpty ? [app] : matchingApps
     }
 }

@@ -8,6 +8,12 @@ enum RuntimeAXWindowRecovery {
         let reason: String
     }
 
+    enum StickyBindingVerification {
+        case exactPrivateBridge
+        case unavailable
+        case conflict(WindowBindingDiagnostic)
+    }
+
     static func resolvePrivateExactBridgeMatches(
         axWindows: [RuntimeAXWindowEntry],
         validCGWindowIDs: Set<CGWindowID>,
@@ -31,29 +37,31 @@ enum RuntimeAXWindowRecovery {
         return matches
     }
 
-    static func stickyBindingConflictDiagnostic(
+    static func verifyStickyBinding(
         record: RuntimeWindowRecord,
         reusedAXWindow: RuntimeAXWindowEntry,
         validCGWindowIDs: Set<CGWindowID>
-    ) -> WindowBindingDiagnostic? {
+    ) -> StickyBindingVerification {
         guard let exactCGWindowID = AXWindowInspector.cgWindowID(for: reusedAXWindow.window) else {
-            return nil
+            return .unavailable
         }
         guard validCGWindowIDs.contains(exactCGWindowID) else {
-            return nil
+            return .unavailable
         }
         guard exactCGWindowID != record.cgWindowID else {
-            return nil
+            return .exactPrivateBridge
         }
-        return WindowBindingDiagnostic(
-            stableWindowID: record.stableWindowID,
-            axWindowID: reusedAXWindow.id,
-            cgWindowID: exactCGWindowID,
-            confidence: .ambiguous,
-            source: .privateExactBridge,
-            reason: .privateExactBridgeConflictsWithStickyBinding,
-            candidateCount: 2,
-            allowedActions: WindowBindingConfidence.ambiguous.allowedActions
+        return .conflict(
+            WindowBindingDiagnostic(
+                stableWindowID: record.stableWindowID,
+                axWindowID: reusedAXWindow.id,
+                cgWindowID: exactCGWindowID,
+                confidence: .ambiguous,
+                source: .privateExactBridge,
+                reason: .privateExactBridgeConflictsWithStickyBinding,
+                candidateCount: 2,
+                allowedActions: WindowBindingConfidence.ambiguous.allowedActions
+            )
         )
     }
 

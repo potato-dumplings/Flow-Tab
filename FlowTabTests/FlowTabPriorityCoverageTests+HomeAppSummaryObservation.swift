@@ -312,6 +312,55 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(owner.isObserving)
     }
 
+    func testHomeSelectedAppSummaryRefreshPolicyBoundsEachExpectedTargetToOneRequest() {
+        let expectation = HomeSelectedAppRefreshExpectation(
+            processIdentifier: 83_885,
+            windowCount: 2
+        )
+
+        XCTAssertEqual(
+            HomeSelectedAppSummaryRefreshPolicy.decision(
+                summaryProcessIdentifier: expectation.processIdentifier,
+                summaryWindowCount: expectation.windowCount,
+                cachedWindowCount: 1,
+                outstandingExpectation: nil
+            ),
+            .request(expectation)
+        )
+        XCTAssertEqual(
+            HomeSelectedAppSummaryRefreshPolicy.decision(
+                summaryProcessIdentifier: expectation.processIdentifier,
+                summaryWindowCount: expectation.windowCount,
+                cachedWindowCount: 0,
+                outstandingExpectation: expectation
+            ),
+            .noRequest
+        )
+        XCTAssertEqual(
+            HomeSelectedAppSummaryRefreshPolicy.decision(
+                summaryProcessIdentifier: 6_520,
+                summaryWindowCount: 2,
+                cachedWindowCount: 0,
+                outstandingExpectation: expectation
+            ),
+            .request(
+                HomeSelectedAppRefreshExpectation(
+                    processIdentifier: 6_520,
+                    windowCount: 2
+                )
+            )
+        )
+        XCTAssertEqual(
+            HomeSelectedAppSummaryRefreshPolicy.decision(
+                summaryProcessIdentifier: expectation.processIdentifier,
+                summaryWindowCount: expectation.windowCount,
+                cachedWindowCount: expectation.windowCount,
+                outstandingExpectation: expectation
+            ),
+            .clearOutstanding
+        )
+    }
+
     private func makeObservedHomeSummaryProjection(
         generation: UInt64,
         isCompleteForScope: Bool

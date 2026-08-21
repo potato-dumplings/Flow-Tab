@@ -8,7 +8,7 @@ FlowTab is a macOS app switcher designed to stay close to the native `Command + 
 
 ## What You Can Do
 
-- Record six key-set fields directly from the keyboard; every field accepts any recognized keys and has no app-defined key-count limit
+- Record seven key-set fields directly from the keyboard; every field accepts any recognized keys and has no app-defined key-count limit
 - Switch across app-level and window-level views
 - Preview windows and activate a specific window directly
 - Quit the highlighted app inside the panel (default `Option + Q`)
@@ -54,10 +54,10 @@ System paths:
 3. Press `Enter` in the panel to start searching and narrow results.
 4. Release a key from the configured primary key set to confirm and switch.
 
-The six defaults are `Option`, `Shift`, `Tab`, `Q`, `Control + Tab`, and
-`Shift`. Recording accumulates every simultaneously held key and saves after
+The seven defaults are `Option`, `Shift`, `Tab`, `Q`, `Control`, `Shift`, and
+`Tab`. Recording accumulates every simultaneously held key and saves after
 the complete set is released. The first four fields are pairwise disjoint, as
-are the two in-app fields. Partial reuse across those two families is allowed,
+are the three in-app fields. Partial reuse across those two families is allowed,
 while the five resulting action chords must remain distinct. Invalid input is
 rejected with field-level red feedback and the saved value is retained.
 Without Accessibility permission, the primary and reverse modifier fields

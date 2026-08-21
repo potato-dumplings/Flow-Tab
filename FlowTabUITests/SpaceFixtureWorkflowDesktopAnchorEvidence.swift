@@ -31,12 +31,14 @@ struct SpaceFixtureWorkflowDesktopAnchorExpectation:
     let processIdentifier: pid_t
     let windows:
         [SpaceFixtureWorkflowDesktopAnchorWindowExpectation]
+    let fullscreenSizedDesktopWindowPlanIndices: Set<Int>
 
     init(
         bundleIdentifier: String,
         processIdentifier: pid_t,
         windows:
-            [SpaceFixtureWorkflowDesktopAnchorWindowExpectation]
+            [SpaceFixtureWorkflowDesktopAnchorWindowExpectation],
+        fullscreenSizedDesktopWindowPlanIndices: Set<Int> = []
     ) {
         precondition(!bundleIdentifier.isEmpty)
         precondition(processIdentifier > 0)
@@ -49,9 +51,16 @@ struct SpaceFixtureWorkflowDesktopAnchorExpectation:
             Set(windows.map(\.accessibilityIdentifier))
                 .count == windows.count
         )
+        precondition(
+            fullscreenSizedDesktopWindowPlanIndices.isSubset(
+                of: Set(windows.map(\.planIndex))
+            )
+        )
         self.bundleIdentifier = bundleIdentifier
         self.processIdentifier = processIdentifier
         self.windows = windows
+        self.fullscreenSizedDesktopWindowPlanIndices =
+            fullscreenSizedDesktopWindowPlanIndices
     }
 }
 
@@ -123,7 +132,13 @@ struct SpaceFixtureWorkflowDesktopAnchorSnapshot:
         ) {
             conditions.append("exactCGWindowIdentity")
         }
-        if topmostCGWindowIsFullscreenSpaceSized {
+        if topmostCGWindowIsFullscreenSpaceSized,
+           identifiedWindowPlanIndex.map(
+               expectation
+                   .fullscreenSizedDesktopWindowPlanIndices
+                   .contains
+           ) != true
+        {
             conditions.append("desktopSpace")
         }
         return conditions

@@ -621,7 +621,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testProjectionRefreshKeepsVisiblePreviewImagesInCurrentSession() {
+    func testWindowLayerSnapshotKeepsVisiblePreviewImagesAfterProjectionCommit() {
         let currentApp = NSRunningApplication.current
         let appID = "com.flowtab.tests.preview-refresh-continuity"
         let windows = (0..<4).map { index in
@@ -676,7 +676,7 @@ extension FlowTabPriorityCoverageTests {
         )
         capturesAreAvailable = false
 
-        XCTAssertTrue(model.handleAppSwitcherProjectionDidUpdate())
+        XCTAssertFalse(model.handleAppSwitcherProjectionDidUpdate())
         let refreshed = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
 
         XCTAssertEqual(refreshed.count, visibleRange.count)

@@ -709,19 +709,39 @@ extension FlowTabTests {
                 )
             ]
         )
-        let model = LiveSwitcherModel(
-            runtimeProjectionService: RecordingRuntimeProjectionService(
-                appSwitcherApps: [sessionOnlyApp],
-                committedSearchApps: [committedSearchApp]
-            )
+        let runningApp = NSRunningApplication.current
+        let committedContext = RuntimeAppContext(
+            appID: committedSearchApp.id,
+            runningApp: runningApp,
+            windowsByID: [
+                "committed-docs": RuntimeWindowContext(
+                    id: "committed-docs",
+                    title: "Runtime Committed Docs",
+                    isMinimized: false,
+                    ownerPID: runningApp.processIdentifier,
+                    cgWindowID: 240_173
+                )
+            ]
         )
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherApps: [sessionOnlyApp],
+            committedSearchApps: [committedSearchApp]
+        )
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         var activationTarget: ActivationTarget?
-        model.activationOverride = { target, _ in
+        var activatedContext: RuntimeAppContext?
+        model.activationOverride = { target, contextsByID in
             activationTarget = target
+            activatedContext = contextsByID[committedSearchApp.id]
         }
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertEqual(model.session?.apps.map(\.id), ["com.example.session-only"])
+        runtimeProjectionService.installAppSwitcherProjection(
+            apps: [sessionOnlyApp, committedSearchApp],
+            contextsByID: [committedSearchApp.id: committedContext],
+            projectionGeneration: 2
+        )
         XCTAssertTrue(model.enterSearchMode())
         XCTAssertEqual(model.searchScope, .window)
         XCTAssertTrue(
@@ -755,6 +775,7 @@ extension FlowTabTests {
                 restoreIfMinimized: false
             )
         )
+        XCTAssertNotNil(activatedContext?.windowsByID["committed-docs"])
     }
 
     @MainActor

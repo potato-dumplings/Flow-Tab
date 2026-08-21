@@ -433,7 +433,9 @@ extension FlowTabUITests {
                             FlowTabUITestInAppWindowRequestObservationPolicy
                             .watchdog
                     ),
-                    "Noisy Control+Tab exact sticky window-request watchdog expired for \(phase.trace). \(requestOwner.diagnosticSummary)"
+                    "Noisy Control+Tab reusable window-request evidence "
+                        + "watchdog expired for \(phase.trace). "
+                        + requestOwner.diagnosticSummary
                 )
                 XCTAssertEqual(
                     requestEvidence.value.windowID,
@@ -510,7 +512,9 @@ extension FlowTabUITests {
                     FlowTabUITestInAppWindowLayerObservationPolicy
                     .watchdog
             ),
-            "Noisy Control+Tab exact sticky Window-layer watchdog expired for \(phaseTrace). \(owner.diagnosticSummary)"
+            "Noisy Control+Tab reusable Window-layer evidence watchdog "
+                + "expired for \(phaseTrace). "
+                + owner.diagnosticSummary
         )
         XCTAssertEqual(
             evidence.value.windowID,

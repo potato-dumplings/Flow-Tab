@@ -1,0 +1,28 @@
+{
+  "workflowName": "app-name-fallback-visible-frame",
+  "settleTimeoutMs": 8000,
+  "apps": [
+    {
+      "appID": "chrome",
+      "appName": "Chrome Fixture",
+      "bundleId": "com.example.fixture.chrome",
+      "launchOrder": 1,
+      "windows": [
+        {
+          "title": "Chrome Fixture",
+          "contentTitle": "Project Alpha",
+          "frameMode": "visibleFrame",
+          "mode": "standard",
+          "tabs": []
+        },
+        {
+          "title": "Project Beta",
+          "contentTitle": "Project Beta",
+          "frameMode": "visibleFrame",
+          "mode": "standard",
+          "tabs": []
+        }
+      ]
+    }
+  ]
+}

@@ -134,6 +134,7 @@ final class SwitcherHotkeyInputOwner {
         let sourceRegistrationGeneration: UInt64
         var latestSequence: UInt64?
         var latestPhase: HotkeyInputEvent.Phase?
+        var latestHoldSetPressedEvidence: Bool?
     }
 
     private var routeStates: [SwitcherHotkeyInputRoute: RouteState] = [:]
@@ -155,7 +156,8 @@ final class SwitcherHotkeyInputOwner {
             sourceID: sourceID,
             sourceRegistrationGeneration: sourceRegistrationGeneration,
             latestSequence: nil,
-            latestPhase: nil
+            latestPhase: nil,
+            latestHoldSetPressedEvidence: nil
         )
         return sourceRegistrationGeneration
     }
@@ -198,6 +200,12 @@ final class SwitcherHotkeyInputOwner {
         inputGeneration &+= 1
         state.latestSequence = event.identity.sequence
         state.latestPhase = event.phase
+        if let holdSetPressedEvidence =
+            event.holdSetPressedEvidence
+        {
+            state.latestHoldSetPressedEvidence =
+                holdSetPressedEvidence
+        }
         routeStates[route] = state
         return .accepted(
             SwitcherHotkeyInputReceipt(
@@ -216,6 +224,21 @@ final class SwitcherHotkeyInputOwner {
         for route: SwitcherHotkeyInputRoute
     ) -> HotkeyInputEvent.Phase? {
         routeStates[route]?.latestPhase
+    }
+
+    func latestHoldSetPressedEvidence(
+        for route: SwitcherHotkeyInputRoute
+    ) -> Bool? {
+        routeStates[route]?.latestHoldSetPressedEvidence
+    }
+
+    func updateHoldSetPressedEvidence(
+        _ evidence: Bool,
+        for route: SwitcherHotkeyInputRoute
+    ) {
+        guard var state = routeStates[route] else { return }
+        state.latestHoldSetPressedEvidence = evidence
+        routeStates[route] = state
     }
 
 }

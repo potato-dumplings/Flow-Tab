@@ -17,7 +17,9 @@ struct SpaceFixtureWindowPlan: Equatable {
     let configuredTitle: String
     let fixtureAppName: String?
     let title: String
+    let contentTitle: String
     let frame: CGRect
+    let frameMode: SpaceFixtureWindowFrameMode
     let isFullscreenTarget: Bool
     let tabs: [SpaceFixtureConfiguredTab]
     let noisyCGSiblings: Bool
@@ -32,7 +34,9 @@ struct SpaceFixtureWindowPlan: Equatable {
         configuredTitle: String,
         fixtureAppName: String?,
         title: String,
+        contentTitle: String? = nil,
         frame: CGRect,
+        frameMode: SpaceFixtureWindowFrameMode = .standard,
         isFullscreenTarget: Bool,
         tabs: [SpaceFixtureConfiguredTab],
         noisyCGSiblings: Bool,
@@ -46,7 +50,9 @@ struct SpaceFixtureWindowPlan: Equatable {
         self.configuredTitle = configuredTitle
         self.fixtureAppName = fixtureAppName
         self.title = title
+        self.contentTitle = contentTitle ?? title
         self.frame = frame
+        self.frameMode = frameMode
         self.isFullscreenTarget = isFullscreenTarget
         self.tabs = tabs
         self.noisyCGSiblings = noisyCGSiblings
@@ -130,13 +136,18 @@ enum SpaceFixtureWindowPlanner {
             )
 
             let configuredWindow = configuration.windows[index - 1]
+            let frame = configuredWindow.frameMode == .visibleFrame
+                ? visibleFrame
+                : CGRect(origin: origin, size: defaultWindowSize)
             return SpaceFixtureWindowPlan(
                 index: index,
                 totalWindowCount: configuration.windowCount,
                 configuredTitle: configuredWindow.configuredTitle,
                 fixtureAppName: configuration.workflowAppName,
                 title: configuredWindow.windowTitle,
-                frame: CGRect(origin: origin, size: defaultWindowSize),
+                contentTitle: configuredWindow.contentTitle,
+                frame: frame,
+                frameMode: configuredWindow.frameMode,
                 isFullscreenTarget: configuredWindow.isFullscreenTarget,
                 tabs: configuredWindow.tabs,
                 noisyCGSiblings: configuredWindow.noisyCGSiblings,

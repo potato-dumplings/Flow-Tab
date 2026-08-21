@@ -17,12 +17,14 @@ struct FlowTabUITestInAppWindowLayerRecord: Equatable {
     let windowID: String
     let windowNumber: CGWindowID
     let title: String
+    let reusableWindowEvidence: FlowTabUITestReusableWindowEvidence
     let spaceEvidence: SpaceEvidence
 
     var diagnosticSummary: String {
         "app=\(appName) pid=\(processIdentifier) "
             + "windowID=\(windowID) cg=\(windowNumber) "
-            + "title=\(title) source=stickyBinding "
+            + "title=\(title) sticky=1 "
+            + "source=\(reusableWindowEvidence.rawValue) "
             + "spaceEvidence=\(spaceEvidence.rawValue)"
     }
 
@@ -74,16 +76,22 @@ struct FlowTabUITestInAppWindowLayerRecord: Equatable {
               ),
               let windowNumber = CGWindowID(cgText),
               windowNumber > 0,
-              contents(
+              let stickyText = contents(
                   in: entry,
                   after: ":sticky=",
                   before: ":source="
-              ) == "1",
-              contents(
+              ),
+              let source = contents(
                   in: entry,
                   after: ":source=",
                   before: ":spaceEvidence="
-              ) == "stickyBinding",
+              ),
+              let reusableWindowEvidence =
+                  FlowTabUITestReusableWindowEvidence
+                  .parseCurrent(
+                      hasStickyBinding: stickyText == "1",
+                      source: source
+                  ),
               let spaceEvidenceText = contents(
                   in: entry,
                   after: ":spaceEvidence=",
@@ -102,6 +110,8 @@ struct FlowTabUITestInAppWindowLayerRecord: Equatable {
             windowID: windowID,
             windowNumber: windowNumber,
             title: title,
+            reusableWindowEvidence:
+                reusableWindowEvidence,
             spaceEvidence: spaceEvidence
         )
     }

@@ -68,7 +68,7 @@ final class SwitcherPanelController {
         case suppressedForTesting
         case explicitCancel
         case panelHidden
-        case searchActive
+        case searchInteraction
         case sessionChanged
     }
 
@@ -252,6 +252,11 @@ final class SwitcherPanelController {
 
     var searchFeatureEnabled: Bool {
         SearchInteractionPreferencesStore.loadIsEnabled()
+    }
+
+    var hasActiveOrPendingSearchInteraction: Bool {
+        model.isSearchActive
+            || model.pendingSearchActivationAfterFreshnessBarrier
     }
 
     var isPanelPresented: Bool {

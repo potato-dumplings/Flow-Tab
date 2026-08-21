@@ -94,20 +94,24 @@ extension FlowTabUITests {
         mainModifiersText: String,
         mainKey: String,
         quitKey: String,
-        inAppModifiers: XCUIElement.KeyModifierFlags,
-        inAppShortcutText: String,
-        inAppKey: String,
+        inAppBaseKeys: XCUIElement.KeyModifierFlags,
+        inAppBaseKeysText: String,
+        inAppMainKey: String,
         mainReverseModifiers: XCUIElement.KeyModifierFlags = .shift,
         mainReverseModifiersText: String = "Shift",
         inAppReverseModifiers: XCUIElement.KeyModifierFlags = .shift,
         inAppReverseModifiersText: String = "Shift"
     ) -> [FlowTabUITestShortcutRecording] {
         [
-            FlowTabUITestShortcutRecording(
-                controlIdentifier: Identifier.settingsHotkeyInAppShortcut,
-                key: inAppKey,
-                modifierFlags: inAppModifiers,
-                expectedValue: inAppShortcutText
+            .key(
+                controlIdentifier: Identifier.settingsHotkeyInAppMainKeys,
+                key: inAppMainKey,
+                expectedValue: shortcutKeyDisplayName(inAppMainKey)
+            ),
+            .modifiers(
+                controlIdentifier: Identifier.settingsHotkeyInAppBaseKeys,
+                modifierFlags: inAppBaseKeys,
+                expectedValue: inAppBaseKeysText
             ),
             .modifiers(
                 controlIdentifier: Identifier.settingsHotkeyInAppReverseModifiers,

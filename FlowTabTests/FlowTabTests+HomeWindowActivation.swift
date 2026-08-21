@@ -28,7 +28,10 @@ extension FlowTabTests {
             preferences: preferences
         )
 
-        XCTAssertEqual(request?.target, .app(appID: appID))
+        XCTAssertEqual(
+            request?.target,
+            .window(appID: appID, windowID: "mail-archive", restoreIfMinimized: false)
+        )
         let contextKeys = Set<String>(request?.contextsByID.keys.map { $0 } ?? [])
         XCTAssertEqual(contextKeys, [appID])
     }

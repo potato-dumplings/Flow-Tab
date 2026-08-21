@@ -66,6 +66,93 @@ extension FlowTabUITests {
         )
     }
 
+    func testSpaceFixturePermissionObservationKeepsScheduledReadbacksInactiveBeforeTrigger() {
+        var scheduledRegistrationCount = 0
+        let owner =
+            SpaceFixtureWorkflowPermissionObservationOwner(
+                observationRegistration: { _ in
+                    scheduledRegistrationCount += 1
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: {
+                    self.permissionSnapshot(
+                        accessibilityStatusLabel: "",
+                        screenCaptureStatusLabel: ""
+                    )
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        XCTAssertEqual(scheduledRegistrationCount, 0)
+    }
+
+    func testSpaceFixturePermissionObservationActivatesScheduledReadbacksAfterUnresolvedTrigger() {
+        var snapshot = permissionSnapshot(
+            accessibilityStatusLabel: "",
+            screenCaptureStatusLabel: ""
+        )
+        var scheduledReadback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var scheduledRegistrationCount = 0
+        let owner =
+            SpaceFixtureWorkflowPermissionObservationOwner(
+                observationRegistration: { callback in
+                    scheduledRegistrationCount += 1
+                    scheduledReadback = callback
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: { snapshot }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        owner.markTriggerCompleted()
+        XCTAssertEqual(scheduledRegistrationCount, 1)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        snapshot = permissionSnapshot(
+            accessibilityStatusLabel: "Granted",
+            screenCaptureStatusLabel: "Granted"
+        )
+        scheduledReadback?(.scheduledReadback)
+
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .scheduledReadback
+        )
+    }
+
+    func testSpaceFixturePermissionObservationKeepsScheduleInactiveWhenTriggerResolves() {
+        var snapshot = permissionSnapshot(
+            accessibilityStatusLabel: "",
+            screenCaptureStatusLabel: ""
+        )
+        var scheduledRegistrationCount = 0
+        let owner =
+            SpaceFixtureWorkflowPermissionObservationOwner(
+                observationRegistration: { _ in
+                    scheduledRegistrationCount += 1
+                    return FlowTabUITestObservationCancellation {}
+                },
+                readback: { snapshot }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        snapshot = permissionSnapshot(
+            accessibilityStatusLabel: "Granted",
+            screenCaptureStatusLabel: "Granted"
+        )
+        owner.markTriggerCompleted()
+
+        XCTAssertEqual(scheduledRegistrationCount, 0)
+        XCTAssertEqual(
+            owner.resolvedEvidence?.source,
+            .triggerReadback
+        )
+    }
+
     func testSpaceFixturePermissionObservationAcceptsInitialGrantedProjection() {
         let snapshot = permissionSnapshot(
             accessibilityStatusLabel: "Granted",
@@ -114,6 +201,7 @@ extension FlowTabUITests {
             owner.latestEvidence?.value.projection,
             .projecting
         )
+        owner.markTriggerCompleted()
         for _ in 0..<20 {
             readback?(.scheduledReadback)
             XCTAssertNil(owner.resolvedEvidence)
@@ -161,9 +249,11 @@ extension FlowTabUITests {
                     readback: { snapshot }
                 )
             owner.start()
+            owner.markTriggerCompleted()
             let staleReadback = callbacks[0]
             owner.cancel()
             owner.start()
+            owner.markTriggerCompleted()
 
             snapshot = permissionSnapshot(
                 accessibilityStatusLabel: "Granted",

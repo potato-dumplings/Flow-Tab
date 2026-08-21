@@ -39,6 +39,65 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(model.session)
     }
 
+    @MainActor
+    func testLiveSwitcherModelProjectionRefreshPlacesNewRuntimeLeaderAheadOfVisibleOrder() {
+        let mail = AppSwitchCandidate(
+            id: "com.example.mail",
+            displayName: "Mail",
+            groupID: "mail",
+            lastActiveAt: 300,
+            windows: []
+        )
+        let browser = AppSwitchCandidate(
+            id: "com.example.browser",
+            displayName: "Browser",
+            groupID: "browser",
+            lastActiveAt: 200,
+            windows: []
+        )
+        let runtimeProjectionService =
+            RecordingRuntimeProjectionService(
+                appSwitcherApps: [mail, browser]
+            )
+        let model = LiveSwitcherModel(
+            runtimeProjectionService: runtimeProjectionService
+        )
+        model.runtimeProjectionMaintenanceEnabled = false
+
+        XCTAssertTrue(
+            model.startSession(triggerDirection: .forward)
+        )
+        let selectedAppID = model.session?.selectedApp.id
+        let calendar = AppSwitchCandidate(
+            id: "com.example.calendar",
+            displayName: "Calendar",
+            groupID: "calendar",
+            lastActiveAt: 400,
+            windows: []
+        )
+        runtimeProjectionService.installAppSwitcherProjection(
+            apps: [calendar, browser, mail],
+            contextsByID: [:],
+            generatedAt: 20
+        )
+
+        XCTAssertTrue(
+            model.handleAppSwitcherProjectionDidUpdate()
+        )
+        XCTAssertEqual(
+            model.session?.apps.map(\.id),
+            [
+                calendar.id,
+                mail.id,
+                browser.id,
+            ]
+        )
+        XCTAssertEqual(
+            model.session?.selectedApp.id,
+            selectedAppID
+        )
+    }
+
     func testRuntimeLogIntegrationFiltersDeltasAndClearsEntries() async {
         let defaults = UserDefaults.standard
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)

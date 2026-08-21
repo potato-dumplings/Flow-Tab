@@ -757,9 +757,11 @@ extension FlowTabTests {
 
     func testInAppWindowHotkeyResolveAndLoadNormalizeInvalidValues() {
         let resolved = InAppWindowHotkeyPreferencesStore.resolve(
-            shortcutKeysRaw: "invalid"
+            baseKeysRaw: "invalid",
+            mainKeysRaw: "invalid"
         )
-        XCTAssertEqual(resolved.shortcutKeys, [.control, .tab])
+        XCTAssertEqual(resolved.baseKeys, [.control])
+        XCTAssertEqual(resolved.mainKeys, [.tab])
 
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
         defer { clearIsolatedUserDefaults(userDefaults) }
@@ -769,13 +771,49 @@ extension FlowTabTests {
         )
 
         let configuration = InAppWindowHotkeyPreferencesStore.load(userDefaults: userDefaults)
-        XCTAssertEqual(configuration.baseKeys, [.control, .tab])
+        XCTAssertEqual(configuration.baseKeys, [.control])
+        XCTAssertEqual(configuration.mainKeys, [.tab])
         XCTAssertEqual(configuration.quitKeys, [.q])
         XCTAssertEqual(
             userDefaults.string(
-                forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+                forKey: AppPreferenceKeys.inAppWindowHotkeyBaseKeys
             ),
-            InAppWindowHotkeyPreferencesStore.defaultShortcutKeys.rawValue
+            InAppWindowHotkeyPreferencesStore.defaultBaseKeys.rawValue
+        )
+        XCTAssertEqual(
+            userDefaults.string(
+                forKey: AppPreferenceKeys.inAppWindowHotkeyMainKeys
+            ),
+            InAppWindowHotkeyPreferencesStore.defaultMainKeys.rawValue
+        )
+    }
+
+    func testInAppWindowHotkeyLoadMigratesLegacyCombinedShortcut() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
+        userDefaults.set(
+            "control+tab+w",
+            forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+        )
+
+        let configuration = InAppWindowHotkeyPreferencesStore.load(
+            userDefaults: userDefaults
+        )
+
+        XCTAssertEqual(configuration.baseKeys, [.control])
+        XCTAssertEqual(configuration.mainKeys, [.tab, .w])
+        XCTAssertEqual(configuration.reverseKeys, [.shift])
+        XCTAssertEqual(
+            userDefaults.string(
+                forKey: AppPreferenceKeys.inAppWindowHotkeyBaseKeys
+            ),
+            SwitcherHotkeyKeySet([.control]).rawValue
+        )
+        XCTAssertEqual(
+            userDefaults.string(
+                forKey: AppPreferenceKeys.inAppWindowHotkeyMainKeys
+            ),
+            SwitcherHotkeyKeySet([.tab, .w]).rawValue
         )
     }
 
@@ -788,10 +826,12 @@ extension FlowTabTests {
         )
 
         let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
-            shortcutKeysRaw: "control+tab",
+            baseKeysRaw: "control",
+            mainKeysRaw: "tab",
             switcherConfiguration: mainConfiguration
         )
-        XCTAssertEqual(resolved.shortcutKeys, [.option, .tab])
+        XCTAssertEqual(resolved.baseKeys, [.option])
+        XCTAssertEqual(resolved.mainKeys, [.tab])
     }
 
     func testInAppWindowHotkeyResolveAvoidingMainConflictKeepsNonConflictingShortcut() {
@@ -803,10 +843,12 @@ extension FlowTabTests {
         )
 
         let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
-            shortcutKeysRaw: "option+space",
+            baseKeysRaw: "option",
+            mainKeysRaw: "space",
             switcherConfiguration: mainConfiguration
         )
-        XCTAssertEqual(resolved.shortcutKeys, [.option, .space])
+        XCTAssertEqual(resolved.baseKeys, [.option])
+        XCTAssertEqual(resolved.mainKeys, [.space])
     }
 
     func testInAppWindowHotkeyResolveAvoidingQuitConflictFallsBackToNonConflictingModifier() {
@@ -818,10 +860,12 @@ extension FlowTabTests {
         )
 
         let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingSwitcherHotkeyConflicts(
-            shortcutKeysRaw: "option+q",
+            baseKeysRaw: "option",
+            mainKeysRaw: "q",
             switcherConfiguration: mainConfiguration
         )
-        XCTAssertEqual(resolved.shortcutKeys, [.control, .q])
+        XCTAssertEqual(resolved.baseKeys, [.control])
+        XCTAssertEqual(resolved.mainKeys, [.q])
     }
 
     func testSwitcherBehaviorAndVisibilityPreferenceDefaults() {
@@ -1191,7 +1235,8 @@ extension FlowTabTests {
             hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.command.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
-            inAppWindowHotkeyShortcutKeysRaw: "option+tab",
+            inAppWindowHotkeyBaseKeysRaw: "option",
+            inAppWindowHotkeyMainKeysRaw: "tab",
             commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
             accessibilityTrusted: true,
             appLanguageRaw: AppLanguage.simplifiedChinese.rawValue
@@ -1217,7 +1262,8 @@ extension FlowTabTests {
             hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.option.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
-            inAppWindowHotkeyShortcutKeysRaw: "control+tab",
+            inAppWindowHotkeyBaseKeysRaw: "control",
+            inAppWindowHotkeyMainKeysRaw: "tab",
             commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: false,
             screenCaptureTrusted: false,

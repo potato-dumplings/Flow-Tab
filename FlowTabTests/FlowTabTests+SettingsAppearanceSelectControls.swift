@@ -304,7 +304,8 @@ extension FlowTabTests {
             hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.option.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
-            inAppWindowHotkeyShortcutKeysRaw: "control+tab",
+            inAppWindowHotkeyBaseKeysRaw: "control",
+            inAppWindowHotkeyMainKeysRaw: "tab",
             commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: true,
             appLanguageRaw: AppLanguage.simplifiedChinese.rawValue
@@ -316,7 +317,7 @@ extension FlowTabTests {
             descendant(in: view, identifier: "flowtab.settings.hotkey.quit-key")
         )
         let inAppRecorder: FlowSettingsShortcutRecorderControl = try XCTUnwrap(
-            descendant(in: view, identifier: "flowtab.settings.hotkey.in-app-shortcut")
+            descendant(in: view, identifier: "flowtab.settings.hotkey.in-app-base-keys")
         )
         quitRecorder.update(
             keys: [.tab],
@@ -349,7 +350,7 @@ extension FlowTabTests {
             descendant(in: view, identifier: "flowtab.settings.hotkey.quit-key")
         )
         let inAppRecorder: FlowSettingsShortcutRecorderControl = try XCTUnwrap(
-            descendant(in: view, identifier: "flowtab.settings.hotkey.in-app-shortcut")
+            descendant(in: view, identifier: "flowtab.settings.hotkey.in-app-base-keys")
         )
         quitRecorder.update(
             keys: [.tab],
@@ -369,12 +370,13 @@ extension FlowTabTests {
                 hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.option.rawValue,
                 hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
                 hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
-                inAppWindowHotkeyShortcutKeysRaw: "control+tab"
+                inAppWindowHotkeyBaseKeysRaw: "control",
+                inAppWindowHotkeyMainKeysRaw: "tab"
             )
         )
 
         XCTAssertEqual(quitRecorder.recordedKeys, [.q])
-        XCTAssertEqual(inAppRecorder.recordedKeys, [.control, .tab])
+        XCTAssertEqual(inAppRecorder.recordedKeys, [.control])
     }
 
     func testFlowDropdownSharedControlDoesNotReadPresentationOrLocalizationState() throws {
@@ -673,7 +675,8 @@ extension FlowTabTests {
             hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.option.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
-            inAppWindowHotkeyShortcutKeysRaw: "control+tab",
+            inAppWindowHotkeyBaseKeysRaw: "control",
+            inAppWindowHotkeyMainKeysRaw: "tab",
             commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: false,
             screenCaptureTrusted: false,

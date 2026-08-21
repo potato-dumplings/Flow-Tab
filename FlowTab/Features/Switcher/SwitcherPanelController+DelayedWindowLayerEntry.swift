@@ -8,9 +8,9 @@ extension SwitcherPanelController {
             clearDelayedWindowLayerEntryState()
             return
         }
-        guard !model.isSearchActive else {
+        guard !hasActiveOrPendingSearchInteraction else {
             clearDelayedWindowLayerEntryState()
-            RuntimeLog.debug(.autoEnter, "skip searchActive")
+            RuntimeLog.debug(.autoEnter, "skip searchInteraction")
             return
         }
         guard isPanelPresented else {

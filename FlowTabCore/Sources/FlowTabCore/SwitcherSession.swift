@@ -84,14 +84,12 @@ public struct SwitcherSession: Sendable {
             let selectedWindowIndex = selectedWindowIndexByAppID[appID] ?? 0
             let window = app.windows[safe: selectedWindowIndex] ?? app.windows[0]
             rememberedWindowIDByAppID[appID] = window.id
-            return activationTarget(appID: appID, window: window)
+            return windowActivationTarget(appID: appID, window: window)
         }
 
         let app = selectedApp
-        if let preferredWindow = preferredWindow(for: app) {
-            return activationTarget(appID: app.id, window: preferredWindow)
-        }
-        return .app(appID: app.id)
+        let fallback = preferredWindow(for: app).flatMap(appActivationFallback)
+        return .app(appID: app.id, fallback: fallback)
     }
 
     private mutating func handleInAppCycle(_ keyInput: KeyInput) {
@@ -260,11 +258,22 @@ public struct SwitcherSession: Sendable {
         }
     }
 
-    private func activationTarget(appID: String, window: WindowCandidate) -> ActivationTarget {
+    private func appActivationFallback(for window: WindowCandidate) -> AppActivationFallback? {
         if window.isMinimized && !preferences.autoRestoreMinimizedWindowOnSwitch {
-            return .app(appID: appID)
+            return nil
         }
 
+        return AppActivationFallback(
+            windowID: window.id,
+            restoreIfMinimized: window.isMinimized
+                && preferences.autoRestoreMinimizedWindowOnSwitch
+        )
+    }
+
+    private func windowActivationTarget(
+        appID: String,
+        window: WindowCandidate
+    ) -> ActivationTarget {
         return .window(
             appID: appID,
             windowID: window.id,

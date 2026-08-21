@@ -8,6 +8,15 @@ struct RuntimeCurrentAppRepairEvidence: Equatable, Sendable {
     let currentAppWindowPayloadWasEmpty: Bool
     let authoritativeCGWindowIDs: Set<CGWindowID>?
 
+    var reconciledPIDs: Set<pid_t> {
+        Set(
+            appDirectoryEntries
+                .filter { $0.appID == appID }
+                .map(\.pid)
+        )
+        .union([pid])
+    }
+
     init(
         appID: String,
         pid: pid_t,

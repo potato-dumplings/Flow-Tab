@@ -4,7 +4,7 @@ enum HotkeySettingsConflict: String, Equatable, Sendable {
     case mainAndQuit = "main_and_quit"
     case mainAndInApp = "main_and_in_app"
     case quitAndInApp = "quit_and_in_app"
-    case inAppAndReverseModifier = "in_app_and_reverse_modifier"
+    case inAppFamilyDuplicateKey = "in_app_family_duplicate_key"
 }
 
 enum HotkeySettingsField: String, CaseIterable, Equatable, Hashable, Sendable {
@@ -12,8 +12,9 @@ enum HotkeySettingsField: String, CaseIterable, Equatable, Hashable, Sendable {
     case mainReverseModifiers = "main_reverse_modifiers"
     case mainKey = "main_key"
     case quitKey = "quit_key"
-    case inAppShortcut = "in_app_shortcut"
+    case inAppBaseKeys = "in_app_base_keys"
     case inAppReverseModifiers = "in_app_reverse_modifiers"
+    case inAppMainKeys = "in_app_main_keys"
 }
 
 struct HotkeySettingsChangeCandidate: Equatable {
@@ -46,7 +47,8 @@ enum HotkeySettingsPermissionlessFieldPolicy {
             return !keys.isEmpty && keys.nonModifierKeys.isEmpty
         case .mainKey:
             return keys.nonModifierKeys.count == 1
-        case .quitKey, .inAppShortcut, .inAppReverseModifiers:
+        case .quitKey, .inAppBaseKeys, .inAppReverseModifiers,
+             .inAppMainKeys:
             return true
         }
     }
@@ -85,7 +87,7 @@ enum HotkeySettingsPermissionlessFieldPolicy {
             return configuration.mainKeys
         case .quitKey:
             return configuration.quitKeys
-        case .inAppShortcut, .inAppReverseModifiers:
+        case .inAppBaseKeys, .inAppReverseModifiers, .inAppMainKeys:
             return SwitcherHotkeyKeySet()
         }
     }
@@ -130,8 +132,9 @@ enum HotkeySettingsChangeTransaction {
             quitKeysRaw: values.hotkeyQuitKeyRaw
         )
         let resolvedInAppConfiguration = InAppWindowHotkeyPreferencesStore.resolveCandidate(
-            shortcutKeysRaw: values.inAppWindowHotkeyShortcutKeysRaw,
-            reverseKeysRaw: values.inAppWindowHotkeyReverseKeysRaw
+            baseKeysRaw: values.inAppWindowHotkeyBaseKeysRaw,
+            reverseKeysRaw: values.inAppWindowHotkeyReverseKeysRaw,
+            mainKeysRaw: values.inAppWindowHotkeyMainKeysRaw
         )
         let inAppConfiguration = resolvedInAppConfiguration.configuration
 
@@ -150,11 +153,21 @@ enum HotkeySettingsChangeTransaction {
         if mainConfiguration.mainFamilyHasDuplicateKeys {
             return .conflict(.mainFamilyDuplicateKey)
         }
-        if !inAppConfiguration.baseKeys.isDisjoint(
-            with: inAppConfiguration.reverseKeys
-        )
-        {
-            return .conflict(.inAppAndReverseModifier)
+        let inAppFields = [
+            inAppConfiguration.baseKeys,
+            inAppConfiguration.reverseKeys,
+            inAppConfiguration.mainKeys
+        ]
+        for index in inAppFields.indices {
+            for otherIndex in inAppFields.indices
+            where otherIndex > index
+            {
+                if !inAppFields[index].isDisjoint(
+                    with: inAppFields[otherIndex]
+                ) {
+                    return .conflict(.inAppFamilyDuplicateKey)
+                }
+            }
         }
 
         let mainSwitchingShortcuts = mainConfiguration.switchingShortcuts

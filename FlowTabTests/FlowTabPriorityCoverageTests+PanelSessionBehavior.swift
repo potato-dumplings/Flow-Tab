@@ -976,7 +976,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelKeepsActiveWindowCycleOrderWhenCurrentAppProjectionRefreshes() {
+    func testLiveSwitcherModelKeepsWindowLayerSnapshotWhenCurrentAppProjectionRefreshes() {
         let appID = "com.example.active-window-cycle-refresh"
         let runningApp = NSRunningApplication.current
         let initialWindows = [
@@ -1054,7 +1054,11 @@ extension FlowTabPriorityCoverageTests {
         model.handle(.rightArrow)
         XCTAssertEqual(model.session?.selectedWindow?.id, "normal")
 
-        XCTAssertTrue(model.applyCurrentAppWindowProjectionIfReady(appID: appID))
+        XCTAssertFalse(model.applyCurrentAppWindowProjectionIfReady(appID: appID))
+        XCTAssertEqual(
+            runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID),
+            0
+        )
         XCTAssertEqual(
             model.session?.selectedApp.windows.map(\.id),
             ["fullscreen", "normal", "incognito", "second-fullscreen"]
@@ -1067,7 +1071,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelKeepsActiveWindowCycleOrderWhenAppSwitcherProjectionRefreshes() {
+    func testLiveSwitcherModelKeepsWindowLayerSnapshotWhenAppSwitcherProjectionRefreshes() {
         let appID = "com.example.active-window-cycle-app-refresh"
         let runningApp = NSRunningApplication.current
         let initialWindows = [
@@ -1150,7 +1154,7 @@ extension FlowTabPriorityCoverageTests {
             generatedAt: 13
         )
 
-        XCTAssertTrue(model.handleAppSwitcherProjectionDidUpdate())
+        XCTAssertFalse(model.handleAppSwitcherProjectionDidUpdate())
         XCTAssertEqual(
             model.session?.selectedApp.windows.map(\.id),
             ["fullscreen", "normal", "incognito", "second-fullscreen"]

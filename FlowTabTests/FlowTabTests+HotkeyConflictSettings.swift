@@ -86,9 +86,10 @@ extension FlowTabTests {
         XCTAssertEqual(request.mainConfiguration.quitKeys, [.z])
         XCTAssertEqual(
             request.inAppWindowConfiguration.baseKeys,
-            [.control, .b]
+            [.control]
         )
         XCTAssertEqual(request.inAppWindowConfiguration.reverseKeys, [.shift])
+        XCTAssertEqual(request.inAppWindowConfiguration.mainKeys, [.b])
     }
 
     @MainActor
@@ -117,11 +118,14 @@ extension FlowTabTests {
             hotkeyReverseModifiersRaw: state.binding(\.hotkeyReverseModifiersRaw),
             hotkeyMainKeyRaw: state.binding(\.hotkeyMainKeyRaw),
             hotkeyQuitKeyRaw: state.binding(\.hotkeyQuitKeyRaw),
-            inAppWindowHotkeyShortcutKeysRaw: state.binding(
-                \.inAppWindowHotkeyShortcutKeysRaw
+            inAppWindowHotkeyBaseKeysRaw: state.binding(
+                \.inAppWindowHotkeyBaseKeysRaw
             ),
             inAppWindowHotkeyReverseKeysRaw: state.binding(
                 \.inAppWindowHotkeyReverseKeysRaw
+            ),
+            inAppWindowHotkeyMainKeysRaw: state.binding(
+                \.inAppWindowHotkeyMainKeysRaw
             ),
             commandTabTakeoverRegistrationState: .inactive,
             hotkeyConflict: nil,
@@ -197,7 +201,8 @@ extension FlowTabTests {
             hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.option.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.z.rawValue,
-            inAppWindowHotkeyShortcutKeysRaw: "control+space",
+            inAppWindowHotkeyBaseKeysRaw: "control",
+            inAppWindowHotkeyMainKeysRaw: "space",
             commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: true,
             appLanguageRaw: AppLanguage.simplifiedChinese.rawValue,
@@ -260,7 +265,8 @@ extension FlowTabTests {
             hotkeyPrimaryModifierRaw: SwitcherHotkeyKey.option.rawValue,
             hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             hotkeyQuitKeyRaw: SwitcherHotkeyKey.z.rawValue,
-            inAppWindowHotkeyShortcutKeysRaw: "control+space",
+            inAppWindowHotkeyBaseKeysRaw: "control",
+            inAppWindowHotkeyMainKeysRaw: "space",
             commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: true,
             appLanguageRaw: AppLanguage.simplifiedChinese.rawValue,
@@ -353,8 +359,9 @@ extension FlowTabTests {
             hotkeyReverseModifiersRaw: "shift",
             hotkeyMainKeyRaw: "tab",
             hotkeyQuitKeyRaw: "q",
-            inAppWindowHotkeyShortcutKeysRaw: "option+space",
-            inAppWindowHotkeyReverseKeysRaw: "shift"
+            inAppWindowHotkeyBaseKeysRaw: "option",
+            inAppWindowHotkeyReverseKeysRaw: "shift",
+            inAppWindowHotkeyMainKeysRaw: "space"
         )
         let candidate = HotkeySettingsChangeCandidate(
             field: .mainModifiers,
@@ -391,8 +398,9 @@ extension FlowTabTests {
                 hotkeyReverseModifiersRaw: "shift",
                 hotkeyMainKeyRaw: "tab",
                 hotkeyQuitKeyRaw: "q+w",
-                inAppWindowHotkeyShortcutKeysRaw: "control+space",
-                inAppWindowHotkeyReverseKeysRaw: "shift"
+                inAppWindowHotkeyBaseKeysRaw: "control",
+                inAppWindowHotkeyReverseKeysRaw: "shift",
+                inAppWindowHotkeyMainKeysRaw: "space"
             )
         )
         var committed: HotkeyRegistrationRequest?
@@ -417,8 +425,9 @@ extension FlowTabTests {
                 hotkeyReverseModifiersRaw: "shift",
                 hotkeyMainKeyRaw: "tab",
                 hotkeyQuitKeyRaw: "q",
-                inAppWindowHotkeyShortcutKeysRaw: "control+space",
-                inAppWindowHotkeyReverseKeysRaw: "shift"
+                inAppWindowHotkeyBaseKeysRaw: "control",
+                inAppWindowHotkeyReverseKeysRaw: "shift",
+                inAppWindowHotkeyMainKeysRaw: "space"
             )
         )
 
@@ -438,7 +447,8 @@ extension FlowTabTests {
             hotkeyPrimaryModifierRaw: "option",
             hotkeyMainKeyRaw: "tab",
             hotkeyQuitKeyRaw: "q",
-            inAppWindowHotkeyShortcutKeysRaw: "control+tab",
+            inAppWindowHotkeyBaseKeysRaw: "control",
+            inAppWindowHotkeyMainKeysRaw: "tab",
             commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: false,
             appLanguageRaw: AppLanguage.simplifiedChinese.rawValue,
@@ -485,8 +495,9 @@ extension FlowTabTests {
             hotkeyReverseModifiersRaw: "shift+c",
             hotkeyMainKeyRaw: "e+tab",
             hotkeyQuitKeyRaw: screenshotQuitKeys.rawValue,
-            inAppWindowHotkeyShortcutKeysRaw: "control+space",
-            inAppWindowHotkeyReverseKeysRaw: "command"
+            inAppWindowHotkeyBaseKeysRaw: "control",
+            inAppWindowHotkeyReverseKeysRaw: "command",
+            inAppWindowHotkeyMainKeysRaw: "space"
         )
         let mainKeyCandidate = HotkeySettingsChangeCandidate(
             field: .mainKey,
@@ -497,10 +508,12 @@ extension FlowTabTests {
                     screenshotValues.hotkeyReverseModifiersRaw,
                 hotkeyMainKeyRaw: "tab",
                 hotkeyQuitKeyRaw: screenshotValues.hotkeyQuitKeyRaw,
-                inAppWindowHotkeyShortcutKeysRaw:
-                    screenshotValues.inAppWindowHotkeyShortcutKeysRaw,
+                inAppWindowHotkeyBaseKeysRaw:
+                    screenshotValues.inAppWindowHotkeyBaseKeysRaw,
                 inAppWindowHotkeyReverseKeysRaw:
-                    screenshotValues.inAppWindowHotkeyReverseKeysRaw
+                    screenshotValues.inAppWindowHotkeyReverseKeysRaw,
+                inAppWindowHotkeyMainKeysRaw:
+                    screenshotValues.inAppWindowHotkeyMainKeysRaw
             )
         )
         var committed: HotkeyRegistrationRequest?
@@ -564,7 +577,8 @@ extension FlowTabTests {
             hotkeyReverseModifiersRaw: "shift+c",
             hotkeyMainKeyRaw: "e+tab",
             hotkeyQuitKeyRaw: screenshotQuitKeys.rawValue,
-            inAppWindowHotkeyShortcutKeysRaw: "control+space",
+            inAppWindowHotkeyBaseKeysRaw: "control",
+            inAppWindowHotkeyMainKeysRaw: "space",
             commandTabTakeoverRegistrationState: .inactive,
             accessibilityTrusted: false,
             appLanguageRaw: AppLanguage.simplifiedChinese.rawValue
@@ -618,9 +632,9 @@ extension FlowTabTests {
             hotkeyReverseModifiersRaw: "shift",
             hotkeyMainKeyRaw: mainKey.rawValue,
             hotkeyQuitKeyRaw: quitKey.rawValue,
-            inAppWindowHotkeyShortcutKeysRaw:
-                SwitcherHotkeyKeySet([inAppModifier, inAppKey]).rawValue,
-            inAppWindowHotkeyReverseKeysRaw: "shift"
+            inAppWindowHotkeyBaseKeysRaw: inAppModifier.rawValue,
+            inAppWindowHotkeyReverseKeysRaw: "shift",
+            inAppWindowHotkeyMainKeysRaw: inAppKey.rawValue
         )
     }
 
@@ -676,8 +690,9 @@ private final class HotkeySettingsBridgeBindingState {
     var hotkeyReverseModifiersRaw = "shift"
     var hotkeyMainKeyRaw = SwitcherHotkeyKey.tab.rawValue
     var hotkeyQuitKeyRaw = SwitcherHotkeyKey.z.rawValue
-    var inAppWindowHotkeyShortcutKeysRaw = "control+space"
+    var inAppWindowHotkeyBaseKeysRaw = "control"
     var inAppWindowHotkeyReverseKeysRaw = "shift"
+    var inAppWindowHotkeyMainKeysRaw = "space"
 
     func binding<Value>(
         _ keyPath: ReferenceWritableKeyPath<HotkeySettingsBridgeBindingState, Value>

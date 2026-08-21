@@ -71,7 +71,17 @@ public enum KeyInput: Equatable, Sendable {
     case rightArrow
 }
 
+public struct AppActivationFallback: Equatable, Sendable {
+    public let windowID: String
+    public let restoreIfMinimized: Bool
+
+    public init(windowID: String, restoreIfMinimized: Bool) {
+        self.windowID = windowID
+        self.restoreIfMinimized = restoreIfMinimized
+    }
+}
+
 public enum ActivationTarget: Equatable, Sendable {
-    case app(appID: String)
+    case app(appID: String, fallback: AppActivationFallback? = nil)
     case window(appID: String, windowID: String, restoreIfMinimized: Bool)
 }

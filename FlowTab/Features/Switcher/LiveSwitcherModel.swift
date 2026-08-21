@@ -542,18 +542,9 @@ final class LiveSwitcherModel: ObservableObject {
     func handleAppSwitcherProjectionDidUpdate() -> Bool {
         guard let currentSession = session else { return false }
         guard !searchViewState.isActive else { return false }
+        guard !isPresentingWindowLayerSnapshot(currentSession) else { return false }
         let preferredSelectedAppID = currentSession.selectedApp.id
-        let previousMode = currentSession.mode
-        let previousSelectedWindowID = currentSession.selectedWindow?.id
-        let previousSelectedApp = currentSession.selectedApp
-        let previousSelectedAppContext = runtimeContextsByID[previousSelectedApp.id]
-        let previousWindowOrderIDs: [String]
-        if case .windowCycle(let appID) = previousMode, appID == currentSession.selectedApp.id {
-            previousWindowOrderIDs = currentSession.selectedApp.windows.map(\.id)
-        } else {
-            previousWindowOrderIDs = []
-        }
-        let refreshed = loadAppSwitcherProjectionSession(
+        return loadAppSwitcherProjectionSession(
             triggerDirection: .forward,
             preferredSelectedAppID: preferredSelectedAppID,
             animateAppStripUpdate: true,
@@ -562,121 +553,24 @@ final class LiveSwitcherModel: ObservableObject {
             preservePreviewSnapshotState: true,
             preservingVisibleAppOrderFrom: currentSession.apps
         )
-        guard refreshed else { return false }
-        restoreSessionModeAfterProjectionUpdate(
-            previousMode: previousMode,
-            previousSelectedWindowID: previousSelectedWindowID,
-            previousWindowOrderIDs: previousWindowOrderIDs,
-            previousSelectedApp: previousSelectedApp,
-            previousSelectedAppContext: previousSelectedAppContext
-        )
-        if case .windowCycle(let appID) = previousMode {
-            _ = applyCurrentAppWindowProjectionIfReady(
-                appID: appID,
-                restoringWindowCycleSelectedWindowID: previousSelectedWindowID
-            )
-        }
-        return true
     }
 
     @discardableResult
     func handleCurrentAppWindowProjectionDidUpdate(appID: String?) -> Bool {
         guard let currentSession = session else { return false }
         guard !searchViewState.isActive else { return false }
+        guard !isPresentingWindowLayerSnapshot(currentSession) else { return false }
         let targetAppID = appID ?? currentSession.selectedApp.id
         guard currentSession.apps.contains(where: { $0.id == targetAppID }) else { return false }
         guard targetAppID == currentSession.selectedApp.id else { return false }
         return applyCurrentAppWindowProjectionIfReady(appID: targetAppID)
     }
 
-    func restoreSessionModeAfterProjectionUpdate(
-        previousMode: SessionMode,
-        previousSelectedWindowID: String?,
-        previousWindowOrderIDs: [String] = [],
-        previousSelectedApp: AppSwitchCandidate,
-        previousSelectedAppContext: RuntimeAppContext?
-    ) {
-        guard var refreshedSession = session else { return }
-        switch previousMode {
-        case .appCycle:
-            return
-        case .groupCycle:
-            return
-        case .windowCycle(let appID):
-            if let appIndex = refreshedSession.apps.firstIndex(where: { $0.id == appID }),
-               refreshedSession.apps[appIndex].windows.isEmpty,
-               previousSelectedApp.id == appID,
-               !previousSelectedApp.windows.isEmpty,
-               let previousSelectedAppContext,
-               let refreshedContext = runtimeContextsByID[appID],
-               previousSelectedAppContext.runningApp.processIdentifier
-                   == refreshedContext.runningApp.processIdentifier {
-                // Keep an already-visible window cycle intact while the same process's
-                // current-window projection is being repaired.
-                let refreshedApp = refreshedSession.apps[appIndex]
-                var apps = refreshedSession.apps
-                apps[appIndex] = AppSwitchCandidate(
-                    id: refreshedApp.id,
-                    displayName: refreshedApp.displayName,
-                    groupID: refreshedApp.groupID,
-                    lastActiveAt: refreshedApp.lastActiveAt,
-                    windows: previousSelectedApp.windows
-                )
-                refreshedSession = SwitcherSession(
-                    apps: apps,
-                    preferences: refreshedSession.preferences,
-                    triggerDirection: .forward,
-                    rememberedWindowIDByAppID: refreshedSession.rememberedWindowIDByAppID
-                )
-                _ = refreshedSession.selectApp(withID: appID)
-                runtimeContextsByID[appID] = previousSelectedAppContext
-            }
-            if !previousWindowOrderIDs.isEmpty,
-               let appIndex = refreshedSession.apps.firstIndex(where: { $0.id == appID }) {
-                let app = refreshedSession.apps[appIndex]
-                let reorderedWindows = windowsByPreservingSessionOrder(
-                    app.windows,
-                    previousWindowOrderIDs: previousWindowOrderIDs
-                )
-                if reorderedWindows.map(\.id) != app.windows.map(\.id) {
-                    var apps = refreshedSession.apps
-                    apps[appIndex] = AppSwitchCandidate(
-                        id: app.id,
-                        displayName: app.displayName,
-                        groupID: app.groupID,
-                        lastActiveAt: app.lastActiveAt,
-                        windows: reorderedWindows
-                    )
-                    refreshedSession = SwitcherSession(
-                        apps: apps,
-                        preferences: refreshedSession.preferences,
-                        triggerDirection: .forward,
-                        rememberedWindowIDByAppID: refreshedSession.rememberedWindowIDByAppID
-                    )
-                    _ = refreshedSession.selectApp(withID: appID)
-                }
-            }
-            if let previousSelectedWindowID,
-               refreshedSession.selectWindow(appID: appID, windowID: previousSelectedWindowID) {
-                session = refreshedSession
-                return
-            }
-            guard refreshedSession.selectApp(withID: appID) else { return }
-            _ = refreshedSession.enterWindowCycle(allowSingleWindow: true)
-            session = refreshedSession
+    func isPresentingWindowLayerSnapshot(_ session: SwitcherSession) -> Bool {
+        if case .windowCycle = session.mode {
+            return true
         }
-    }
-
-    private func windowsByPreservingSessionOrder(
-        _ windows: [WindowCandidate],
-        previousWindowOrderIDs: [String]
-    ) -> [WindowCandidate] {
-        let windowsByID = Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) })
-        let retainedWindows = previousWindowOrderIDs.compactMap { windowsByID[$0] }
-        guard !retainedWindows.isEmpty else { return windows }
-        let retainedWindowIDs = Set(retainedWindows.map(\.id))
-        let appendedWindows = windows.filter { !retainedWindowIDs.contains($0.id) }
-        return retainedWindows + appendedWindows
+        return false
     }
 
     @discardableResult

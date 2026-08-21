@@ -488,6 +488,63 @@ extension FlowTabTests {
         XCTAssertEqual(plans[1].modeText, "Fullscreen Target")
     }
 
+    func testSpaceFixtureWorkflowSupportsDistinctContentTitlesAndVisibleFrameWindows() throws {
+        let workflowURL = try makeSpaceFixtureWorkflowFile(
+            """
+            {
+              "workflowName": "app-name-fallback-visible-frame",
+              "apps": [
+                {
+                  "appID": "chrome",
+                  "appName": "Chrome Fixture",
+                  "bundleId": "com.example.fixture.chrome",
+                  "launchOrder": 1,
+                  "windows": [
+                    {
+                      "title": "Chrome Fixture",
+                      "contentTitle": "Project Alpha",
+                      "frameMode": "visibleFrame",
+                      "mode": "standard",
+                      "tabs": []
+                    },
+                    {
+                      "title": "Project Beta",
+                      "mode": "standard",
+                      "tabs": []
+                    }
+                  ]
+                }
+              ]
+            }
+            """
+        )
+        let configuration = try SpaceFixtureLaunchConfiguration.load(
+            arguments: [
+                "FlowTabSpaceFixture",
+                "--workflow-config", workflowURL.path,
+                "--workflow-app-id", "chrome"
+            ]
+        )
+        let visibleFrame = CGRect(x: 12, y: 38, width: 1_704, height: 1_040)
+
+        XCTAssertEqual(configuration.windowTitles, ["Chrome Fixture", "Project Beta"])
+        XCTAssertEqual(configuration.windows.map(\.contentTitle), ["Project Alpha", "Project Beta"])
+        XCTAssertEqual(configuration.windows.map(\.frameMode), [.visibleFrame, .standard])
+
+        let plans = SpaceFixtureWindowPlanner.makePlans(
+            configuration: configuration,
+            visibleFrame: visibleFrame
+        )
+
+        XCTAssertEqual(plans[0].title, "Chrome Fixture")
+        XCTAssertEqual(plans[0].contentTitle, "Project Alpha")
+        XCTAssertEqual(plans[0].frame, visibleFrame)
+        XCTAssertEqual(plans[0].frameMode, .visibleFrame)
+        XCTAssertEqual(plans[1].contentTitle, plans[1].title)
+        XCTAssertEqual(plans[1].frame.size, CGSize(width: 960, height: 640))
+        XCTAssertEqual(plans[1].frameMode, .standard)
+    }
+
     private func makeSpaceFixtureWorkflowFile(_ contents: String) throws -> URL {
         let directoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

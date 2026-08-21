@@ -101,9 +101,12 @@ final class FlowTabUITests: XCTestCase {
             "flowtab.settings.hotkey.main-reverse-modifiers"
         static let settingsHotkeyMainKey = "flowtab.settings.hotkey.main-key"
         static let settingsHotkeyQuitKey = "flowtab.settings.hotkey.quit-key"
-        static let settingsHotkeyInAppShortcut = "flowtab.settings.hotkey.in-app-shortcut"
+        static let settingsHotkeyInAppBaseKeys =
+            "flowtab.settings.hotkey.in-app-base-keys"
         static let settingsHotkeyInAppReverseModifiers =
             "flowtab.settings.hotkey.in-app-reverse-modifiers"
+        static let settingsHotkeyInAppMainKeys =
+            "flowtab.settings.hotkey.in-app-main-keys"
         static let settingsHotkeyMainTakeoverStatus = "flowtab.settings.hotkey.main-takeover-status"
         static func settingsHotkeyConflictStatus(
             for controlIdentifier: String

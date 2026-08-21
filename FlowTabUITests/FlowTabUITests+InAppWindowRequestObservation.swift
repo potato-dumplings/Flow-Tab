@@ -12,11 +12,13 @@ struct FlowTabUITestInAppWindowRequestRecord: Equatable {
     let windowID: String
     let windowNumber: CGWindowID
     let title: String
+    let reusableWindowEvidence: FlowTabUITestReusableWindowEvidence
 
     var diagnosticSummary: String {
         "appID=\(appID) pid=\(processIdentifier) "
             + "windowID=\(windowID) cg=\(windowNumber) "
-            + "title=\(title) sticky=1 source=stickyBinding"
+            + "title=\(title) sticky=1 "
+            + "source=\(reusableWindowEvidence.rawValue)"
     }
 
     static func records(in contents: String) -> [Self] {
@@ -66,16 +68,22 @@ struct FlowTabUITestInAppWindowRequestRecord: Equatable {
               ),
               let windowNumber = CGWindowID(cgText),
               windowNumber > 0,
-              contents(
+              let stickyText = contents(
                   in: line,
                   after: " sticky=",
                   before: " source="
-              ) == "true",
-              contents(
+              ),
+              let source = contents(
                   in: line,
                   after: " source=",
                   before: " publicAXRecovery="
-              ) == "stickyBinding",
+              ),
+              let reusableWindowEvidence =
+                  FlowTabUITestReusableWindowEvidence
+                  .parseCurrent(
+                      hasStickyBinding: stickyText == "true",
+                      source: source
+                  ),
               windowID == "cg:\(processIdentifier):\(windowNumber)"
         else {
             return nil
@@ -85,7 +93,9 @@ struct FlowTabUITestInAppWindowRequestRecord: Equatable {
             processIdentifier: processIdentifier,
             windowID: windowID,
             windowNumber: windowNumber,
-            title: title
+            title: title,
+            reusableWindowEvidence:
+                reusableWindowEvidence
         )
     }
 

@@ -909,6 +909,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 appID: evidence.appID,
                 pid: evidence.pid,
                 clearsDirtyState: true,
+                clearsDirtyPIDs: evidence.reconciledPIDs,
                 authoritativeCGWindowIDs: evidence.authoritativeCGWindowIDs,
                 generatedAt: generatedAt
             )
@@ -920,6 +921,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         appID: String,
         pid: pid_t,
         clearsDirtyState: Bool,
+        clearsDirtyPIDs: Set<pid_t> = [],
         authoritativeCGWindowIDs: Set<CGWindowID>? = nil,
         generatedAt: TimeInterval
     ) -> Bool {
@@ -937,6 +939,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         readModelStore.commitCurrentAppWindowProjection(
             mainTablePayload,
             clearsDirtyState: clearsDirtyState,
+            clearsDirtyPIDs: clearsDirtyPIDs,
             authoritativeCGWindowIDs: authoritativeCGWindowIDs,
             generatedAt: generatedAt
         )

@@ -348,9 +348,9 @@ extension FlowTabUITests {
                     mainModifiersText: item.modifierText,
                     mainKey: item.key,
                     quitKey: "z",
-                    inAppModifiers: .option,
-                    inAppShortcutText: "Option + C",
-                    inAppKey: "c"
+                    inAppBaseKeys: .option,
+                    inAppBaseKeysText: "Option",
+                    inAppMainKey: "c"
                 ),
                 expectedLogMarkers: [
                     "updated main=\(item.shortcutText)",
@@ -410,9 +410,9 @@ extension FlowTabUITests {
                     mainModifiersText: "Option",
                     mainKey: "space",
                     quitKey: "z",
-                    inAppModifiers: .option,
-                    inAppShortcutText: "Option + B",
-                    inAppKey: "b"
+                    inAppBaseKeys: .option,
+                    inAppBaseKeysText: "Option",
+                    inAppMainKey: "b"
                 ),
                 "Option + Space",
                 "z",
@@ -424,9 +424,9 @@ extension FlowTabUITests {
                     mainModifiersText: "Option",
                     mainKey: "q",
                     quitKey: "w",
-                    inAppModifiers: .control,
-                    inAppShortcutText: "Control + B",
-                    inAppKey: "b"
+                    inAppBaseKeys: .control,
+                    inAppBaseKeysText: "Control",
+                    inAppMainKey: "b"
                 ),
                 "Option + Q",
                 "w",
@@ -673,8 +673,9 @@ extension FlowTabUITests {
         ) else {
             return
         }
-        XCTAssertFalse(controls.shortcut.isEnabled)
+        XCTAssertFalse(controls.baseKeys.isEnabled)
         XCTAssertFalse(controls.reverseModifiers.isEnabled)
+        XCTAssertFalse(controls.mainKeys.isEnabled)
     }
 
     private func assertSettingsPageSubtitleIsVisible(

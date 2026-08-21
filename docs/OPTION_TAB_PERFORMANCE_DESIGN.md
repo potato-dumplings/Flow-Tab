@@ -210,7 +210,8 @@ selected app 的窗口排序建议优先级：
 - 有 CG window ID 时优先使用 CG window ID。
 - AX 可以补充 title、role、tab 信息，但不能导致全量 all-app AX 扫描。
 - fullscreen sibling / desktop sibling artifact 应通过拓扑规则过滤，不能通过某个 app 的特殊 title hack 处理。
-- 进入窗口层后，本次 session 应使用同一个排序结果做分页和截图调度；后台 snapshot 返回只能安全合并，不得让当前页顺序抖动或已显示图片回退。
+- 进入窗口层后，本次 session 固定完整的窗口卡片集合、顺序、选中项与预览内容，并使用这份快照做分页和截图调度。
+- runtime projection 与 reconciliation 在后台继续提交窗口事实；这些提交从下一次 Switcher session 起生效。当前 session 的激活动作在提交目标前单独校验目标是否仍可用。
 
 ## 首屏窗口数量与分页
 

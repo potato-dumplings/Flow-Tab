@@ -46,11 +46,18 @@ extension FlowTabUITests {
         )
         recordShortcut(
             in: app,
-            FlowTabUITestShortcutRecording(
-                controlIdentifier: Identifier.settingsHotkeyInAppShortcut,
+            .key(
+                controlIdentifier: Identifier.settingsHotkeyInAppMainKeys,
                 key: "b",
+                expectedValue: "B"
+            )
+        )
+        recordShortcut(
+            in: app,
+            .modifiers(
+                controlIdentifier: Identifier.settingsHotkeyInAppBaseKeys,
                 modifierFlags: .option,
-                expectedValue: "Option + B"
+                expectedValue: "Option"
             )
         )
         enterShortcut(
@@ -83,30 +90,36 @@ extension FlowTabUITests {
 
         recordShortcut(
             in: app,
-            FlowTabUITestShortcutRecording(
-                controlIdentifier: Identifier.settingsHotkeyInAppShortcut,
+            .key(
+                controlIdentifier: Identifier.settingsHotkeyInAppMainKeys,
                 key: "q",
-                modifierFlags: .command,
-                expectedValue: "Command + Q"
+                expectedValue: "Q"
             )
         )
-        enterShortcut(
+        recordShortcut(
             in: app,
-            controlIdentifier: Identifier.settingsHotkeyInAppShortcut,
-            key: "q",
+            .modifiers(
+                controlIdentifier: Identifier.settingsHotkeyInAppBaseKeys,
+                modifierFlags: .command,
+                expectedValue: "Command"
+            )
+        )
+        enterModifiers(
+            in: app,
+            controlIdentifier: Identifier.settingsHotkeyInAppBaseKeys,
             modifierFlags: .option
         )
 
         assertValue(
             of: element(
                 in: app,
-                identifier: Identifier.settingsHotkeyInAppShortcut
+                identifier: Identifier.settingsHotkeyInAppBaseKeys
             ),
-            equals: "Command + Q"
+            equals: "Command"
         )
         assertHotkeyConflictVisible(
             in: app,
-            controlIdentifier: Identifier.settingsHotkeyInAppShortcut
+            controlIdentifier: Identifier.settingsHotkeyInAppBaseKeys
         )
     }
 
@@ -172,9 +185,9 @@ extension FlowTabUITests {
                     mainModifiersText: "Option",
                     mainKey: "space",
                     quitKey: "z",
-                    inAppModifiers: .option,
-                    inAppShortcutText: "Option + B",
-                    inAppKey: "b"
+                    inAppBaseKeys: .option,
+                    inAppBaseKeysText: "Option",
+                    inAppMainKey: "b"
                 ),
                 "option",
                 "b",
@@ -186,9 +199,9 @@ extension FlowTabUITests {
                     mainModifiersText: "Option",
                     mainKey: "b",
                     quitKey: "z",
-                    inAppModifiers: .control,
-                    inAppShortcutText: "Control + B",
-                    inAppKey: "b"
+                    inAppBaseKeys: .control,
+                    inAppBaseKeysText: "Control",
+                    inAppMainKey: "b"
                 ),
                 "control",
                 "b",

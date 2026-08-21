@@ -186,8 +186,9 @@ extension FlowTabTests {
             quitKeys: [.q]
         )
         let simpleInApp = SwitcherHotkeyConfiguration.inApp(
-            shortcutKeys: [.control, .tab],
-            reverseKeys: [.shift]
+            baseKeys: [.control],
+            reverseKeys: [.shift],
+            mainKeys: [.tab]
         )
         let multiKeyMain = SwitcherHotkeyConfiguration(
             baseKeys: [.control, .w],
@@ -196,8 +197,9 @@ extension FlowTabTests {
             quitKeys: [.q]
         )
         let multiKeyInApp = SwitcherHotkeyConfiguration.inApp(
-            shortcutKeys: [.control, .w, .tab],
-            reverseKeys: [.shift]
+            baseKeys: [.control],
+            reverseKeys: [.shift],
+            mainKeys: [.w, .tab]
         )
 
         XCTAssertFalse(
@@ -237,12 +239,14 @@ extension FlowTabTests {
             quitKeys: [.q]
         )
         let simpleInApp = SwitcherHotkeyConfiguration.inApp(
-            shortcutKeys: [.control, .tab],
-            reverseKeys: [.shift]
+            baseKeys: [.control],
+            reverseKeys: [.shift],
+            mainKeys: [.tab]
         )
         let multiKeyInApp = SwitcherHotkeyConfiguration.inApp(
-            shortcutKeys: [.control, .w, .space],
-            reverseKeys: [.shift]
+            baseKeys: [.control],
+            reverseKeys: [.shift],
+            mainKeys: [.w, .space]
         )
 
         XCTAssertEqual(
@@ -384,12 +388,16 @@ extension FlowTabTests {
             forKey: AppPreferenceKeys.hotkeyQuitKey
         )
         userDefaults.set(
-            SwitcherHotkeyKeySet([.control, .tab]).rawValue,
-            forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+            SwitcherHotkeyKeySet([.control]).rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyBaseKeys
         )
         userDefaults.set(
             SwitcherHotkeyKeySet([.shift]).rawValue,
             forKey: AppPreferenceKeys.inAppWindowHotkeyReverseKeys
+        )
+        userDefaults.set(
+            SwitcherHotkeyKeySet([.tab]).rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyMainKeys
         )
 
         let appDelegate = AppDelegate()
@@ -479,12 +487,16 @@ extension FlowTabTests {
         )
         userDefaults.set(false, forKey: AppPreferenceKeys.showPermissionReminder)
         userDefaults.set(
-            "control+w+space",
-            forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+            "control",
+            forKey: AppPreferenceKeys.inAppWindowHotkeyBaseKeys
         )
         userDefaults.set(
             "shift",
             forKey: AppPreferenceKeys.inAppWindowHotkeyReverseKeys
+        )
+        userDefaults.set(
+            "w+space",
+            forKey: AppPreferenceKeys.inAppWindowHotkeyMainKeys
         )
 
         let appDelegate = AppDelegate()
@@ -523,8 +535,9 @@ extension FlowTabTests {
         let arbitraryRequest = HotkeyRegistrationRequest(
             mainConfiguration: arbitraryMain,
             inAppWindowConfiguration: .inApp(
-                shortcutKeys: [.control, .w, .space],
-                reverseKeys: [.shift]
+                baseKeys: [.control],
+                reverseKeys: [.shift],
+                mainKeys: [.w, .space]
             )
         )
         appDelegate.requestHotkeyReload(
@@ -654,12 +667,16 @@ extension FlowTabTests {
             forKey: AppPreferenceKeys.hotkeyQuitKey
         )
         userDefaults.set(
-            "control+space",
-            forKey: AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+            "control",
+            forKey: AppPreferenceKeys.inAppWindowHotkeyBaseKeys
         )
         userDefaults.set(
             "command",
             forKey: AppPreferenceKeys.inAppWindowHotkeyReverseKeys
+        )
+        userDefaults.set(
+            "space",
+            forKey: AppPreferenceKeys.inAppWindowHotkeyMainKeys
         )
 
         let appDelegate = AppDelegate()
@@ -711,8 +728,9 @@ extension FlowTabTests {
             hotkeyReverseModifiersRaw: "shift+c",
             hotkeyMainKeyRaw: "tab",
             hotkeyQuitKeyRaw: screenshotQuitKeys.rawValue,
-            inAppWindowHotkeyShortcutKeysRaw: "control+space",
-            inAppWindowHotkeyReverseKeysRaw: "command"
+            inAppWindowHotkeyBaseKeysRaw: "control",
+            inAppWindowHotkeyReverseKeysRaw: "command",
+            inAppWindowHotkeyMainKeysRaw: "space"
         )
         guard case .applied = apply(field: .mainKey, values: mainKeyRepair)
         else {
@@ -732,8 +750,9 @@ extension FlowTabTests {
             hotkeyReverseModifiersRaw: "shift+c",
             hotkeyMainKeyRaw: "tab",
             hotkeyQuitKeyRaw: screenshotQuitKeys.rawValue,
-            inAppWindowHotkeyShortcutKeysRaw: "control+space",
-            inAppWindowHotkeyReverseKeysRaw: "command"
+            inAppWindowHotkeyBaseKeysRaw: "control",
+            inAppWindowHotkeyReverseKeysRaw: "command",
+            inAppWindowHotkeyMainKeysRaw: "space"
         )
         guard case .applied = apply(
             field: .mainModifiers,
@@ -757,8 +776,9 @@ extension FlowTabTests {
             hotkeyReverseModifiersRaw: "shift",
             hotkeyMainKeyRaw: "tab",
             hotkeyQuitKeyRaw: screenshotQuitKeys.rawValue,
-            inAppWindowHotkeyShortcutKeysRaw: "control+space",
-            inAppWindowHotkeyReverseKeysRaw: "command"
+            inAppWindowHotkeyBaseKeysRaw: "control",
+            inAppWindowHotkeyReverseKeysRaw: "command",
+            inAppWindowHotkeyMainKeysRaw: "space"
         )
         guard case .applied = apply(
             field: .mainReverseModifiers,

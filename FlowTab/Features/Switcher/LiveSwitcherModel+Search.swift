@@ -35,12 +35,16 @@ extension LiveSwitcherModel {
         guard SearchInteractionPreferencesStore.loadIsEnabled() else { return false }
         guard overlayStyle == .appAndWindow else { return false }
         guard let session, case .appCycle = session.mode else { return false }
+        let freshnessBarrierWasPending = pendingSearchActivationAfterFreshnessBarrier
         cancelPendingSearchComputation()
         pendingSearchActivationAfterFreshnessBarrier = true
         sessionAppsByID = Dictionary(uniqueKeysWithValues: session.apps.map { ($0.id, $0) })
-        guard rebuildSearchIndexFromCommittedProjection(reason: "enterSearchMode") else {
-            pendingSearchActivationAfterFreshnessBarrier =
-                lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier == true
+        guard rebuildSearchIndexFromCommittedProjection(
+            reason: "enterSearchMode",
+            requestFreshnessBarrierIfNeeded: !freshnessBarrierWasPending
+        ) else {
+            pendingSearchActivationAfterFreshnessBarrier = freshnessBarrierWasPending
+                || lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier == true
             RuntimeLog.debug(
                 .searchModel,
                 "enterSearchMode changed=0 reason=noCommittedSearchIndex sessionAppCount=\(session.apps.count)"
@@ -148,13 +152,18 @@ extension LiveSwitcherModel {
     }
 
     @discardableResult
-    func rebuildSearchIndexFromCommittedProjection(reason: String) -> Bool {
+    func rebuildSearchIndexFromCommittedProjection(
+        reason: String,
+        requestFreshnessBarrierIfNeeded: Bool = true
+    ) -> Bool {
         let read = runtimeProjectionService.readCommittedSearchIndexForSearch()
+        let requestedFreshnessBarrier = read.shouldRequestFreshnessBarrier
+            && requestFreshnessBarrierIfNeeded
         guard let projection = read.projection else {
             committedSearchAppsByID = [:]
             searchCoordinator.resetIndex()
             publishSearchStateIfNeeded()
-            if read.shouldRequestFreshnessBarrier {
+            if requestedFreshnessBarrier {
                 runtimeProjectionService.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
             }
             lastSearchIndexReadDiagnostic = SearchIndexReadDiagnostic(
@@ -168,15 +177,15 @@ extension LiveSwitcherModel {
                 dirtyPIDCount: 0,
                 dirtyCGWindowIDCount: 0,
                 pendingRepairScopeCount: 0,
-                requestedFreshnessBarrier: read.shouldRequestFreshnessBarrier
+                requestedFreshnessBarrier: requestedFreshnessBarrier
             )
             RuntimeLog.debug(
                 .searchModel,
-                "searchIndexSource reason=\(reason) source=none readiness=\(read.readiness.rawValue) resultState=\(read.resultState.rawValue) freshnessBarrierRequested=\(read.shouldRequestFreshnessBarrier ? 1 : 0)"
+                "searchIndexSource reason=\(reason) source=none readiness=\(read.readiness.rawValue) resultState=\(read.resultState.rawValue) freshnessBarrierRequested=\(requestedFreshnessBarrier ? 1 : 0)"
             )
             return false
         }
-        if read.shouldRequestFreshnessBarrier {
+        if requestedFreshnessBarrier {
             runtimeProjectionService.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
         }
         let searchProjection = projection.filteringApps(
@@ -349,9 +358,13 @@ extension LiveSwitcherModel {
         guard var session else { return false }
         flushCurrentSearchComputationForCommit()
         guard let selected = searchViewState.selectedResult else { return false }
+        let selectedAppID: String
+        let selectedWindowID: String?
 
         switch selected.kind {
         case .app(let appID):
+            selectedAppID = appID
+            selectedWindowID = nil
             if !session.selectApp(withID: appID) {
                 guard let committedApp = committedSearchAppsByID[appID] else { return false }
                 session = Self.sessionByApplyingCommittedSearchTarget(
@@ -361,6 +374,8 @@ extension LiveSwitcherModel {
                 guard session.selectApp(withID: appID) else { return false }
             }
         case .window(let appID, let windowID):
+            selectedAppID = appID
+            selectedWindowID = windowID
             if !session.selectWindow(appID: appID, windowID: windowID) {
                 guard
                     let committedApp = committedSearchAppsByID[appID],
@@ -377,6 +392,10 @@ extension LiveSwitcherModel {
                 }
             }
         }
+        hydrateRuntimeContextForSearchSelectionIfNeeded(
+            appID: selectedAppID,
+            windowID: selectedWindowID
+        )
 
         autoEnterSuppressedAppID = nil
         cancelPendingSearchComputation()
@@ -385,6 +404,26 @@ extension LiveSwitcherModel {
         _ = searchCoordinator.exit()
         publishSearchStateIfNeeded()
         return true
+    }
+
+    private func hydrateRuntimeContextForSearchSelectionIfNeeded(
+        appID: String,
+        windowID: String?
+    ) {
+        if let windowID {
+            guard runtimeContextsByID[appID]?.windowsByID[windowID] == nil else { return }
+        } else {
+            guard runtimeContextsByID[appID] == nil else { return }
+        }
+        guard
+            let context = runtimeProjectionService
+                .readAppSwitcherProjection()?
+                .contextsByID[appID],
+            windowID.map({ context.windowsByID[$0] != nil }) ?? true
+        else {
+            return
+        }
+        runtimeContextsByID[appID] = context
     }
 
     private static func sessionByApplyingCommittedSearchTarget(

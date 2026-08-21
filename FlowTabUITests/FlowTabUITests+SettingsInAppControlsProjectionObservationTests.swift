@@ -30,13 +30,13 @@ extension FlowTabUITests {
         )
         XCTAssertFalse(
             settingsInAppControlsProjectionSnapshot(
-                shortcutExists: false,
-                shortcutEnabled: nil
+                baseKeysExists: false,
+                baseKeysEnabled: nil
             ).isDisabledProjection
         )
         XCTAssertFalse(
             settingsInAppControlsProjectionSnapshot(
-                shortcutEnabled: true
+                baseKeysEnabled: true
             ).isDisabledProjection
         )
         XCTAssertFalse(
@@ -48,6 +48,17 @@ extension FlowTabUITests {
         XCTAssertFalse(
             settingsInAppControlsProjectionSnapshot(
                 reverseModifiersEnabled: true
+            ).isDisabledProjection
+        )
+        XCTAssertFalse(
+            settingsInAppControlsProjectionSnapshot(
+                mainKeysExists: false,
+                mainKeysEnabled: nil
+            ).isDisabledProjection
+        )
+        XCTAssertFalse(
+            settingsInAppControlsProjectionSnapshot(
+                mainKeysEnabled: true
             ).isDisabledProjection
         )
     }
@@ -85,8 +96,8 @@ extension FlowTabUITests {
 
     func testSettingsInAppControlsProjectionUsesLaterEvidenceAndCancels() {
         var snapshot = settingsInAppControlsProjectionSnapshot(
-            shortcutExists: false,
-            shortcutEnabled: nil
+            baseKeysExists: false,
+            baseKeysEnabled: nil
         )
         var scheduledReadback:
             ((FlowTabUITestConditionObservationSource) -> Void)?
@@ -106,7 +117,7 @@ extension FlowTabUITests {
 
         for _ in 0..<20 {
             snapshot = settingsInAppControlsProjectionSnapshot(
-                shortcutEnabled: true
+                baseKeysEnabled: true
             )
             scheduledReadback?(.scheduledReadback)
             XCTAssertNil(owner.resolvedEvidence)
@@ -162,8 +173,8 @@ extension FlowTabUITests {
                         return self.settingsInAppControlsProjectionSnapshot()
                     }
                     return self.settingsInAppControlsProjectionSnapshot(
-                        shortcutExists: false,
-                        shortcutEnabled: nil
+                        baseKeysExists: false,
+                        baseKeysEnabled: nil
                     )
                 }
             )
@@ -182,13 +193,18 @@ extension FlowTabUITests {
         XCTAssertTrue(
             owner.diagnosticSummary.contains("source=watchdogReadback")
         )
-        XCTAssertTrue(owner.diagnosticSummary.contains("shortcutExists=true"))
+        XCTAssertTrue(owner.diagnosticSummary.contains("baseKeysExists=true"))
         XCTAssertTrue(
-            owner.diagnosticSummary.contains("shortcutEnabled=Optional(false)")
+            owner.diagnosticSummary.contains("baseKeysEnabled=Optional(false)")
         )
         XCTAssertTrue(
             owner.diagnosticSummary.contains(
                 "reverseModifiersEnabled=Optional(false)"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "mainKeysEnabled=Optional(false)"
             )
         )
         XCTAssertTrue(owner.diagnosticSummary.contains("waitResult="))
@@ -246,18 +262,22 @@ extension FlowTabUITests {
     private func settingsInAppControlsProjectionSnapshot(
         appState: XCUIApplication.State = .runningForeground,
         settingsContentExists: Bool = true,
-        shortcutExists: Bool = true,
-        shortcutEnabled: Bool? = false,
+        baseKeysExists: Bool = true,
+        baseKeysEnabled: Bool? = false,
         reverseModifiersExists: Bool = true,
-        reverseModifiersEnabled: Bool? = false
+        reverseModifiersEnabled: Bool? = false,
+        mainKeysExists: Bool = true,
+        mainKeysEnabled: Bool? = false
     ) -> FlowTabUITestSettingsInAppControlsProjectionSnapshot {
         FlowTabUITestSettingsInAppControlsProjectionSnapshot(
             appState: appState,
             settingsContentExists: settingsContentExists,
-            shortcutExists: shortcutExists,
-            shortcutEnabled: shortcutEnabled,
+            baseKeysExists: baseKeysExists,
+            baseKeysEnabled: baseKeysEnabled,
             reverseModifiersExists: reverseModifiersExists,
-            reverseModifiersEnabled: reverseModifiersEnabled
+            reverseModifiersEnabled: reverseModifiersEnabled,
+            mainKeysExists: mainKeysExists,
+            mainKeysEnabled: mainKeysEnabled
         )
     }
 }

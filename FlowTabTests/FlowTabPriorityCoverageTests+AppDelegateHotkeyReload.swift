@@ -79,8 +79,9 @@ extension FlowTabPriorityCoverageTests {
                 quitKeys: [.q]
             ),
             inAppWindowConfiguration: .inApp(
-                shortcutKeys: [.option, .grave],
-                reverseKeys: [.shift]
+                baseKeys: [.option],
+                reverseKeys: [.shift],
+                mainKeys: [.grave]
             )
         )
         let expectedGeneration = baselineGeneration + 1
@@ -226,8 +227,9 @@ extension FlowTabPriorityCoverageTests {
                 quitKeys: [.w]
             ),
             inAppWindowConfiguration: .inApp(
-                shortcutKeys: [.option, .grave],
-                reverseKeys: [.shift]
+                baseKeys: [.option],
+                reverseKeys: [.shift],
+                mainKeys: [.grave]
             )
         )
         NotificationCenter.default.post(

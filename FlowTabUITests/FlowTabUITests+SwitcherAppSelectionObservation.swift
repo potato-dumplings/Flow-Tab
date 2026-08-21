@@ -195,4 +195,39 @@ extension FlowTabUITests {
         }
         return true
     }
+
+    func performAndWaitForSwitcherAppSelection(
+        in app: XCUIApplication,
+        bundleIdentifier: String,
+        appProjectionExpectation:
+            FlowTabUITestSwitcherAppProjectionExpectation,
+        timeout: TimeInterval,
+        presentationTrigger: () -> Void,
+        trigger: () throws -> Void
+    ) rethrows -> Bool {
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        guard
+            performAndWaitForSwitcherAppProjection(
+                diagnosticsSummary,
+                expectation:
+                    .bundleIdentifier(bundleIdentifier),
+                timeout: timeout,
+                trigger: presentationTrigger
+            )
+        else {
+            return false
+        }
+
+        return try performAndWaitForSwitcherAppSelection(
+            in: app,
+            bundleIdentifier: bundleIdentifier,
+            appProjectionExpectation:
+                appProjectionExpectation,
+            timeout: timeout,
+            trigger: trigger
+        )
+    }
 }

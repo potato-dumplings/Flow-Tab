@@ -93,6 +93,8 @@ struct SpaceFixtureWorkflowPermissionSnapshot: Equatable {
 }
 
 final class SpaceFixtureWorkflowPermissionObservationOwner {
+    private let deferredReadbacks:
+        FlowTabUITestDeferredConditionReadbackRegistration?
     private let conditionOwner:
         FlowTabUITestConditionObservationOwner<
             SpaceFixtureWorkflowPermissionSnapshot
@@ -110,8 +112,21 @@ final class SpaceFixtureWorkflowPermissionObservationOwner {
         readback: @escaping () ->
             SpaceFixtureWorkflowPermissionSnapshot
     ) {
+        let deferredReadbacks = observationRegistration.map {
+            FlowTabUITestDeferredConditionReadbackRegistration(
+                downstreamRegistration: $0
+            )
+        }
+        let deferredRegistration:
+            FlowTabUITestConditionObservationRegistration? =
+                deferredReadbacks.map { deferredReadbacks in
+                    { readback in
+                        deferredReadbacks.register(readback)
+                    }
+                }
+        self.deferredReadbacks = deferredReadbacks
         conditionOwner = FlowTabUITestConditionObservationOwner(
-            observationRegistration: observationRegistration,
+            observationRegistration: deferredRegistration,
             readback: readback,
             isSatisfied: {
                 $0.projection != .projecting
@@ -124,10 +139,12 @@ final class SpaceFixtureWorkflowPermissionObservationOwner {
         conditionOwner.start()
     }
 
-    func requestReadback(
-        source: FlowTabUITestConditionObservationSource
-    ) {
-        conditionOwner.requestReadback(source: source)
+    func markTriggerCompleted() {
+        guard conditionOwner.resolvedEvidence == nil else { return }
+        conditionOwner.requestReadback(source: .triggerReadback)
+        if conditionOwner.resolvedEvidence == nil {
+            deferredReadbacks?.activate()
+        }
     }
 
     func waitForResolution(
@@ -240,7 +257,7 @@ extension FlowTabUITests {
         )
         guard navigationSatisfied else { return false }
 
-        observation.requestReadback(source: .triggerReadback)
+        observation.markTriggerCompleted()
         guard let evidence = observation.waitForResolution(
             timeout:
                 FlowTabUITestSupportWatchdogPolicy

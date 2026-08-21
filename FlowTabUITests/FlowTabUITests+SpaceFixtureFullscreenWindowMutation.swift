@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 
 extension FlowTabUITests {
-    func testSwitcherPanelRefreshesOpenFullscreenWorkflowAppWindowLayerAfterTargetWindowCloses()
+    func testSwitcherPanelKeepsOpenFullscreenWorkflowAppWindowLayerSnapshotAfterTargetWindowCloses()
         throws
     {
         let workflow =
@@ -17,19 +17,15 @@ extension FlowTabUITests {
         let fullscreenTitles = Set(
             targetApp.fullscreenWindowTitles
         )
-        let remainingTitles =
-            targetApp.expectedWindowTitles.filter {
-                !fullscreenTitles.contains($0)
-            }
+        let snapshotTitles = targetApp.expectedWindowTitles
         let initialWindowPlanIndices =
             Array(1...targetApp.windowCount)
         let remainingWindowPlanIndices =
             initialWindowPlanIndices.filter {
                 $0 != fullscreenWindowIndex
             }
-        XCTAssertEqual(targetApp.expectedWindowTitles.count, 2)
+        XCTAssertEqual(snapshotTitles.count, 2)
         XCTAssertEqual(fullscreenTitles.count, 1)
-        XCTAssertEqual(remainingTitles.count, 1)
 
         let windowCloseRoute =
             makeSpaceFixtureWindowCloseFaultRoute()
@@ -140,7 +136,7 @@ extension FlowTabUITests {
             let postCloseCards =
                 makeSwitcherWindowTitleObservation(
                     in: app,
-                    expectedTitles: remainingTitles,
+                    expectedTitles: snapshotTitles,
                     acceptsResolution: {
                         acceptsPostCloseProjection
                     }
@@ -245,10 +241,16 @@ extension FlowTabUITests {
                 )
                 return
             }
-            XCTAssertEqual(projectionEvidence.value.cardCount, 1)
+            XCTAssertEqual(
+                projectionEvidence.value.cardCount,
+                snapshotTitles.count
+            )
             XCTAssertEqual(
                 projectionEvidence.value.titleCounts,
-                [remainingTitles[0]: 1]
+                Dictionary(
+                    uniqueKeysWithValues:
+                        snapshotTitles.map { ($0, 1) }
+                )
             )
             guard requireActiveSwitcherPreview(
                 targetApp,
@@ -272,12 +274,12 @@ extension FlowTabUITests {
                 targetApp,
                 processIdentifier: targetProcessIdentifier
             )
-            XCTAssertFalse(
+            XCTAssertTrue(
                 switcherPreviewTitles(
                     from: diagnosticsSummary
                 ).contains(closedFullscreenTitle),
                 """
-                Open Switcher window layer still exposed the closed fullscreen target window.
+                Open Switcher window-layer snapshot dropped the closed fullscreen target window.
 
                 \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
                 """

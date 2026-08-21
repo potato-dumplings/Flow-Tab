@@ -1,5 +1,6 @@
 import AppKit
 import Carbon
+import FlowTabCore
 import Foundation
 import Darwin
 
@@ -522,7 +523,10 @@ final class OptionTabHotkeyMonitor {
         let inputEvent = HotkeyInputEvent(
             identity: nextInputEventIdentity(),
             phase: phase,
-            isBackward: isBackward
+            isBackward: isBackward,
+            // Carbon only reports that the registered chord ended; the base
+            // keys may still be held when the main key is released.
+            holdSetPressedEvidence: phase == .pressed ? true : nil
         )
         let phaseText = phase == .pressed ? "pressed" : "released"
         RuntimeLog.debug(

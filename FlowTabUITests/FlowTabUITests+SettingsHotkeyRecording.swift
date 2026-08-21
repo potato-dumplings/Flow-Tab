@@ -246,7 +246,7 @@ extension FlowTabUITests {
         }
     }
 
-    func testSettingsInAppShortcutRecordsControlTab() throws {
+    func testSettingsInAppBaseAndMainKeysRecordIndependently() throws {
         let app = makeApp(
             additionalArguments: hotkeyEffectArguments(resetDefaults: true)
         )
@@ -256,20 +256,26 @@ extension FlowTabUITests {
 
         recordShortcut(
             in: app,
-            FlowTabUITestShortcutRecording(
-                controlIdentifier: Identifier.settingsHotkeyInAppShortcut,
+            .key(
+                controlIdentifier: Identifier.settingsHotkeyInAppMainKeys,
                 key: "b",
-                modifierFlags: .option,
-                expectedValue: "Option + B"
+                expectedValue: "B"
             )
         )
         recordShortcut(
             in: app,
-            FlowTabUITestShortcutRecording(
-                controlIdentifier: Identifier.settingsHotkeyInAppShortcut,
-                key: "tab",
+            .modifiers(
+                controlIdentifier: Identifier.settingsHotkeyInAppBaseKeys,
                 modifierFlags: .control,
-                expectedValue: "Control + Tab"
+                expectedValue: "Control"
+            )
+        )
+        recordShortcut(
+            in: app,
+            .key(
+                controlIdentifier: Identifier.settingsHotkeyInAppMainKeys,
+                key: "tab",
+                expectedValue: "Tab"
             )
         )
     }
@@ -297,18 +303,18 @@ extension FlowTabUITests {
             mainModifiersText: "Option",
             mainKey: "space",
             quitKey: "z",
-            inAppModifiers: .command,
-            inAppShortcutText: "Command + A",
-            inAppKey: "a"
+            inAppBaseKeys: .command,
+            inAppBaseKeysText: "Command",
+            inAppMainKey: "a"
         )
         let baselineRecordings = hotkeyRecordings(
             mainModifiers: .control,
             mainModifiersText: "Control",
             mainKey: "x",
             quitKey: "y",
-            inAppModifiers: .option,
-            inAppShortcutText: "Option + B",
-            inAppKey: "b"
+            inAppBaseKeys: .option,
+            inAppBaseKeysText: "Option",
+            inAppMainKey: "b"
         )
         for recording in baselineRecordings {
             recordShortcut(in: firstLaunchApp, recording)
@@ -372,7 +378,7 @@ extension FlowTabUITests {
         }
     }
 
-    func testSettingsHotkeySixDefaultsRejectOverlappingModifierComponents() throws {
+    func testSettingsHotkeySevenDefaultsRejectOverlappingComponents() throws {
         let app = makeApp(
             additionalArguments: hotkeyEffectArguments(resetDefaults: true)
         )
@@ -385,9 +391,9 @@ extension FlowTabUITests {
             mainModifiersText: "Option",
             mainKey: "tab",
             quitKey: "q",
-            inAppModifiers: .control,
-            inAppShortcutText: "Control + Tab",
-            inAppKey: "tab"
+            inAppBaseKeys: .control,
+            inAppBaseKeysText: "Control",
+            inAppMainKey: "tab"
         )
         for recording in defaults {
             assertValue(
@@ -419,7 +425,7 @@ extension FlowTabUITests {
 
         enterShortcut(
             in: app,
-            controlIdentifier: Identifier.settingsHotkeyInAppShortcut,
+            controlIdentifier: Identifier.settingsHotkeyInAppMainKeys,
             key: "b",
             modifierFlags: [.control, .shift]
         )
@@ -427,14 +433,14 @@ extension FlowTabUITests {
         assertValue(
             of: element(
                 in: app,
-                identifier: Identifier.settingsHotkeyInAppShortcut
+                identifier: Identifier.settingsHotkeyInAppMainKeys
             ),
-            equals: "Control + Tab"
+            equals: "Tab"
         )
         let inAppConflictStatus = element(
             in: app,
             identifier: Identifier.settingsHotkeyConflictStatus(
-                for: Identifier.settingsHotkeyInAppShortcut
+                for: Identifier.settingsHotkeyInAppMainKeys
             )
         )
         XCTAssertTrue(inAppConflictStatus.waitForExistence(timeout: 5))

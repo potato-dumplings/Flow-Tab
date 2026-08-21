@@ -197,7 +197,7 @@ extension FlowTabUITests {
         let postCloseCards =
             makeSwitcherWindowTitleObservation(
                 in: app,
-                expectedTitles: [allTitles[1]],
+                expectedTitles: allTitles,
                 acceptsResolution: {
                     acceptsPostCloseWindowProjection
                 }
@@ -283,17 +283,22 @@ extension FlowTabUITests {
         )
         acceptsPostCloseWindowProjection = true
         postCloseCards.requestReadback(source: .triggerReadback)
-        guard postCloseCards.waitForResolution(
+        guard let projectionEvidence = postCloseCards.waitForResolution(
             timeout:
                 FlowTabUITestSwitcherWindowTitleObservationPolicy
                     .selectedWindowMutationProjectionWatchdog
-        ) != nil else {
+        ) else {
             XCTFail(
                 "Selected Mutation Window-card projection watchdog expired. "
                     + postCloseCards.diagnosticSummary
             )
             return
         }
+        XCTAssertEqual(projectionEvidence.value.cardCount, allTitles.count)
+        XCTAssertEqual(
+            projectionEvidence.value.titleCounts,
+            Dictionary(uniqueKeysWithValues: allTitles.map { ($0, 1) })
+        )
         guard requireActiveSwitcherPreview(
             expectedBundleIdentifier:
                 identity.bundleIdentifier,

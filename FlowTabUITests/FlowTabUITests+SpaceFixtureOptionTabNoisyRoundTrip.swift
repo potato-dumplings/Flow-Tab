@@ -131,7 +131,7 @@ extension FlowTabUITests {
                 diagnosticsSummary: diagnosticsSummary,
                 traceLabel: "\(traceLabel).\(phase.trace)"
             )
-            assertNoisyOptionTabWindowLayerSource(
+            assertNoisyOptionTabReusableWindowLayerSource(
                 selection,
                 phaseTrace: phase.trace,
                 since: runtimeLogSnapshot
@@ -154,7 +154,7 @@ extension FlowTabUITests {
                 ),
                 "Noisy Option+Tab must activate the exact \(phase.targetTitle) CG window selected in \(phase.trace)."
             )
-            assertNoisyOptionTabWindowRequestSource(
+            assertNoisyOptionTabReusableWindowRequestSource(
                 selection,
                 appID: targetApp.identity.bundleIdentifier,
                 phaseTrace: phase.trace,
@@ -168,8 +168,11 @@ extension FlowTabUITests {
                         .postConfirmReconciliationWatchdog,
                 description: "nonzero Space topology affected-window diff and signature diagnostics after \(phase.trace) confirm"
             )
+            let verifiedFocusPattern =
+                FlowTabUITestReusableWindowEvidence
+                .verifiedFocusReadbackRegexPattern
             waitForRuntimeLogFiles(
-                matching: "binding-confidence-change windowID=cg:[0-9]+:\(selection.windowNumber) cg=\(selection.windowNumber) .* source=.*->verifiedFocusReadback",
+                matching: "binding-confidence-change windowID=cg:[0-9]+:\(selection.windowNumber) cg=\(selection.windowNumber) .* \(verifiedFocusPattern) verifiedFocusFallbackAX=0",
                 since: topologyLogSnapshot,
                 timeout:
                     FlowTabUITestNoisyOptionTabPolicy
@@ -234,22 +237,24 @@ extension FlowTabUITests {
         )
     }
 
-    private func assertNoisyOptionTabWindowLayerSource(
+    private func assertNoisyOptionTabReusableWindowLayerSource(
         _ selection: RuntimeTruthWindowSelection,
         phaseTrace: String,
         since snapshot:
             FlowTabUITestRuntimeLogObservationBaseline
     ) {
         let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
+        let sourcePattern = FlowTabUITestReusableWindowEvidence
+            .currentSourceRegexPattern
         waitForRuntimeLogFiles(
-            matching: #"window-entries app=Chrome Fixture .*id=cg:[0-9]+:\#(selection.windowNumber):title=\#(escapedTitle)[^\n]*source=stickyBinding:spaceEvidence=(observed|inferredFromTopology)"#,
+            matching: #"window-entries app=Chrome Fixture .*id=cg:[0-9]+:\#(selection.windowNumber):title=\#(escapedTitle)[^,\n]*:sticky=1:source=\#(sourcePattern):spaceEvidence=(observed|inferredFromTopology)"#,
             since: snapshot,
             timeout: FlowTabUITestNoisyOptionTabPolicy.preConfirmEvidenceWatchdog,
-            description: "sticky window-layer source for selected Noisy Option+Tab \(phaseTrace) window"
+            description: "reusable window-layer source for selected Noisy Option+Tab \(phaseTrace) window"
         )
     }
 
-    private func assertNoisyOptionTabWindowRequestSource(
+    private func assertNoisyOptionTabReusableWindowRequestSource(
         _ selection: RuntimeTruthWindowSelection,
         appID: String,
         phaseTrace: String,
@@ -258,13 +263,15 @@ extension FlowTabUITests {
     ) {
         let escapedAppID = NSRegularExpression.escapedPattern(for: appID)
         let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
+        let sourcePattern = FlowTabUITestReusableWindowEvidence
+            .currentSourceRegexPattern
         waitForRuntimeLogFiles(
-            matching: #"window-request appID=\#(escapedAppID) pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) title=\#(escapedTitle)[^\n]* sticky=true source=stickyBinding"#,
+            matching: #"window-request appID=\#(escapedAppID) pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) title=\#(escapedTitle)[^\n]* sticky=true source=\#(sourcePattern) publicAXRecovery="#,
             since: snapshot,
             timeout:
                 FlowTabUITestNoisyOptionTabPolicy
                     .postConfirmReconciliationWatchdog,
-            description: "sticky window request source for selected Noisy Option+Tab \(phaseTrace) window"
+            description: "reusable window request source for selected Noisy Option+Tab \(phaseTrace) window"
         )
     }
 

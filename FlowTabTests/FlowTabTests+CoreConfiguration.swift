@@ -85,7 +85,12 @@ extension FlowTabTests {
     func testRuntimeActivatorOpenConfigurationActivatesTargetApp() {
         XCTAssertTrue(
             AppPreferenceKeys.allKeys.contains(
-                AppPreferenceKeys.inAppWindowHotkeyShortcutKeys
+                AppPreferenceKeys.inAppWindowHotkeyBaseKeys
+            )
+        )
+        XCTAssertTrue(
+            AppPreferenceKeys.allKeys.contains(
+                AppPreferenceKeys.inAppWindowHotkeyMainKeys
             )
         )
         let configuration = RuntimeActivator.makeOpenConfiguration()

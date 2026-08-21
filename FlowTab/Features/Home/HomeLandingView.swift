@@ -78,6 +78,8 @@ struct HomeLandingView: View {
     @State private var homeDetailProjectionsByAppID: [String: RuntimeHomeAppDetailProjection] = [:]
     @State private var homeSummaryProjectionFreshness: RuntimeProjectionFreshness?
     @State private var loadingWindowCountAppIDs: Set<String> = []
+    @State private var selectedDetailRefreshExpectations:
+        [String: HomeSelectedAppRefreshExpectation] = [:]
     @State private var selectedAppID: String?
     @State private var windowChangeMonitor = RuntimeAXWindowChangeMonitor()
 
@@ -646,6 +648,9 @@ struct HomeLandingView: View {
         homeDetailProjectionsByAppID = homeDetailProjectionsByAppID.filter {
             validAppIDs.contains($0.key)
         }
+        selectedDetailRefreshExpectations = selectedDetailRefreshExpectations.filter {
+            validAppIDs.contains($0.key)
+        }
         appDetailProjectionObservationOwner.retainObservations(
             for: validAppIDs
         )
@@ -701,6 +706,9 @@ struct HomeLandingView: View {
         let validAppIDs = Set(summaries.map(\.appID))
         windowsByAppID = windowsByAppID.filter { validAppIDs.contains($0.key) }
         homeDetailProjectionsByAppID = homeDetailProjectionsByAppID.filter { validAppIDs.contains($0.key) }
+        selectedDetailRefreshExpectations = selectedDetailRefreshExpectations.filter {
+            validAppIDs.contains($0.key)
+        }
         appDetailProjectionObservationOwner.retainObservations(
             for: validAppIDs
         )
@@ -708,14 +716,32 @@ struct HomeLandingView: View {
         setupWindowMonitorIfNeeded()
         persistCache()
 
-        if let selectedAppID = currentSelectedAppID {
-            let summaryCount = summaries.first(where: { $0.appID == selectedAppID })?.windowCount
+        if let selectedAppID = currentSelectedAppID,
+           let summary = summaries.first(where: { $0.appID == selectedAppID })
+        {
             let cachedCount = windowsByAppID[selectedAppID]?.count
-            requestSelectedAppRefresh(
-                appID: selectedAppID,
-                force: summaryCount == nil || cachedCount != summaryCount,
-                reason: "selected_after_\(reason)"
+            switch HomeSelectedAppSummaryRefreshPolicy.decision(
+                summaryProcessIdentifier: summary.pid,
+                summaryWindowCount: summary.windowCount,
+                cachedWindowCount: cachedCount,
+                outstandingExpectation:
+                    selectedDetailRefreshExpectations[selectedAppID]
             )
+            {
+            case .noRequest:
+                break
+            case .clearOutstanding:
+                selectedDetailRefreshExpectations.removeValue(
+                    forKey: selectedAppID
+                )
+            case .request(let expectation):
+                selectedDetailRefreshExpectations[selectedAppID] = expectation
+                requestSelectedAppRefresh(
+                    appID: selectedAppID,
+                    force: true,
+                    reason: "selected_after_\(reason)"
+                )
+            }
         }
         RuntimeLog.debug(
             .projection,
@@ -758,6 +784,13 @@ struct HomeLandingView: View {
             return
         }
         let appID = request.appID
+        if let summary = appSummaries.first(where: { $0.appID == appID }) {
+            selectedDetailRefreshExpectations[appID] =
+                HomeSelectedAppRefreshExpectation(
+                    processIdentifier: summary.pid,
+                    windowCount: summary.windowCount
+                )
+        }
         let shouldUpdateWindows = updateWindows
             ?? (appID == currentSelectedAppID
                 || windowsByAppID[appID] != nil)
@@ -813,6 +846,12 @@ struct HomeLandingView: View {
         if updateWindows {
             windowsByAppID[appID] = detailProjection.candidate.windows
             homeDetailProjectionsByAppID[appID] = detailProjection
+            if let expectation = selectedDetailRefreshExpectations[appID],
+               expectation.processIdentifier == detailProjection.summary.pid,
+               expectation.windowCount == detailProjection.candidate.windows.count
+            {
+                selectedDetailRefreshExpectations.removeValue(forKey: appID)
+            }
         }
 
         syncSelectedApp()
@@ -850,6 +889,7 @@ struct HomeLandingView: View {
         appDetailProjectionObservationOwner.stopAll(
             reason: "homeDisappeared"
         )
+        selectedDetailRefreshExpectations.removeAll()
         permissionObservationOwner.stop()
         windowChangeMonitor.stop()
         persistCache()

@@ -765,7 +765,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testRuntimeActivatorVerifiesFocusWhenFocusedAXCGMatchesOffscreenTargetCG() {
+    func testRuntimeActivatorKeepsOffscreenFocusedAXCGMatchUnverified() {
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
@@ -846,10 +846,11 @@ extension FlowTabPriorityCoverageTests {
             contextsByID: [appID: context]
         )
 
-        XCTAssertEqual(verification?.targetCGWindowID, targetCGWindowID)
-        XCTAssertEqual(verification?.focusedCGWindowID, targetCGWindowID)
-        XCTAssertTrue(verification?.focusedAXWindow.map { CFEqual($0, axWindow) } == true)
-        XCTAssertTrue(mismatchDiagnostics.isEmpty)
+        XCTAssertNil(verification)
+        XCTAssertEqual(mismatchDiagnostics.count, 1)
+        XCTAssertEqual(mismatchDiagnostics.first?.reason, .targetCGNotVisible)
+        XCTAssertEqual(mismatchDiagnostics.first?.targetCGWindowID, targetCGWindowID)
+        XCTAssertEqual(mismatchDiagnostics.first?.focusedCGWindowID, targetCGWindowID)
     }
 
     @MainActor
@@ -1754,6 +1755,7 @@ extension FlowTabPriorityCoverageTests {
             guard Unmanaged.passUnretained(window).toOpaque() == recoveredPointer else { return nil }
             return targetFrame
         }
+        var didFocusRecoveredWindow = false
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             return [
@@ -1761,7 +1763,7 @@ extension FlowTabPriorityCoverageTests {
                     id: targetCGWindowID,
                     title: "Fullscreen Target",
                     bounds: targetFrame,
-                    isOnscreen: false,
+                    isOnscreen: didFocusRecoveredWindow,
                     alpha: 1.0,
                     storeType: 1
                 )
@@ -1778,6 +1780,7 @@ extension FlowTabPriorityCoverageTests {
             let pointer = Unmanaged.passUnretained(window).toOpaque()
             focusedWindowPointers.append(pointer)
             if pointer == recoveredPointer {
+                didFocusRecoveredWindow = true
                 recoveredFocus.fulfill()
                 return true
             }

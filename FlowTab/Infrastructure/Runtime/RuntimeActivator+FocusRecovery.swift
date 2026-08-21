@@ -121,31 +121,24 @@ extension RuntimeActivator {
             forPID: app.processIdentifier
         )
         let focusReadback = currentWindowFocusReadbackEvidence(in: app)
-        let focusedCGWindowID = focusReadback.focusedCGWindowID
-        let frontmostCGWindowID = frontmostVisibleCGWindowID(
-            in: currentWindows
+        let focusState = RuntimeExactWindowFocusState(
+            targetCGWindowID: targetCGWindowID,
+            currentWindows: currentWindows,
+            focusReadback: focusReadback
         )
-        let visibleCGWindowIDs = currentWindows
-            .filter {
-                $0.isOnscreen
-                    && RuntimeCGWindowFacts.passesValidityConstraints($0)
-            }
-            .map(\.id)
-        let targetIsVisible = targetCGWindowID.map {
-            visibleCGWindowIDs.contains($0)
-        } ?? false
-        let conditionSatisfied = targetCGWindowID.map {
-            focusedCGWindowID == $0
-                || (focusedCGWindowID == nil && frontmostCGWindowID == $0)
-        } ?? false
+        let targetIsVisible = targetCGWindowID == nil
+            ? false
+            : focusState.targetIsVisible
+        let conditionSatisfied = targetCGWindowID != nil
+            && focusState.isVerified
         let observation = RuntimeFocusRecoveryObservation(
             conditionSatisfied: conditionSatisfied,
             processIsTerminated:
                 trigger == .targetApplicationTerminated || app.isTerminated,
             targetIsVisible: targetIsVisible,
-            focusedCGWindowID: focusedCGWindowID,
-            frontmostCGWindowID: frontmostCGWindowID,
-            visibleCGWindowIDs: visibleCGWindowIDs
+            focusedCGWindowID: focusState.focusedCGWindowID,
+            frontmostCGWindowID: focusState.frontmostCGWindowID,
+            visibleCGWindowIDs: focusState.visibleCGWindowIDs
         )
         RuntimeLog.debug(
             .activation,
@@ -160,9 +153,9 @@ extension RuntimeActivator {
                 "conditionSatisfied=\(conditionSatisfied ? 1 : 0)",
                 "processTerminated=\(observation.processIsTerminated ? 1 : 0)",
                 "targetVisible=\(targetIsVisible ? 1 : 0)",
-                "focusedCG=\(focusedCGWindowID.map(String.init) ?? "nil")",
-                "frontmostCG=\(frontmostCGWindowID.map(String.init) ?? "nil")",
-                "visibleCG=\(visibleCGWindowIDs.map(String.init).joined(separator: ","))"
+                "focusedCG=\(focusState.focusedCGWindowID.map(String.init) ?? "nil")",
+                "frontmostCG=\(focusState.frontmostCGWindowID.map(String.init) ?? "nil")",
+                "visibleCG=\(focusState.visibleCGWindowIDs.map(String.init).joined(separator: ","))"
             ].joined(separator: " ")
         )
         return (observation, focusReadback)

@@ -2315,9 +2315,10 @@ polling cadence, deadline, or timeout in the scoped paths.
   Search activation, any other handled key, event-monitor removal, presentation
   cancellation, session end, and controller teardown cancel it. Exact appID,
   PID, observation generation, and presentation generation reject unrelated,
-  stale, duplicate, and out-of-order events. After entry, later exact
-  projection commits continue to refresh the frozen window layer and preserve
-  a valid selected-window identity when a window disappears.
+  stale, duplicate, and out-of-order events. After entry, the resulting
+  `windowCycle` owns a complete session snapshot. Later projection commits
+  continue updating runtime state and become visible in the next session;
+  they leave the current card set, order, selection, and frozen preview intact.
 - Retained time policy: none. This repair adds no duration, polling cadence,
   retry, timer, deadline, or watchdog. Scheduling pressure can postpone the
   later generation and therefore entry latency; it cannot select from the

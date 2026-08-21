@@ -324,7 +324,7 @@ extension SwitcherPanelController {
         trigger: String
     ) {
         guard let sessionKind = activeHotkeySessionKind else { return }
-        guard !model.isSearchActive else { return }
+        guard !hasActiveOrPendingSearchInteraction else { return }
         guard !isHotkeyHoldSetPressed(
             for: sessionKind
         ) else { return }

@@ -316,11 +316,9 @@ extension FlowTabTests {
                 quitKeys: [.q]
             ),
             inAppWindowConfiguration: .inApp(
-                shortcutKeys: SwitcherHotkeyKeySet([
-                    inAppModifier,
-                    inAppKey
-                ]),
-                reverseKeys: [.shift]
+                baseKeys: SwitcherHotkeyKeySet([inAppModifier]),
+                reverseKeys: [.shift],
+                mainKeys: SwitcherHotkeyKeySet([inAppKey])
             )
         )
     }

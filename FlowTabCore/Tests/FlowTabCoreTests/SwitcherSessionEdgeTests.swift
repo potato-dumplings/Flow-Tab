@@ -144,10 +144,12 @@ final class SwitcherSessionEdgeTests: XCTestCase {
 
         XCTAssertEqual(
             session.commitSelection(),
-            .window(
+            .app(
                 appID: "com.example.Terminal",
-                windowID: "term-newer",
-                restoreIfMinimized: false
+                fallback: AppActivationFallback(
+                    windowID: "term-newer",
+                    restoreIfMinimized: false
+                )
             )
         )
     }
@@ -169,10 +171,12 @@ final class SwitcherSessionEdgeTests: XCTestCase {
 
         XCTAssertEqual(
             session.releasePrimaryModifier(),
-            .window(
+            .app(
                 appID: "com.example.Terminal",
-                windowID: "term-1",
-                restoreIfMinimized: false
+                fallback: AppActivationFallback(
+                    windowID: "term-1",
+                    restoreIfMinimized: false
+                )
             )
         )
     }

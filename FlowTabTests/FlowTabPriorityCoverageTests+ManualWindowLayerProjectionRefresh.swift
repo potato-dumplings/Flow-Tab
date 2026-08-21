@@ -5,7 +5,7 @@ import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
     @MainActor
-    func testSwitcherPanelControllerCurrentAppProjectionCommitRefreshesFrozenWindowLayerPreview() {
+    func testSwitcherPanelControllerKeepsWindowLayerSnapshotWhenUnselectedWindowCloses() {
         let initialWindows = [
             WindowCandidate(
                 id: "open-layer-1",
@@ -55,7 +55,7 @@ extension FlowTabPriorityCoverageTests {
             ["open-layer-1", "open-layer-2"]
         )
 
-        XCTAssertTrue(
+        XCTAssertFalse(
             fixture.publishCurrentProjection(
                 windows: [initialWindows[0]],
                 projectionGeneration: 3
@@ -64,18 +64,18 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(
             fixture.controller.modelForTesting.session?
                 .selectedApp.windows.map(\.id),
-            ["open-layer-1"]
+            ["open-layer-1", "open-layer-2"]
         )
         XCTAssertEqual(
             fixture.controller.modelForTesting
                 .windowPreviewSnapshotForTesting().map(\.id),
-            ["open-layer-1"]
+            ["open-layer-1", "open-layer-2"]
         )
         fixture.controller.cancelSelectionForTesting()
     }
 
     @MainActor
-    func testSwitcherPanelControllerCurrentAppProjectionCommitKeepsWindowLayerWhenSelectedWindowIsRemoved() {
+    func testSwitcherPanelControllerKeepsWindowLayerSnapshotWhenSelectedWindowCloses() {
         let initialWindows = [
             WindowCandidate(
                 id: "open-layer-remaining",
@@ -117,7 +117,7 @@ extension FlowTabPriorityCoverageTests {
             "open-layer-removed"
         )
 
-        XCTAssertTrue(
+        XCTAssertFalse(
             fixture.publishCurrentProjection(
                 windows: [initialWindows[0]],
                 projectionGeneration: 3
@@ -130,12 +130,17 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(
             fixture.controller.modelForTesting.session?
                 .selectedWindow?.id,
-            "open-layer-remaining"
+            "open-layer-removed"
+        )
+        XCTAssertEqual(
+            fixture.controller.modelForTesting.session?
+                .selectedApp.windows.map(\.id),
+            ["open-layer-remaining", "open-layer-removed"]
         )
         XCTAssertEqual(
             fixture.controller.modelForTesting
                 .windowPreviewSnapshotForTesting().map(\.id),
-            ["open-layer-remaining"]
+            ["open-layer-remaining", "open-layer-removed"]
         )
         fixture.controller.cancelSelectionForTesting()
     }

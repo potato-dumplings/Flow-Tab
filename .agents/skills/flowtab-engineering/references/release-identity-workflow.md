@@ -7,6 +7,7 @@ or any delivery expected to preserve Accessibility and Screen Recording grants.
 
 - [Identity Contract](#identity-contract)
 - [Package Modes](#package-modes)
+- [Community Build Naming](#community-build-naming)
 - [Workflow](#workflow)
 - [Continuity Audit](#continuity-audit)
 - [TCC-Safe Upgrade Validation](#tcc-safe-upgrade-validation)
@@ -28,8 +29,8 @@ A permission-preserving candidate must satisfy all of these invariants:
 - The version inside the final mounted App equals the requested release version.
 - The candidate and the App from the actual preceding distributed asset mutually satisfy each
   other's designated requirements.
-- The intended signing class is explicit: Apple Development for a named local upgrade test, or
-  Developer ID Application for public distribution.
+- The intended signing class is explicit: Apple Development for a named local upgrade test or
+  Community Build, or Developer ID Application for public distribution.
 - Packaging, copying, mounting, and ZIP extraction preserve the already-verified App bundle
   byte-for-byte.
 
@@ -47,13 +48,22 @@ timestamp, Apple notarization acceptance, stapling, Gatekeeper acceptance, and t
 distribution verification. Missing signing or notarization credentials block delivery. Preserve
 the last verified artifact and do not create an ad-hoc substitute.
 
+### Community Build
+
+Use this mode only when the user explicitly requests an unnotarized open-source community
+artifact. Sign the final App, uninstaller, and DMG with the usable Apple Development identity that
+matches the preceding community artifact when permission continuity is required. Keep the
+Community Build classification, signing class, notarization state, architectures, and Gatekeeper
+result in the GitHub Release metadata and handoff. Verify the final mounted bundles and run the
+continuity audit with `--authority-kind apple-development`.
+
 ### Local Upgrade Test
 
-Apple Development is allowed only for an explicitly local artifact whose purpose is to validate
-upgrade and privacy-identity continuity. Resolve the same usable certificate identity as the
-baseline, sign nested code and the outer App through `scripts/release/sign-macos-bundle.sh`, and
-run the continuity audit below. Label the artifact as Apple Development and keep it out of public
-release uploads.
+For a Local Upgrade Test, use an explicitly local Apple Development artifact whose purpose is to
+validate upgrade and privacy-identity continuity. Resolve the same usable certificate identity as
+the baseline, sign nested code and the outer App through `scripts/release/sign-macos-bundle.sh`,
+and run the continuity audit below. Label the artifact as Apple Development and keep it out of
+public release uploads.
 
 ### Ad-Hoc Migration Boundary
 
@@ -62,10 +72,25 @@ first stable certificate-signed candidate cannot inherit its TCC grants. Record 
 `--accept-adhoc-migration`, require one user reauthorization after installing the stable App, and
 use that stable App as the baseline for every later version. Do not use the migration flag again.
 
+## Community Build Naming
+
+Normalize the requested version to its numeric and prerelease portion, then derive the canonical
+package basename as `FlowTab-v<version>`. Reuse that exact basename for the release directory, DMG
+filename, mounted volume label, DMG signing identifier, and checksum filename prefix. Resolve the
+output path intent as:
+
+```text
+release/FlowTab-v<version>/FlowTab-v<version>.dmg
+release/FlowTab-v<version>/FlowTab-v<version>.dmg.sha256
+```
+
+Record the target architectures and Community Build classification in release metadata and
+validation evidence.
+
 ## Workflow
 
-1. Resolve the requested version, tag or commit, target architectures, and package mode. Confirm
-   the source tree and embedded version identify the same candidate.
+1. Resolve the requested version, tag or commit, target architectures, package mode, and canonical
+   package basename. Confirm the source tree and embedded version identify the same candidate.
 2. Preserve the existing release artifact. Allocate a fresh ignored build root below
    `.build-local/`; do not overwrite the current release asset before all gates pass.
 3. Obtain the actual preceding user-distributed archive. Mount or extract it through its owning
@@ -82,8 +107,9 @@ use that stable App as the baseline for every later version. Do not use the migr
 8. Create and sign the DMG. Mount the final DMG, compare its App and uninstaller to the verified
    staged bundles, then rerun the continuity audit against the mounted App.
 9. For public distribution, complete notarization, stapling, Gatekeeper, and repository
-   distribution verification. For a local upgrade test, report those public-distribution checks
-   as not applicable to the named local artifact.
+   distribution verification. For a Community Build, verify and report its explicit unnotarized
+   delivery state. For a local upgrade test, report those public-distribution checks as not
+   applicable to the named local artifact.
 10. Create the final archive only after every required gate passes. Verify its layout and checksum,
     publish or hand off the new path, and remove the reproducible build root.
 
