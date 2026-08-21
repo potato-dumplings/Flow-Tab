@@ -11,6 +11,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     private var spaceTopologySignatureSummary: String?
     private var pendingRepairScopes: Set<String> = []
     private var appDirectoryState = RuntimeAppDirectoryState()
+    private var focusedAppActivationEntry: RuntimeAppDirectoryEntry?
     private var spaceTopologySignature: RuntimeSpaceTopologySignature?
     private var spaceTopologyAffectedCGWindowIDs: Set<CGWindowID> = []
     private var spaceTopologyGeneratedAt: TimeInterval?
@@ -191,6 +192,35 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         }
     }
 
+    @discardableResult
+    func markAppActivated(
+        appID: String,
+        pid: pid_t,
+        appDirectoryEntry: RuntimeAppDirectoryEntry,
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) -> Bool {
+        guard pid != ProcessInfo.processInfo.processIdentifier,
+              appDirectoryEntry.appID == appID,
+              appDirectoryEntry.pid == pid
+        else {
+            return false
+        }
+
+        lock.lock()
+        defer { lock.unlock() }
+
+        generation.appLifecycle &+= 1
+        dirtyAppIDs.insert(appID)
+        dirtyPIDs.insert(pid)
+        pendingRepairScopes.insert("selectedCurrentAppWindows:\(appID)")
+        focusedAppActivationEntry = appDirectoryEntry
+        upsertAppDirectoryStateLocked(
+            entries: [appDirectoryEntry],
+            generatedAt: generatedAt
+        )
+        return true
+    }
+
     func markAppWindowsDirty(appID: String, pid: pid_t, pendingScope: String) {
         lock.lock()
         defer { lock.unlock() }
@@ -261,6 +291,10 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
+        if focusedAppActivationEntry?.appID == appID,
+           focusedAppActivationEntry?.pid == pid {
+            focusedAppActivationEntry = nil
+        }
         guard shouldRemoveTerminatedAppLocked(appID: appID, pid: pid) else {
             dirtyPIDs.remove(pid)
             return
@@ -449,7 +483,10 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     }
 
     private func focusedCurrentAppDirectoryEntryLocked() -> RuntimeAppDirectoryEntry? {
-        appDirectoryState.entries
+        if let focusedAppActivationEntry {
+            return focusedAppActivationEntry
+        }
+        return appDirectoryState.entries
             .compactMap { entry -> (entry: RuntimeAppDirectoryEntry, rank: Int)? in
                 guard let rank = entry.activationRank else { return nil }
                 return (entry, rank)

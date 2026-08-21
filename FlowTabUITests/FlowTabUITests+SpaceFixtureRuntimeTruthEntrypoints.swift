@@ -8,6 +8,89 @@ struct RuntimeTruthWindowSelection: Equatable {
 }
 
 extension FlowTabUITests {
+    func testInAppWindowSwitcherImmediatelyUsesNewlyActivatedWorkflowApp() throws {
+        let workflow = try configuredSwitcherSpaceFixtureWorkflow()
+        let desktopApps = workflow.apps.filter {
+            $0.fullscreenWindowIndex == nil
+        }
+        let priorApp = try XCTUnwrap(
+            desktopApps.first,
+            "Switcher workflow must include an initial desktop app."
+        )
+        let activatedApp = try XCTUnwrap(
+            desktopApps.dropFirst().first,
+            "Switcher workflow must include a second desktop app."
+        )
+
+        try runRealSpaceFixtureWorkflow(
+            workflow,
+            flowTabAdditionalArguments:
+                runtimeTruthSwitcherLaunchArguments(),
+            validatesPermissionsBeforeFixtureLaunch: true,
+            prelaunchesFlowTabBeforeFixture: true
+        ) { _, app in
+            let priorApplication =
+                makeSpaceFixtureWorkflowApplication(
+                    for: priorApp.identity
+                )
+            priorApplication.activate()
+            let priorDiagnostics =
+                performAndWaitForInAppSwitcherPanelProjection(
+                    for: priorApp,
+                    in: app,
+                    trigger: {
+                        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                            .inApp,
+                            traceLabel: "control.activation.prior"
+                        )
+                    }
+                )
+            XCTAssertEqual(
+                switcherPanelDiagnosticsValue(
+                    priorDiagnostics,
+                    key: "selected"
+                ),
+                priorApp.identity.bundleIdentifier
+            )
+
+            app.activate()
+            app.typeKey(.escape, modifierFlags: [])
+            XCTAssertTrue(
+                waitForNonExistence(
+                    priorDiagnostics,
+                    timeout:
+                        FlowTabUITestRuntimeTruthWatchdogPolicy
+                            .optionTabSwitcherDismissal
+                ),
+                "The initial in-app panel must close before the activation race phase."
+            )
+
+            let activatedApplication =
+                makeSpaceFixtureWorkflowApplication(
+                    for: activatedApp.identity
+                )
+            let activatedDiagnostics =
+                performAndWaitForInAppSwitcherPanelProjection(
+                    for: activatedApp,
+                    in: app,
+                    trigger: {
+                        activatedApplication.activate()
+                        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                            .inApp,
+                            traceLabel: "control.activation.immediate"
+                        )
+                    }
+                )
+            XCTAssertEqual(
+                switcherPanelDiagnosticsValue(
+                    activatedDiagnostics,
+                    key: "selected"
+                ),
+                activatedApp.identity.bundleIdentifier
+            )
+        }
+    }
+
     func testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithoutAppAXWindows() throws {
         let workflow = try configuredSwitcherRuntimeTruthWorkflow(
             sourceWorkflowURL: SpaceFixtureMultiAppWorkflowDefaults.optionTabWindowStateRuntimeTruthWorkflowSourceURL

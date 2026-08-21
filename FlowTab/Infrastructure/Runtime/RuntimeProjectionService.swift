@@ -288,6 +288,21 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         }
     }
 
+    func signalAppActivated(
+        appID: String,
+        pid: pid_t,
+        appDirectoryEntry: RuntimeAppDirectoryEntry
+    ) {
+        guard readModelStore.markAppActivated(
+            appID: appID,
+            pid: pid,
+            appDirectoryEntry: appDirectoryEntry
+        ) else {
+            return
+        }
+        signalSelectedCurrentAppWindowsChanged(appID: appID, pid: pid)
+    }
+
     func signalAppWindowsChanged(appID: String, pid: pid_t) {
         guard canScheduleAXWindowRepair else { return }
         maintenanceOwner.enqueue { [self] in

@@ -59,6 +59,18 @@ extension AppDelegate {
         Self.testHooks.workspaceNotificationCenter ?? NSWorkspace.shared.notificationCenter
     }
 
+    func signalWorkspaceAppActivated(_ app: NSRunningApplication) {
+        guard !FlowTabTestLaunchOptions.usesMockRuntimeProjection else {
+            resolvedRuntimeProjectionService.signalFocusedCurrentAppWindowsChanged()
+            return
+        }
+        resolvedRuntimeProjectionService.signalAppActivated(
+            appID: RuntimeAppIdentity.appID(for: app),
+            pid: app.processIdentifier,
+            appDirectoryEntry: RuntimeAppDirectoryEntry(app: app)
+        )
+    }
+
     func makeAppLaunchWindowEvidenceCoordinator()
         -> any RuntimeAppLaunchWindowEvidenceCoordinating
     {

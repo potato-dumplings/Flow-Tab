@@ -507,6 +507,8 @@
 		E03600022FF600100B0D737 /* FlowTabPriorityCoverageTests+RuntimeMainTableSearchCoverage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E03600012FF600100B0D737 /* FlowTabPriorityCoverageTests+RuntimeMainTableSearchCoverage.swift */; };
 		E03600042FF600100B0D737 /* FlowTabPriorityCoverageTests+RuntimeApplicationTermination.swift in Sources */ = {isa = PBXBuildFile; fileRef = E03600032FF600100B0D737 /* FlowTabPriorityCoverageTests+RuntimeApplicationTermination.swift */; };
 		C1A0A0023A10000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A0A0013A10000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication.swift */; };
+		A82101022FA1000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusedAppActivationIsolation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A82100022FA1000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusedAppActivationIsolation.swift */; };
+		A82101032FA1000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A82100032FA1000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeTestSupport.swift */; };
 		D2C0A0023A23000100B0D737 /* FlowTabPriorityCoverageTests+HomeColdStart.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2C0A0013A23000100B0D737 /* FlowTabPriorityCoverageTests+HomeColdStart.swift */; };
 		C8A200023A24000100B0D737 /* FlowTabPriorityCoverageTests+AppDirectoryPermissionBoundary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A200013A24000100B0D737 /* FlowTabPriorityCoverageTests+AppDirectoryPermissionBoundary.swift */; };
 		B10011142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift */; };
@@ -604,6 +606,7 @@
 		C100000E2F75000100B0D737 /* AppLogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001E2F75000100B0D737 /* AppLogsView.swift */; };
 		C100000F2F75000100B0D737 /* AppSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001F2F75000100B0D737 /* AppSettingsView.swift */; };
 		C10000102F75000100B0D737 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000202F75000100B0D737 /* AppDelegate.swift */; };
+		A82101012FA1000100B0D737 /* AppDelegate+Production.swift in Sources */ = {isa = PBXBuildFile; fileRef = A82100012FA1000100B0D737 /* AppDelegate+Production.swift */; };
 		C10000272F75000100B0D737 /* FlowTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000282F75000100B0D737 /* FlowTypography.swift */; };
 		C10000242F75000100B0D737 /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000212F75000100B0D737 /* AppPreferences.swift */; };
 		C10000252F75000100B0D737 /* SystemThemeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000222F75000100B0D737 /* SystemThemeState.swift */; };
@@ -923,6 +926,8 @@
 		E03600012FF600100B0D737 /* FlowTabPriorityCoverageTests+RuntimeMainTableSearchCoverage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeMainTableSearchCoverage.swift"; sourceTree = "<group>"; };
 		E03600032FF600100B0D737 /* FlowTabPriorityCoverageTests+RuntimeApplicationTermination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeApplicationTermination.swift"; sourceTree = "<group>"; };
 		C1A0A0013A10000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication.swift"; sourceTree = "<group>"; };
+		A82100022FA1000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusedAppActivationIsolation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeFocusedAppActivationIsolation.swift"; sourceTree = "<group>"; };
+		A82100032FA1000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeTestSupport.swift"; sourceTree = "<group>"; };
 		D2C0A0013A23000100B0D737 /* FlowTabPriorityCoverageTests+HomeColdStart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+HomeColdStart.swift"; sourceTree = "<group>"; };
 		C8A200013A24000100B0D737 /* FlowTabPriorityCoverageTests+AppDirectoryPermissionBoundary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+AppDirectoryPermissionBoundary.swift"; sourceTree = "<group>"; };
 		B10001142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+WindowRecency.swift"; sourceTree = "<group>"; };
@@ -1040,6 +1045,7 @@
 		C100001E2F75000100B0D737 /* AppLogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLogsView.swift; sourceTree = "<group>"; };
 		C100001F2F75000100B0D737 /* AppSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsView.swift; sourceTree = "<group>"; };
 		C10000202F75000100B0D737 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		A82100012FA1000100B0D737 /* AppDelegate+Production.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+Production.swift"; sourceTree = "<group>"; };
 		C10000212F75000100B0D737 /* AppPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferences.swift; sourceTree = "<group>"; };
 		C10000222F75000100B0D737 /* SystemThemeState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemThemeState.swift; sourceTree = "<group>"; };
 		C10000232F75000100B0D737 /* String+FlowTabAccessibilitySlug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+FlowTabAccessibilitySlug.swift"; sourceTree = "<group>"; };
@@ -1545,6 +1551,8 @@
 				E03600012FF600100B0D737 /* FlowTabPriorityCoverageTests+RuntimeMainTableSearchCoverage.swift */,
 				E03600032FF600100B0D737 /* FlowTabPriorityCoverageTests+RuntimeApplicationTermination.swift */,
 				C1A0A0013A10000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication.swift */,
+				A82100022FA1000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusedAppActivationIsolation.swift */,
+				A82100032FA1000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeTestSupport.swift */,
 				D2C0A0013A23000100B0D737 /* FlowTabPriorityCoverageTests+HomeColdStart.swift */,
 				ECD100033D1A000100B0D737 /* FlowTabPriorityCoverageTests+HomeAppSummaryObservation.swift */,
 				EDD100033D1B000100B0D737 /* FlowTabPriorityCoverageTests+HomeAppDetailObservation.swift */,
@@ -1883,6 +1891,7 @@
 				C10000112F75000100B0D737 /* AppFoundation.swift */,
 				EED100013D1C000100B0D737 /* TemporaryRegularActivationRestorationOwner.swift */,
 				C10000202F75000100B0D737 /* AppDelegate.swift */,
+				A82100012FA1000100B0D737 /* AppDelegate+Production.swift */,
 				B1C2D3E32F74000100B0D737 /* AppLocalization.swift */,
 				C10000122F75000100B0D737 /* HomeRootView.swift */,
 				4A6DAE6F2F727AF500B0D737 /* ContentView.swift */,
@@ -2414,6 +2423,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C10000102F75000100B0D737 /* AppDelegate.swift in Sources */,
+				A82101012FA1000100B0D737 /* AppDelegate+Production.swift in Sources */,
 				FDD100023D2A000100B0D737 /* SettingsAppVisibilityNavigationAnimationPolicy.swift in Sources */,
 				C100000F2F75000100B0D737 /* AppSettingsView.swift in Sources */,
 				F0D100043D1E000100B0D737 /* HotkeyRegistrationObservationOwner.swift in Sources */,
@@ -2728,6 +2738,8 @@
 				E03600022FF600100B0D737 /* FlowTabPriorityCoverageTests+RuntimeMainTableSearchCoverage.swift in Sources */,
 				E03600042FF600100B0D737 /* FlowTabPriorityCoverageTests+RuntimeApplicationTermination.swift in Sources */,
 				C1A0A0023A10000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication.swift in Sources */,
+				A82101022FA1000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusedAppActivationIsolation.swift in Sources */,
+				A82101032FA1000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeTestSupport.swift in Sources */,
 				D2C0A0023A23000100B0D737 /* FlowTabPriorityCoverageTests+HomeColdStart.swift in Sources */,
 				ECD100043D1A000100B0D737 /* FlowTabPriorityCoverageTests+HomeAppSummaryObservation.swift in Sources */,
 				EDD100043D1B000100B0D737 /* FlowTabPriorityCoverageTests+HomeAppDetailObservation.swift in Sources */,

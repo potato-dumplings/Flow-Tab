@@ -564,6 +564,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 appDirectoryEntry: RuntimeAppDirectoryEntry(app: app)
             )
         }
+        let didActivateObserver = resolvedWorkspaceNotificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self else { return }
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
+                return
+            }
+            self.signalWorkspaceAppActivated(app)
+        }
         let didTerminateObserver = resolvedWorkspaceNotificationCenter.addObserver(
             forName: NSWorkspace.didTerminateApplicationNotification,
             object: nil,
@@ -583,7 +594,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 pid: app.processIdentifier
             )
         }
-        workspaceLifecycleObservers = [didLaunchObserver, didTerminateObserver]
+        workspaceLifecycleObservers = [
+            didLaunchObserver,
+            didActivateObserver,
+            didTerminateObserver,
+        ]
     }
 
     func makeDefaultAppLaunchWindowEvidenceCoordinator()
@@ -732,61 +747,3 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         handleStatusItemQuitAction(application: NSApp)
     }
 }
-
-#if !FLOWTAB_TESTING
-@MainActor
-extension AppDelegate {
-    var resolvedUserDefaults: UserDefaults {
-        .standard
-    }
-
-    var resolvedLaunchAtLoginManager: any LaunchAtLoginManaging {
-        LaunchAtLoginController.shared
-    }
-
-    var resolvedActivationPolicyApplication: any AppActivationPolicyApplying {
-        NSApp
-    }
-
-    var resolvedRuntimeProjectionService: any RuntimeProjectionServing {
-        sharedRuntimeProjectionService
-    }
-
-    var resolvedWorkspaceNotificationCenter: NotificationCenter {
-        NSWorkspace.shared.notificationCenter
-    }
-
-    func makeAppLaunchWindowEvidenceCoordinator()
-        -> any RuntimeAppLaunchWindowEvidenceCoordinating
-    {
-        makeDefaultAppLaunchWindowEvidenceCoordinator()
-    }
-
-    func makePanelController() -> SwitcherPanelController {
-        SwitcherPanelController(
-            model: LiveSwitcherModel(runtimeProjectionService: resolvedRuntimeProjectionService)
-        )
-    }
-
-    func makeHotkeyMonitor(
-        configuration: SwitcherHotkeyConfiguration,
-        signature: OSType,
-        forwardHotkeyID: UInt32,
-        backwardHotkeyID: UInt32
-    ) -> any HotkeyMonitoring {
-        OptionTabHotkeyMonitor(
-            configuration: configuration,
-            signature: signature,
-            forwardHotkeyID: forwardHotkeyID,
-            backwardHotkeyID: backwardHotkeyID,
-            startsMonitoring: false
-        )
-    }
-
-    func currentHotkeyChordEventAccessSnapshot()
-        -> HotkeyChordEventAccessSnapshot
-    {
-        .current()
-    }
-}
-#endif

@@ -139,6 +139,11 @@ protocol RuntimeProjectionServing: Sendable {
         pid: pid_t,
         appDirectoryEntry: RuntimeAppDirectoryEntry?
     )
+    func signalAppActivated(
+        appID: String,
+        pid: pid_t,
+        appDirectoryEntry: RuntimeAppDirectoryEntry
+    )
     func signalAppWindowsChanged(appID: String, pid: pid_t)
     func signalSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t)
     func signalFocusedCurrentAppWindowsChanged()
@@ -151,6 +156,14 @@ protocol RuntimeProjectionServing: Sendable {
 }
 
 extension RuntimeProjectionServing {
+    func signalAppActivated(
+        appID: String,
+        pid: pid_t,
+        appDirectoryEntry _: RuntimeAppDirectoryEntry
+    ) {
+        signalSelectedCurrentAppWindowsChanged(appID: appID, pid: pid)
+    }
+
     func scheduleWorkspaceAppTerminated(appID: String, pid: pid_t) {
         signalAppTerminated(appID: appID, pid: pid)
     }

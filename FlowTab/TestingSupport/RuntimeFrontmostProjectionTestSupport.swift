@@ -131,6 +131,14 @@ final class RuntimeUITestFrontmostProjectionService: RuntimeProjectionServing, @
         )
     }
 
+    func signalAppActivated(
+        appID _: String,
+        pid _: pid_t,
+        appDirectoryEntry _: RuntimeAppDirectoryEntry
+    ) {
+        signalFocusedCurrentAppWindowsChanged()
+    }
+
     func signalAppWindowsChanged(appID: String, pid: pid_t) {
         baseService.signalAppWindowsChanged(appID: appID, pid: pid)
     }
