@@ -619,16 +619,18 @@ private final class SwitcherCommandNotificationObserver: NSObject {
             guard
                 let appID = Self.switcherCommandPayload()?
                     .trimmingCharacters(in: .whitespacesAndNewlines),
-                !appID.isEmpty,
-                var session = panelController.modelForTesting.session
+                !appID.isEmpty
             else {
                 return
             }
-            guard session.selectApp(withID: appID) else {
+            let model = panelController.modelForTesting
+            guard model.selectAppFromPointer(appID: appID) else {
                 RuntimeLog.info("UITest", "select app command missed appID=\(appID)")
                 return
             }
-            panelController.modelForTesting.session = session
+            _ = model.scheduleSelectedAppWindowProjectionIfNeeded(
+                for: appID
+            )
             panelController.syncPanelAccessibilityAnchors()
             panelController.updatePanelSize()
             RuntimeLog.info("UITest", "select app command applied appID=\(appID)")

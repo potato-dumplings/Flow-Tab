@@ -20,12 +20,17 @@ struct FlowTabUITestInAppVerifiedFocusReadbackRecord:
     let windowID: String
     let windowNumber: CGWindowID
     let axWindowID: String
+    let reusableWindowEvidence: FlowTabUITestReusableWindowEvidence
 
     var diagnosticSummary: String {
         "pid=\(processIdentifier) windowID=\(windowID) "
             + "cg=\(windowNumber) ax=\(axWindowID) "
-            + "confidence=sticky->exact "
-            + "source=stickyBinding->verifiedFocusReadback "
+            + "confidence="
+            + reusableWindowEvidence
+                .verifiedFocusConfidenceTransition + " "
+            + "source="
+            + reusableWindowEvidence
+                .verifiedFocusSourceTransition + " "
             + "verifiedFocusFallbackAX=0"
     }
 
@@ -55,10 +60,21 @@ struct FlowTabUITestInAppVerifiedFocusReadbackRecord:
               let axWindowID = value(in: detail, key: "ax"),
               axProcessIdentifier(in: axWindowID)
                 == identity.processIdentifier,
-              value(in: detail, key: "confidence")
-                == "sticky->exact",
-              value(in: detail, key: "source")
-                == "stickyBinding->verifiedFocusReadback",
+              let confidenceTransition = value(
+                  in: detail,
+                  key: "confidence"
+              ),
+              let sourceTransition = value(
+                  in: detail,
+                  key: "source"
+              ),
+              let reusableWindowEvidence =
+                  FlowTabUITestReusableWindowEvidence
+                  .parseVerifiedFocusReadback(
+                      confidenceTransition:
+                          confidenceTransition,
+                      sourceTransition: sourceTransition
+                  ),
               value(
                   in: detail,
                   key: "verifiedFocusFallbackAX"
@@ -70,7 +86,9 @@ struct FlowTabUITestInAppVerifiedFocusReadbackRecord:
             processIdentifier: identity.processIdentifier,
             windowID: windowID,
             windowNumber: windowNumber,
-            axWindowID: axWindowID
+            axWindowID: axWindowID,
+            reusableWindowEvidence:
+                reusableWindowEvidence
         )
     }
 
@@ -189,9 +207,15 @@ private final class
         "expectedPID=\(expectedProcessIdentifier) "
             + "expectedWindowID=\(expectedWindowID) "
             + "expectedCG=\(expectedWindowNumber) "
-            + "expectedConfidence=sticky->exact "
-            + "expectedSource="
-            + "stickyBinding->verifiedFocusReadback"
+            + "expectedReusableEvidence="
+            + FlowTabUITestReusableWindowEvidence
+                .allCases
+                .map {
+                    $0.verifiedFocusConfidenceTransition
+                        + "/"
+                        + $0.verifiedFocusSourceTransition
+                }
+                .joined(separator: ",")
     }
 }
 

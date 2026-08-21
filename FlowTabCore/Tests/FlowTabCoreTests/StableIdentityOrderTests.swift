@@ -47,4 +47,29 @@ final class StableIdentityOrderTests: XCTestCase {
             updated
         )
     }
+
+    func testReconcilePlacesNewRuntimeLeaderAheadOfVisibleOrder() {
+        let current = [
+            Item(id: "mail", value: 1),
+            Item(id: "browser", value: 2),
+        ]
+        let updated = [
+            Item(id: "calendar", value: 30),
+            Item(id: "browser", value: 20),
+            Item(id: "mail", value: 10),
+        ]
+
+        XCTAssertEqual(
+            StableIdentityOrder.reconcile(
+                current: current,
+                updated: updated,
+                identity: { $0.id }
+            ),
+            [
+                Item(id: "calendar", value: 30),
+                Item(id: "mail", value: 10),
+                Item(id: "browser", value: 20),
+            ]
+        )
+    }
 }

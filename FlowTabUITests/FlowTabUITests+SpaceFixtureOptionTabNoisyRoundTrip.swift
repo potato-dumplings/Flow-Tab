@@ -168,8 +168,11 @@ extension FlowTabUITests {
                         .postConfirmReconciliationWatchdog,
                 description: "nonzero Space topology affected-window diff and signature diagnostics after \(phase.trace) confirm"
             )
+            let verifiedFocusPattern =
+                FlowTabUITestReusableWindowEvidence
+                .verifiedFocusReadbackRegexPattern
             waitForRuntimeLogFiles(
-                matching: "binding-confidence-change windowID=cg:[0-9]+:\(selection.windowNumber) cg=\(selection.windowNumber) .* source=.*->verifiedFocusReadback",
+                matching: "binding-confidence-change windowID=cg:[0-9]+:\(selection.windowNumber) cg=\(selection.windowNumber) .* \(verifiedFocusPattern) verifiedFocusFallbackAX=0",
                 since: topologyLogSnapshot,
                 timeout:
                     FlowTabUITestNoisyOptionTabPolicy
@@ -241,8 +244,10 @@ extension FlowTabUITests {
             FlowTabUITestRuntimeLogObservationBaseline
     ) {
         let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
+        let sourcePattern = FlowTabUITestReusableWindowEvidence
+            .currentSourceRegexPattern
         waitForRuntimeLogFiles(
-            matching: #"window-entries app=Chrome Fixture .*id=cg:[0-9]+:\#(selection.windowNumber):title=\#(escapedTitle)[^\n]*source=(stickyBinding|privateExactBridge):spaceEvidence=(observed|inferredFromTopology)"#,
+            matching: #"window-entries app=Chrome Fixture .*id=cg:[0-9]+:\#(selection.windowNumber):title=\#(escapedTitle)[^,\n]*:sticky=1:source=\#(sourcePattern):spaceEvidence=(observed|inferredFromTopology)"#,
             since: snapshot,
             timeout: FlowTabUITestNoisyOptionTabPolicy.preConfirmEvidenceWatchdog,
             description: "reusable window-layer source for selected Noisy Option+Tab \(phaseTrace) window"
@@ -258,8 +263,10 @@ extension FlowTabUITests {
     ) {
         let escapedAppID = NSRegularExpression.escapedPattern(for: appID)
         let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
+        let sourcePattern = FlowTabUITestReusableWindowEvidence
+            .currentSourceRegexPattern
         waitForRuntimeLogFiles(
-            matching: #"window-request appID=\#(escapedAppID) pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) title=\#(escapedTitle)[^\n]* sticky=true source=(stickyBinding|privateExactBridge)"#,
+            matching: #"window-request appID=\#(escapedAppID) pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) title=\#(escapedTitle)[^\n]* sticky=true source=\#(sourcePattern) publicAXRecovery="#,
             since: snapshot,
             timeout:
                 FlowTabUITestNoisyOptionTabPolicy

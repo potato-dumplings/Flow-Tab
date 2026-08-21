@@ -51,16 +51,37 @@ extension FlowTabUITests {
     }
 
     func testInAppVerifiedFocusReadbackRecordRequiresAtomicExactTransition() {
-        XCTAssertEqual(
+        let records =
             FlowTabUITestInAppVerifiedFocusReadbackRecord.records(
-                in: makeInAppVerifiedFocusReadbackLine()
-            ),
+                in: [
+                    makeInAppVerifiedFocusReadbackLine(),
+                    makeInAppVerifiedFocusReadbackLine(
+                        windowNumber: 766,
+                        cgWindowNumber: 766,
+                        axWindowIndex: 1,
+                        confidence: "exact->exact",
+                        source:
+                            "privateExactBridge->verifiedFocusReadback"
+                    )
+                ].joined(separator: "\n")
+            )
+
+        XCTAssertEqual(
+            records,
             [
                 FlowTabUITestInAppVerifiedFocusReadbackRecord(
                     processIdentifier: 4_321,
                     windowID: "cg:4321:765",
                     windowNumber: 765,
-                    axWindowID: "ax:4321:0"
+                    axWindowID: "ax:4321:0",
+                    reusableWindowEvidence: .stickyBinding
+                ),
+                FlowTabUITestInAppVerifiedFocusReadbackRecord(
+                    processIdentifier: 4_321,
+                    windowID: "cg:4321:766",
+                    windowNumber: 766,
+                    axWindowID: "ax:4321:1",
+                    reusableWindowEvidence: .privateExactBridge
                 )
             ]
         )
@@ -77,6 +98,15 @@ extension FlowTabUITests {
             ),
             makeInAppVerifiedFocusReadbackLine(
                 confidence: "exact->exact"
+            ),
+            makeInAppVerifiedFocusReadbackLine(
+                source:
+                    "privateExactBridge->verifiedFocusReadback"
+            ),
+            makeInAppVerifiedFocusReadbackLine(
+                confidence: "exact->exact",
+                source:
+                    "stickyBinding->verifiedFocusReadback"
             ),
             makeInAppVerifiedFocusReadbackLine(
                 source: "publicExactMatch->verifiedFocusReadback"

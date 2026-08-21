@@ -62,6 +62,7 @@ extension FlowTabUITests {
                     windowNumber: 766,
                     cgWindowNumber: 766,
                     title: "Chrome Fullscreen Tab",
+                    source: "privateExactBridge",
                     spaceEvidence: "inferredFromTopology"
                 )
             ].joined(separator: "\n")
@@ -76,6 +77,7 @@ extension FlowTabUITests {
                     windowID: "cg:4321:765",
                     windowNumber: 765,
                     title: "Chrome Normal Tab",
+                    reusableWindowEvidence: .stickyBinding,
                     spaceEvidence: .observed
                 ),
                 FlowTabUITestInAppWindowLayerRecord(
@@ -84,6 +86,7 @@ extension FlowTabUITests {
                     windowID: "cg:4321:766",
                     windowNumber: 766,
                     title: "Chrome Fullscreen Tab",
+                    reusableWindowEvidence: .privateExactBridge,
                     spaceEvidence: .inferredFromTopology
                 )
             ]

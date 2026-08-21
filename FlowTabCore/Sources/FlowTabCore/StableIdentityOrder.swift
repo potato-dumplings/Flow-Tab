@@ -20,6 +20,17 @@ public enum StableIdentityOrder {
         var reconciled: [Element] = []
         reconciled.reserveCapacity(updatedElementsByIdentity.count)
         var emittedIdentities: Set<Identity> = []
+        let currentIdentities = Set(current.map(identity))
+        let leadingAdditions = updatedIdentities.prefix {
+            !currentIdentities.contains($0)
+        }
+        for elementIdentity in leadingAdditions {
+            if let updatedElement =
+                updatedElementsByIdentity[elementIdentity],
+               emittedIdentities.insert(elementIdentity).inserted {
+                reconciled.append(updatedElement)
+            }
+        }
         for element in current {
             let elementIdentity = identity(element)
             guard

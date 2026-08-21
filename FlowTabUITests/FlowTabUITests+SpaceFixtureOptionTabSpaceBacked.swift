@@ -143,12 +143,14 @@ extension FlowTabUITests {
                 timeout:
                     FlowTabUITestRuntimeTruthWatchdogPolicy
                         .switcherDiagnosticsAppSelectionProjectionApplication,
-                trigger: {
-                    postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                presentationTrigger: {
+                    self.postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
                         .global,
                         traceLabel:
                             "option.provisionalHidden"
                     )
+                },
+                trigger: {
                     try FlowTabUITestSwitcherCommandPayload.write(
                         targetApp.identity.bundleIdentifier
                     )

@@ -52,17 +52,37 @@ extension FlowTabUITests {
     }
 
     func testInAppWindowRequestRecordRequiresAtomicExactIdentity() {
+        let records = FlowTabUITestInAppWindowRequestRecord
+            .records(
+                in: [
+                    makeInAppWindowRequestLine(),
+                    makeInAppWindowRequestLine(
+                        windowNumber: 766,
+                        cgWindowNumber: 766,
+                        title: "Chrome Fullscreen Tab",
+                        source: "privateExactBridge"
+                    )
+                ].joined(separator: "\n")
+            )
+
         XCTAssertEqual(
-            FlowTabUITestInAppWindowRequestRecord.records(
-                in: makeInAppWindowRequestLine()
-            ),
+            records,
             [
                 FlowTabUITestInAppWindowRequestRecord(
                     appID: "com.example.fixture.chrome",
                     processIdentifier: 4_321,
                     windowID: "cg:4321:765",
                     windowNumber: 765,
-                    title: "Chrome Normal Tab"
+                    title: "Chrome Normal Tab",
+                    reusableWindowEvidence: .stickyBinding
+                ),
+                FlowTabUITestInAppWindowRequestRecord(
+                    appID: "com.example.fixture.chrome",
+                    processIdentifier: 4_321,
+                    windowID: "cg:4321:766",
+                    windowNumber: 766,
+                    title: "Chrome Fullscreen Tab",
+                    reusableWindowEvidence: .privateExactBridge
                 )
             ]
         )

@@ -84,6 +84,19 @@ extension FlowTabUITests {
                 traceLabel: traceLabel,
                 allowsNoisyCGSiblings: allowsNoisyCGSiblings
             )
+            let appProjection =
+                FlowTabUITestSwitcherAppProjectionReadback(
+                    diagnostics:
+                        switcherDiagnosticsSnapshot(
+                            diagnosticsSummary,
+                            keys: ["apps"]
+                        )
+                )
+            XCTAssertEqual(
+                appProjection.entries.first?.bundleIdentifier,
+                targetApp.identity.bundleIdentifier,
+                "The newly frontmost workflow app must lead the refreshed Switcher order."
+            )
             if allowsNoisyCGSiblings {
                 try runNoisyOptionTabWindowStateRoundTrip(
                     app: app,
@@ -449,13 +462,15 @@ extension FlowTabUITests {
             timeout:
                 FlowTabUITestRuntimeTruthWatchdogPolicy
                     .switcherDiagnosticsAppSelectionProjectionApplication,
-            trigger: {
-                postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+            presentationTrigger: {
+                self.postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
                     .global,
                     traceLabel:
                         globalTriggerTraceLabel
                             ?? traceLabel
                 )
+            },
+            trigger: {
                 try FlowTabUITestSwitcherCommandPayload.write(
                     workflowApp.identity.bundleIdentifier
                 )
