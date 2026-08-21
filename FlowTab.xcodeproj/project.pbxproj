@@ -3341,7 +3341,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0-alpha.03;
+				MARKETING_VERSION = 0.1.0-alpha.03;
 				PRODUCT_BUNDLE_IDENTIFIER = "io.github.potato-dumplings.flowtab";
 				PRODUCT_MODULE_NAME = FlowTab;
 				PRODUCT_NAME = "Flow Tab";
@@ -3373,7 +3373,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0-alpha.03;
+				MARKETING_VERSION = 0.1.0-alpha.03;
 				PRODUCT_BUNDLE_IDENTIFIER = "io.github.potato-dumplings.flowtab";
 				PRODUCT_MODULE_NAME = FlowTab;
 				PRODUCT_NAME = "Flow Tab";
@@ -3406,7 +3406,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0-alpha.03;
+				MARKETING_VERSION = 0.1.0-alpha.03;
 				OTHER_CODE_SIGN_FLAGS = "--timestamp";
 				PRODUCT_BUNDLE_IDENTIFIER = "io.github.potato-dumplings.flowtab";
 				PRODUCT_MODULE_NAME = FlowTab;
