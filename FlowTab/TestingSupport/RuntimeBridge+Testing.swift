@@ -73,6 +73,23 @@ struct FlowTabUITestRuntimeProjectionDataset {
         variant: String?
     ) -> [UITestAppDefinition] {
         switch variant {
+        case FlowTabUITestAppVisibilityIdentityFixture.variant:
+            return [
+                (
+                    appID: FlowTabUITestAppVisibilityIdentityFixture.configurableAppID,
+                    name: "Identity Editor",
+                    windows: [
+                        WindowCandidate(
+                            id: "identity-editor-main",
+                            title: "Identity Document",
+                            isMinimized: false,
+                            lastActiveAt: 400
+                        )
+                    ],
+                    rank: 0,
+                    bundleURL: nil
+                )
+            ]
         case "search-wrap":
             return (1...10).map { item in
                 let suffix = String(format: "%02d", item)

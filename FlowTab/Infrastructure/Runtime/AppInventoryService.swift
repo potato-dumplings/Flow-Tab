@@ -8,57 +8,76 @@ struct InstalledAppRecord: Identifiable, Equatable, Sendable {
     let bundleIdentifier: String?
     let path: String?
     let isRunning: Bool
+    let visibilityCapability: AppVisibilityCapability
+
+    init(
+        id: String,
+        displayName: String,
+        bundleIdentifier: String?,
+        path: String?,
+        isRunning: Bool,
+        visibilityCapability: AppVisibilityCapability = .configurable
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.bundleIdentifier = bundleIdentifier
+        self.path = path
+        self.isRunning = isRunning
+        self.visibilityCapability = visibilityCapability
+    }
 
     var subtitle: String {
         bundleIdentifier ?? path ?? id
     }
 
-    static func unresolvedHiddenApp(id: String) -> InstalledAppRecord {
-        InstalledAppRecord(
-            id: id,
-            displayName: unresolvedDisplayName(for: id),
-            bundleIdentifier: id.hasPrefix("/") || id.hasPrefix("pid:") ? nil : id,
-            path: id.hasPrefix("/") ? id : nil,
-            isRunning: false
-        )
-    }
-
-    private static func unresolvedDisplayName(for id: String) -> String {
-        guard id.hasPrefix("/") else { return id }
-        let filename = URL(fileURLWithPath: id).deletingPathExtension().lastPathComponent
-        return filename.isEmpty ? id : filename
-    }
 }
 
-final class AppInventoryService: @unchecked Sendable {
+protocol AppInventoryProviding: Sendable {
+    func installedApps() -> [InstalledAppRecord]
+}
+
+final class AppInventoryService: AppInventoryProviding, @unchecked Sendable {
     private let fileManager: FileManager
     private let workspace: NSWorkspace
+    private let searchDirectoriesOverride: [URL]?
 
     init(
         fileManager: FileManager = .default,
-        workspace: NSWorkspace = .shared
+        workspace: NSWorkspace = .shared,
+        searchDirectories: [URL]? = nil
     ) {
         self.fileManager = fileManager
         self.workspace = workspace
+        searchDirectoriesOverride = searchDirectories
     }
 
     func installedApps() -> [InstalledAppRecord] {
         var recordsByID: [String: InstalledAppRecord] = [:]
 
-#if FLOWTAB_TESTING
-        for record in uiTestRuntimeRecords() {
-            recordsByID[record.id] = record
-        }
-#endif
-
-        for record in runningAppRecords() {
-            recordsByID[record.id] = record
-        }
-
         for directory in applicationSearchDirectories() {
             for record in appRecords(in: directory) {
                 recordsByID[record.id] = mergedRecord(existing: recordsByID[record.id], incoming: record)
             }
+        }
+
+#if FLOWTAB_TESTING
+        for record in uiTestRuntimeRecords() {
+            recordsByID[record.id] = mergedRecord(existing: recordsByID[record.id], incoming: record)
+        }
+#endif
+
+        for app in workspace.runningApplications {
+            let appID = RuntimeAppIdentity.appID(for: app)
+            let bundleSource: ApplicationBundleSource = recordsByID[appID] == nil
+                ? .none
+                : .standardApplicationsDirectory
+            guard let record = runningAppRecord(for: app, bundleSource: bundleSource) else {
+                continue
+            }
+            recordsByID[record.id] = mergedRecord(
+                existing: recordsByID[record.id],
+                incoming: record
+            )
         }
 
         return recordsByID.values.sorted { lhs, rhs in
@@ -73,7 +92,7 @@ final class AppInventoryService: @unchecked Sendable {
 #if FLOWTAB_TESTING
     private func uiTestRuntimeRecords() -> [InstalledAppRecord] {
         guard let dataset = FlowTabUITestRuntimeProjectionDataset.current() else { return [] }
-        return dataset.appSwitcherApps.map { app in
+        var records = dataset.appSwitcherApps.map { app in
             InstalledAppRecord(
                 id: app.id,
                 displayName: app.displayName,
@@ -82,10 +101,27 @@ final class AppInventoryService: @unchecked Sendable {
                 isRunning: true
             )
         }
+        if FlowTabTestLaunchOptions.mockRuntimeVariant
+            == FlowTabUITestAppVisibilityIdentityFixture.variant {
+            records.append(
+                InstalledAppRecord(
+                    id: FlowTabUITestAppVisibilityIdentityFixture.systemManagedAppID,
+                    displayName: "Identity Menu Bar",
+                    bundleIdentifier: FlowTabUITestAppVisibilityIdentityFixture.systemManagedAppID,
+                    path: "/Applications/Identity Menu Bar.app",
+                    isRunning: true,
+                    visibilityCapability: .systemManaged(reason: .macOSRuntimeMode)
+                )
+            )
+        }
+        return records
     }
 #endif
 
     private func applicationSearchDirectories() -> [URL] {
+        if let searchDirectoriesOverride {
+            return uniqueDirectories(searchDirectoriesOverride)
+        }
         var directories = [
             URL(fileURLWithPath: "/Applications", isDirectory: true),
             URL(fileURLWithPath: "/System/Applications", isDirectory: true),
@@ -99,6 +135,10 @@ final class AppInventoryService: @unchecked Sendable {
             directories.append(userApplications)
         }
 
+        return uniqueDirectories(directories)
+    }
+
+    private func uniqueDirectories(_ directories: [URL]) -> [URL] {
         var seenPaths: Set<String> = []
         return directories.filter { directory in
             let path = directory.standardizedFileURL.path
@@ -127,23 +167,33 @@ final class AppInventoryService: @unchecked Sendable {
         return records
     }
 
-    private func runningAppRecords() -> [InstalledAppRecord] {
-        workspace.runningApplications.compactMap { app in
-            guard app.activationPolicy == .regular, !app.isTerminated else { return nil }
-            return runningAppRecord(for: app)
-        }
-    }
-
-    private func runningAppRecord(for app: NSRunningApplication) -> InstalledAppRecord? {
+    private func runningAppRecord(
+        for app: NSRunningApplication,
+        bundleSource: ApplicationBundleSource
+    ) -> InstalledAppRecord? {
         let appID = app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
         guard AppVisibilityFilter.normalizedAppID(appID) != nil else { return nil }
+        let bundle = app.bundleURL.flatMap(Bundle.init(url:))
+        let decision = ApplicationIdentityPolicy.decision(
+            for: ApplicationIdentityFacts(
+                isCurrentProcess:
+                    app.processIdentifier == ProcessInfo.processInfo.processIdentifier,
+                isTerminated: app.isTerminated,
+                runtimeActivationPolicy: app.activationPolicy.flowTabCorePolicy,
+                bundleSource: bundleSource,
+                isUIElement: bundleFlag("LSUIElement", bundle: bundle),
+                isBackgroundOnly: bundleFlag("LSBackgroundOnly", bundle: bundle)
+            )
+        )
+        guard let visibilityCapability = decision.visibilityCapability else { return nil }
         let displayName = app.localizedName ?? appID
         return InstalledAppRecord(
             id: appID,
             displayName: displayName,
             bundleIdentifier: app.bundleIdentifier,
             path: app.bundleURL?.standardizedFileURL.path,
-            isRunning: true
+            isRunning: true,
+            visibilityCapability: visibilityCapability
         )
     }
 
@@ -153,14 +203,40 @@ final class AppInventoryService: @unchecked Sendable {
         let bundleIdentifier = bundle?.bundleIdentifier
         let appID = bundleIdentifier ?? standardizedURL.path
         guard AppVisibilityFilter.normalizedAppID(appID) != nil else { return nil }
+        let decision = ApplicationIdentityPolicy.decision(
+            for: ApplicationIdentityFacts(
+                isCurrentProcess: false,
+                isTerminated: false,
+                runtimeActivationPolicy: nil,
+                bundleSource: .standardApplicationsDirectory,
+                isUIElement: bundleFlag("LSUIElement", bundle: bundle),
+                isBackgroundOnly: bundleFlag("LSBackgroundOnly", bundle: bundle)
+            )
+        )
+        guard let visibilityCapability = decision.visibilityCapability else { return nil }
 
         return InstalledAppRecord(
             id: appID,
             displayName: displayName(for: standardizedURL, bundle: bundle, appID: appID),
             bundleIdentifier: bundleIdentifier,
             path: standardizedURL.path,
-            isRunning: false
+            isRunning: false,
+            visibilityCapability: visibilityCapability
         )
+    }
+
+    private func bundleFlag(_ key: String, bundle: Bundle?) -> Bool {
+        let value = bundle?.infoDictionary?[key]
+        if let boolValue = value as? Bool {
+            return boolValue
+        }
+        if let numberValue = value as? NSNumber {
+            return numberValue.boolValue
+        }
+        if let stringValue = value as? String {
+            return NSString(string: stringValue).boolValue
+        }
+        return false
     }
 
     private func displayName(for url: URL, bundle: Bundle?, appID: String) -> String {
@@ -185,7 +261,8 @@ final class AppInventoryService: @unchecked Sendable {
             displayName: existing.displayName.isEmpty ? incoming.displayName : existing.displayName,
             bundleIdentifier: existing.bundleIdentifier ?? incoming.bundleIdentifier,
             path: existing.path ?? incoming.path,
-            isRunning: existing.isRunning || incoming.isRunning
+            isRunning: existing.isRunning || incoming.isRunning,
+            visibilityCapability: incoming.visibilityCapability
         )
     }
 }

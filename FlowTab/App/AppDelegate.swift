@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var workspaceLifecycleObservers: [NSObjectProtocol] = []
     private var appLaunchWindowEvidenceCoordinator:
         (any RuntimeAppLaunchWindowEvidenceCoordinating)?
+    private var appVisibilityReconciliationTask: Task<Void, Never>?
     private var requestedAccessibilityPermissionThisLaunch = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -71,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installLanguageObserver()
         appLaunchWindowEvidenceCoordinator = makeAppLaunchWindowEvidenceCoordinator()
         installWorkspaceLifecycleObserver()
+        startAppVisibilityReconciliation()
 
         installStatusItem()
 #if FLOWTAB_TESTING
@@ -170,6 +172,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         appLaunchWindowEvidenceCoordinator?.stop()
         appLaunchWindowEvidenceCoordinator = nil
+        appVisibilityReconciliationTask?.cancel()
+        appVisibilityReconciliationTask = nil
         hotkeyMonitor?.stop()
         inAppWindowHotkeyMonitor?.stop()
 #if FLOWTAB_TESTING
@@ -553,6 +557,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
                 return
             }
+            guard let appDirectoryEntry = RuntimeAppDirectoryFactSource.runningApplicationEntry(
+                for: app
+            ) else {
+                return
+            }
             let appID = RuntimeAppIdentity.appID(for: app)
             self.appLaunchWindowEvidenceCoordinator?.prepareObservation(
                 appID: appID,
@@ -561,10 +570,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.resolvedRuntimeProjectionService.signalAppLaunched(
                 appID: appID,
                 pid: app.processIdentifier,
-                appDirectoryEntry:
-                    RuntimeAppDirectoryFactSource.runningApplicationEntry(
-                        for: app
-                    )
+                appDirectoryEntry: appDirectoryEntry
             )
         }
         let didActivateObserver = resolvedWorkspaceNotificationCenter.addObserver(
@@ -602,6 +608,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             didActivateObserver,
             didTerminateObserver,
         ]
+    }
+
+    private func startAppVisibilityReconciliation() {
+        appVisibilityReconciliationTask?.cancel()
+
+        let recordsProvider: @Sendable () -> [InstalledAppRecord]
+#if FLOWTAB_TESTING
+        if let testRecordsProvider = Self.testHooks.appVisibilityRecordsProvider {
+            recordsProvider = testRecordsProvider
+        } else {
+            guard !FlowTabTestLaunchOptions.isRunningUnitTests else { return }
+            let inventoryService = AppInventoryService()
+            recordsProvider = { inventoryService.installedApps() }
+        }
+#else
+        let inventoryService = AppInventoryService()
+        recordsProvider = { inventoryService.installedApps() }
+#endif
+
+        let userDefaults = resolvedUserDefaults
+        appVisibilityReconciliationTask = Task { [weak self] in
+            let records = await Task.detached(priority: .utility) {
+                recordsProvider()
+            }.value
+            guard
+                !Task.isCancelled,
+                let self,
+                Self.shared === self
+            else { return }
+
+            let configurableAppIDs = Set(
+                records
+                    .filter { $0.visibilityCapability.isConfigurable }
+                    .map(\.id)
+            )
+            let result = AppVisibilityPreferencesStore.reconcileHiddenAppIDs(
+                configurableAppIDs: configurableAppIDs,
+                userDefaults: userDefaults
+            )
+            appVisibilityReconciliationTask = nil
+            if result.didChange {
+                NotificationCenter.default.post(
+                    name: .flowTabAppVisibilityPreferenceChanged,
+                    object: nil
+                )
+            }
+        }
     }
 
     func makeDefaultAppLaunchWindowEvidenceCoordinator()

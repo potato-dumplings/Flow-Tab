@@ -21,6 +21,9 @@ final class FlowTabUITests: XCTestCase {
         static let homeAppCount = "flowtab.home.app.count"
         static let homeAppMockBrowser = "flowtab.home.app.\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
         static let homeAppMockMail = "flowtab.home.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
+        static let homeAppIdentityEditor = "flowtab.home.app.\("com.flowtab.mock.identity-editor".flowTabUITestAccessibilityIdentifierComponent)"
+        static let homeAppIdentityMenuBar = "flowtab.home.app.\("com.flowtab.mock.identity-menu-bar".flowTabUITestAccessibilityIdentifierComponent)"
+        static let homeAppIdentityHelper = "flowtab.home.app.\("com.flowtab.mock.identity-helper".flowTabUITestAccessibilityIdentifierComponent)"
         static let homeAppWeChat = "flowtab.home.app.\("com.tencent.xinWeChat".flowTabUITestAccessibilityIdentifierComponent)"
         static let homeAppNestedWeChatAppEx =
             "flowtab.home.app.\("com.tencent.flue.WeChatAppEx".flowTabUITestAccessibilityIdentifierComponent)"
@@ -87,10 +90,17 @@ final class FlowTabUITests: XCTestCase {
         static let settingsAppVisibilityDetailProjectionPrefix =
             "flowtab.settings.app-visibility.detail."
         static let settingsAppVisibilityShowToggle = "flowtab.settings.app-visibility.show-toggle"
+        static let settingsAppVisibilityUnavailableReason =
+            "flowtab.settings.app-visibility.unavailable-reason"
+        static let settingsAppVisibilitySystemManagedBadge =
+            "flowtab.settings.app-visibility.system-managed-badge"
         static let settingsAppVisibilityCurrentApp =
             "flowtab.settings.app-visibility.app.\(FlowTabUITestAppIdentity.configured().bundleIdentifier.flowTabUITestAccessibilityIdentifierComponent)"
         static let settingsAppVisibilityMockMail = "flowtab.settings.app-visibility.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
         static let settingsAppVisibilityChineseTest = "flowtab.settings.app-visibility.app.\("com.xxx.test".flowTabUITestAccessibilityIdentifierComponent)"
+        static let settingsAppVisibilityIdentityEditor = "flowtab.settings.app-visibility.app.\("com.flowtab.mock.identity-editor".flowTabUITestAccessibilityIdentifierComponent)"
+        static let settingsAppVisibilityIdentityMenuBar = "flowtab.settings.app-visibility.app.\("com.flowtab.mock.identity-menu-bar".flowTabUITestAccessibilityIdentifierComponent)"
+        static let settingsAppVisibilityIdentityHelper = "flowtab.settings.app-visibility.app.\("com.flowtab.mock.identity-helper".flowTabUITestAccessibilityIdentifierComponent)"
         static let settingsPermissionAccessibilityAction = "flowtab.settings.permission.accessibility-action"
         static let settingsPermissionScreenCaptureAction = "flowtab.settings.permission.screen-capture-action"
         static let settingsPermissionLaunchAtLogin = "flowtab.settings.permission.launch-at-login"
@@ -121,6 +131,8 @@ final class FlowTabUITests: XCTestCase {
             "\(switcherAppPrefix)\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherAppMockMail =
             "\(switcherAppPrefix)\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
+        static let switcherAppIdentityEditor =
+            "\(switcherAppPrefix)\("com.flowtab.mock.identity-editor".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherAppMockManyWindows = "flowtab.switcher.app.\("com.flowtab.mock.many-windows".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherAppMockMinimizedNotes = "flowtab.switcher.app.\("com.flowtab.mock.minimized-notes".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherAppWeChat = "flowtab.switcher.app.\("com.tencent.xinWeChat".flowTabUITestAccessibilityIdentifierComponent)"

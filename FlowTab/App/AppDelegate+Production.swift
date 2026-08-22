@@ -25,13 +25,15 @@ extension AppDelegate {
     }
 
     func signalWorkspaceAppActivated(_ app: NSRunningApplication) {
+        guard let appDirectoryEntry = RuntimeAppDirectoryFactSource.runningApplicationEntry(
+            for: app
+        ) else {
+            return
+        }
         resolvedRuntimeProjectionService.signalAppActivated(
             appID: RuntimeAppIdentity.appID(for: app),
             pid: app.processIdentifier,
-            appDirectoryEntry:
-                RuntimeAppDirectoryFactSource.runningApplicationEntry(
-                    for: app
-                )
+            appDirectoryEntry: appDirectoryEntry
         )
     }
 

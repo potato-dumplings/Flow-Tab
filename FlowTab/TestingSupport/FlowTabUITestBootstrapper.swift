@@ -94,6 +94,18 @@ enum FlowTabUITestBootstrapper {
             FlowPresentationState.shared.refreshFromStoredPreferences()
         }
 
+        if FlowTabTestLaunchOptions.mockRuntimeVariant
+            == FlowTabUITestAppVisibilityIdentityFixture.variant {
+            userDefaults.set(true, forKey: AppPreferenceKeys.showInCommandTab)
+            userDefaults.set(
+                [
+                    FlowTabUITestAppVisibilityIdentityFixture.systemManagedAppID,
+                    FlowTabUITestAppVisibilityIdentityFixture.auxiliaryProcessID
+                ],
+                forKey: AppPreferenceKeys.hiddenAppIDs
+            )
+        }
+
         if FlowTabTestLaunchOptions.enablesMockHotkeyEffects {
             FlowTabUITestMockRuntimeEffects.reset()
         }

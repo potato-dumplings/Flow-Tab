@@ -3,37 +3,46 @@ import XCTest
 @testable import FlowTab
 
 extension FlowTabPriorityCoverageTests {
-    func testRuntimeProjectionServiceRejectsAccessoryAppActivationFromAppSwitcher() {
+    func testRuntimeAppDirectoryDoesNotReadmitHiddenAccessoryProcess() {
+        let regularApp = PermissionBoundaryRunningApplication(
+            pid: 40_801,
+            bundleIdentifier: "com.example.editor",
+            localizedName: "Editor"
+        )
+        let hiddenAccessoryProcess = PermissionBoundaryRunningApplication(
+            pid: 40_802,
+            bundleIdentifier: "com.example.editor.helper",
+            localizedName: "Editor Helper",
+            activationPolicy: .accessory
+        )
+
+        let facts = RuntimeAppDirectoryFactSource.maintenanceFacts(
+            from: [regularApp, hiddenAccessoryProcess],
+            currentPID: 40_899,
+            includeCurrentProcessInAppLayer: false,
+            rankProvider: { _ in [:] }
+        )
+
+        XCTAssertEqual(facts.entries.map(\.appID), ["com.example.editor"])
+        XCTAssertEqual(
+            facts.windowRepairApplications.map(\.processIdentifier),
+            [regularApp.processIdentifier]
+        )
+    }
+
+    func testRuntimeDirectoryRejectsAccessoryAppActivationEntry() {
         let accessoryApp = PermissionBoundaryRunningApplication(
             pid: 40_901,
             bundleIdentifier: "com.example.menu-bar-helper",
             localizedName: "Menu Bar Helper",
             activationPolicy: .accessory
         )
-        let entry = RuntimeAppDirectoryFactSource.runningApplicationEntry(
-            for: accessoryApp
+        XCTAssertNil(
+            RuntimeAppDirectoryFactSource.runningApplicationEntry(
+                for: accessoryApp,
+                currentPID: 40_999
+            )
         )
-        let readModelStore = RuntimeReadModelStore()
-        let service = RuntimeProjectionService(
-            label: "FlowTabTests.RuntimeProjectionService.AccessoryAppActivation",
-            repairProvider: RuntimeProjectionRepairProvider(
-                reconciliationCoordinator: RuntimeReconciliationCoordinator()
-            ),
-            readModelStore: readModelStore,
-            axWindowRepairAvailability: { false }
-        )
-
-        XCTAssertFalse(entry.isEligibleForAppSwitcherProjection)
-
-        service.signalAppActivated(
-            appID: entry.appID,
-            pid: entry.pid,
-            appDirectoryEntry: entry
-        )
-
-        XCTAssertNil(readModelStore.readAppDirectoryProjection())
-        XCTAssertNil(readModelStore.readFocusedCurrentAppWindowProjection())
-        XCTAssertNil(readModelStore.readAppSwitcherProjection())
     }
 
     func testFocusedRepairDirectoryEvidenceDoesNotProjectAccessoryApp() throws {
@@ -44,28 +53,10 @@ extension FlowTabPriorityCoverageTests {
             activationPolicy: .accessory
         )
         let entries = RuntimeAppDirectoryFactSource.entries(
-            from: [accessoryApp]
+            from: [accessoryApp],
+            currentPID: 40_999
         )
-        let readModelStore = RuntimeReadModelStore()
-        readModelStore.commitCurrentAppRepairAppDirectoryEvidence(
-            entries,
-            generatedAt: 10
-        )
-
-        let storedEntry = try XCTUnwrap(
-            readModelStore.readAppDirectoryProjection()?.entries.first
-        )
-        XCTAssertFalse(storedEntry.isEligibleForAppSwitcherProjection)
-
-        let payload = try XCTUnwrap(
-            RuntimeMainTableProjectionBuilder(
-                windowRecordStore: RuntimeWindowRecordStore()
-            ).appSwitcherProjectionPayloadFromMainTables(
-                appDirectoryEntries: [storedEntry],
-                generatedAt: 11
-            )
-        )
-        XCTAssertTrue(payload.apps.isEmpty)
+        XCTAssertTrue(entries.isEmpty)
     }
 
     func testRuntimeAppDirectorySeparatesMembershipFromWindowRepairEligibility() {
@@ -78,12 +69,6 @@ extension FlowTabPriorityCoverageTests {
             pid: 41_002,
             bundleIdentifier: "com.example.flowtab",
             localizedName: "FlowTab",
-            activationPolicy: .accessory
-        )
-        let trackedAccessoryApp = PermissionBoundaryRunningApplication(
-            pid: 41_003,
-            bundleIdentifier: "com.example.tracked",
-            localizedName: "Tracked",
             activationPolicy: .accessory
         )
         let unrelatedAccessoryApp = PermissionBoundaryRunningApplication(
@@ -103,21 +88,23 @@ extension FlowTabPriorityCoverageTests {
             from: [
                 regularApp,
                 currentAccessoryApp,
-                trackedAccessoryApp,
                 unrelatedAccessoryApp,
                 terminatedApp
             ],
             currentPID: currentAccessoryApp.processIdentifier,
             includeCurrentProcessInAppLayer: false,
-            explicitlyTrackedAppIDs: [trackedAccessoryApp.bundleIdentifier!],
             rankProvider: { apps in
-                Dictionary(uniqueKeysWithValues: apps.enumerated().map { ($0.element.processIdentifier, $0.offset) })
+                Dictionary(
+                    uniqueKeysWithValues: apps.enumerated().map {
+                        ($0.element.processIdentifier, $0.offset)
+                    }
+                )
             }
         )
 
         XCTAssertEqual(
             facts.entries.map(\.appID),
-            ["com.example.editor", "com.example.flowtab", "com.example.tracked"]
+            ["com.example.editor", "com.example.flowtab"]
         )
         XCTAssertEqual(
             facts.windowRepairApplications.map(\.processIdentifier),
@@ -129,8 +116,7 @@ extension FlowTabPriorityCoverageTests {
             }),
             [
                 "com.example.editor": true,
-                "com.example.flowtab": false,
-                "com.example.tracked": false
+                "com.example.flowtab": false
             ]
         )
     }

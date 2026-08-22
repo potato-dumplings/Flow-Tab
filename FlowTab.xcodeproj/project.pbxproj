@@ -452,6 +452,7 @@
 		B10011012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */; };
 		B10011022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift */; };
 		B10011032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift */; };
+		E5A1B00136A2000100B0D737 /* FlowTabTests+ApplicationIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5A1A00136A2000100B0D737 /* FlowTabTests+ApplicationIdentity.swift */; };
 		FA14000231A1000100C0D001 /* FlowTabTests+AppLanguageDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA14000131A1000100C0D001 /* FlowTabTests+AppLanguageDefaults.swift */; };
 		9D6F70B3709646D09744E552 /* FlowTabTests+SystemThemeReadback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 125C23FC5F5849C4B80EC194 /* FlowTabTests+SystemThemeReadback.swift */; };
 		90C598A2EC4741759017CFF8 /* SettingsPresentationObservationTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F579AC8FD7949238E13861B /* SettingsPresentationObservationTestSupport.swift */; };
@@ -475,6 +476,7 @@
 		B10011412F76000100B0D737 /* FlowTabPriorityCoverageTests+AppWindowCoordinatorOpen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001412F76000100B0D737 /* FlowTabPriorityCoverageTests+AppWindowCoordinatorOpen.swift */; };
 		B10011082F76000100B0D737 /* FlowTabPriorityCoverageTests+HotkeyMonitorAndRuntimeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001082F76000100B0D737 /* FlowTabPriorityCoverageTests+HotkeyMonitorAndRuntimeState.swift */; };
 		B10011092F76000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001092F76000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLifecycle.swift */; };
+		E5A1B00236A2000100B0D737 /* FlowTabPriorityCoverageTests+AppVisibilityReconciliation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5A1A00236A2000100B0D737 /* FlowTabPriorityCoverageTests+AppVisibilityReconciliation.swift */; };
 		E2D100023D10000100B0D737 /* FlowTabPriorityCoverageTests+AppLaunchEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D100013D10000100B0D737 /* FlowTabPriorityCoverageTests+AppLaunchEvidence.swift */; };
 		E3D100043D11000100B0D737 /* FlowTabPriorityCoverageTests+TransientRepairObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3D100033D11000100B0D737 /* FlowTabPriorityCoverageTests+TransientRepairObservation.swift */; };
 		E4D100043D12000100B0D737 /* FlowTabPriorityCoverageTests+AXWindowChangeDelivery.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4D100033D12000100B0D737 /* FlowTabPriorityCoverageTests+AXWindowChangeDelivery.swift */; };
@@ -601,6 +603,7 @@
 		C100000C2F75000100B0D737 /* SearchSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001C2F75000100B0D737 /* SearchSettingsCard.swift */; };
 		A9V110032F91000100B0D737 /* AppVisibilityManagerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9V100032F91000100B0D737 /* AppVisibilityManagerModel.swift */; };
 		A9V110042F91000100B0D737 /* AppVisibilityManagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9V100042F91000100B0D737 /* AppVisibilityManagerView.swift */; };
+		D4A6B00136A1000100B0D737 /* AppVisibilityManagerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A6A00136A1000100B0D737 /* AppVisibilityManagerDetailView.swift */; };
 		A9V110052F91000100B0D737 /* AppVisibilitySettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9V100052F91000100B0D737 /* AppVisibilitySettingsCard.swift */; };
 		C100000D2F75000100B0D737 /* PermissionSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001D2F75000100B0D737 /* PermissionSettingsCard.swift */; };
 		C100000E2F75000100B0D737 /* AppLogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001E2F75000100B0D737 /* AppLogsView.swift */; };
@@ -871,6 +874,7 @@
 		B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+CoreConfiguration.swift"; sourceTree = "<group>"; };
 		B10001022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimeInteraction.swift"; sourceTree = "<group>"; };
 		B10001032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+PreferencesAndDiagnostics.swift"; sourceTree = "<group>"; };
+		E5A1A00136A2000100B0D737 /* FlowTabTests+ApplicationIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+ApplicationIdentity.swift"; sourceTree = "<group>"; };
 		FA14000131A1000100C0D001 /* FlowTabTests+AppLanguageDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+AppLanguageDefaults.swift"; sourceTree = "<group>"; };
 		125C23FC5F5849C4B80EC194 /* FlowTabTests+SystemThemeReadback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SystemThemeReadback.swift"; sourceTree = "<group>"; };
 		6F579AC8FD7949238E13861B /* SettingsPresentationObservationTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPresentationObservationTestSupport.swift; sourceTree = "<group>"; };
@@ -894,6 +898,7 @@
 		B10001412F76000100B0D737 /* FlowTabPriorityCoverageTests+AppWindowCoordinatorOpen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+AppWindowCoordinatorOpen.swift"; sourceTree = "<group>"; };
 		B10001082F76000100B0D737 /* FlowTabPriorityCoverageTests+HotkeyMonitorAndRuntimeState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+HotkeyMonitorAndRuntimeState.swift"; sourceTree = "<group>"; };
 		B10001092F76000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+AppDelegateLifecycle.swift"; sourceTree = "<group>"; };
+		E5A1A00236A2000100B0D737 /* FlowTabPriorityCoverageTests+AppVisibilityReconciliation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+AppVisibilityReconciliation.swift"; sourceTree = "<group>"; };
 		E2D100013D10000100B0D737 /* FlowTabPriorityCoverageTests+AppLaunchEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+AppLaunchEvidence.swift"; sourceTree = "<group>"; };
 		E3D100033D11000100B0D737 /* FlowTabPriorityCoverageTests+TransientRepairObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+TransientRepairObservation.swift"; sourceTree = "<group>"; };
 		E4D100033D12000100B0D737 /* FlowTabPriorityCoverageTests+AXWindowChangeDelivery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+AXWindowChangeDelivery.swift"; sourceTree = "<group>"; };
@@ -1040,6 +1045,7 @@
 		C100001C2F75000100B0D737 /* SearchSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchSettingsCard.swift; sourceTree = "<group>"; };
 		A9V100032F91000100B0D737 /* AppVisibilityManagerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVisibilityManagerModel.swift; sourceTree = "<group>"; };
 		A9V100042F91000100B0D737 /* AppVisibilityManagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVisibilityManagerView.swift; sourceTree = "<group>"; };
+		D4A6A00136A1000100B0D737 /* AppVisibilityManagerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVisibilityManagerDetailView.swift; sourceTree = "<group>"; };
 		A9V100052F91000100B0D737 /* AppVisibilitySettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVisibilitySettingsCard.swift; sourceTree = "<group>"; };
 		C100001D2F75000100B0D737 /* PermissionSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionSettingsCard.swift; sourceTree = "<group>"; };
 		C100001E2F75000100B0D737 /* AppLogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLogsView.swift; sourceTree = "<group>"; };
@@ -1460,6 +1466,7 @@
 				B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */,
 				B10001022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift */,
 				B10001032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift */,
+				E5A1A00136A2000100B0D737 /* FlowTabTests+ApplicationIdentity.swift */,
 				FA14000131A1000100C0D001 /* FlowTabTests+AppLanguageDefaults.swift */,
 				125C23FC5F5849C4B80EC194 /* FlowTabTests+SystemThemeReadback.swift */,
 				6F579AC8FD7949238E13861B /* SettingsPresentationObservationTestSupport.swift */,
@@ -1517,6 +1524,7 @@
 				B10001082F76000100B0D737 /* FlowTabPriorityCoverageTests+HotkeyMonitorAndRuntimeState.swift */,
 				A4D100013B20000100B0D737 /* FlowTabPriorityCoverageTests+SystemAppMRU.swift */,
 				B10001092F76000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLifecycle.swift */,
+				E5A1A00236A2000100B0D737 /* FlowTabPriorityCoverageTests+AppVisibilityReconciliation.swift */,
 				FFFD00013D3C000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateWorkspaceLifecycle.swift */,
 				A0361F053E01000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeProjectionMaintenanceOwner.swift */,
 				FFFE00013D3D000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateHotkeyReload.swift */,
@@ -2158,6 +2166,7 @@
 				C100001C2F75000100B0D737 /* SearchSettingsCard.swift */,
 				A9V100032F91000100B0D737 /* AppVisibilityManagerModel.swift */,
 				A9V100042F91000100B0D737 /* AppVisibilityManagerView.swift */,
+				D4A6A00136A1000100B0D737 /* AppVisibilityManagerDetailView.swift */,
 				A9V100052F91000100B0D737 /* AppVisibilitySettingsCard.swift */,
 				C100001D2F75000100B0D737 /* PermissionSettingsCard.swift */,
 				C10000152F75000100B0D737 /* HotkeySettingsCard.swift */,
@@ -2433,6 +2442,7 @@
 				C100000C2F75000100B0D737 /* SearchSettingsCard.swift in Sources */,
 				A9V110032F91000100B0D737 /* AppVisibilityManagerModel.swift in Sources */,
 				A9V110042F91000100B0D737 /* AppVisibilityManagerView.swift in Sources */,
+				D4A6B00136A1000100B0D737 /* AppVisibilityManagerDetailView.swift in Sources */,
 				A9V110052F91000100B0D737 /* AppVisibilitySettingsCard.swift in Sources */,
 				C100000B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift in Sources */,
 				C100000A2F75000100B0D737 /* AppearanceSettingsCard.swift in Sources */,
@@ -2658,6 +2668,7 @@
 				B10011012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift in Sources */,
 				B10011022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift in Sources */,
 				B10011032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift in Sources */,
+				E5A1B00136A2000100B0D737 /* FlowTabTests+ApplicationIdentity.swift in Sources */,
 				FA14000231A1000100C0D001 /* FlowTabTests+AppLanguageDefaults.swift in Sources */,
 				9D6F70B3709646D09744E552 /* FlowTabTests+SystemThemeReadback.swift in Sources */,
 				90C598A2EC4741759017CFF8 /* SettingsPresentationObservationTestSupport.swift in Sources */,
@@ -2715,6 +2726,7 @@
 				B10011082F76000100B0D737 /* FlowTabPriorityCoverageTests+HotkeyMonitorAndRuntimeState.swift in Sources */,
 				A4D100023B20000100B0D737 /* FlowTabPriorityCoverageTests+SystemAppMRU.swift in Sources */,
 				B10011092F76000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLifecycle.swift in Sources */,
+				E5A1B00236A2000100B0D737 /* FlowTabPriorityCoverageTests+AppVisibilityReconciliation.swift in Sources */,
 				E2D100023D10000100B0D737 /* FlowTabPriorityCoverageTests+AppLaunchEvidence.swift in Sources */,
 				E3D100043D11000100B0D737 /* FlowTabPriorityCoverageTests+TransientRepairObservation.swift in Sources */,
 				E4D100043D12000100B0D737 /* FlowTabPriorityCoverageTests+AXWindowChangeDelivery.swift in Sources */,

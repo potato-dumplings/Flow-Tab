@@ -187,8 +187,7 @@ struct RuntimeProjectionRepairFactSource {
 
     func collectFullRepairRunningAppFacts() -> RuntimeFullRepairRunningAppFacts {
         let maintenanceFacts = RuntimeAppDirectoryFactSource.currentMaintenanceFacts(
-            includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab(),
-            explicitlyTrackedAppIDs: AppVisibilityPreferencesStore.loadHiddenAppIDs()
+            includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab()
         )
         return RuntimeFullRepairRunningAppFacts(
             runningApps: maintenanceFacts.windowRepairApplications,

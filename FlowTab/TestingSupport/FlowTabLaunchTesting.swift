@@ -1,6 +1,13 @@
 #if FLOWTAB_TESTING
 import Foundation
 
+enum FlowTabUITestAppVisibilityIdentityFixture {
+    static let variant = "app-visibility-identity"
+    static let configurableAppID = "com.flowtab.mock.identity-editor"
+    static let systemManagedAppID = "com.flowtab.mock.identity-menu-bar"
+    static let auxiliaryProcessID = "com.flowtab.mock.identity-helper"
+}
+
 enum FlowTabTestLaunchOptions {
     static let uiTestingEnvironmentKey = "FLOWTAB_UI_TESTING"
     static let uiTestingEnvironmentValue = "1"

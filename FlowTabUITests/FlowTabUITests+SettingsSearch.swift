@@ -189,7 +189,11 @@ extension FlowTabUITests {
         )
         setToggle(searchEnabledToggle, to: true)
 
-        selectOption(in: firstLaunchApp, controlIdentifier: Identifier.settingsSearchDefaultScope, optionIdentifier: "window")
+        selectOption(
+            in: firstLaunchApp,
+            controlIdentifier: Identifier.settingsSearchDefaultScope,
+            optionIdentifier: "window"
+        )
         assertValue(of: element(in: firstLaunchApp, identifier: Identifier.settingsSearchDefaultScope), equals: "window")
         firstLaunchApp.terminate()
 
@@ -558,6 +562,117 @@ extension FlowTabUITests {
         )
     }
 
+    func testAppVisibilityIdentityCatalogExcludesAuxiliaryAndDisablesSystemManagedVisibility() throws {
+        let app = makeApp(
+            additionalArguments:
+                appVisibilityRuntimeArguments(
+                    resetDefaults: true,
+                    mockRuntimeVariant: "app-visibility-identity"
+                )
+                + ["--flowtab-ui-listen-switcher-trigger"]
+                + FlowTabUITestSearchInputReadinessPolicy.applicationEvidenceLaunchArguments
+        )
+        launchFlowTabUITestApplication(app)
+        assertHomeAndLogsApplicationIsForegroundReady(app)
+        guard assertHomeAndLogsOverviewChromeAfterNavigation(
+            in: app,
+            targetDescription: "application identity Home projection"
+        ) else {
+            return
+        }
+
+        assertValue(of: element(in: app, identifier: Identifier.homeStatsTotalApps), equals: "1")
+        assertValue(of: element(in: app, identifier: Identifier.homeStatsVisibleApps), equals: "1")
+        assertValue(of: element(in: app, identifier: Identifier.homeStatsHiddenApps), equals: "0")
+        assertValue(of: element(in: app, identifier: Identifier.homeStatsTotalWindows), equals: "1")
+        XCTAssertTrue(element(in: app, identifier: Identifier.homeAppIdentityEditor).exists)
+        XCTAssertFalse(element(in: app, identifier: Identifier.homeAppIdentityMenuBar).exists)
+        XCTAssertFalse(element(in: app, identifier: Identifier.homeAppIdentityHelper).exists)
+
+        openSettingsTab(in: app)
+        guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
+            in: app,
+            targetDescription: "application identity inventory"
+        ) else {
+            return
+        }
+        guard assertSettingsAppVisibilityQueryProjection(
+            "Identity Menu Bar",
+            targetRowIdentifier: Identifier.settingsAppVisibilityIdentityMenuBar,
+            in: app,
+            targetDescription: "system-managed application query"
+        ) else {
+            return
+        }
+
+        let systemManagedRow = element(
+            in: app,
+            identifier: Identifier.settingsAppVisibilityIdentityMenuBar
+        )
+        tapElement(systemManagedRow)
+        let reason = element(
+            in: app,
+            identifier: Identifier.settingsAppVisibilityUnavailableReason
+        )
+        XCTAssertTrue(reason.waitForExistence(timeout: 6))
+        let systemManagedToggle = element(
+            in: app,
+            identifier: Identifier.settingsAppVisibilityShowToggle
+        )
+        XCTAssertTrue(systemManagedToggle.exists)
+        XCTAssertFalse(systemManagedToggle.isEnabled)
+        XCTAssertTrue(
+            element(
+                in: app,
+                identifier: Identifier.settingsAppVisibilitySystemManagedBadge
+            ).exists
+        )
+        XCTAssertFalse(
+            element(in: app, identifier: Identifier.settingsAppVisibilityIdentityHelper).exists
+        )
+
+        replaceText(
+            in: element(in: app, identifier: Identifier.settingsAppVisibilitySearch),
+            with: "",
+            app: app
+        )
+        guard assertSettingsAppVisibilityQueryProjection(
+            "Identity Editor",
+            targetRowIdentifier: Identifier.settingsAppVisibilityIdentityEditor,
+            in: app,
+            targetDescription: "configurable application query"
+        ) else {
+            return
+        }
+        guard let configurableToggle = settingsAppVisibilityShowToggleAfterSelecting(
+            rowIdentifier: Identifier.settingsAppVisibilityIdentityEditor,
+            in: app,
+            targetDescription: "configurable application detail"
+        ) else {
+            return
+        }
+        XCTAssertTrue(configurableToggle.isEnabled)
+        XCTAssertTrue(toggleIsOn(configurableToggle))
+
+        XCTAssertTrue(
+            performAndWaitForVisibleSwitcherAppProjection(
+                in: app,
+                requiredBundleIdentifiers: ["com.flowtab.mock.identity-editor"],
+                excludedBundleIdentifiers: [
+                    "com.flowtab.mock.identity-menu-bar",
+                    "com.flowtab.mock.identity-helper"
+                ],
+                targetDescription: "application identity Switcher projection",
+                trigger: {
+                    postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                        .global,
+                        traceLabel: "application-identity-switcher"
+                    )
+                }
+            )
+        )
+    }
+
     func testSettingsCurrentAppActivationPolicyAppearsAsHiddenApp() throws {
         let app = makeApp(
             additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)
@@ -598,7 +713,7 @@ extension FlowTabUITests {
         XCTAssertFalse(toggleIsOn(showToggle))
     }
 
-    func testSettingsAppVisibilityHiddenFilterShowsStoredHiddenAppMissingFromInventory() throws {
+    func testSettingsAppVisibilityHiddenFilterRemovesStoredHiddenAppMissingFromInventory() throws {
         let firstLaunchApp = makeApp(
             additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)
         )
@@ -647,24 +762,26 @@ extension FlowTabUITests {
             return
         }
 
-        guard assertSettingsAppVisibilityHiddenFilterProjection(
-            targetRowIdentifier: Identifier.settingsAppVisibilityMockMail,
+        let hiddenFilter = element(
             in: staleInventoryApp,
-            targetDescription: "stale hidden-App filter projection"
-        ) else {
-            return
-        }
-
-        guard let staleShowToggle =
-            settingsAppVisibilityShowToggleAfterSelecting(
-                rowIdentifier: Identifier.settingsAppVisibilityMockMail,
-                in: staleInventoryApp,
-                targetDescription: "stale hidden-App detail"
+            identifier: Identifier.settingsAppVisibilityFilterHidden
+        )
+        let hiddenProjection = staleInventoryApp.descendants(matching: .any)
+            .matching(
+                NSPredicate(
+                    format: "identifier BEGINSWITH %@",
+                    Identifier.settingsAppVisibilityHiddenFilterProjectionPrefix
+                )
             )
-        else {
-            return
-        }
-        XCTAssertFalse(toggleIsOn(staleShowToggle))
+            .firstMatch
+        tapElement(hiddenFilter)
+        XCTAssertTrue(hiddenProjection.waitForExistence(timeout: 6))
+        XCTAssertFalse(
+            element(
+                in: staleInventoryApp,
+                identifier: Identifier.settingsAppVisibilityMockMail
+            ).exists
+        )
     }
 
     private func launchMockSwitcherSearchFromUserPath() -> XCUIApplication {

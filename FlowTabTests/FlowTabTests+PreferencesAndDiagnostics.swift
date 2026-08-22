@@ -127,7 +127,10 @@ extension FlowTabTests {
         view.layoutSubtreeIfNeeded()
 
         let localizedText = localizedTextValues(in: view)
-        XCTAssertTrue(localizedText.contains("Display, hotkeys, and permissions"), localizedText.sorted().joined(separator: "\n"))
+        XCTAssertTrue(
+            localizedText.contains("Display, hotkeys, and permissions"),
+            localizedText.sorted().joined(separator: "\n")
+        )
         XCTAssertTrue(localizedText.contains("Appearance"), localizedText.sorted().joined(separator: "\n"))
         XCTAssertTrue(localizedText.contains("Theme mode"), localizedText.sorted().joined(separator: "\n"))
         XCTAssertTrue(localizedText.contains("System"), localizedText.sorted().joined(separator: "\n"))
@@ -889,30 +892,6 @@ extension FlowTabTests {
             userDefaults: userDefaults
         )
         XCTAssertTrue(customPreferences.autoRestoreMinimizedWindowOnSwitch)
-    }
-
-    @MainActor
-    func testCurrentAppActivationPolicyProjectsIntoHiddenAppIDs() {
-        guard let userDefaults = makeIsolatedUserDefaults() else { return }
-        defer { clearIsolatedUserDefaults(userDefaults) }
-
-        let currentAppID = Bundle.main.bundleIdentifier ?? "pid:\(ProcessInfo.processInfo.processIdentifier)"
-
-        userDefaults.set(false, forKey: AppPreferenceKeys.showInCommandTab)
-        let hiddenModel = AppVisibilityManagerModel(userDefaults: userDefaults)
-
-        XCTAssertTrue(hiddenModel.hiddenAppIDs.contains(currentAppID))
-        XCTAssertEqual(hiddenModel.hiddenCount, 1)
-
-        hiddenModel.setHidden(false, for: currentAppID)
-        XCTAssertTrue(AppVisibilityPreferencesStore.loadShowInCommandTab(userDefaults: userDefaults))
-        XCTAssertFalse(hiddenModel.hiddenAppIDs.contains(currentAppID))
-        XCTAssertEqual(hiddenModel.hiddenCount, 0)
-
-        hiddenModel.setHidden(true, for: currentAppID)
-        XCTAssertFalse(AppVisibilityPreferencesStore.loadShowInCommandTab(userDefaults: userDefaults))
-        XCTAssertTrue(hiddenModel.hiddenAppIDs.contains(currentAppID))
-        XCTAssertEqual(hiddenModel.hiddenCount, 1)
     }
 
     func testAppVisibilityIconStateRefreshesWhenAppSourceChanges() {

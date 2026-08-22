@@ -78,12 +78,12 @@ final class AppVisibilityManagerModel: ObservableObject {
     @Published private(set) var selectedAppID: String?
     @Published private(set) var selectionProjectionGeneration: UInt64 = 0
 
-    private let inventoryService: AppInventoryService
+    private let inventoryService: any AppInventoryProviding
     private let userDefaults: UserDefaults
     private var reloadTask: Task<Void, Never>?
 
     init(
-        inventoryService: AppInventoryService = AppInventoryService(),
+        inventoryService: any AppInventoryProviding = AppInventoryService(),
         userDefaults: UserDefaults = .standard
     ) {
         self.inventoryService = inventoryService
@@ -93,7 +93,7 @@ final class AppVisibilityManagerModel: ObservableObject {
 
     var visibleApps: [InstalledAppRecord] {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let filteredApps = managedApps.enumerated().filter { _, app in
+        let filteredApps = apps.enumerated().filter { _, app in
             matchesFilter(app)
         }
         guard !trimmedQuery.isEmpty else {
@@ -122,7 +122,7 @@ final class AppVisibilityManagerModel: ObservableObject {
 
     var selectedApp: InstalledAppRecord? {
         guard let selectedAppID else { return nil }
-        return managedApps.first { $0.id == selectedAppID }
+        return apps.first { $0.id == selectedAppID }
     }
 
     func reload() {
@@ -137,14 +137,27 @@ final class AppVisibilityManagerModel: ObservableObject {
 
             await MainActor.run {
                 guard let self else { return }
-                self.apps = records
-                self.hiddenAppIDs = AppVisibilityPreferencesStore.loadHiddenAppIDs(
+                let configurableAppIDs = Set(
+                    records
+                        .filter { $0.visibilityCapability.isConfigurable }
+                        .map(\.id)
+                )
+                let reconciliation = AppVisibilityPreferencesStore.reconcileHiddenAppIDs(
+                    configurableAppIDs: configurableAppIDs,
                     userDefaults: self.userDefaults
                 )
+                self.apps = records
+                self.hiddenAppIDs = reconciliation.hiddenAppIDs
                 self.resolveSelectionAfterReload()
                 self.isLoading = false
                 self.inventoryReadiness = .ready
                 self.reloadTask = nil
+                if reconciliation.didChange {
+                    NotificationCenter.default.post(
+                        name: .flowTabAppVisibilityPreferenceChanged,
+                        object: nil
+                    )
+                }
             }
         }
     }
@@ -168,29 +181,22 @@ final class AppVisibilityManagerModel: ObservableObject {
     }
 
     func setHidden(_ hidden: Bool, for appID: String) {
+        guard let app = apps.first(where: { $0.id == appID }) else { return }
+        guard app.visibilityCapability.isConfigurable else { return }
+        let previousHiddenAppIDs = hiddenAppIDs
         AppVisibilityPreferencesStore.setAppHidden(
             hidden,
             appID: appID,
             userDefaults: userDefaults
         )
         hiddenAppIDs = AppVisibilityPreferencesStore.loadHiddenAppIDs(userDefaults: userDefaults)
+        guard hiddenAppIDs != previousHiddenAppIDs else { return }
         resolveSelectionAfterReload()
         NotificationCenter.default.post(name: .flowTabAppVisibilityPreferenceChanged, object: nil)
     }
 
     func isHidden(_ app: InstalledAppRecord) -> Bool {
         hiddenAppIDs.contains(app.id)
-    }
-
-    private var managedApps: [InstalledAppRecord] {
-        guard !hiddenAppIDs.isEmpty else { return apps }
-
-        let appIDs = Set(apps.map(\.id))
-        let unresolvedHiddenApps = hiddenAppIDs
-            .filter { !appIDs.contains($0) }
-            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
-            .map(InstalledAppRecord.unresolvedHiddenApp)
-        return apps + unresolvedHiddenApps
     }
 
     private func resolveSelectionAfterReload() {

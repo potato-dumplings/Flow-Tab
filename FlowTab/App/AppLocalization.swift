@@ -134,8 +134,11 @@ enum AppStringKey: String {
     case appVisibilityStatus
     case appVisibilityStatusVisible
     case appVisibilityStatusHidden
+    case appVisibilityStatusSystemManaged
     case appVisibilityEffectNote
     case appVisibilityHiddenBadge
+    case appVisibilitySystemManagedBadge
+    case appVisibilitySystemManagedReason
     case permissionAccessibilityGranted
     case permissionAccessibilityDenied
     case permissionAccessibilityManage
@@ -298,8 +301,11 @@ enum AppStrings {
             .appVisibilityStatus: "状态",
             .appVisibilityStatusVisible: "显示",
             .appVisibilityStatusHidden: "已隐藏",
+            .appVisibilityStatusSystemManaged: "无法设置",
             .appVisibilityEffectNote: "该设置影响全局 Option + Tab 应用面板、应用搜索以及对应窗口搜索结果。当前应用内的窗口切换不受影响。",
             .appVisibilityHiddenBadge: "已隐藏",
+            .appVisibilitySystemManagedBadge: "无法设置",
+            .appVisibilitySystemManagedReason: "该应用由 macOS 以菜单栏或后台方式运行，不参与应用切换，因此 FlowTab 无法设置其可见性。",
             .permissionAccessibilityGranted: "辅助功能权限：已授权",
             .permissionAccessibilityDenied: "辅助功能权限：未授权",
             .permissionAccessibilityManage: "管理辅助功能权限",
@@ -457,8 +463,11 @@ enum AppStrings {
             .appVisibilityStatus: "Status",
             .appVisibilityStatusVisible: "Visible",
             .appVisibilityStatusHidden: "Hidden",
+            .appVisibilityStatusSystemManaged: "Unavailable",
             .appVisibilityEffectNote: "This affects the global Option + Tab app layer, app search, and matching window search results. In-app window switching is not affected.",
             .appVisibilityHiddenBadge: "Hidden",
+            .appVisibilitySystemManagedBadge: "Unavailable",
+            .appVisibilitySystemManagedReason: "This app runs in a macOS-managed menu bar or background mode and does not participate in app switching, so FlowTab cannot configure its visibility.",
             .permissionAccessibilityGranted: "Accessibility: Granted",
             .permissionAccessibilityDenied: "Accessibility: Not granted",
             .permissionAccessibilityManage: "Manage",

@@ -21,6 +21,8 @@ struct AppDelegateTestHooks {
     var workspaceNotificationCenter: NotificationCenter? = nil
     var appLaunchWindowEvidenceCoordinator:
         (any RuntimeAppLaunchWindowEvidenceCoordinating)? = nil
+    var appVisibilityRecordsProvider:
+        (@Sendable () -> [InstalledAppRecord])? = nil
 }
 
 @MainActor
@@ -64,13 +66,15 @@ extension AppDelegate {
             resolvedRuntimeProjectionService.signalFocusedCurrentAppWindowsChanged()
             return
         }
+        guard let appDirectoryEntry = RuntimeAppDirectoryFactSource.runningApplicationEntry(
+            for: app
+        ) else {
+            return
+        }
         resolvedRuntimeProjectionService.signalAppActivated(
             appID: RuntimeAppIdentity.appID(for: app),
             pid: app.processIdentifier,
-            appDirectoryEntry:
-                RuntimeAppDirectoryFactSource.runningApplicationEntry(
-                    for: app
-                )
+            appDirectoryEntry: appDirectoryEntry
         )
     }
 

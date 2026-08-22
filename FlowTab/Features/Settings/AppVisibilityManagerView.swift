@@ -282,123 +282,13 @@ struct AppVisibilityManagerView: View {
     }
 
     private var detailPane: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if let selectedApp = model.selectedApp {
-                appDetail(for: selectedApp)
-            } else {
-                emptyDetail
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(.horizontal, 30)
-        .padding(.top, 60)
-        .padding(.bottom, 24)
-    }
-
-    private func appDetail(for app: InstalledAppRecord) -> some View {
-        let isHidden = model.isHidden(app)
-        return VStack(alignment: .leading, spacing: 23) {
-            HStack(alignment: .center, spacing: 16) {
-                AppVisibilityIconView(app: app, size: 62)
-                    .id(AppVisibilityIconSourceKey(app: app).value)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(app.displayName)
-                        .font(.system(size: 22, weight: .semibold))
-                        .lineLimit(1)
-                    Text(app.subtitle)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-
-            Divider()
-
-            HStack(spacing: 14) {
-                Text(AppStrings.text(.appVisibilityShowInSwitcher, language: appLanguage))
-                    .font(.system(size: 14, weight: .medium))
-                Toggle(
-                    "",
-                    isOn: Binding(
-                        get: { !isHidden },
-                        set: { model.setHidden(!$0, for: app.id) }
-                    )
-                )
-                .toggleStyle(.switch)
-                .labelsHidden()
-                .accessibilityIdentifier("flowtab.settings.app-visibility.show-toggle")
-            }
-
-            VStack(alignment: .leading, spacing: 0) {
-                detailRow(
-                    title: AppStrings.text(.appVisibilityBundleID, language: appLanguage),
-                    value: app.bundleIdentifier ?? "-"
-                )
-                Divider().overlay(rowSeparatorColor)
-                detailRow(
-                    title: AppStrings.text(.appVisibilityPath, language: appLanguage),
-                    value: app.path ?? "-"
-                )
-                Divider().overlay(rowSeparatorColor)
-                detailRow(
-                    title: AppStrings.text(.appVisibilityStatus, language: appLanguage),
-                    value: isHidden
-                        ? AppStrings.text(.appVisibilityStatusHidden, language: appLanguage)
-                        : AppStrings.text(.appVisibilityStatusVisible, language: appLanguage)
-                )
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(groupedSurface)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(borderColor, lineWidth: 1)
-            )
-
-            Text(AppStrings.text(.appVisibilityEffectNote, language: appLanguage))
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .lineSpacing(2)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Spacer(minLength: 0)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(
-            AppVisibilityDetailProjectionAccessibility.identifier(
-                appID: app.id,
-                generation: model.selectionProjectionGeneration
-            )
+        AppVisibilityManagerDetailView(
+            model: model,
+            language: appLanguage,
+            groupedSurface: groupedSurface,
+            borderColor: borderColor,
+            rowSeparatorColor: rowSeparatorColor
         )
-    }
-
-    private func detailRow(title: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 14) {
-            Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 82, alignment: .leading)
-            Text(value)
-                .font(.system(size: 12))
-                .textSelection(.enabled)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-        }
-        .frame(minHeight: 38)
-    }
-
-    private var emptyDetail: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(AppStrings.text(.appVisibilityNoSelectionTitle, language: appLanguage))
-                .font(.system(size: 20, weight: .semibold))
-            Text(AppStrings.text(.appVisibilityNoSelectionSubtitle, language: appLanguage))
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-        }
     }
 
     private func resolveSelectionAfterVisibleAppsChange() {
@@ -430,10 +320,16 @@ private struct AppVisibilityListRow: View {
                         .lineLimit(1)
                     if isHidden {
                         Text(AppStrings.text(.appVisibilityHiddenBadge, language: language))
-                            .font(.system(size: 9.5, weight: .medium))
+                            .font(FlowTypography.swiftUI(.micro))
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
                             .background(Capsule().fill(Color.secondary.opacity(0.16)))
+                    } else if !app.visibilityCapability.isConfigurable {
+                        Text(AppStrings.text(.appVisibilitySystemManagedBadge, language: language))
+                            .font(FlowTypography.swiftUI(.micro))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Capsule().fill(Color.orange.opacity(0.14)))
                     }
                 }
                 Text(app.subtitle)
@@ -483,7 +379,7 @@ private extension View {
     }
 }
 
-private struct AppVisibilityIconView: View {
+struct AppVisibilityIconView: View {
     let app: InstalledAppRecord
     let size: CGFloat
     @State private var iconState: AppVisibilityIconState

@@ -399,6 +399,11 @@ enum ThemePreferencesStore {
     }
 }
 
+struct AppVisibilityReconciliationResult: Equatable, Sendable {
+    let hiddenAppIDs: Set<String>
+    let didChange: Bool
+}
+
 enum AppVisibilityPreferencesStore {
     static let defaultShowInCommandTab = false
 
@@ -441,6 +446,39 @@ enum AppVisibilityPreferencesStore {
         saveStoredHiddenAppIDs(
             hiddenAppIDsWithCurrentAppPolicy(hiddenAppIDs, userDefaults: userDefaults),
             userDefaults: userDefaults
+        )
+    }
+
+    static func reconcileHiddenAppIDs(
+        configurableAppIDs: Set<String>,
+        userDefaults: UserDefaults = .standard
+    ) -> AppVisibilityReconciliationResult {
+        let rawHiddenAppIDs = userDefaults.stringArray(
+            forKey: AppPreferenceKeys.hiddenAppIDs
+        ) ?? []
+        let storedHiddenAppIDs = Set(
+            AppVisibilityFilter.normalizedHiddenAppIDs(rawHiddenAppIDs)
+        )
+        let normalizedConfigurableAppIDs = Set(
+            AppVisibilityFilter.normalizedHiddenAppIDs(Array(configurableAppIDs))
+        )
+        let reconciledHiddenAppIDs = hiddenAppIDsWithCurrentAppPolicy(
+            storedHiddenAppIDs.intersection(normalizedConfigurableAppIDs),
+            userDefaults: userDefaults
+        )
+        let normalizedReconciledIDs = AppVisibilityFilter.normalizedHiddenAppIDs(
+            Array(reconciledHiddenAppIDs)
+        )
+        let didChange = rawHiddenAppIDs != normalizedReconciledIDs
+        if didChange {
+            userDefaults.set(
+                normalizedReconciledIDs,
+                forKey: AppPreferenceKeys.hiddenAppIDs
+            )
+        }
+        return AppVisibilityReconciliationResult(
+            hiddenAppIDs: Set(normalizedReconciledIDs),
+            didChange: didChange
         )
     }
 
