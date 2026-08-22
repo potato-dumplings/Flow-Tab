@@ -28,7 +28,10 @@ extension AppDelegate {
         resolvedRuntimeProjectionService.signalAppActivated(
             appID: RuntimeAppIdentity.appID(for: app),
             pid: app.processIdentifier,
-            appDirectoryEntry: RuntimeAppDirectoryEntry(app: app)
+            appDirectoryEntry:
+                RuntimeAppDirectoryFactSource.runningApplicationEntry(
+                    for: app
+                )
         )
     }
 

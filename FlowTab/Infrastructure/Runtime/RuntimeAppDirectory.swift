@@ -23,6 +23,13 @@ enum RuntimeApplicationDirectoryFilter {
 }
 
 enum RuntimeAppLayerProjectionFilter {
+    static func isEligibleRunningApplication(
+        activationPolicy: NSApplication.ActivationPolicy,
+        isTerminated: Bool
+    ) -> Bool {
+        activationPolicy == .regular && !isTerminated
+    }
+
     static func shouldIncludeRunningApplication(
         activationPolicy: NSApplication.ActivationPolicy,
         isTerminated: Bool,
@@ -30,8 +37,10 @@ enum RuntimeAppLayerProjectionFilter {
         currentPID: pid_t,
         includeCurrentProcessInAppLayer: Bool
     ) -> Bool {
-        activationPolicy == .regular
-            && !isTerminated
+        isEligibleRunningApplication(
+            activationPolicy: activationPolicy,
+            isTerminated: isTerminated
+        )
             && (includeCurrentProcessInAppLayer || pid != currentPID)
     }
 
@@ -133,13 +142,28 @@ enum RuntimeAppDirectoryFactSource {
         )
     }
 
+    static func runningApplicationEntry(
+        for app: NSRunningApplication,
+        activationRank: Int? = nil
+    ) -> RuntimeAppDirectoryEntry {
+        RuntimeAppDirectoryEntry(
+            app: app,
+            activationRank: activationRank,
+            isEligibleForAppSwitcherProjection:
+                RuntimeAppLayerProjectionFilter.isEligibleRunningApplication(
+                    activationPolicy: app.activationPolicy,
+                    isTerminated: app.isTerminated
+                )
+        )
+    }
+
     static func entries(
         from runningApplications: [NSRunningApplication],
         rankByPID: [pid_t: Int] = [:]
     ) -> [RuntimeAppDirectoryEntry] {
         runningApplications.map { app in
-            RuntimeAppDirectoryEntry(
-                app: app,
+            runningApplicationEntry(
+                for: app,
                 activationRank: rankByPID[app.processIdentifier]
             )
         }

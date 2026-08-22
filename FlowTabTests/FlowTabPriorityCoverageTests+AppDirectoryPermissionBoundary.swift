@@ -3,6 +3,71 @@ import XCTest
 @testable import FlowTab
 
 extension FlowTabPriorityCoverageTests {
+    func testRuntimeProjectionServiceRejectsAccessoryAppActivationFromAppSwitcher() {
+        let accessoryApp = PermissionBoundaryRunningApplication(
+            pid: 40_901,
+            bundleIdentifier: "com.example.menu-bar-helper",
+            localizedName: "Menu Bar Helper",
+            activationPolicy: .accessory
+        )
+        let entry = RuntimeAppDirectoryFactSource.runningApplicationEntry(
+            for: accessoryApp
+        )
+        let readModelStore = RuntimeReadModelStore()
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.AccessoryAppActivation",
+            repairProvider: RuntimeProjectionRepairProvider(
+                reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            readModelStore: readModelStore,
+            axWindowRepairAvailability: { false }
+        )
+
+        XCTAssertFalse(entry.isEligibleForAppSwitcherProjection)
+
+        service.signalAppActivated(
+            appID: entry.appID,
+            pid: entry.pid,
+            appDirectoryEntry: entry
+        )
+
+        XCTAssertNil(readModelStore.readAppDirectoryProjection())
+        XCTAssertNil(readModelStore.readFocusedCurrentAppWindowProjection())
+        XCTAssertNil(readModelStore.readAppSwitcherProjection())
+    }
+
+    func testFocusedRepairDirectoryEvidenceDoesNotProjectAccessoryApp() throws {
+        let accessoryApp = PermissionBoundaryRunningApplication(
+            pid: 40_902,
+            bundleIdentifier: "com.example.focused-menu-bar-helper",
+            localizedName: "Focused Menu Bar Helper",
+            activationPolicy: .accessory
+        )
+        let entries = RuntimeAppDirectoryFactSource.entries(
+            from: [accessoryApp]
+        )
+        let readModelStore = RuntimeReadModelStore()
+        readModelStore.commitCurrentAppRepairAppDirectoryEvidence(
+            entries,
+            generatedAt: 10
+        )
+
+        let storedEntry = try XCTUnwrap(
+            readModelStore.readAppDirectoryProjection()?.entries.first
+        )
+        XCTAssertFalse(storedEntry.isEligibleForAppSwitcherProjection)
+
+        let payload = try XCTUnwrap(
+            RuntimeMainTableProjectionBuilder(
+                windowRecordStore: RuntimeWindowRecordStore()
+            ).appSwitcherProjectionPayloadFromMainTables(
+                appDirectoryEntries: [storedEntry],
+                generatedAt: 11
+            )
+        )
+        XCTAssertTrue(payload.apps.isEmpty)
+    }
+
     func testRuntimeAppDirectorySeparatesMembershipFromWindowRepairEligibility() {
         let regularApp = PermissionBoundaryRunningApplication(
             pid: 41_001,

@@ -561,7 +561,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.resolvedRuntimeProjectionService.signalAppLaunched(
                 appID: appID,
                 pid: app.processIdentifier,
-                appDirectoryEntry: RuntimeAppDirectoryEntry(app: app)
+                appDirectoryEntry:
+                    RuntimeAppDirectoryFactSource.runningApplicationEntry(
+                        for: app
+                    )
             )
         }
         let didActivateObserver = resolvedWorkspaceNotificationCenter.addObserver(

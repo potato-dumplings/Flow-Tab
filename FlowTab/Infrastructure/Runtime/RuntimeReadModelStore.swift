@@ -199,9 +199,9 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         appDirectoryEntry: RuntimeAppDirectoryEntry,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) -> Bool {
-        guard pid != ProcessInfo.processInfo.processIdentifier,
-              appDirectoryEntry.appID == appID,
-              appDirectoryEntry.pid == pid
+        guard appDirectoryEntry.isEligibleForAppSwitcherProjection,
+              pid != ProcessInfo.processInfo.processIdentifier,
+              appDirectoryEntry.appID == appID && appDirectoryEntry.pid == pid
         else {
             return false
         }
