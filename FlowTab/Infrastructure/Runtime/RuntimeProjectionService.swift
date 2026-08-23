@@ -67,7 +67,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         if let appDirectoryProvider {
             self.appDirectoryProvider = appDirectoryProvider
         } else {
-            self.appDirectoryProvider = repairProvider == nil ? RuntimeWorkspaceAppDirectoryProvider() : nil
+            self.appDirectoryProvider = repairProvider == nil
+                ? RuntimeAppDirectoryProviderFactory.makeDefault()
+                : nil
         }
         self.readModelStore = readModelStore
         reconciliationDrainer = RuntimeProjectionReconciliationDrainer(
@@ -84,6 +86,17 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     deinit {
         maintenanceOwner.cancelPendingPriorityWork()
         transientRepairObservationDriver.cancelAll(reason: "serviceDeinit")
+    }
+
+    func refreshApplicationDirectoryMembershipForPresentation() {
+        guard let evidence = appDirectoryProvider?
+            .appDirectorySnapshotEvidenceForPresentation()
+        else { return }
+        guard readModelStore.commitAppDirectoryPresentationEvidence(evidence) else { return }
+        RuntimeProjectionNotificationPublisher.post(
+            name: .runtimeAppSwitcherProjectionDidUpdate,
+            object: self
+        )
     }
 
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason) {
@@ -821,8 +834,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         if requiresExistingProjectionCoverage,
            let existingProjection = readModelStore.readCommittedAppSwitcherProjectionCacheForMaintenance() {
             let payloadAppIDs = Set(payload.apps.map(\.id))
-            let requiredExistingAppIDs = Set(existingProjection.apps.map(\.id))
-                .subtracting(permittedMissingAppIDs)
+            let requiredExistingAppIDs = readModelStore.requiredExistingSwitcherAppIDs(
+                existingAppIDs: Set(existingProjection.apps.map(\.id)),
+                permittedMissingAppIDs: permittedMissingAppIDs
+            )
             guard requiredExistingAppIDs.isSubset(of: payloadAppIDs) else {
                 return false
             }
@@ -843,11 +858,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     @discardableResult
     private func commitAppDirectoryProviderEvidenceLocked(generatedAt: TimeInterval) -> Int {
-        guard let entries = appDirectoryProvider?.appDirectoryEntriesForRuntimeMaintenance() else {
+        guard let evidence = appDirectoryProvider?
+            .appDirectorySnapshotEvidenceForRuntimeMaintenance()
+        else {
             return 0
         }
-        readModelStore.commitAppDirectoryProviderEvidence(entries, generatedAt: generatedAt)
-        return entries.count
+        readModelStore.commitAppDirectoryProviderEvidence(evidence)
+        return evidence.entries.count
     }
 
     @discardableResult

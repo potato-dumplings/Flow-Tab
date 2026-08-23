@@ -24,6 +24,8 @@ final class FlowTabUITests: XCTestCase {
         static let homeAppIdentityEditor = "flowtab.home.app.\("com.flowtab.mock.identity-editor".flowTabUITestAccessibilityIdentifierComponent)"
         static let homeAppIdentityMenuBar = "flowtab.home.app.\("com.flowtab.mock.identity-menu-bar".flowTabUITestAccessibilityIdentifierComponent)"
         static let homeAppIdentityHelper = "flowtab.home.app.\("com.flowtab.mock.identity-helper".flowTabUITestAccessibilityIdentifierComponent)"
+        static let homeAppMembershipStable = "flowtab.home.app.\("com.flowtab.mock.membership-stable".flowTabUITestAccessibilityIdentifierComponent)"
+        static let homeAppMembershipFinalAccessory = "flowtab.home.app.\("com.flowtab.mock.membership-final-accessory".flowTabUITestAccessibilityIdentifierComponent)"
         static let homeAppWeChat = "flowtab.home.app.\("com.tencent.xinWeChat".flowTabUITestAccessibilityIdentifierComponent)"
         static let homeAppNestedWeChatAppEx =
             "flowtab.home.app.\("com.tencent.flue.WeChatAppEx".flowTabUITestAccessibilityIdentifierComponent)"
@@ -133,6 +135,10 @@ final class FlowTabUITests: XCTestCase {
             "\(switcherAppPrefix)\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherAppIdentityEditor =
             "\(switcherAppPrefix)\("com.flowtab.mock.identity-editor".flowTabUITestAccessibilityIdentifierComponent)"
+        static let switcherAppMembershipStable =
+            "\(switcherAppPrefix)\("com.flowtab.mock.membership-stable".flowTabUITestAccessibilityIdentifierComponent)"
+        static let switcherAppMembershipFinalAccessory =
+            "\(switcherAppPrefix)\("com.flowtab.mock.membership-final-accessory".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherAppMockManyWindows = "flowtab.switcher.app.\("com.flowtab.mock.many-windows".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherAppMockMinimizedNotes = "flowtab.switcher.app.\("com.flowtab.mock.minimized-notes".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherAppWeChat = "flowtab.switcher.app.\("com.tencent.xinWeChat".flowTabUITestAccessibilityIdentifierComponent)"

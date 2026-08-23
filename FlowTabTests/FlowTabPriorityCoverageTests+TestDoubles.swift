@@ -159,6 +159,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private var focusedCurrentAppWindowProjectionReads = 0
     private var spaceTopologyProjectionReads = 0
     private var committedSearchIndexReads = 0
+    private var appDirectoryMembershipPresentationRefreshes = 0
     private var appSwitcherMaintenanceRequests: [RuntimeProjectionMaintenanceReason] = []
     private var appSwitcherMaintenanceRequestHandler:
         ((RuntimeProjectionMaintenanceReason) -> Void)?
@@ -335,6 +336,12 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         return committedSearchIndexReads
     }
 
+    func appDirectoryMembershipPresentationRefreshCount() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return appDirectoryMembershipPresentationRefreshes
+    }
+
     func installAppSwitcherProjection(
         apps: [AppSwitchCandidate],
         contextsByID: [String: RuntimeAppContext] = [:],
@@ -492,6 +499,12 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         defer { lock.unlock() }
         appSwitcherProjectionReads += 1
         return appSwitcherProjection
+    }
+
+    func refreshApplicationDirectoryMembershipForPresentation() {
+        lock.lock()
+        appDirectoryMembershipPresentationRefreshes += 1
+        lock.unlock()
     }
 
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection? {

@@ -528,6 +528,7 @@
 		FA14000431A1000100C0D001 /* FlowTabUITests+AppLanguageDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA14000331A1000100C0D001 /* FlowTabUITests+AppLanguageDefaults.swift */; };
 		E12000033600000100B0D737 /* FlowTabUITests+EnglishLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = E12000023600000100B0D737 /* FlowTabUITests+EnglishLayout.swift */; };
 		B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */; };
+		C8A300023A25000100B0D737 /* FlowTabUITests+ApplicationMembership.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A300013A25000100B0D737 /* FlowTabUITests+ApplicationMembership.swift */; };
 		A47A00023D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A47A00013D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift */; };
 		C1F100023A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F100013A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift */; };
 		C1F200023A21000100B0D737 /* FlowTabUITests+HotkeyReleaseLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F200013A21000100B0D737 /* FlowTabUITests+HotkeyReleaseLifecycle.swift */; };
@@ -689,6 +690,8 @@
 		F6E7C01235C000100B0D737 /* RuntimeProjectionPayloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7C01135C000100B0D737 /* RuntimeProjectionPayloads.swift */; };
 		F6E7C01435C000100B0D737 /* RuntimeAXWindowRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7C01335C000100B0D737 /* RuntimeAXWindowRecovery.swift */; };
 		F6E7C01635C000100B0D737 /* RuntimeAppDirectory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7C01535C000100B0D737 /* RuntimeAppDirectory.swift */; };
+		A7D4C00236A000100B0D737 /* RuntimeAppDirectoryEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7D4C00136A000100B0D737 /* RuntimeAppDirectoryEvidence.swift */; };
+		A7D4C00436A000100B0D737 /* RuntimeApplicationMembershipProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7D4C00336A000100B0D737 /* RuntimeApplicationMembershipProjection.swift */; };
 		F6E7C01835C000100B0D737 /* RuntimeWindowMappingState+StickyBindings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7C01735C000100B0D737 /* RuntimeWindowMappingState+StickyBindings.swift */; };
 		F6E7B00835AC000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7B00735AC000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift */; };
 /* End PBXBuildFile section */
@@ -970,6 +973,7 @@
 		FA14000331A1000100C0D001 /* FlowTabUITests+AppLanguageDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+AppLanguageDefaults.swift"; sourceTree = "<group>"; };
 		E12000023600000100B0D737 /* FlowTabUITests+EnglishLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+EnglishLayout.swift"; sourceTree = "<group>"; };
 		B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherAndSearch.swift"; sourceTree = "<group>"; };
+		C8A300013A25000100B0D737 /* FlowTabUITests+ApplicationMembership.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ApplicationMembership.swift"; sourceTree = "<group>"; };
 		A47A00013D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SearchSelectionWrap.swift"; sourceTree = "<group>"; };
 		C1F100013A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherInteractionRegressions.swift"; sourceTree = "<group>"; };
 		C1F200013A21000100B0D737 /* FlowTabUITests+HotkeyReleaseLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HotkeyReleaseLifecycle.swift"; sourceTree = "<group>"; };
@@ -1375,6 +1379,8 @@
 		D100000A2FF500500B0D737 /* RuntimeMainTableProjectionBuilding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeMainTableProjectionBuilding.swift; sourceTree = "<group>"; };
 		F6E7C01335C000100B0D737 /* RuntimeAXWindowRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAXWindowRecovery.swift; sourceTree = "<group>"; };
 		F6E7C01535C000100B0D737 /* RuntimeAppDirectory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAppDirectory.swift; sourceTree = "<group>"; };
+		A7D4C00136A000100B0D737 /* RuntimeAppDirectoryEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAppDirectoryEvidence.swift; sourceTree = "<group>"; };
+		A7D4C00336A000100B0D737 /* RuntimeApplicationMembershipProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeApplicationMembershipProjection.swift; sourceTree = "<group>"; };
 		F6E7C01735C000100B0D737 /* RuntimeWindowMappingState+StickyBindings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeWindowMappingState+StickyBindings.swift"; sourceTree = "<group>"; };
 		F6E7B00735AC000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift"; sourceTree = "<group>"; };
 		F6E7B20935AC000100B0D737 /* RuntimeWindowRecordStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowRecordStore.swift; sourceTree = "<group>"; };
@@ -1696,6 +1702,7 @@
 				A49200013D9E000100B0D737 /* FlowTabUITests+SettingsWindowBehaviorPersistence.swift */,
 				F7B8C9D535B8000100B0D737 /* FlowTabUITests+LaunchAtLoginSettings.swift */,
 				B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */,
+				C8A300013A25000100B0D737 /* FlowTabUITests+ApplicationMembership.swift */,
 				A47A00013D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift */,
 				FFFB00083D3A000100B0D737 /* FlowTabUITests+TabSwitchStressEvidence.swift */,
 				C1F100013A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift */,
@@ -2047,6 +2054,8 @@
 				F8A9B0C835AE000100B0D737 /* RuntimeWindowListDeduplicator.swift */,
 				F6E7C01335C000100B0D737 /* RuntimeAXWindowRecovery.swift */,
 				F6E7C01535C000100B0D737 /* RuntimeAppDirectory.swift */,
+				A7D4C00136A000100B0D737 /* RuntimeAppDirectoryEvidence.swift */,
+				A7D4C00336A000100B0D737 /* RuntimeApplicationMembershipProjection.swift */,
 				F6E7C01735C000100B0D737 /* RuntimeWindowMappingState+StickyBindings.swift */,
 				F6E7A8BB35AC000100B0D737 /* RuntimeWindowSpaceClassification.swift */,
 				D43000122FFD000100B0D737 /* RuntimeAXWindowChangeMonitor.swift */,
@@ -2542,6 +2551,8 @@
 				F6E7C01235C000100B0D737 /* RuntimeProjectionPayloads.swift in Sources */,
 				F6E7C01435C000100B0D737 /* RuntimeAXWindowRecovery.swift in Sources */,
 				F6E7C01635C000100B0D737 /* RuntimeAppDirectory.swift in Sources */,
+				A7D4C00236A000100B0D737 /* RuntimeAppDirectoryEvidence.swift in Sources */,
+				A7D4C00436A000100B0D737 /* RuntimeApplicationMembershipProjection.swift in Sources */,
 				F6E7C01835C000100B0D737 /* RuntimeWindowMappingState+StickyBindings.swift in Sources */,
 				F6E7B20A35AC000100B0D737 /* RuntimeWindowRecordStore.swift in Sources */,
 				F2B3C4E52F8C000100B0D737 /* RuntimeWindowListDiagnostics.swift in Sources */,
@@ -2921,6 +2932,7 @@
 				A49200023D9E000100B0D737 /* FlowTabUITests+SettingsWindowBehaviorPersistence.swift in Sources */,
 				F7B8C9D635B8000100B0D737 /* FlowTabUITests+LaunchAtLoginSettings.swift in Sources */,
 				B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */,
+				C8A300023A25000100B0D737 /* FlowTabUITests+ApplicationMembership.swift in Sources */,
 				A47A00023D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift in Sources */,
 				FFFB01083D3A000100B0D737 /* FlowTabUITests+TabSwitchStressEvidence.swift in Sources */,
 				C1F100023A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift in Sources */,

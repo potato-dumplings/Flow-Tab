@@ -20,6 +20,7 @@ final class RuntimeActivator {
     var focusCGWindowOverride: ((NSRunningApplication, CGWindowID) -> Bool)?
     var frontmostApplicationOverride: (() -> NSRunningApplication?)?
     var applicationIsTerminatedOverride: ((NSRunningApplication) -> Bool)?
+    var applicationIsEligibleForSwitcherActivationOverride: ((NSRunningApplication) -> Bool)?
     var focusRecoveryPolicy: RuntimeFocusRecoveryPolicy = .standard
     let focusRecoveryCoordinator: RuntimeFocusRecoveryCoordinator
     var activationGeneration: UInt64 = 0
@@ -69,6 +70,10 @@ final class RuntimeActivator {
         contextsByID: [String: RuntimeAppContext]
     ) {
         guard let context = contextsByID[appID] else { return }
+        guard applicationIsEligibleForSwitcherActivation(context.runningApp) else {
+            logIneligibleApplicationActivation(appID: appID, app: context.runningApp)
+            return
+        }
         guard let windowContext = context.windowsByID[windowID] else {
             requestActivation(
                 of: context.runningApp,
@@ -77,6 +82,10 @@ final class RuntimeActivator {
             return
         }
         let targetApp = activationTargetApplication(for: windowContext, fallback: context.runningApp)
+        guard applicationIsEligibleForSwitcherActivation(targetApp) else {
+            logIneligibleApplicationActivation(appID: appID, app: targetApp)
+            return
+        }
         if activateCurrentAppIfNeeded(targetApp) {
             return
         }
@@ -106,6 +115,10 @@ final class RuntimeActivator {
     }
 
     func focusWindow(_ request: WindowFocusRequest, in app: NSRunningApplication) {
+        guard applicationIsEligibleForSwitcherActivation(app) else {
+            logIneligibleApplicationActivation(appID: request.appID, app: app)
+            return
+        }
         let allowsChromeInternalBypass =
             bindingAllowsChromeInternalActivationBypass(request, in: app)
         guard request.allowsAnyActivationRoute || allowsChromeInternalBypass else {
@@ -137,6 +150,24 @@ final class RuntimeActivator {
         }
         performFocusRecoveryInitialReadback(
             generation: recoveryGeneration
+        )
+    }
+
+    func applicationIsEligibleForSwitcherActivation(_ app: NSRunningApplication) -> Bool {
+        if let applicationIsEligibleForSwitcherActivationOverride {
+            return applicationIsEligibleForSwitcherActivationOverride(app)
+        }
+        guard !applicationIsTerminated(app) else { return false }
+        if app.processIdentifier == ProcessInfo.processInfo.processIdentifier {
+            return true
+        }
+        return app.activationPolicy == .regular
+    }
+
+    func logIneligibleApplicationActivation(appID: String, app: NSRunningApplication) {
+        RuntimeLog.debug(
+            .activation,
+            "app-activation result=ineligible-runtime-identity appID=\(appID) pid=\(app.processIdentifier) policy=\(app.activationPolicy.rawValue) terminated=\(applicationIsTerminated(app) ? 1 : 0)"
         )
     }
 

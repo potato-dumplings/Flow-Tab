@@ -8,6 +8,12 @@ enum FlowTabUITestAppVisibilityIdentityFixture {
     static let auxiliaryProcessID = "com.flowtab.mock.identity-helper"
 }
 
+enum FlowTabUITestApplicationMembershipFixture {
+    static let variant = "application-membership-transition"
+    static let stableAppID = "com.flowtab.mock.membership-stable"
+    static let finalAccessoryAppID = "com.flowtab.mock.membership-final-accessory"
+}
+
 enum FlowTabTestLaunchOptions {
     static let uiTestingEnvironmentKey = "FLOWTAB_UI_TESTING"
     static let uiTestingEnvironmentValue = "1"

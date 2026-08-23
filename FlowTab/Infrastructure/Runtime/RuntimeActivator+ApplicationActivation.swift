@@ -15,6 +15,10 @@ extension RuntimeActivator {
             )
             return
         }
+        guard applicationIsEligibleForSwitcherActivation(context.runningApp) else {
+            logIneligibleApplicationActivation(appID: appID, app: context.runningApp)
+            return
+        }
         if activateCurrentAppIfNeeded(context.runningApp) {
             return
         }
@@ -59,11 +63,8 @@ extension RuntimeActivator {
             )
             return
         }
-        guard !applicationIsTerminated(openedApp) else {
-            RuntimeLog.debug(
-                .activation,
-                "app-activation result=application-terminated appID=\(appID) pid=\(openedApp.processIdentifier) generation=\(generation)"
-            )
+        guard applicationIsEligibleForSwitcherActivation(openedApp) else {
+            logIneligibleApplicationActivation(appID: appID, app: openedApp)
             return
         }
 
@@ -105,11 +106,8 @@ extension RuntimeActivator {
             for: windowContext,
             fallback: openedApp
         )
-        guard !applicationIsTerminated(targetApp) else {
-            RuntimeLog.debug(
-                .activation,
-                "app-activation result=fallback-owner-terminated appID=\(appID) pid=\(targetApp.processIdentifier) generation=\(generation) windowID=\(fallback.windowID)"
-            )
+        guard applicationIsEligibleForSwitcherActivation(targetApp) else {
+            logIneligibleApplicationActivation(appID: appID, app: targetApp)
             return
         }
         let request = makeWindowFocusRequest(
@@ -186,6 +184,13 @@ extension RuntimeActivator {
         generation: UInt64,
         completion: ((NSRunningApplication) -> Void)? = nil
     ) {
+        guard applicationIsEligibleForSwitcherActivation(app) else {
+            logIneligibleApplicationActivation(
+                appID: app.bundleIdentifier ?? "unknown",
+                app: app
+            )
+            return
+        }
         let guardedCompletion = completion.map { completion in
             { [weak self] (openedApp: NSRunningApplication) in
                 guard let self else { return }
@@ -193,6 +198,13 @@ extension RuntimeActivator {
                     RuntimeLog.debug(
                         .activation,
                         "app-activation result=stale-completion pid=\(openedApp.processIdentifier) generation=\(generation) current=\(self.activationGeneration)"
+                    )
+                    return
+                }
+                guard self.applicationIsEligibleForSwitcherActivation(openedApp) else {
+                    self.logIneligibleApplicationActivation(
+                        appID: openedApp.bundleIdentifier ?? "unknown",
+                        app: openedApp
                     )
                     return
                 }
@@ -245,6 +257,13 @@ extension RuntimeActivator {
     ) {
         guard let completion else { return }
         Task { @MainActor in
+            guard self.applicationIsEligibleForSwitcherActivation(app) else {
+                self.logIneligibleApplicationActivation(
+                    appID: app.bundleIdentifier ?? "unknown",
+                    app: app
+                )
+                return
+            }
             completion(app)
         }
     }
@@ -280,7 +299,7 @@ extension RuntimeActivator {
         frontmostApplicationOverride?() ?? NSWorkspace.shared.frontmostApplication
     }
 
-    private func applicationIsTerminated(_ app: NSRunningApplication) -> Bool {
+    func applicationIsTerminated(_ app: NSRunningApplication) -> Bool {
         applicationIsTerminatedOverride?(app) ?? app.isTerminated
     }
 }

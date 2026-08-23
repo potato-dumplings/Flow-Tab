@@ -351,6 +351,7 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     func startSession(triggerDirection: CycleDirection) -> Bool {
+        runtimeProjectionService.refreshApplicationDirectoryMembershipForPresentation()
         invalidateSelectedAppWindowProjection(reason: .startSession)
         clearTerminateSelectedAppAnimation()
         overlayStyle = .appAndWindow

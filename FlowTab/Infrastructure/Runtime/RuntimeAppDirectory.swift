@@ -188,19 +188,6 @@ enum RuntimeAppDirectoryFactSource {
     }
 }
 
-protocol RuntimeAppDirectoryProviding: AnyObject {
-    func appDirectoryEntriesForRuntimeMaintenance() -> [RuntimeAppDirectoryEntry]
-}
-
-final class RuntimeWorkspaceAppDirectoryProvider: RuntimeAppDirectoryProviding {
-    func appDirectoryEntriesForRuntimeMaintenance() -> [RuntimeAppDirectoryEntry] {
-        RuntimeAppDirectoryFactSource.currentMaintenanceFacts(
-            includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab()
-        )
-        .entries
-    }
-}
-
 extension NSApplication.ActivationPolicy {
     var flowTabCorePolicy: ApplicationRuntimeActivationPolicy {
         switch self {
@@ -300,6 +287,35 @@ struct RuntimeAppDirectoryEntry: Equatable {
             activationRank: preservedRank,
             runningApplication: preservedRunningApplication,
             isEligibleForAppSwitcherProjection: preservedAppSwitcherEligibility
+        )
+    }
+
+    func preservingSnapshotMetadata(from existing: RuntimeAppDirectoryEntry?) -> RuntimeAppDirectoryEntry {
+        guard let existing, existing.appID == appID else { return self }
+        return RuntimeAppDirectoryEntry(
+            pid: pid,
+            appID: appID,
+            bundleIdentifier: existing.bundleIdentifier ?? bundleIdentifier,
+            localizedName: existing.localizedName ?? localizedName,
+            bundleURL: existing.bundleURL ?? bundleURL,
+            launchDate: existing.launchDate ?? launchDate,
+            activationRank: existing.activationRank ?? activationRank,
+            runningApplication: existing.runningApplication ?? runningApplication,
+            isEligibleForAppSwitcherProjection: isEligibleForAppSwitcherProjection
+        )
+    }
+
+    func withActivationRank(_ activationRank: Int?) -> RuntimeAppDirectoryEntry {
+        RuntimeAppDirectoryEntry(
+            pid: pid,
+            appID: appID,
+            bundleIdentifier: bundleIdentifier,
+            localizedName: localizedName,
+            bundleURL: bundleURL,
+            launchDate: launchDate,
+            activationRank: activationRank,
+            runningApplication: runningApplication,
+            isEligibleForAppSwitcherProjection: isEligibleForAppSwitcherProjection
         )
     }
 }

@@ -41,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         FlowTabUITestBootstrapper.prepareIfNeeded(userDefaults: resolvedUserDefaults)
 #endif
         applyActivationPolicyFromPreferences(application: resolvedActivationPolicyApplication)
+        resolvedRuntimeProjectionService.refreshApplicationDirectoryMembershipForPresentation()
         syncLaunchAtLoginPreferenceOnLaunch()
 
         let panelController = makePanelController()
@@ -130,6 +131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
+        resolvedRuntimeProjectionService.refreshApplicationDirectoryMembershipForPresentation()
         let accessSnapshot = currentHotkeyChordEventAccessSnapshot()
         if lastHotkeyAccessibilityTrusted
             != accessSnapshot.accessibilityTrusted
