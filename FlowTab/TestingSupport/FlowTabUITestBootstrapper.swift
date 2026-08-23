@@ -94,8 +94,10 @@ enum FlowTabUITestBootstrapper {
             FlowPresentationState.shared.refreshFromStoredPreferences()
         }
 
-        if FlowTabTestLaunchOptions.mockRuntimeVariant
-            == FlowTabUITestAppVisibilityIdentityFixture.variant {
+        if FlowTabTestLaunchOptions.resetsUserDefaultsOnLaunch,
+           FlowTabUITestAppVisibilityIdentityFixture.contains(
+               FlowTabTestLaunchOptions.mockRuntimeVariant
+           ) {
             userDefaults.set(true, forKey: AppPreferenceKeys.showInCommandTab)
             userDefaults.set(
                 [

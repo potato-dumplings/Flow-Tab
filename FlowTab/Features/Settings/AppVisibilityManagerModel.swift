@@ -67,7 +67,8 @@ final class AppVisibilityManagerModel: ObservableObject {
     }
 
     @Published private(set) var apps: [InstalledAppRecord] = []
-    @Published private(set) var hiddenAppIDs: Set<String>
+    @Published private(set) var preferenceHiddenAppIDs: Set<String>
+    @Published private(set) var effectiveHiddenAppIDs: Set<String>
     @Published private(set) var isLoading = false
     @Published private(set) var inventoryReadiness:
         AppVisibilityInventoryReadiness = .idle
@@ -81,6 +82,7 @@ final class AppVisibilityManagerModel: ObservableObject {
     private let inventoryService: any AppInventoryProviding
     private let userDefaults: UserDefaults
     private var reloadTask: Task<Void, Never>?
+    private var requestedReloadGeneration: UInt64 = 0
 
     init(
         inventoryService: any AppInventoryProviding = AppInventoryService(),
@@ -88,7 +90,15 @@ final class AppVisibilityManagerModel: ObservableObject {
     ) {
         self.inventoryService = inventoryService
         self.userDefaults = userDefaults
-        hiddenAppIDs = AppVisibilityPreferencesStore.loadHiddenAppIDs(userDefaults: userDefaults)
+        let storedHiddenAppIDs = AppVisibilityPreferencesStore.loadHiddenAppIDs(
+            userDefaults: userDefaults
+        )
+        preferenceHiddenAppIDs = storedHiddenAppIDs
+        effectiveHiddenAppIDs = storedHiddenAppIDs
+    }
+
+    var hiddenAppIDs: Set<String> {
+        preferenceHiddenAppIDs
     }
 
     var visibleApps: [InstalledAppRecord] {
@@ -117,7 +127,7 @@ final class AppVisibilityManagerModel: ObservableObject {
     }
 
     var hiddenCount: Int {
-        hiddenAppIDs.count
+        effectiveHiddenAppIDs.count
     }
 
     var selectedApp: InstalledAppRecord? {
@@ -126,39 +136,72 @@ final class AppVisibilityManagerModel: ObservableObject {
     }
 
     func reload() {
-        guard reloadTask == nil else { return }
+        requestedReloadGeneration &+= 1
         inventoryReadiness = .loading
         isLoading = true
+        startLatestReloadIfNeeded()
+    }
+
+    func refreshStoredPreferences() {
+        let nextPreferenceHiddenAppIDs =
+            AppVisibilityPreferencesStore.loadHiddenAppIDs(
+                userDefaults: userDefaults
+            )
+        guard nextPreferenceHiddenAppIDs != preferenceHiddenAppIDs else { return }
+        preferenceHiddenAppIDs = nextPreferenceHiddenAppIDs
+        recomputeEffectiveHiddenAppIDs()
+        resolveSelectionAfterReload()
+    }
+
+    func presentation(for app: InstalledAppRecord) -> AppVisibilityPresentation {
+        app.visibilityPresentation(
+            preferenceIsHidden: preferenceHiddenAppIDs.contains(app.id)
+        )
+    }
+
+    private func startLatestReloadIfNeeded() {
+        guard reloadTask == nil else { return }
+        let reloadGeneration = requestedReloadGeneration
         let service = inventoryService
         reloadTask = Task { [weak self] in
             let records = await Task.detached(priority: .utility) {
                 service.installedApps()
             }.value
+            guard let self else { return }
+            self.completeReload(records, generation: reloadGeneration)
+        }
+    }
 
-            await MainActor.run {
-                guard let self else { return }
-                let configurableAppIDs = Set(
-                    records
-                        .filter { $0.visibilityCapability.isConfigurable }
-                        .map(\.id)
-                )
-                let reconciliation = AppVisibilityPreferencesStore.reconcileHiddenAppIDs(
-                    configurableAppIDs: configurableAppIDs,
-                    userDefaults: self.userDefaults
-                )
-                self.apps = records
-                self.hiddenAppIDs = reconciliation.hiddenAppIDs
-                self.resolveSelectionAfterReload()
-                self.isLoading = false
-                self.inventoryReadiness = .ready
-                self.reloadTask = nil
-                if reconciliation.didChange {
-                    NotificationCenter.default.post(
-                        name: .flowTabAppVisibilityPreferenceChanged,
-                        object: nil
-                    )
-                }
-            }
+    private func completeReload(
+        _ records: [InstalledAppRecord],
+        generation: UInt64
+    ) {
+        reloadTask = nil
+        guard generation == requestedReloadGeneration else {
+            startLatestReloadIfNeeded()
+            return
+        }
+
+        let preferenceConfigurableAppIDs = Set(
+            records
+                .filter { $0.visibilityCapability.isConfigurable }
+                .map(\.id)
+        )
+        let reconciliation = AppVisibilityPreferencesStore.reconcileHiddenAppIDs(
+            preferenceConfigurableAppIDs: preferenceConfigurableAppIDs,
+            userDefaults: userDefaults
+        )
+        apps = records
+        preferenceHiddenAppIDs = reconciliation.hiddenAppIDs
+        recomputeEffectiveHiddenAppIDs()
+        resolveSelectionAfterReload()
+        isLoading = false
+        inventoryReadiness = .ready
+        if reconciliation.didChange {
+            NotificationCenter.default.post(
+                name: .flowTabAppVisibilityPreferenceChanged,
+                object: nil
+            )
         }
     }
 
@@ -183,20 +226,27 @@ final class AppVisibilityManagerModel: ObservableObject {
     func setHidden(_ hidden: Bool, for appID: String) {
         guard let app = apps.first(where: { $0.id == appID }) else { return }
         guard app.visibilityCapability.isConfigurable else { return }
-        let previousHiddenAppIDs = hiddenAppIDs
+        let previousHiddenAppIDs = preferenceHiddenAppIDs
         AppVisibilityPreferencesStore.setAppHidden(
             hidden,
             appID: appID,
             userDefaults: userDefaults
         )
-        hiddenAppIDs = AppVisibilityPreferencesStore.loadHiddenAppIDs(userDefaults: userDefaults)
-        guard hiddenAppIDs != previousHiddenAppIDs else { return }
+        preferenceHiddenAppIDs = AppVisibilityPreferencesStore.loadHiddenAppIDs(
+            userDefaults: userDefaults
+        )
+        guard preferenceHiddenAppIDs != previousHiddenAppIDs else { return }
+        recomputeEffectiveHiddenAppIDs()
         resolveSelectionAfterReload()
         NotificationCenter.default.post(name: .flowTabAppVisibilityPreferenceChanged, object: nil)
     }
 
     func isHidden(_ app: InstalledAppRecord) -> Bool {
-        hiddenAppIDs.contains(app.id)
+        effectiveHiddenAppIDs.contains(app.id)
+    }
+
+    func isPreferenceHidden(_ app: InstalledAppRecord) -> Bool {
+        preferenceHiddenAppIDs.contains(app.id)
     }
 
     private func resolveSelectionAfterReload() {
@@ -215,6 +265,21 @@ final class AppVisibilityManagerModel: ObservableObject {
             return isHidden(app)
         case .running:
             return app.isRunning
+        }
+    }
+
+    private func recomputeEffectiveHiddenAppIDs() {
+        guard inventoryReadiness != .idle || !apps.isEmpty else {
+            effectiveHiddenAppIDs = preferenceHiddenAppIDs
+            return
+        }
+        let nextEffectiveHiddenAppIDs = Set(
+            apps.compactMap { app in
+                presentation(for: app).state.isEffectivelyHidden ? app.id : nil
+            }
+        )
+        if effectiveHiddenAppIDs != nextEffectiveHiddenAppIDs {
+            effectiveHiddenAppIDs = nextEffectiveHiddenAppIDs
         }
     }
 

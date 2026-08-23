@@ -279,6 +279,8 @@
 		FFFB01073D3A000100B0D737 /* TabSwitchStressEvidenceTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFFB00073D3A000100B0D737 /* TabSwitchStressEvidenceTransport.swift */; };
 		FFFB01083D3A000100B0D737 /* FlowTabUITests+TabSwitchStressEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFFB00083D3A000100B0D737 /* FlowTabUITests+TabSwitchStressEvidence.swift */; };
 		FFFC01013D3B000100B0D737 /* FlowTabTests+AppVisibilityReload.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFFC00013D3B000100B0D737 /* FlowTabTests+AppVisibilityReload.swift */; };
+		A5B100023DC1000100B0D737 /* FlowTabTests+AppVisibilityRuntimeIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5B100013DC1000100B0D737 /* FlowTabTests+AppVisibilityRuntimeIdentity.swift */; };
+		A5B100043DC1000100B0D737 /* FlowTabUITests+AppVisibilityIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5B100033DC1000100B0D737 /* FlowTabUITests+AppVisibilityIdentity.swift */; };
 		FFFD01013D3C000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateWorkspaceLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFFD00013D3C000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateWorkspaceLifecycle.swift */; };
 		A0361F063E01000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeProjectionMaintenanceOwner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0361F053E01000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeProjectionMaintenanceOwner.swift */; };
 		FFFE01013D3D000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateHotkeyReload.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFFE00013D3D000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateHotkeyReload.swift */; };
@@ -1341,6 +1343,8 @@
 		FFFB00073D3A000100B0D737 /* TabSwitchStressEvidenceTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSwitchStressEvidenceTransport.swift; sourceTree = "<group>"; };
 		FFFB00083D3A000100B0D737 /* FlowTabUITests+TabSwitchStressEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+TabSwitchStressEvidence.swift"; sourceTree = "<group>"; };
 		FFFC00013D3B000100B0D737 /* FlowTabTests+AppVisibilityReload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+AppVisibilityReload.swift"; sourceTree = "<group>"; };
+		A5B100013DC1000100B0D737 /* FlowTabTests+AppVisibilityRuntimeIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+AppVisibilityRuntimeIdentity.swift"; sourceTree = "<group>"; };
+		A5B100033DC1000100B0D737 /* FlowTabUITests+AppVisibilityIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+AppVisibilityIdentity.swift"; sourceTree = "<group>"; };
 		FFFD00013D3C000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateWorkspaceLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+AppDelegateWorkspaceLifecycle.swift"; sourceTree = "<group>"; };
 		A0361F053E01000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeProjectionMaintenanceOwner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeProjectionMaintenanceOwner.swift"; sourceTree = "<group>"; };
 		FFFE00013D3D000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateHotkeyReload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+AppDelegateHotkeyReload.swift"; sourceTree = "<group>"; };
@@ -1626,6 +1630,7 @@
 				FFFB00053D3A000100B0D737 /* FlowTabTests+TabSwitchStressRunnerPressure.swift */,
 				FFFB00063D3A000100B0D737 /* TabSwitchStressTestSupport.swift */,
 				FFFC00013D3B000100B0D737 /* FlowTabTests+AppVisibilityReload.swift */,
+				A5B100013DC1000100B0D737 /* FlowTabTests+AppVisibilityRuntimeIdentity.swift */,
 			);
 			path = FlowTabTests;
 			sourceTree = "<group>";
@@ -1688,6 +1693,7 @@
 				A48A00073D92000100B0D737 /* FlowTabUITests+SettingsAppVisibilityManagerProjectionObservationTests.swift */,
 				A48A00013D92000100B0D737 /* FlowTabUITests+SettingsPermissionActionProjectionObservation.swift */,
 				A48A00033D92000100B0D737 /* FlowTabUITests+SettingsPermissionActionProjectionObservationTests.swift */,
+				A5B100033DC1000100B0D737 /* FlowTabUITests+AppVisibilityIdentity.swift */,
 				B10002052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift */,
 				A48D00013D99000100B0D737 /* FlowTabUITests+SettingsCurrentAppActivationProjectionObservation.swift */,
 				A48D00033D99000100B0D737 /* FlowTabUITests+SettingsCurrentAppActivationProjectionObservationTests.swift */,
@@ -2844,6 +2850,7 @@
 				FFFB01053D3A000100B0D737 /* FlowTabTests+TabSwitchStressRunnerPressure.swift in Sources */,
 				FFFB01063D3A000100B0D737 /* TabSwitchStressTestSupport.swift in Sources */,
 				FFFC01013D3B000100B0D737 /* FlowTabTests+AppVisibilityReload.swift in Sources */,
+				A5B100023DC1000100B0D737 /* FlowTabTests+AppVisibilityRuntimeIdentity.swift in Sources */,
 				FFFD01013D3C000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateWorkspaceLifecycle.swift in Sources */,
 				A0361F063E01000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeProjectionMaintenanceOwner.swift in Sources */,
 				FFFE01013D3D000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateHotkeyReload.swift in Sources */,
@@ -2918,6 +2925,7 @@
 				A48A00083D92000100B0D737 /* FlowTabUITests+SettingsAppVisibilityManagerProjectionObservationTests.swift in Sources */,
 				A48A00023D92000100B0D737 /* FlowTabUITests+SettingsPermissionActionProjectionObservation.swift in Sources */,
 				A48A00043D92000100B0D737 /* FlowTabUITests+SettingsPermissionActionProjectionObservationTests.swift in Sources */,
+				A5B100043DC1000100B0D737 /* FlowTabUITests+AppVisibilityIdentity.swift in Sources */,
 				B10012052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift in Sources */,
 				A48D00023D99000100B0D737 /* FlowTabUITests+SettingsCurrentAppActivationProjectionObservation.swift in Sources */,
 				A48D00043D99000100B0D737 /* FlowTabUITests+SettingsCurrentAppActivationProjectionObservationTests.swift in Sources */,

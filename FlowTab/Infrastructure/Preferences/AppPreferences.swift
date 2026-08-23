@@ -450,7 +450,7 @@ enum AppVisibilityPreferencesStore {
     }
 
     static func reconcileHiddenAppIDs(
-        configurableAppIDs: Set<String>,
+        preferenceConfigurableAppIDs: Set<String>,
         userDefaults: UserDefaults = .standard
     ) -> AppVisibilityReconciliationResult {
         let rawHiddenAppIDs = userDefaults.stringArray(
@@ -460,7 +460,9 @@ enum AppVisibilityPreferencesStore {
             AppVisibilityFilter.normalizedHiddenAppIDs(rawHiddenAppIDs)
         )
         let normalizedConfigurableAppIDs = Set(
-            AppVisibilityFilter.normalizedHiddenAppIDs(Array(configurableAppIDs))
+            AppVisibilityFilter.normalizedHiddenAppIDs(
+                Array(preferenceConfigurableAppIDs)
+            )
         )
         let reconciledHiddenAppIDs = hiddenAppIDsWithCurrentAppPolicy(
             storedHiddenAppIDs.intersection(normalizedConfigurableAppIDs),

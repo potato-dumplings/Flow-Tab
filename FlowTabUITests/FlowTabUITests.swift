@@ -22,6 +22,7 @@ final class FlowTabUITests: XCTestCase {
         static let homeAppMockBrowser = "flowtab.home.app.\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
         static let homeAppMockMail = "flowtab.home.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
         static let homeAppIdentityEditor = "flowtab.home.app.\("com.flowtab.mock.identity-editor".flowTabUITestAccessibilityIdentifierComponent)"
+        static let homeAppIdentityDynamic = "flowtab.home.app.\("com.flowtab.mock.identity-dynamic".flowTabUITestAccessibilityIdentifierComponent)"
         static let homeAppIdentityMenuBar = "flowtab.home.app.\("com.flowtab.mock.identity-menu-bar".flowTabUITestAccessibilityIdentifierComponent)"
         static let homeAppIdentityHelper = "flowtab.home.app.\("com.flowtab.mock.identity-helper".flowTabUITestAccessibilityIdentifierComponent)"
         static let homeAppMembershipStable = "flowtab.home.app.\("com.flowtab.mock.membership-stable".flowTabUITestAccessibilityIdentifierComponent)"
@@ -92,6 +93,16 @@ final class FlowTabUITests: XCTestCase {
         static let settingsAppVisibilityDetailProjectionPrefix =
             "flowtab.settings.app-visibility.detail."
         static let settingsAppVisibilityShowToggle = "flowtab.settings.app-visibility.show-toggle"
+        static let settingsAppVisibilityEffectiveHiddenCount =
+            "flowtab.settings.app-visibility.effective-hidden-count"
+        static let settingsAppVisibilityEffectiveHiddenBadge =
+            "flowtab.settings.app-visibility.effective-hidden-badge"
+        static let settingsAppVisibilityRuntimeHiddenReason =
+            "flowtab.settings.app-visibility.runtime-hidden-reason"
+        static let settingsAppVisibilityRegularModeToggleTitle =
+            "flowtab.settings.app-visibility.regular-mode-toggle-title"
+        static let settingsAppVisibilityStandardToggleTitle =
+            "flowtab.settings.app-visibility.standard-toggle-title"
         static let settingsAppVisibilityUnavailableReason =
             "flowtab.settings.app-visibility.unavailable-reason"
         static let settingsAppVisibilitySystemManagedBadge =
@@ -101,6 +112,7 @@ final class FlowTabUITests: XCTestCase {
         static let settingsAppVisibilityMockMail = "flowtab.settings.app-visibility.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
         static let settingsAppVisibilityChineseTest = "flowtab.settings.app-visibility.app.\("com.xxx.test".flowTabUITestAccessibilityIdentifierComponent)"
         static let settingsAppVisibilityIdentityEditor = "flowtab.settings.app-visibility.app.\("com.flowtab.mock.identity-editor".flowTabUITestAccessibilityIdentifierComponent)"
+        static let settingsAppVisibilityIdentityDynamic = "flowtab.settings.app-visibility.app.\("com.flowtab.mock.identity-dynamic".flowTabUITestAccessibilityIdentifierComponent)"
         static let settingsAppVisibilityIdentityMenuBar = "flowtab.settings.app-visibility.app.\("com.flowtab.mock.identity-menu-bar".flowTabUITestAccessibilityIdentifierComponent)"
         static let settingsAppVisibilityIdentityHelper = "flowtab.settings.app-visibility.app.\("com.flowtab.mock.identity-helper".flowTabUITestAccessibilityIdentifierComponent)"
         static let settingsPermissionAccessibilityAction = "flowtab.settings.permission.accessibility-action"

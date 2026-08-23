@@ -64,7 +64,7 @@ extension FlowTabTests {
         )
 
         let result = AppVisibilityPreferencesStore.reconcileHiddenAppIDs(
-            configurableAppIDs: ["com.example.editor", currentAppID],
+            preferenceConfigurableAppIDs: ["com.example.editor", currentAppID],
             userDefaults: userDefaults
         )
 
@@ -76,7 +76,7 @@ extension FlowTabTests {
         )
 
         let stableResult = AppVisibilityPreferencesStore.reconcileHiddenAppIDs(
-            configurableAppIDs: ["com.example.editor", currentAppID],
+            preferenceConfigurableAppIDs: ["com.example.editor", currentAppID],
             userDefaults: userDefaults
         )
         XCTAssertFalse(stableResult.didChange)
@@ -89,14 +89,14 @@ extension FlowTabTests {
                 .appVisibilitySystemManagedReason,
                 language: .simplifiedChinese
             ),
-            "该应用由 macOS 以菜单栏或后台方式运行，不参与应用切换，因此 FlowTab 无法设置其可见性。"
+            "该应用在安装包中声明为菜单栏或后台应用，运行方式由 macOS 管理，因此 FlowTab 无法设置其可见性。"
         )
         XCTAssertEqual(
             AppStrings.text(
                 .appVisibilitySystemManagedReason,
                 language: .english
             ),
-            "This app runs in a macOS-managed menu bar or background mode and does not participate in app switching, so FlowTab cannot configure its visibility."
+            "This app declares itself as a menu bar or background app in its bundle. macOS manages how it runs, so FlowTab cannot configure its visibility."
         )
     }
 
@@ -109,7 +109,7 @@ extension FlowTabTests {
         userDefaults.set([], forKey: AppPreferenceKeys.hiddenAppIDs)
 
         let result = AppVisibilityPreferencesStore.reconcileHiddenAppIDs(
-            configurableAppIDs: [currentAppID],
+            preferenceConfigurableAppIDs: [currentAppID],
             userDefaults: userDefaults
         )
 
@@ -175,11 +175,11 @@ extension FlowTabTests {
         XCTAssertEqual(recordsByID["com.example.editor"]?.visibilityCapability, .configurable)
         XCTAssertEqual(
             recordsByID["com.example.menu-bar"]?.visibilityCapability,
-            .systemManaged(reason: .macOSRuntimeMode)
+            .systemManaged(reason: .staticBundleDeclaration)
         )
         XCTAssertEqual(
             recordsByID["com.example.background"]?.visibilityCapability,
-            .systemManaged(reason: .macOSRuntimeMode)
+            .systemManaged(reason: .staticBundleDeclaration)
         )
         XCTAssertNil(recordsByID["com.example.editor.helper"])
     }

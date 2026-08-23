@@ -57,10 +57,26 @@ final class ApplicationIdentityPolicyTests: XCTestCase {
         )
 
         let expected = ApplicationDirectoryDecision.included(
-            visibilityCapability: .systemManaged(reason: .macOSRuntimeMode)
+            visibilityCapability: .systemManaged(reason: .staticBundleDeclaration)
         )
         XCTAssertEqual(menuBarDecision, expected)
         XCTAssertEqual(backgroundDecision, expected)
+    }
+
+    func testTopLevelDynamicAccessoryApplicationRemainsConfigurable() {
+        XCTAssertEqual(
+            ApplicationIdentityPolicy.decision(
+                for: ApplicationIdentityFacts(
+                    isCurrentProcess: false,
+                    isTerminated: false,
+                    runtimeActivationPolicy: .accessory,
+                    bundleSource: .standardApplicationsDirectory,
+                    isUIElement: false,
+                    isBackgroundOnly: false
+                )
+            ),
+            .included(visibilityCapability: .configurable)
+        )
     }
 
     func testAccessoryHelperOutsideStandardApplicationDirectoryIsExcluded() {

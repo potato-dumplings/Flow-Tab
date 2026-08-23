@@ -8,6 +8,8 @@ struct InstalledAppRecord: Identifiable, Equatable, Sendable {
     let bundleIdentifier: String?
     let path: String?
     let isRunning: Bool
+    let isCurrentProcess: Bool
+    let runtimeActivationPolicy: ApplicationRuntimeActivationPolicy?
     let visibilityCapability: AppVisibilityCapability
 
     init(
@@ -16,6 +18,8 @@ struct InstalledAppRecord: Identifiable, Equatable, Sendable {
         bundleIdentifier: String?,
         path: String?,
         isRunning: Bool,
+        isCurrentProcess: Bool = false,
+        runtimeActivationPolicy: ApplicationRuntimeActivationPolicy? = nil,
         visibilityCapability: AppVisibilityCapability = .configurable
     ) {
         self.id = id
@@ -23,6 +27,8 @@ struct InstalledAppRecord: Identifiable, Equatable, Sendable {
         self.bundleIdentifier = bundleIdentifier
         self.path = path
         self.isRunning = isRunning
+        self.isCurrentProcess = isCurrentProcess
+        self.runtimeActivationPolicy = runtimeActivationPolicy
         self.visibilityCapability = visibilityCapability
     }
 
@@ -30,6 +36,18 @@ struct InstalledAppRecord: Identifiable, Equatable, Sendable {
         bundleIdentifier ?? path ?? id
     }
 
+    func visibilityPresentation(
+        preferenceIsHidden: Bool
+    ) -> AppVisibilityPresentation {
+        AppVisibilityPresentationPolicy.presentation(
+            for: AppVisibilityPresentationFacts(
+                visibilityCapability: visibilityCapability,
+                runtimeActivationPolicy: runtimeActivationPolicy,
+                isCurrentProcess: isCurrentProcess,
+                isHiddenByUserPreference: preferenceIsHidden
+            )
+        )
+    }
 }
 
 protocol AppInventoryProviding: Sendable {
@@ -52,6 +70,13 @@ final class AppInventoryService: AppInventoryProviding, @unchecked Sendable {
     }
 
     func installedApps() -> [InstalledAppRecord] {
+#if FLOWTAB_TESTING
+        if FlowTabUITestAppVisibilityIdentityFixture.contains(
+            FlowTabTestLaunchOptions.mockRuntimeVariant
+        ) {
+            return sortedRecords(uiTestRuntimeRecords())
+        }
+#endif
         var recordsByID: [String: InstalledAppRecord] = [:]
 
         for directory in applicationSearchDirectories() {
@@ -80,7 +105,13 @@ final class AppInventoryService: AppInventoryProviding, @unchecked Sendable {
             )
         }
 
-        return recordsByID.values.sorted { lhs, rhs in
+        return sortedRecords(Array(recordsByID.values))
+    }
+
+    private func sortedRecords(
+        _ records: [InstalledAppRecord]
+    ) -> [InstalledAppRecord] {
+        records.sorted { lhs, rhs in
             let nameOrder = lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName)
             if nameOrder != .orderedSame {
                 return nameOrder == .orderedAscending
@@ -98,11 +129,12 @@ final class AppInventoryService: AppInventoryProviding, @unchecked Sendable {
                 displayName: app.displayName,
                 bundleIdentifier: app.id.hasPrefix("pid:") ? nil : app.id,
                 path: nil,
-                isRunning: true
+                isRunning: true,
+                runtimeActivationPolicy: .regular
             )
         }
-        if FlowTabTestLaunchOptions.mockRuntimeVariant
-            == FlowTabUITestAppVisibilityIdentityFixture.variant {
+        let mockRuntimeVariant = FlowTabTestLaunchOptions.mockRuntimeVariant
+        if FlowTabUITestAppVisibilityIdentityFixture.contains(mockRuntimeVariant) {
             records.append(
                 InstalledAppRecord(
                     id: FlowTabUITestAppVisibilityIdentityFixture.systemManagedAppID,
@@ -110,7 +142,29 @@ final class AppInventoryService: AppInventoryProviding, @unchecked Sendable {
                     bundleIdentifier: FlowTabUITestAppVisibilityIdentityFixture.systemManagedAppID,
                     path: "/Applications/Identity Menu Bar.app",
                     isRunning: true,
-                    visibilityCapability: .systemManaged(reason: .macOSRuntimeMode)
+                    runtimeActivationPolicy: .accessory,
+                    visibilityCapability: .systemManaged(
+                        reason: .staticBundleDeclaration
+                    )
+                )
+            )
+            let dynamicRuntimePolicy: ApplicationRuntimeActivationPolicy?
+            switch mockRuntimeVariant {
+            case FlowTabUITestAppVisibilityIdentityFixture.accessoryVariant:
+                dynamicRuntimePolicy = .accessory
+            case FlowTabUITestAppVisibilityIdentityFixture.regularVariant:
+                dynamicRuntimePolicy = .regular
+            default:
+                dynamicRuntimePolicy = nil
+            }
+            records.append(
+                InstalledAppRecord(
+                    id: FlowTabUITestAppVisibilityIdentityFixture.dynamicAppID,
+                    displayName: "Identity Dynamic",
+                    bundleIdentifier: FlowTabUITestAppVisibilityIdentityFixture.dynamicAppID,
+                    path: "/Applications/Identity Dynamic.app",
+                    isRunning: dynamicRuntimePolicy != nil,
+                    runtimeActivationPolicy: dynamicRuntimePolicy
                 )
             )
         }
@@ -174,12 +228,14 @@ final class AppInventoryService: AppInventoryProviding, @unchecked Sendable {
         let appID = app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
         guard AppVisibilityFilter.normalizedAppID(appID) != nil else { return nil }
         let bundle = app.bundleURL.flatMap(Bundle.init(url:))
+        let isCurrentProcess =
+            app.processIdentifier == ProcessInfo.processInfo.processIdentifier
+        let runtimeActivationPolicy = app.activationPolicy.flowTabCorePolicy
         let decision = ApplicationIdentityPolicy.decision(
             for: ApplicationIdentityFacts(
-                isCurrentProcess:
-                    app.processIdentifier == ProcessInfo.processInfo.processIdentifier,
+                isCurrentProcess: isCurrentProcess,
                 isTerminated: app.isTerminated,
-                runtimeActivationPolicy: app.activationPolicy.flowTabCorePolicy,
+                runtimeActivationPolicy: runtimeActivationPolicy,
                 bundleSource: bundleSource,
                 isUIElement: bundleFlag("LSUIElement", bundle: bundle),
                 isBackgroundOnly: bundleFlag("LSBackgroundOnly", bundle: bundle)
@@ -193,6 +249,8 @@ final class AppInventoryService: AppInventoryProviding, @unchecked Sendable {
             bundleIdentifier: app.bundleIdentifier,
             path: app.bundleURL?.standardizedFileURL.path,
             isRunning: true,
+            isCurrentProcess: isCurrentProcess,
+            runtimeActivationPolicy: runtimeActivationPolicy,
             visibilityCapability: visibilityCapability
         )
     }
@@ -262,7 +320,28 @@ final class AppInventoryService: AppInventoryProviding, @unchecked Sendable {
             bundleIdentifier: existing.bundleIdentifier ?? incoming.bundleIdentifier,
             path: existing.path ?? incoming.path,
             isRunning: existing.isRunning || incoming.isRunning,
-            visibilityCapability: incoming.visibilityCapability
+            isCurrentProcess: existing.isCurrentProcess || incoming.isCurrentProcess,
+            runtimeActivationPolicy:
+                ApplicationRuntimeActivationPolicyAggregation.aggregate(
+                    [
+                        existing.runtimeActivationPolicy,
+                        incoming.runtimeActivationPolicy
+                    ].compactMap { $0 }
+                ),
+            visibilityCapability: mergedVisibilityCapability(
+                existing.visibilityCapability,
+                incoming.visibilityCapability
+            )
         )
+    }
+
+    private func mergedVisibilityCapability(
+        _ lhs: AppVisibilityCapability,
+        _ rhs: AppVisibilityCapability
+    ) -> AppVisibilityCapability {
+        if let reason = lhs.unavailableReason ?? rhs.unavailableReason {
+            return .systemManaged(reason: reason)
+        }
+        return .configurable
     }
 }

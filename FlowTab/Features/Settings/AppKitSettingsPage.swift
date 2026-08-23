@@ -426,7 +426,10 @@ final class AppKitSettingsPageView: NSView {
             with: appVisibilityState
         )
         appVisibilityCard.updateTitleAccessory(
-            appVisibilityState.statusText
+            appVisibilityState.statusText,
+            accessibilityIdentifier:
+                "flowtab.settings.app-visibility.effective-hidden-count",
+            accessibilityValue: "\(appVisibilityState.hiddenAppCount)"
         )
         hotkeyContent.update(with: hotkeyCardState(from: state))
         permissionContent.update(

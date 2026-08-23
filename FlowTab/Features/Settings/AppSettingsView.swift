@@ -59,6 +59,7 @@ struct AppSettingsView: View {
         RuntimePermissionObservationCoordinator()
     @StateObject private var hotkeyRegistrationObservationOwner =
         HotkeyRegistrationObservationOwner()
+    @StateObject private var appVisibilityModel = AppVisibilityManagerModel()
     @State private var windowLayerAutoEnterDelayText = ""
     @State private var didInitialize = false
     @State private var isWindowLayerAutoEnterDelayEditing = false
@@ -67,7 +68,6 @@ struct AppSettingsView: View {
     @State private var hotkeyConflict: HotkeySettingsConflictPresentation?
     @State private var hotkeyPermissionRequirement:
         HotkeySettingsPermissionPresentation?
-    @State private var hiddenAppCount = AppVisibilityPreferencesStore.loadHiddenAppIDs().count
     @State private var showsAppVisibilityManager = false
 
     private let permissionObservationPolicy:
@@ -130,7 +130,7 @@ struct AppSettingsView: View {
                     appID: AppVisibilityPreferencesStore.currentAppID()
                 )
                 showInCommandTab = AppVisibilityPreferencesStore.loadShowInCommandTab()
-                refreshHiddenAppCount()
+                appVisibilityModel.refreshStoredPreferences()
             }
         )
     }
@@ -179,7 +179,7 @@ struct AppSettingsView: View {
                 allowLaunchAtLogin: $allowLaunchAtLogin,
                 searchEnabled: $searchEnabled,
                 searchDefaultScopeRaw: $searchDefaultScopeRaw,
-                hiddenAppCount: hiddenAppCount,
+                hiddenAppCount: appVisibilityModel.hiddenCount,
                 hotkeyPrimaryModifierRaw: $hotkeyPrimaryModifierRaw,
                 hotkeyReverseModifiersRaw: $hotkeyReverseModifiersRaw,
                 hotkeyMainKeyRaw: $hotkeyMainKeyRaw,
@@ -204,7 +204,6 @@ struct AppSettingsView: View {
                 onLaunchAtLoginChanged: handleLaunchAtLoginChanged,
                 onManageAppVisibility: {
                     dismissHotkeyValidation()
-                    refreshHiddenAppCount()
                     withAnimation(appVisibilityNavigationAnimation) {
                         showsAppVisibilityManager = true
                     }
@@ -231,11 +230,10 @@ struct AppSettingsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
             if showsAppVisibilityManager {
-                AppVisibilityManagerView {
+                AppVisibilityManagerView(model: appVisibilityModel) {
                     withAnimation(appVisibilityNavigationAnimation) {
                         showsAppVisibilityManager = false
                     }
-                    refreshHiddenAppCount()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .transition(.opacity)
@@ -281,6 +279,7 @@ struct AppSettingsView: View {
             guard isActive else { return }
             refreshAccessibilityStatus()
             refreshScreenCaptureStatus()
+            appVisibilityModel.reload()
         }
         .onReceive(NotificationCenter.default.publisher(
             for: NSApplication.didResignActiveNotification
@@ -291,12 +290,12 @@ struct AppSettingsView: View {
             for: UserDefaults.didChangeNotification
         )) { _ in
             handleStoredHotkeyDefaultsDidChange()
-            refreshHiddenAppCount()
+            appVisibilityModel.refreshStoredPreferences()
         }
         .onReceive(NotificationCenter.default.publisher(
             for: .flowTabAppVisibilityPreferenceChanged
         )) { _ in
-            refreshHiddenAppCount()
+            appVisibilityModel.refreshStoredPreferences()
         }
         .onDisappear {
             dismissHotkeyValidation()
@@ -326,6 +325,7 @@ struct AppSettingsView: View {
         }
         refreshAccessibilityStatus()
         refreshScreenCaptureStatus()
+        appVisibilityModel.reload()
     }
 
     private func cancelPermissionObservation() {
@@ -719,16 +719,12 @@ struct AppSettingsView: View {
     }
 
     private func notifyAppVisibilityPreferenceChanged() {
-        refreshHiddenAppCount()
+        appVisibilityModel.refreshStoredPreferences()
         RuntimeLog.info(
             .app,
             "showInCommandTab=\(showInCommandTab)"
         )
         NotificationCenter.default.post(name: .flowTabAppVisibilityPreferenceChanged, object: nil)
-    }
-
-    private func refreshHiddenAppCount() {
-        hiddenAppCount = AppVisibilityPreferencesStore.loadHiddenAppIDs().count
     }
 
     private func startPermissionObservation(

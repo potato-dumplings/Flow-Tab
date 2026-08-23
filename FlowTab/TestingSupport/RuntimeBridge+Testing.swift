@@ -104,7 +104,8 @@ struct FlowTabUITestRuntimeProjectionDataset {
                     bundleURL: nil
                 )
             ]
-        case FlowTabUITestAppVisibilityIdentityFixture.variant:
+        case FlowTabUITestAppVisibilityIdentityFixture.closedVariant,
+             FlowTabUITestAppVisibilityIdentityFixture.accessoryVariant:
             return [
                 (
                     appID: FlowTabUITestAppVisibilityIdentityFixture.configurableAppID,
@@ -118,6 +119,37 @@ struct FlowTabUITestRuntimeProjectionDataset {
                         )
                     ],
                     rank: 0,
+                    bundleURL: nil
+                )
+            ]
+        case FlowTabUITestAppVisibilityIdentityFixture.regularVariant:
+            return [
+                (
+                    appID: FlowTabUITestAppVisibilityIdentityFixture.configurableAppID,
+                    name: "Identity Editor",
+                    windows: [
+                        WindowCandidate(
+                            id: "identity-editor-main",
+                            title: "Identity Document",
+                            isMinimized: false,
+                            lastActiveAt: 400
+                        )
+                    ],
+                    rank: 0,
+                    bundleURL: nil
+                ),
+                (
+                    appID: FlowTabUITestAppVisibilityIdentityFixture.dynamicAppID,
+                    name: "Identity Dynamic",
+                    windows: [
+                        WindowCandidate(
+                            id: "identity-dynamic-main",
+                            title: "Dynamic Document",
+                            isMinimized: false,
+                            lastActiveAt: 399
+                        )
+                    ],
+                    rank: 1,
                     bundleURL: nil
                 )
             ]

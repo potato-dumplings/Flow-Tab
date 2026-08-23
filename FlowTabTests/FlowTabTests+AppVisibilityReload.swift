@@ -42,7 +42,9 @@ extension FlowTabTests {
                     bundleIdentifier: systemManagedAppID,
                     path: "/Applications/Menu Bar.app",
                     isRunning: true,
-                    visibilityCapability: .systemManaged(reason: .macOSRuntimeMode)
+                    visibilityCapability: .systemManaged(
+                        reason: .staticBundleDeclaration
+                    )
                 )
             ]
         )

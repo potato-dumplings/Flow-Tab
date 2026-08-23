@@ -24,8 +24,9 @@ struct AppVisibilityManagerDetailView: View {
     }
 
     private func appDetail(for app: InstalledAppRecord) -> some View {
-        let isHidden = model.isHidden(app)
-        let isConfigurable = app.visibilityCapability.isConfigurable
+        let presentation = model.presentation(for: app)
+        let isPreferenceHidden = model.isPreferenceHidden(app)
+        let isControlAvailable = presentation.controlMode != .unavailable
         return VStack(alignment: .leading, spacing: 23) {
             HStack(alignment: .center, spacing: 16) {
                 AppVisibilityIconView(app: app, size: 62)
@@ -35,19 +36,28 @@ struct AppVisibilityManagerDetailView: View {
                         Text(app.displayName)
                             .font(FlowTypography.swiftUI(.pageTitle))
                             .lineLimit(1)
-                        if !isConfigurable {
-                            Text(
-                                AppStrings.text(
+                        switch presentation.state {
+                        case .visible:
+                            EmptyView()
+                        case .hidden:
+                            visibilityBadge(
+                                text: AppStrings.text(
+                                    .appVisibilityHiddenBadge,
+                                    language: language
+                                ),
+                                color: .secondary,
+                                accessibilityIdentifier:
+                                    "flowtab.settings.app-visibility.effective-hidden-badge"
+                            )
+                        case .unavailable:
+                            visibilityBadge(
+                                text: AppStrings.text(
                                     .appVisibilitySystemManagedBadge,
                                     language: language
-                                )
-                            )
-                            .font(FlowTypography.swiftUI(.micro))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(Color.orange.opacity(0.14)))
-                            .accessibilityIdentifier(
-                                "flowtab.settings.app-visibility.system-managed-badge"
+                                ),
+                                color: .orange,
+                                accessibilityIdentifier:
+                                    "flowtab.settings.app-visibility.system-managed-badge"
                             )
                         }
                     }
@@ -62,30 +72,33 @@ struct AppVisibilityManagerDetailView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 14) {
-                    Text(AppStrings.text(.appVisibilityShowInSwitcher, language: language))
+                    Text(toggleTitle(presentation.controlMode))
                         .font(FlowTypography.swiftUI(.formLabelEmphasized))
+                        .accessibilityIdentifier(
+                            presentation.controlMode == .regularModeOnly
+                                ? "flowtab.settings.app-visibility.regular-mode-toggle-title"
+                                : "flowtab.settings.app-visibility.standard-toggle-title"
+                        )
                     Toggle(
                         "",
                         isOn: Binding(
-                            get: { !isHidden },
+                            get: { !isPreferenceHidden },
                             set: { model.setHidden(!$0, for: app.id) }
                         )
                     )
                     .toggleStyle(.switch)
                     .labelsHidden()
-                    .disabled(!isConfigurable)
+                    .disabled(!isControlAvailable)
                     .accessibilityIdentifier("flowtab.settings.app-visibility.show-toggle")
                 }
 
-                if let reason = app.visibilityCapability.unavailableReason {
-                    Text(unavailableReasonText(reason))
+                if let reasonText = reasonText(for: presentation.state) {
+                    Text(reasonText.text)
                         .font(FlowTypography.swiftUI(.body))
                         .foregroundStyle(.secondary)
                         .lineSpacing(2)
                         .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier(
-                            "flowtab.settings.app-visibility.unavailable-reason"
-                        )
+                        .accessibilityIdentifier(reasonText.accessibilityIdentifier)
                 }
             }
 
@@ -102,7 +115,7 @@ struct AppVisibilityManagerDetailView: View {
                 Divider().overlay(rowSeparatorColor)
                 detailRow(
                     title: AppStrings.text(.appVisibilityStatus, language: language),
-                    value: statusText(isHidden: isHidden, isConfigurable: isConfigurable)
+                    value: statusText(presentation.state)
                 )
             }
             .padding(.horizontal, 14)
@@ -116,7 +129,7 @@ struct AppVisibilityManagerDetailView: View {
                     .stroke(borderColor, lineWidth: 1)
             )
 
-            if isConfigurable {
+            if isControlAvailable {
                 Text(AppStrings.text(.appVisibilityEffectNote, language: language))
                     .font(FlowTypography.swiftUI(.body))
                     .foregroundStyle(.secondary)
@@ -151,6 +164,19 @@ struct AppVisibilityManagerDetailView: View {
         .frame(minHeight: 38)
     }
 
+    private func visibilityBadge(
+        text: String,
+        color: Color,
+        accessibilityIdentifier: String
+    ) -> some View {
+        Text(text)
+            .font(FlowTypography.swiftUI(.micro))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(color.opacity(0.14)))
+            .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
     private var emptyDetail: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(AppStrings.text(.appVisibilityNoSelectionTitle, language: language))
@@ -161,20 +187,49 @@ struct AppVisibilityManagerDetailView: View {
         }
     }
 
-    private func statusText(isHidden: Bool, isConfigurable: Bool) -> String {
-        if !isConfigurable {
+    private func statusText(_ state: AppVisibilityPresentationState) -> String {
+        switch state {
+        case .visible:
+            return AppStrings.text(.appVisibilityStatusVisible, language: language)
+        case .hidden:
+            return AppStrings.text(.appVisibilityStatusHidden, language: language)
+        case .unavailable:
             return AppStrings.text(.appVisibilityStatusSystemManaged, language: language)
         }
-        return AppStrings.text(
-            isHidden ? .appVisibilityStatusHidden : .appVisibilityStatusVisible,
-            language: language
-        )
     }
 
     private func unavailableReasonText(_ reason: AppVisibilityUnavailableReason) -> String {
         switch reason {
-        case .macOSRuntimeMode:
+        case .staticBundleDeclaration:
             return AppStrings.text(.appVisibilitySystemManagedReason, language: language)
+        }
+    }
+
+    private func toggleTitle(_ controlMode: AppVisibilityControlMode) -> String {
+        AppStrings.text(
+            controlMode == .regularModeOnly
+                ? .appVisibilityShowInSwitcherRegularMode
+                : .appVisibilityShowInSwitcher,
+            language: language
+        )
+    }
+
+    private func reasonText(
+        for state: AppVisibilityPresentationState
+    ) -> (text: String, accessibilityIdentifier: String)? {
+        switch state {
+        case .visible, .hidden(reason: .userPreference):
+            return nil
+        case .hidden(reason: .runtimeMode):
+            return (
+                AppStrings.text(.appVisibilityRuntimeHiddenReason, language: language),
+                "flowtab.settings.app-visibility.runtime-hidden-reason"
+            )
+        case let .unavailable(reason):
+            return (
+                unavailableReasonText(reason),
+                "flowtab.settings.app-visibility.unavailable-reason"
+            )
         }
     }
 }

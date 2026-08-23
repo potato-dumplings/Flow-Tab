@@ -646,7 +646,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     .map(\.id)
             )
             let result = AppVisibilityPreferencesStore.reconcileHiddenAppIDs(
-                configurableAppIDs: configurableAppIDs,
+                preferenceConfigurableAppIDs: configurableAppIDs,
                 userDefaults: userDefaults
             )
             appVisibilityReconciliationTask = nil

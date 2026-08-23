@@ -2,10 +2,19 @@
 import Foundation
 
 enum FlowTabUITestAppVisibilityIdentityFixture {
-    static let variant = "app-visibility-identity"
+    static let closedVariant = "app-visibility-identity-closed"
+    static let accessoryVariant = "app-visibility-identity-accessory"
+    static let regularVariant = "app-visibility-identity-regular"
     static let configurableAppID = "com.flowtab.mock.identity-editor"
+    static let dynamicAppID = "com.flowtab.mock.identity-dynamic"
     static let systemManagedAppID = "com.flowtab.mock.identity-menu-bar"
     static let auxiliaryProcessID = "com.flowtab.mock.identity-helper"
+
+    static func contains(_ variant: String?) -> Bool {
+        variant == closedVariant
+            || variant == accessoryVariant
+            || variant == regularVariant
+    }
 }
 
 enum FlowTabUITestApplicationMembershipFixture {

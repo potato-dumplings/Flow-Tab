@@ -129,6 +129,7 @@ enum AppStringKey: String {
     case appVisibilityNoSelectionTitle
     case appVisibilityNoSelectionSubtitle
     case appVisibilityShowInSwitcher
+    case appVisibilityShowInSwitcherRegularMode
     case appVisibilityBundleID
     case appVisibilityPath
     case appVisibilityStatus
@@ -139,6 +140,7 @@ enum AppStringKey: String {
     case appVisibilityHiddenBadge
     case appVisibilitySystemManagedBadge
     case appVisibilitySystemManagedReason
+    case appVisibilityRuntimeHiddenReason
     case permissionAccessibilityGranted
     case permissionAccessibilityDenied
     case permissionAccessibilityManage
@@ -296,6 +298,7 @@ enum AppStrings {
             .appVisibilityNoSelectionTitle: "选择一个应用",
             .appVisibilityNoSelectionSubtitle: "在左侧列表中选择应用后调整可见性。",
             .appVisibilityShowInSwitcher: "在 FlowTab 切换器中显示",
+            .appVisibilityShowInSwitcherRegularMode: "普通模式下在 FlowTab 中显示",
             .appVisibilityBundleID: "Bundle ID",
             .appVisibilityPath: "路径",
             .appVisibilityStatus: "状态",
@@ -305,7 +308,8 @@ enum AppStrings {
             .appVisibilityEffectNote: "该设置影响全局 Option + Tab 应用面板、应用搜索以及对应窗口搜索结果。当前应用内的窗口切换不受影响。",
             .appVisibilityHiddenBadge: "已隐藏",
             .appVisibilitySystemManagedBadge: "无法设置",
-            .appVisibilitySystemManagedReason: "该应用由 macOS 以菜单栏或后台方式运行，不参与应用切换，因此 FlowTab 无法设置其可见性。",
+            .appVisibilitySystemManagedReason: "该应用在安装包中声明为菜单栏或后台应用，运行方式由 macOS 管理，因此 FlowTab 无法设置其可见性。",
+            .appVisibilityRuntimeHiddenReason: "该应用当前以辅助或后台模式运行，因此暂不参与应用切换；恢复普通模式后将应用此设置。",
             .permissionAccessibilityGranted: "辅助功能权限：已授权",
             .permissionAccessibilityDenied: "辅助功能权限：未授权",
             .permissionAccessibilityManage: "管理辅助功能权限",
@@ -458,6 +462,7 @@ enum AppStrings {
             .appVisibilityNoSelectionTitle: "Select an app",
             .appVisibilityNoSelectionSubtitle: "Choose an app from the list to adjust visibility.",
             .appVisibilityShowInSwitcher: "Show in FlowTab switcher",
+            .appVisibilityShowInSwitcherRegularMode: "Show in FlowTab when running as a regular app",
             .appVisibilityBundleID: "Bundle ID",
             .appVisibilityPath: "Path",
             .appVisibilityStatus: "Status",
@@ -467,7 +472,8 @@ enum AppStrings {
             .appVisibilityEffectNote: "This affects the global Option + Tab app layer, app search, and matching window search results. In-app window switching is not affected.",
             .appVisibilityHiddenBadge: "Hidden",
             .appVisibilitySystemManagedBadge: "Unavailable",
-            .appVisibilitySystemManagedReason: "This app runs in a macOS-managed menu bar or background mode and does not participate in app switching, so FlowTab cannot configure its visibility.",
+            .appVisibilitySystemManagedReason: "This app declares itself as a menu bar or background app in its bundle. macOS manages how it runs, so FlowTab cannot configure its visibility.",
+            .appVisibilityRuntimeHiddenReason: "This app is currently running in an accessory or background mode, so it does not participate in app switching for now. This setting will apply when it returns to regular mode.",
             .permissionAccessibilityGranted: "Accessibility: Granted",
             .permissionAccessibilityDenied: "Accessibility: Not granted",
             .permissionAccessibilityManage: "Manage",

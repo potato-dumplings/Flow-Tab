@@ -1,4 +1,4 @@
-public enum ApplicationRuntimeActivationPolicy: Equatable, Sendable {
+public enum ApplicationRuntimeActivationPolicy: Equatable, Hashable, Sendable {
     case regular
     case accessory
     case prohibited
@@ -10,7 +10,7 @@ public enum ApplicationBundleSource: Equatable, Sendable {
 }
 
 public enum AppVisibilityUnavailableReason: Equatable, Sendable {
-    case macOSRuntimeMode
+    case staticBundleDeclaration
 }
 
 public enum AppVisibilityCapability: Equatable, Sendable {
@@ -72,23 +72,24 @@ public enum ApplicationIdentityPolicy {
     ) -> ApplicationDirectoryDecision {
         guard !facts.isTerminated else { return .excluded }
 
-        if facts.isCurrentProcess || facts.runtimeActivationPolicy == .regular {
+        if facts.isCurrentProcess {
             return .included(visibilityCapability: .configurable)
         }
 
-        guard facts.bundleSource == .standardApplicationsDirectory else {
+        if facts.bundleSource == .standardApplicationsDirectory {
+            if facts.isUIElement || facts.isBackgroundOnly {
+                return .included(
+                    visibilityCapability: .systemManaged(
+                        reason: .staticBundleDeclaration
+                    )
+                )
+            }
+            return .included(visibilityCapability: .configurable)
+        }
+
+        guard facts.runtimeActivationPolicy == .regular else {
             return .excluded
         }
-
-        if facts.isUIElement
-            || facts.isBackgroundOnly
-            || facts.runtimeActivationPolicy == .accessory
-            || facts.runtimeActivationPolicy == .prohibited {
-            return .included(
-                visibilityCapability: .systemManaged(reason: .macOSRuntimeMode)
-            )
-        }
-
         return .included(visibilityCapability: .configurable)
     }
 }

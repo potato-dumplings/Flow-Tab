@@ -1,14 +1,14 @@
 import AppKit
 import SwiftUI
+import FlowTabCore
 
 struct AppVisibilityManagerView: View {
     private enum Layout {
         static let listRowHeight: CGFloat = 55
     }
 
+    @ObservedObject var model: AppVisibilityManagerModel
     let onClose: () -> Void
-
-    @StateObject private var model = AppVisibilityManagerModel()
     @ObservedObject private var presentation = FlowPresentationState.shared
 
     private var colorScheme: ColorScheme {
@@ -114,6 +114,7 @@ struct AppVisibilityManagerView: View {
                 .accessibilityIdentifier(
                     model.inventoryReadiness.accessibilityIdentifier
                 )
+                .accessibilityValue("\(model.hiddenCount)")
             }
         }
     }
@@ -242,7 +243,7 @@ struct AppVisibilityManagerView: View {
         } label: {
             AppVisibilityListRow(
                 app: app,
-                isHidden: model.isHidden(app),
+                presentation: model.presentation(for: app),
                 isSelected: app.id == model.selectedAppID,
                 language: appLanguage
             )
@@ -305,7 +306,7 @@ struct AppVisibilityManagerView: View {
 
 private struct AppVisibilityListRow: View {
     let app: InstalledAppRecord
-    let isHidden: Bool
+    let presentation: AppVisibilityPresentation
     let isSelected: Bool
     let language: AppLanguage
 
@@ -318,18 +319,27 @@ private struct AppVisibilityListRow: View {
                     Text(app.displayName)
                         .font(.system(size: 12.5, weight: .medium))
                         .lineLimit(1)
-                    if isHidden {
+                    switch presentation.state {
+                    case .visible:
+                        EmptyView()
+                    case .hidden:
                         Text(AppStrings.text(.appVisibilityHiddenBadge, language: language))
                             .font(FlowTypography.swiftUI(.micro))
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
                             .background(Capsule().fill(Color.secondary.opacity(0.16)))
-                    } else if !app.visibilityCapability.isConfigurable {
+                            .accessibilityIdentifier(
+                                "flowtab.settings.app-visibility.effective-hidden-badge"
+                            )
+                    case .unavailable:
                         Text(AppStrings.text(.appVisibilitySystemManagedBadge, language: language))
                             .font(FlowTypography.swiftUI(.micro))
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
                             .background(Capsule().fill(Color.orange.opacity(0.14)))
+                            .accessibilityIdentifier(
+                                "flowtab.settings.app-visibility.system-managed-list-badge"
+                            )
                     }
                 }
                 Text(app.subtitle)

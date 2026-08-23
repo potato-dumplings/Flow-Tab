@@ -207,7 +207,9 @@ extension FlowTabPriorityCoverageTests {
                         bundleIdentifier: "com.example.menu-bar",
                         path: "/Applications/Menu Bar.app",
                         isRunning: true,
-                        visibilityCapability: .systemManaged(reason: .macOSRuntimeMode)
+                        visibilityCapability: .systemManaged(
+                            reason: .staticBundleDeclaration
+                        )
                     )
                 ]
             }
