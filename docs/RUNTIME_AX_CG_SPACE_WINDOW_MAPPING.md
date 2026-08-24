@@ -1298,3 +1298,16 @@ Phase 7 completion-audit ledger: [RUNTIME_PROJECTION_COMPLETION_AUDIT.md](RUNTIM
 - `Control+Tab` 首帧继续只读取 runtime focused-current-app projection。应用切换与热键紧邻发生时，焦点身份已经由 Workspace 激活事件写入 lock-protected read model，后台 rank/provider refresh 仍可按既有 maintenance 节奏运行。
 - 永久回归覆盖 activation entry 抵抗旧 rank evidence、AppDelegate activation observer 生命周期、固定前台 UI-test 投影隔离、首个 Control+Tab 手势，以及真实 Finder Fixture -> Chrome Fixture 激活后立即触发 Control+Tab 的精确应用投影。
 - canonical noisy fullscreen/off-Space pressure 通过 20 个 0.5s PID/签名身份匹配样本；CPU avg/p95/max 为 90.48/165.00/165.80%，RSS avg/p95/max 为 141.40/186.98/215.91 MB。相对最近同机同路径基线，CPU 分别变化 -5.36/+1.60/-8.00 个百分点，RSS 分别变化 -4.62/+7.31/+36.10 MB。
+
+## 首页 AX 采集终止不变量（2026-08-24）
+
+- `9dac89a1` 增加的 presentation-time app-membership refresh 会在 Home 看到不完整 projection 时稳定触发 full repair。真实 Release 采样将现象定位到三条同步边界：projection worker 可停在 AX app collection 的 `DispatchGroup.wait()`；日志切首页时主线程可停在 `_AXMIGAddNotification`；首页切日志时主线程可停在 AX notification remove。
+- 所有参与窗口读取、远端 token 解析、初始回读和窗口通知注册的精确 app/window `AXUIElement` 都应用 0.5 秒 messaging timeout。窗口子元素各自设置，因为 timeout 归属于精确元素实例。
+- app collection 使用最多四个 worker、按索引领取任务，并保留 4 秒 terminal completion watchdog。正常完成结果仍按原应用顺序发布；watchdog 到期时关闭 batch、取消剩余远端扫描并只返回已完成应用的结果，迟到结果不能写回已关闭 batch。
+- 被取消的远端扫描携带 `scanned`、`maximum` 与已观察窗口，completeness 为 `cancelled`。该证据保持 non-authoritative，不消费 missing-AX grace，也不能提交窗口缺失事实；只有完整遍历 policy-owned ID range 的 `.complete` 证据具有 absence authority。
+- Home 的 observer create/register、destroyed-window 同步、initial readback 和 unregister 统一调度到最多四并发的 `FlowTab.RuntimeAXWindowObservation` 命名队列。重复 Home projection 读取按 app/PID 合并；当前 Home 生命周期内缓存 unavailable binding；generation 校验负责清理迟到结果；主线程只提交 observer 状态和增删本地 run-loop source。异步 unregister 完成前持续持有 callback context。
+- AX 通知注册在精确元素 timeout 生效后执行。`.cannotComplete` 等远端终止错误会结束该元素的后续注册；已成功注册的通知仍可形成有效 observer。回归覆盖 timeout-first 顺序、终止错误截断、Home 重复 rebind 合并、取消证据的 absence authority，以及 0.1 秒注入 watchdog 返回 `[0, 2]`。
+- 修复前采样中，projection worker 的 2584/2584 个样本均停在 group wait；另一份 Release 采样的 6019 个主线程样本中有 2431 个停在 `_AXMIGAddNotification`。修复后 6 秒 Release 双向切换采样的 4348 个主线程样本中，AX observer add/remove 与 group wait 均为 0；延迟 AX transport 全部位于命名后台队列。
+- 固定路径 UI 回归执行四轮共八次首页/日志双向切换，并验证 degraded Home 最终结束 loading，2/2 通过（9.361 秒与 2.928 秒，总计 12.288 秒）。UI wrapper 会把 `FLOWTAB_UI_TEST_APP_PATH` 写入生成的 `.xctestrun`，保证 runner 使用本次选定并安装的 App 路径。
+- canonical `FlowTabTests` 通过 1229/1229，0 failures；runtime projection exit-contract、UI runner shell、Release control-plane marker、diff 完整性和 GitNexus changed-process 审计均通过。
+- canonical runtime-topology Pressure 完整执行真实四窗口 fullscreen/off-Space/no-app-AX 场景，1/1 通过；41/41 次身份检查匹配，稳定窗口 5090 ms，cleanup 精确。CPU avg/p95/max 为 58.86/157.00/199.20%，RSS avg/p95/max 为 173.52/240.84/250.73 MB；证据保存在 `.build-local/home-ax-stall-validation/attempts/topology-005`。

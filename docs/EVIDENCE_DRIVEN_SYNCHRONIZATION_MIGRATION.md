@@ -29593,6 +29593,57 @@ polling cadence, deadline, or timeout in the scoped paths.
 - Closure commit subject:
   `test(sync): close SYNC-001 signed pressure validation`.
 
+#### 2026-08-24 Home AX Termination and Navigation Addendum
+
+- A later presentation-time membership refresh made incomplete Home projection
+  startup reliably enter full repair. Live Release samples mapped the reported
+  behavior to three synchronous boundaries: the projection worker could remain
+  in AX app-collection `DispatchGroup.wait()`, Logs-to-Home could retain the main
+  thread in `_AXMIGAddNotification`, and Home-to-Logs could retain it while AX
+  notifications were removed.
+- Deterministic scan success still requires the complete policy-owned element-ID
+  range. Every exact app/window/remote-token `AXUIElement` now receives a
+  0.5-second messaging timeout before cross-process AX messaging. The app batch
+  uses at most four workers, owns a four-second terminal completion watchdog,
+  and returns completed app results in source order when the watchdog expires.
+- Batch closure propagates cancellation into remote ID scanning. Cancelled
+  evidence records `scanned`, `maximum`, and observed windows, remains
+  non-authoritative for absence, and does not consume missing-AX grace. Late
+  worker results are rejected after batch closure.
+- Home AX observer create/register, destroyed-window synchronization, initial
+  readback, and unregister now run on the bounded named
+  `FlowTab.RuntimeAXWindowObservation` queue. Repeated Home reads coalesce by
+  app/PID, unavailable bindings are cached for the active Home lifecycle, and
+  generation checks clean up stale completions. The main actor only commits
+  observer state and adds or removes local run-loop sources. Observer callback
+  context lifetime extends through asynchronous unregister completion.
+- The pre-change collector regression timed out with no result while one app
+  remained blocked. The fixed regression returns `[0, 2]` under an injected
+  0.1-second watchdog. Registration policy coverage proves timeout-first ordering
+  and terminal-failure cutoff; lifecycle coverage proves deferred/coalesced Home
+  registration and cancellation remains non-authoritative for absence.
+- Pre-change sampling recorded all 2584 projection-worker samples in group wait;
+  a second Release sample recorded 2431 of 6019 main-thread samples in
+  `_AXMIGAddNotification`. In the fixed six-second Release navigation sample,
+  all 4348 main-thread samples contained zero AX observer add/remove calls and
+  zero group-wait frames; the delayed AX transport was confined to the named
+  background queue.
+- Fixed-path UI coverage passed the four-cycle, eight-transition Home/Logs test
+  and degraded Home-loading completion test 2/2 in 12.288 seconds (9.361 and
+  2.928 seconds). The UI wrapper now writes `FLOWTAB_UI_TEST_APP_PATH` into the
+  generated `.xctestrun`, so the test runner uses the selected installed app
+  instead of falling back to a stale Testing app path.
+- Canonical `FlowTabTests` passed 1229/1229 with zero failures. The runtime
+  projection exit-contract audit, UI-runner shell validation, Release
+  control-plane marker audit, project diff check, and GitNexus changed-process
+  review also passed.
+- Canonical runtime-topology Pressure completed the real four-window
+  fullscreen/off-Space/no-app-AX scene 1/1. All 41 identity checks matched over
+  a 5090 ms stable window, cleanup was exact, CPU avg/p95/max was
+  58.86/157.00/199.20%, and RSS avg/p95/max was
+  173.52/240.84/250.73 MB. Evidence is retained under
+  `.build-local/home-ax-stall-validation/attempts/topology-005`.
+
 ### SYNC-002 Authorized Resume Closure Record
 
 - Status and authorization: completed. Before resuming this independently

@@ -4,6 +4,78 @@ import XCTest
 
 extension FlowTabPriorityCoverageTests {
     @MainActor
+    func testAXWindowChangeMonitorRebindDefersRemoteTransportAndCoalescesRepeatedHomeReads() {
+        let scheduler = ManualAXWindowObservationWorkScheduler()
+        let monitor = RuntimeAXWindowChangeMonitor(
+            observationWorkScheduler: scheduler,
+            accessibilityTrustProvider: { true }
+        )
+        let summary = RuntimeHomeAppSummary(
+            appID: "com.example.home-rebind",
+            displayName: "Home Rebind",
+            groupID: "com.example.home-rebind",
+            lastActiveAt: 1,
+            windowCount: 1,
+            pid: 18_418
+        )
+
+        monitor.rebind([summary])
+        monitor.rebind([summary])
+
+        XCTAssertEqual(scheduler.workItems.count, 1)
+
+        monitor.stop()
+        monitor.rebind([summary])
+
+        XCTAssertEqual(scheduler.workItems.count, 2)
+    }
+
+    func testAXWindowObservationRegistrationBoundsRemoteTransportFailure() {
+        XCTAssertEqual(
+            RuntimeAXMessagingTimeoutPolicy.perElementSeconds,
+            0.5,
+            accuracy: 0.001
+        )
+        let appElement = AXUIElementCreateApplication(18_419)
+        let notifications = [
+            kAXWindowCreatedNotification as CFString,
+            kAXFocusedWindowChangedNotification as CFString,
+            kAXMainWindowChangedNotification as CFString
+        ]
+        var events: [String] = []
+
+        let evidence = RuntimeAXWindowObservationRegistrationPolicy.register(
+            element: appElement,
+            notifications: notifications,
+            applyMessagingTimeout: { element in
+                XCTAssertTrue(CFEqual(element, appElement))
+                events.append("timeout")
+            },
+            addNotification: { element, notification in
+                XCTAssertTrue(CFEqual(element, appElement))
+                events.append(notification as String)
+                return notification as String == kAXWindowCreatedNotification as String
+                    ? .success
+                    : .cannotComplete
+            }
+        )
+
+        XCTAssertEqual(
+            events,
+            [
+                "timeout",
+                kAXWindowCreatedNotification as String,
+                kAXFocusedWindowChangedNotification as String
+            ]
+        )
+        XCTAssertEqual(
+            evidence.registeredNotifications.map { $0 as String },
+            [kAXWindowCreatedNotification as String]
+        )
+        XCTAssertEqual(evidence.lastResult, .cannotComplete)
+    }
+
+    @MainActor
     func testAXWindowInitialReadbackCountsExactIdentityWithoutReusingBaselineEntry() {
         let retainedWindow = AXUIElementCreateApplication(18_420)
         let replacedWindow = AXUIElementCreateApplication(18_421)
@@ -351,6 +423,16 @@ private func matchedAXWindowInitialReadbackEvidence(
         fetchErrorRawValue: 0,
         rawValueTypeDescription: "CFArray"
     )
+}
+
+private final class ManualAXWindowObservationWorkScheduler:
+    RuntimeAXWindowObservationWorkScheduling
+{
+    private(set) var workItems: [@Sendable () -> Void] = []
+
+    func schedule(_ work: @escaping @Sendable () -> Void) {
+        workItems.append(work)
+    }
 }
 
 @MainActor

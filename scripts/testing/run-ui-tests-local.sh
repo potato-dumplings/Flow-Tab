@@ -532,6 +532,15 @@ set_xctestrun_environment_value() {
   fi
 }
 
+remove_xctestrun_environment_value() {
+  local xctestrun_path="$1"
+  local key_path="$2"
+
+  if plutil -type "${key_path}" "${xctestrun_path}" >/dev/null 2>&1; then
+    plutil -remove "${key_path}" "${xctestrun_path}"
+  fi
+}
+
 configure_ui_test_runner_environment() {
   local products_root
   local xctestrun_path
@@ -575,6 +584,16 @@ configure_ui_test_runner_environment() {
     "${UI_TEST_XCTESTRUN_PATH}" \
     "FlowTabUITests.EnvironmentVariables.FLOWTAB_SYSTEM_APP_MRU_FIXTURE_WORKFLOW_PATH" \
     "${SYSTEM_APP_MRU_FIXTURE_ACCESSIBLE_PATH}"
+  if [[ -n "${FLOWTAB_UI_TEST_APP_PATH:-}" ]]; then
+    set_xctestrun_environment_value \
+      "${UI_TEST_XCTESTRUN_PATH}" \
+      "FlowTabUITests.EnvironmentVariables.FLOWTAB_UI_TEST_APP_PATH" \
+      "${FLOWTAB_UI_TEST_APP_PATH}"
+  else
+    remove_xctestrun_environment_value \
+      "${UI_TEST_XCTESTRUN_PATH}" \
+      "FlowTabUITests.EnvironmentVariables.FLOWTAB_UI_TEST_APP_PATH"
+  fi
   echo "Configured UI test runner environment: ${UI_TEST_XCTESTRUN_PATH}"
 }
 

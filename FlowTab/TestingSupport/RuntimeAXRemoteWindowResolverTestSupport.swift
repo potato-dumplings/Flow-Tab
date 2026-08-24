@@ -25,10 +25,12 @@ enum RuntimeAXRemoteWindowResolverForTesting {
 
     static func scan(
         for useCase: ScanUseCase,
+        isCancelled: () -> Bool = { false },
         resolveElement: (UInt64) -> AXUIElement?
     ) -> RuntimeAXRemoteWindowResolver.WindowScanResult {
         RuntimeAXRemoteWindowResolver.scanElementIDs(
             policy: RuntimeAXRemoteWindowResolver.scanPolicy(for: useCase),
+            isCancelled: isCancelled,
             resolveElement: resolveElement
         )
     }

@@ -6,6 +6,7 @@ enum FlowTabUITestHomeAndLogsWatchdogPolicy {
     static let frontmostApplicationActivation: TimeInterval = 5
     static let homeTabTriggerReadiness: TimeInterval = 5
     static let homeTabProjectionReadiness: TimeInterval = 5
+    static let bidirectionalNavigationResponsiveness: TimeInterval = 3
     static let liveApplicationDirectoryReadiness: TimeInterval = 2
     static let overviewChromeProjectionReadiness: TimeInterval = 8
     static let hiddenAppRowProjectionReadiness: TimeInterval = 8
@@ -264,6 +265,20 @@ extension FlowTabUITests {
         XCTAssertGreaterThan(
             FlowTabUITestHomeAndLogsWatchdogPolicy
                 .homeTabProjectionReadiness,
+            0
+        )
+        XCTAssertEqual(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .bidirectionalNavigationResponsiveness,
+            3
+        )
+        XCTAssertTrue(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .bidirectionalNavigationResponsiveness.isFinite
+        )
+        XCTAssertGreaterThan(
+            FlowTabUITestHomeAndLogsWatchdogPolicy
+                .bidirectionalNavigationResponsiveness,
             0
         )
         XCTAssertEqual(
