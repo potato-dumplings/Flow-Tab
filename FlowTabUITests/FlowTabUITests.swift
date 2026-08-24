@@ -170,6 +170,7 @@ final class FlowTabUITests: XCTestCase {
     }
 
     override func setUpWithError() throws {
+        FlowTabUITestObservationScope.shared.cancelAll()
         continueAfterFailure = false
         terminateAppIfRunning()
         preserveAndClearFlowTabUserDefaultsForUITest()
@@ -178,6 +179,7 @@ final class FlowTabUITests: XCTestCase {
     }
 
     override func tearDownWithError() throws {
+        FlowTabUITestObservationScope.shared.cancelAll()
         terminateAppIfRunning()
         terminateSpaceFixtureAppIfRunning()
         terminateConfiguredSpaceFixtureWorkflowAppsIfRunning()

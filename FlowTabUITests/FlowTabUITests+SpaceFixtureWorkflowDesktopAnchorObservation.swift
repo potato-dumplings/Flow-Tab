@@ -22,6 +22,8 @@ final class SpaceFixtureWorkflowDesktopAnchorObservationOwner {
     private var workspaceObservationTokens:
         [NSObjectProtocol] = []
     private var conditionPollTimer: Timer?
+    private var testScopeCancellation:
+        FlowTabUITestObservationCancellation?
     private var resolvedExpectation: XCTestExpectation?
     private var currentGeneration: Int?
     private var resolvedEvidence:
@@ -49,6 +51,13 @@ final class SpaceFixtureWorkflowDesktopAnchorObservationOwner {
 
     func start() {
         cancel()
+        testScopeCancellation =
+            FlowTabUITestObservationScope.shared.track(
+                FlowTabUITestObservationCancellation {
+                    [weak self] in
+                    self?.cancelObservation()
+                }
+            )
         resolvedEvidence = nil
         watchdogFailure = nil
         let resolvedExpectation = XCTestExpectation(
@@ -121,6 +130,12 @@ final class SpaceFixtureWorkflowDesktopAnchorObservationOwner {
     }
 
     func cancel() {
+        cancelObservation()
+        testScopeCancellation?.cancel()
+        testScopeCancellation = nil
+    }
+
+    private func cancelObservation() {
         for token in workspaceObservationTokens {
             workspaceNotificationCenter
                 .removeObserver(token)
