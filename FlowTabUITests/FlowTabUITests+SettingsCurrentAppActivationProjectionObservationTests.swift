@@ -49,6 +49,11 @@ extension FlowTabUITests {
                 hiddenCountExists: false
             ).isExactProjection
         )
+        XCTAssertFalse(
+            settingsCurrentAppActivationProjectionSnapshot(
+                hiddenCountValue: "已隐藏 0 个应用"
+            ).isExactProjection
+        )
     }
 
     func testSettingsCurrentAppActivationProjectionAcceptsInitialExactEvidence() {
