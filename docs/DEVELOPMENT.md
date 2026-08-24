@@ -430,7 +430,7 @@ chmod +x scripts/release/release-install.sh
 ```
 
 该脚本会执行：
-1. 退出正在运行的 `FlowTab`，立即读取进程状态并等待精确进程记录消失；替换应用前再次确认进程不存在
+1. 退出正在运行的 `FlowTab`，立即读取进程状态并等待精确进程记录消失；Release 构建完成后再次请求所有同名主应用与 Testing 映像退出，并在读回为空后替换应用
 2. 从 `FLOWTAB_DEVELOPMENT_TEAM` 或 `xcconfigs/LocalSigning.xcconfig` 解析本地签名 team
 3. 重置该应用的辅助功能与屏幕录制授权记录
 4. 无签名构建 Release，避免 Xcode automatic signing 依赖本机不存在的旧证书类型

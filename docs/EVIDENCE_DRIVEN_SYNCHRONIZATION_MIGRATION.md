@@ -8440,13 +8440,16 @@ polling cadence, deadline, or timeout in the scoped paths.
   the clock or any polling work. A named 100ms cadence is retained only while
   process records remain. The ten-second watchdog is solely a terminal failure
   bound and reports `processAbsent`, the exact process name, and the final
-  PID/state/start/command evidence. A second invocation immediately before
-  `rm -rf` closes a process relaunch gap during the Release build.
+  PID/state/start/command evidence. Immediately before `rm -rf`, the installer
+  repeats both the AppleScript/exact-name termination request and the absence
+  readback, so a main or Testing App image that appeared during the Release
+  build receives termination before the installed bundle is replaced.
 - Deterministic and integration regression: the release observation contract
   test covers initial satisfaction with zero polls, later satisfaction after
   two named polling opportunities, terminal watchdog diagnostics, a real
-  exact-name absence readback, the two required caller boundaries, mutation
-  ordering, and removal of the one-second sleep. The first sandboxed real
+  exact-name absence readback, the two required caller boundaries, a termination
+  request before each boundary, mutation ordering, and removal of the one-second
+  sleep. The first sandboxed real
   readback returned `sysmond service not found`; the helper preserved that as
   `readbackError` instead of accepting absence. The same test then passed at
   the release script's Terminal process-list boundary.
