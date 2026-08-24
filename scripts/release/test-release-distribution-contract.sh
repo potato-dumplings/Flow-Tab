@@ -10,6 +10,7 @@ VERIFY_SCRIPT="${ROOT_DIR}/scripts/release/verify-release-distribution.sh"
 PATH_BOUNDARIES_SCRIPT="${ROOT_DIR}/scripts/lib/path-boundaries.sh"
 RELEASE_SECURITY_SCRIPT="${ROOT_DIR}/scripts/release/release-security.sh"
 SECURITY_BOUNDARY_TEST="${ROOT_DIR}/scripts/release/test-release-security-boundaries.sh"
+DMG_MOUNT_LIFECYCLE_TEST="${ROOT_DIR}/scripts/release/test-dmg-mount-lifecycle.sh"
 
 require_literal() {
   local file_path="$1"
@@ -45,6 +46,8 @@ require_literal "${SIGNING_SCRIPT}" "--options runtime"
 require_literal "${RELEASE_SECURITY_SCRIPT}" "Developer ID Application"
 require_literal "${VERIFY_SCRIPT}" "context:primary-signature"
 require_literal "${VERIFY_SCRIPT}" "hdiutil attach"
+require_literal "${VERIFY_SCRIPT}" "dmg-mount-lifecycle.sh"
+require_literal "${VERIFY_SCRIPT}" "flowtab_dmg_mount_finish"
 require_literal "${VERIFY_SCRIPT}" "flowtab_bundle_tree_digest"
 require_literal "${VERIFY_SCRIPT}" "flowtab_require_nested_code_identities"
 require_literal "${PATH_BOUNDARIES_SCRIPT}" "flowtab_prepare_direct_child_directory"
@@ -56,5 +59,6 @@ if /usr/bin/grep -F -q -- "codesign --force --deep --sign" "${RELEASE_SCRIPT}" "
 fi
 
 "${SECURITY_BOUNDARY_TEST}"
+"${DMG_MOUNT_LIFECYCLE_TEST}"
 
 echo "Release distribution contract requires Developer ID, hardened runtime, timestamping, notarization, and stapling."
