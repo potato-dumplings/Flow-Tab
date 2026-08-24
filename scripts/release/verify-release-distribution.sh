@@ -4,9 +4,12 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 RELEASE_SECURITY_PATH="${ROOT_DIR}/scripts/release/release-security.sh"
+DMG_MOUNT_LIFECYCLE_PATH="${ROOT_DIR}/scripts/release/lib/dmg-mount-lifecycle.sh"
 
 # shellcheck source=/dev/null
 source "${RELEASE_SECURITY_PATH}"
+# shellcheck source=scripts/release/lib/dmg-mount-lifecycle.sh
+source "${DMG_MOUNT_LIFECYCLE_PATH}"
 
 EXPECTED_TEAM_ID=""
 EXPECTED_BUNDLE_ID=""
@@ -227,21 +230,24 @@ fi
 /usr/sbin/spctl --assess --type open --context context:primary-signature --verbose=2 "${DMG_PATH}"
 
 MOUNT_ROOT="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/flowtab-dmg-mount.XXXXXX")"
-DMG_ATTACHED="false"
-cleanup_mount() {
-  if [[ "${DMG_ATTACHED}" == "true" ]]; then
-    /usr/bin/hdiutil detach "${MOUNT_ROOT}" -quiet || true
-  fi
-  /bin/rm -rf "${MOUNT_ROOT}"
-}
-trap cleanup_mount EXIT
+ATTACH_OUTPUT=""
+flowtab_dmg_mount_prepare "${MOUNT_ROOT}"
+flowtab_dmg_mount_will_attach
 
-/usr/bin/hdiutil attach \
-  -nobrowse \
-  -readonly \
-  -mountpoint "${MOUNT_ROOT}" \
-  "${DMG_PATH}" >/dev/null
-DMG_ATTACHED="true"
+if ATTACH_OUTPUT="$(
+  /usr/bin/hdiutil attach \
+    -nobrowse \
+    -readonly \
+    -mountpoint "${MOUNT_ROOT}" \
+    "${DMG_PATH}"
+)"; then
+  :
+else
+  ATTACH_STATUS=$?
+  echo "Could not attach the release disk image." >&2
+  exit "${ATTACH_STATUS}"
+fi
+flowtab_dmg_mount_record_attach "${ATTACH_OUTPUT}"
 
 SOURCE_BUNDLES=("${APP_PATH}")
 if [[ "${#EXPECTED_DMG_BUNDLES[@]}" -gt 0 ]]; then
@@ -267,7 +273,6 @@ for source_bundle in "${SOURCE_BUNDLES[@]}"; do
   fi
 done
 
-cleanup_mount
-trap - EXIT
+flowtab_dmg_mount_finish
 
 echo "Verified pinned release identity, bundle contract, entitlements, DMG contents, notarization, and Gatekeeper acceptance."
