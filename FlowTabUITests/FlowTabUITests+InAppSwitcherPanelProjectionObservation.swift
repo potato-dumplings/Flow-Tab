@@ -5,6 +5,14 @@ enum FlowTabUITestInAppSwitcherPanelProjectionPolicy {
     static let readinessWatchdog: TimeInterval = 8
 }
 
+enum FlowTabUITestInAppSwitcherPanelProjectionResolution:
+    Equatable
+{
+    case pending
+    case satisfied
+    case terminalMismatch
+}
+
 struct FlowTabUITestInAppSwitcherPanelProjectionExpectation:
     Equatable
 {
@@ -33,6 +41,13 @@ struct FlowTabUITestInAppSwitcherPanelProjectionExpectation:
         by snapshot:
             FlowTabUITestInAppSwitcherPanelProjectionSnapshot
     ) -> Bool {
+        resolution(for: snapshot) == .satisfied
+    }
+
+    func resolution(
+        for snapshot:
+            FlowTabUITestInAppSwitcherPanelProjectionSnapshot
+    ) -> FlowTabUITestInAppSwitcherPanelProjectionResolution {
         guard isWellFormed,
               snapshot.hasStableRunningApplication,
               snapshot.diagnostics.exists,
@@ -41,19 +56,20 @@ struct FlowTabUITestInAppSwitcherPanelProjectionExpectation:
               snapshot.previewProjection.selectedBundleIdentifier
                 == bundleIdentifier,
               snapshot.previewProjection.previewBundleIdentifier
-                == bundleIdentifier,
-              Self.counts(for: snapshot.previewProjection.titles)
-                == titleCounts
+                == bundleIdentifier
         else {
-            return false
+            return .pending
         }
         let matchingEntries =
             snapshot.appProjection.entries.filter {
                 $0.bundleIdentifier == bundleIdentifier
             }
-        return matchingEntries.count == 1
+        let hasExpectedProjection = matchingEntries.count == 1
             && matchingEntries[0].rawValue
                 == "\(bundleIdentifier):\(windowCount)"
+            && Self.counts(for: snapshot.previewProjection.titles)
+                == titleCounts
+        return hasExpectedProjection ? .satisfied : .terminalMismatch
     }
 
     var diagnosticSummary: String {
@@ -144,6 +160,7 @@ private final class
 {
     var initialAbsenceSatisfied = false
     var triggerCompleted = false
+    var terminalMismatch = false
 }
 
 final class
@@ -184,15 +201,28 @@ final class
                 },
                 readback: readback,
                 isSatisfied: { [state] snapshot in
-                    state.initialAbsenceSatisfied
-                        && state.triggerCompleted
-                        && expectation.isSatisfied(by: snapshot)
+                    guard state.initialAbsenceSatisfied,
+                          state.triggerCompleted
+                    else {
+                        return false
+                    }
+                    switch expectation.resolution(for: snapshot) {
+                    case .pending:
+                        return false
+                    case .satisfied:
+                        return true
+                    case .terminalMismatch:
+                        state.terminalMismatch = true
+                        return true
+                    }
                 },
                 describe: { [state] snapshot in
                     "initialAbsenceSatisfied="
                         + "\(state.initialAbsenceSatisfied) "
                         + "triggerCompleted="
                         + "\(state.triggerCompleted) "
+                        + "terminalMismatch="
+                        + "\(state.terminalMismatch) "
                         + "expected{"
                         + expectation.diagnosticSummary
                         + "} "
@@ -204,6 +234,7 @@ final class
     func start() -> Bool {
         state.initialAbsenceSatisfied = false
         state.triggerCompleted = false
+        state.terminalMismatch = false
         conditionOwner.start()
         guard
             let initialEvidence = conditionOwner.latestEvidence,
@@ -236,13 +267,20 @@ final class
     ) -> FlowTabUITestConditionEvidence<
         FlowTabUITestInAppSwitcherPanelProjectionSnapshot
     >? {
-        conditionOwner.waitForResolution(timeout: timeout)
+        let evidence = conditionOwner.waitForResolution(timeout: timeout)
+        return state.terminalMismatch ? nil : evidence
     }
 
     var resolvedEvidence: FlowTabUITestConditionEvidence<
         FlowTabUITestInAppSwitcherPanelProjectionSnapshot
     >? {
-        conditionOwner.resolvedEvidence
+        state.terminalMismatch ? nil : conditionOwner.resolvedEvidence
+    }
+
+    var terminalMismatchEvidence: FlowTabUITestConditionEvidence<
+        FlowTabUITestInAppSwitcherPanelProjectionSnapshot
+    >? {
+        state.terminalMismatch ? conditionOwner.resolvedEvidence : nil
     }
 
     var diagnosticSummary: String {
@@ -254,6 +292,7 @@ final class
         deferredReadbacks.cancel()
         state.initialAbsenceSatisfied = false
         state.triggerCompleted = false
+        state.terminalMismatch = false
     }
 
     deinit {

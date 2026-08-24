@@ -16,14 +16,11 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     let readModelStore: RuntimeReadModelStore
     private let appDirectoryProvider: RuntimeAppDirectoryProviding?
     private let reconciliationDrainer: RuntimeProjectionReconciliationDrainer
-    private let transientRepairObservationDriver:
-        RuntimeTransientRepairObservationDriver
+    private let transientRepairObservationDriver: RuntimeTransientRepairObservationDriver
     private let axWindowRepairAvailability: @Sendable () -> Bool
     private var pendingSearchIndexFreshnessBarrier = false
 
-    private var canScheduleAXWindowRepair: Bool {
-        axWindowRepairAvailability()
-    }
+    private var canScheduleAXWindowRepair: Bool { axWindowRepairAvailability() }
 
     init(
         label: String = "FlowTab.RuntimeProjectionService",
@@ -673,22 +670,25 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         guard canScheduleAXWindowRepair else {
             return RuntimeProjectionReconciliationDrainResult()
         }
-        let result = reconciliationDrainer.drainReadyRequests(now: now)
-        scheduleTransientRepairObservationsLocked(result.deferredRequests)
-        commitFullRepairEvidenceLocked(
-            result.fullRepairEvidence,
-            generatedAt: now
-        )
-        commitCurrentAppRepairEvidenceLocked(
-            result.currentAppRepairEvidence,
-            generatedAt: now
-        )
-        commitAppSwitcherAfterScopedRepairIfNeededLocked(
-            result,
-            completedCGWindowCleanupPolicy: completedCGWindowCleanupPolicy,
-            generatedAt: now
-        )
-        return result
+        var aggregateResult = RuntimeProjectionReconciliationDrainResult()
+        while true {
+            let result = reconciliationDrainer.drainReadyRequests(
+                now: now,
+                maxRequests: 1
+            )
+            guard !result.startedRequests.isEmpty else { break }
+            scheduleTransientRepairObservationsLocked(result.deferredRequests)
+            commitFullRepairEvidenceLocked(result.fullRepairEvidence, generatedAt: now)
+            commitCurrentAppRepairEvidenceLocked(result.currentAppRepairEvidence, generatedAt: now)
+            commitAppSwitcherAfterScopedRepairIfNeededLocked(
+                result,
+                completedCGWindowCleanupPolicy: completedCGWindowCleanupPolicy,
+                generatedAt: now
+            )
+            aggregateResult.append(result)
+            if result.deferredCount > 0 { break }
+        }
+        return aggregateResult
     }
 
     private func scheduleTransientRepairObservationsLocked(

@@ -469,6 +469,7 @@ fullscreen -> normal 通常表现为：
 - 后来的高优先级 scoped repair 可以取消或越过低优先级 full repair。
 - AX 空结果使用短间隔 retry，不立刻删除。
 - 连续失败进入 backoff。
+- scoped repair 进入 evidence wait 后结束当前 drain，让已调度的短间隔读回先重新进入队列；无关 topology work 保持 ready，下一轮再执行。
 - 用户热路径不等待 maintenance queue drain。
 - 每轮维护有 bounded batch，避免一次性扫完整个系统。
 
@@ -681,6 +682,9 @@ AX notification 不是绝对可靠的系统权威事件源，但很适合作为 
 - 收到无法识别的 destroyed：退回 app dirty，不猜测删除哪个 record。
 - AX 空列表：进入 transient retry，不直接清空窗口。
 - AX notification 缺失：由 periodic stale repair 和 Space/CG diff 补漏。
+- AX observer 安装遇到可恢复错误时由 transport 按 250 ms 起步、指数增长至 4 s 上限持续重试；每个 PID 同时只保留一个安装或重试任务。
+- observer 安装结果必须匹配当前 appID、PID 与 binding generation。成功、映射变化、停止观察或释放对象时取消对应任务；成功后立即读回 AX 窗口并进入既有 dirty、reconciliation 与 projection commit 链路。
+- `.apiDisabled` 等待 Accessibility 授权生命周期重新绑定；终止型错误等待下一次 binding generation。
 
 不依赖 AX notification 保证：
 

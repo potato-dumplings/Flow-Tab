@@ -41,9 +41,13 @@
 		FFF201053D31000100B0D737 /* SpaceFixtureWindowCloseFault.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF200023D31000100B0D737 /* SpaceFixtureWindowCloseFault.swift */; };
 		FFF201063D31000100B0D737 /* FlowTabTests+SpaceFixtureWindowCloseFault.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF200033D31000100B0D737 /* FlowTabTests+SpaceFixtureWindowCloseFault.swift */; };
 		FFF201073D31000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFault.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF200043D31000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFault.swift */; };
+		C7E100023DE0000100B0D737 /* SpaceFixtureWindowOpenMutation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7E100013DE0000100B0D737 /* SpaceFixtureWindowOpenMutation.swift */; };
+		C7E100033DE0000100B0D737 /* SpaceFixtureWindowOpenMutation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7E100013DE0000100B0D737 /* SpaceFixtureWindowOpenMutation.swift */; };
 		A4CC00023DB2000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFaultObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4CC00013DB2000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFaultObservationTests.swift */; };
 		A4CD00023DB2000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFaultAppliedObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4CD00013DB2000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFaultAppliedObservationTests.swift */; };
 		A4E100023DBA000100B0D737 /* FlowTabUITests+SpaceFixtureOpenWindowMutation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4E100013DBA000100B0D737 /* FlowTabUITests+SpaceFixtureOpenWindowMutation.swift */; };
+		C7E200023DE1000100B0D737 /* FlowTabUITests+SpaceFixtureWindowOpenMutation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7E200013DE1000100B0D737 /* FlowTabUITests+SpaceFixtureWindowOpenMutation.swift */; };
+		C7E300023DE2000100B0D737 /* FlowTabUITests+NextControlTabWindowMutation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7E300013DE2000100B0D737 /* FlowTabUITests+NextControlTabWindowMutation.swift */; };
 		A4E200023DBB000100B0D737 /* FlowTabUITests+SpaceFixtureSelectedWindowMutation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4E200013DBB000100B0D737 /* FlowTabUITests+SpaceFixtureSelectedWindowMutation.swift */; };
 		FFF301013D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF300013D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift */; };
 		FFF301023D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF300013D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift */; };
@@ -1138,9 +1142,12 @@
 		FFF200023D31000100B0D737 /* SpaceFixtureWindowCloseFault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWindowCloseFault.swift; sourceTree = "<group>"; };
 		FFF200033D31000100B0D737 /* FlowTabTests+SpaceFixtureWindowCloseFault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SpaceFixtureWindowCloseFault.swift"; sourceTree = "<group>"; };
 		FFF200043D31000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureWindowCloseFault.swift"; sourceTree = "<group>"; };
+		C7E100013DE0000100B0D737 /* SpaceFixtureWindowOpenMutation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWindowOpenMutation.swift; sourceTree = "<group>"; };
 		A4CC00013DB2000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFaultObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureWindowCloseFaultObservationTests.swift"; sourceTree = "<group>"; };
 		A4CD00013DB2000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFaultAppliedObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureWindowCloseFaultAppliedObservationTests.swift"; sourceTree = "<group>"; };
 		A4E100013DBA000100B0D737 /* FlowTabUITests+SpaceFixtureOpenWindowMutation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureOpenWindowMutation.swift"; sourceTree = "<group>"; };
+		C7E200013DE1000100B0D737 /* FlowTabUITests+SpaceFixtureWindowOpenMutation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureWindowOpenMutation.swift"; sourceTree = "<group>"; };
+		C7E300013DE2000100B0D737 /* FlowTabUITests+NextControlTabWindowMutation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+NextControlTabWindowMutation.swift"; sourceTree = "<group>"; };
 		A4E200013DBB000100B0D737 /* FlowTabUITests+SpaceFixtureSelectedWindowMutation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureSelectedWindowMutation.swift"; sourceTree = "<group>"; };
 		FFF300013D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWorkflowReadinessEvidence.swift; sourceTree = "<group>"; };
 		FFF300023D32000100B0D737 /* SpaceFixtureWorkflowReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWorkflowReadiness.swift; sourceTree = "<group>"; };
@@ -1862,6 +1869,8 @@
 				A4CC00013DB2000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFaultObservationTests.swift */,
 				A4CD00013DB2000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFaultAppliedObservationTests.swift */,
 				A4E100013DBA000100B0D737 /* FlowTabUITests+SpaceFixtureOpenWindowMutation.swift */,
+				C7E200013DE1000100B0D737 /* FlowTabUITests+SpaceFixtureWindowOpenMutation.swift */,
+				C7E300013DE2000100B0D737 /* FlowTabUITests+NextControlTabWindowMutation.swift */,
 				A4E200013DBB000100B0D737 /* FlowTabUITests+SpaceFixtureSelectedWindowMutation.swift */,
 				FFF300043D32000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowReadiness.swift */,
 				FFF400013D33000100B0D737 /* SpaceFixtureWorkflowReadinessAggregate.swift */,
@@ -2275,6 +2284,7 @@
 				FFF100023D30000100B0D737 /* SpaceFixtureTerminationFault.swift */,
 				FFF200013D31000100B0D737 /* SpaceFixtureWindowCloseFaultEvidence.swift */,
 				FFF200023D31000100B0D737 /* SpaceFixtureWindowCloseFault.swift */,
+				C7E100013DE0000100B0D737 /* SpaceFixtureWindowOpenMutation.swift */,
 				FFF300013D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift */,
 				FFF300023D32000100B0D737 /* SpaceFixtureWorkflowReadiness.swift */,
 				F50000072F90000100B0D737 /* AppKitSpaceFixtureWindow.swift */,
@@ -2843,6 +2853,7 @@
 				FFF101063D30000100B0D737 /* FlowTabTests+SpaceFixtureTerminationFault.swift in Sources */,
 				FFF201023D31000100B0D737 /* SpaceFixtureWindowCloseFaultEvidence.swift in Sources */,
 				FFF201053D31000100B0D737 /* SpaceFixtureWindowCloseFault.swift in Sources */,
+				C7E100033DE0000100B0D737 /* SpaceFixtureWindowOpenMutation.swift in Sources */,
 				FFF201063D31000100B0D737 /* FlowTabTests+SpaceFixtureWindowCloseFault.swift in Sources */,
 				FFF301023D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift in Sources */,
 				FFF301053D32000100B0D737 /* SpaceFixtureWorkflowReadiness.swift in Sources */,
@@ -3136,6 +3147,8 @@
 				A4CC00023DB2000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFaultObservationTests.swift in Sources */,
 				A4CD00023DB2000100B0D737 /* FlowTabUITests+SpaceFixtureWindowCloseFaultAppliedObservationTests.swift in Sources */,
 				A4E100023DBA000100B0D737 /* FlowTabUITests+SpaceFixtureOpenWindowMutation.swift in Sources */,
+				C7E200023DE1000100B0D737 /* FlowTabUITests+SpaceFixtureWindowOpenMutation.swift in Sources */,
+				C7E300023DE2000100B0D737 /* FlowTabUITests+NextControlTabWindowMutation.swift in Sources */,
 				A4E200023DBB000100B0D737 /* FlowTabUITests+SpaceFixtureSelectedWindowMutation.swift in Sources */,
 				FFF301033D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift in Sources */,
 				FFF301073D32000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowReadiness.swift in Sources */,
@@ -3168,6 +3181,7 @@
 				FFF101043D30000100B0D737 /* SpaceFixtureTerminationFault.swift in Sources */,
 				FFF201013D31000100B0D737 /* SpaceFixtureWindowCloseFaultEvidence.swift in Sources */,
 				FFF201043D31000100B0D737 /* SpaceFixtureWindowCloseFault.swift in Sources */,
+				C7E100023DE0000100B0D737 /* SpaceFixtureWindowOpenMutation.swift in Sources */,
 				FFF301013D32000100B0D737 /* SpaceFixtureWorkflowReadinessEvidence.swift in Sources */,
 				FFF301043D32000100B0D737 /* SpaceFixtureWorkflowReadiness.swift in Sources */,
 				F50001062F90000100B0D737 /* AppKitSpaceFixtureWindow.swift in Sources */,

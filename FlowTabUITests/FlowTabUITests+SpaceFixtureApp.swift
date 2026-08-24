@@ -145,6 +145,7 @@ extension FlowTabUITests {
         terminationDelayMilliseconds: Int = 0,
         closeWindowIndex: Int? = nil,
         closeWindowDelayMilliseconds: Int = 0,
+        deferredOpenWindowIndex: Int? = nil,
         fixtureAdditionalArguments: [String] = []
     ) -> XCUIApplication {
         terminateSpaceFixtureAppIfRunning(identity: identity)
@@ -174,6 +175,12 @@ extension FlowTabUITests {
                 "--close-window-delay-ms", String(closeWindowDelayMilliseconds)
             ]
         }
+        if let deferredOpenWindowIndex {
+            additionalArguments += [
+                "--deferred-open-window-index",
+                String(deferredOpenWindowIndex)
+            ]
+        }
         additionalArguments += fixtureAdditionalArguments
         additionalArguments +=
             readinessRoute.fixtureLaunchArguments
@@ -186,13 +193,22 @@ extension FlowTabUITests {
                     enterFullscreenDelayMilliseconds:
                         enterFullscreenDelayMilliseconds
                 )
+        let initialWindowPlanIndices = (1...windowCount).filter {
+            $0 != deferredOpenWindowIndex
+        }
+        let initialFullscreenWindowIndex =
+            fullscreenWindowIndex == deferredOpenWindowIndex
+                ? nil
+                : fullscreenWindowIndex
         guard let readinessEvidence =
             waitForSpaceFixtureWorkflowReadinessEvidence(
                 observation: readinessObservation,
                 identity: identity,
                 windowCount: windowCount,
                 fullscreenWindowIndex:
-                    fullscreenWindowIndex,
+                    initialFullscreenWindowIndex,
+                expectedWindowPlanIndices:
+                    initialWindowPlanIndices,
                 timeout: readinessWatchdog
             )
         else {
@@ -203,8 +219,12 @@ extension FlowTabUITests {
             expectedWindowTitles: expectedSpaceFixtureWorkflowWindowTitles(
                 titlePrefix: titlePrefix,
                 windowCount: windowCount
-            ),
-            fullscreenWindowIndex: fullscreenWindowIndex,
+            ).enumerated().compactMap { offset, title in
+                initialWindowPlanIndices.contains(offset + 1)
+                    ? title
+                    : nil
+            },
+            fullscreenWindowIndex: initialFullscreenWindowIndex,
             readinessTimeout: readinessWatchdog,
             readinessEvidence: readinessEvidence
         )

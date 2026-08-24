@@ -153,16 +153,19 @@ struct RuntimeProjectionRepairFactSource {
         let windowRecordRefresh = dataset.seedWindowRecordCoverage(in: windowRecordStore)
         let focusedRepairEvidenceByPID = Dictionary(
             dataset.currentAppWindowPayloadsByAppID.values.map { payload in
-                (
+                let cgWindowIDs = payload.candidate.windows.compactMap { window in
+                    payload.context.windowsByID[window.id]?.cgWindowID
+                }
+                return (
                     payload.summary.pid,
                     RuntimeCurrentAppRepairEvidence(
                         appID: payload.summary.appID,
                         pid: payload.summary.pid,
                         appDirectoryEntries: payload.appDirectoryEntries,
                         currentAppWindowPayloadWasEmpty: payload.candidate.windows.isEmpty,
-                        authoritativeCGWindowIDs: Set(
-                            payload.context.windowsByID.values.compactMap(\.cgWindowID)
-                        )
+                        authoritativeCGWindowIDs: cgWindowIDs.count == payload.candidate.windows.count
+                            ? Set(cgWindowIDs)
+                            : nil
                     )
                 )
             },

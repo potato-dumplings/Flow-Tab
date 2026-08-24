@@ -579,6 +579,127 @@ extension FlowTabTests {
         XCTAssertEqual(windowSpies[0].workflowReadyCalls, [["Docs", "Mail"]])
         XCTAssertEqual(windowSpies[1].workflowReadyCalls, [["Docs", "Mail"]])
     }
+
+    @MainActor
+    func testSpaceFixtureWindowCoordinatorDefersAndAcknowledgesWindowOpenMutation() {
+        let route = SpaceFixtureWindowOpenMutationRoute(
+            evidenceNotificationName:
+                Notification.Name("test.window-open.evidence"),
+            triggerNotificationName:
+                Notification.Name("test.window-open.trigger")
+        )
+        let identity = SpaceFixtureApplicationIdentity(
+            bundleIdentifier: "test.fixture",
+            processIdentifier: 4_321
+        )
+        let configuration = SpaceFixtureLaunchConfiguration(
+            windowCount: 2,
+            fullscreenWindowIndex: nil,
+            windowTitlePrefix: "Mutation",
+            usesStaggeredLayout: true,
+            enterFullscreenDelayMilliseconds: 0,
+            preservesDesktopAfterFullscreen: false,
+            windowOpenMutationRoute: route,
+            deferredOpenWindowIndex: 2
+        )
+        var windowSpies: [SpaceFixtureWindowSpy] = []
+        var publishedAccessibilityElements: [[String]] = []
+        var observedEvidence:
+            [SpaceFixtureWindowOpenMutationEvidence] = []
+        var triggerHandler:
+            (@MainActor (
+                SpaceFixtureWindowOpenMutationTrigger
+            ) -> Void)?
+        let triggerToken = ManualSpaceFixtureCancellable()
+
+        let coordinator = SpaceFixtureWindowCoordinator(
+            configuration: configuration,
+            visibleFrameProvider: {
+                CGRect(x: 0, y: 0, width: 1440, height: 900)
+            },
+            windowFactory: { plan in
+                let spy = SpaceFixtureWindowSpy(plan: plan)
+                windowSpies.append(spy)
+                return spy
+            },
+            applicationAccessibilityElementsPublisher: { elements in
+                publishedAccessibilityElements.append(
+                    elements.compactMap { $0 as? String }
+                )
+            },
+            applicationIdentityProvider: { identity },
+            windowOpenMutationTriggerObservationFactory: {
+                observedRoute,
+                onTrigger in
+                XCTAssertEqual(observedRoute, route)
+                triggerHandler = onTrigger
+                return triggerToken
+            },
+            windowOpenMutationEvidencePublisher: {
+                evidence,
+                observedRoute in
+                XCTAssertEqual(observedRoute, route)
+                observedEvidence.append(evidence)
+            }
+        )
+
+        coordinator.launch()
+
+        XCTAssertEqual(windowSpies.map(\.plan.index), [1])
+        XCTAssertEqual(coordinator.windows.map(\.plan.index), [1])
+        XCTAssertEqual(
+            publishedAccessibilityElements.last,
+            ["ax-element-1"]
+        )
+        XCTAssertEqual(
+            observedEvidence,
+            [
+                SpaceFixtureWindowOpenMutationEvidence(
+                    requestGeneration: 1,
+                    phase: .ready,
+                    identity: identity,
+                    snapshot:
+                        SpaceFixtureWindowOpenMutationSnapshot(
+                            targetWindowPlanIndex: 2,
+                            targetWindowTitle: "Mutation 2",
+                            activeWindowPlanIndices: [1]
+                        )
+                )
+            ]
+        )
+
+        triggerHandler?(
+            SpaceFixtureWindowOpenMutationTrigger(
+                requestGeneration: 1,
+                identity: identity,
+                targetWindowPlanIndex: 2
+            )
+        )
+
+        XCTAssertEqual(windowSpies.map(\.plan.index), [1, 2])
+        XCTAssertEqual(coordinator.windows.map(\.plan.index), [1, 2])
+        XCTAssertEqual(windowSpies[1].showCalls, [true])
+        XCTAssertEqual(
+            publishedAccessibilityElements.last,
+            ["ax-element-1", "ax-element-2"]
+        )
+        XCTAssertEqual(observedEvidence.map(\.phase), [.ready, .applied])
+        XCTAssertEqual(
+            observedEvidence.last?.snapshot.activeWindowPlanIndices,
+            [1, 2]
+        )
+        XCTAssertTrue(triggerToken.isCancelled)
+
+        triggerHandler?(
+            SpaceFixtureWindowOpenMutationTrigger(
+                requestGeneration: 1,
+                identity: identity,
+                targetWindowPlanIndex: 2
+            )
+        )
+        XCTAssertEqual(windowSpies.count, 2)
+        XCTAssertEqual(observedEvidence.count, 2)
+    }
 }
 
 @MainActor

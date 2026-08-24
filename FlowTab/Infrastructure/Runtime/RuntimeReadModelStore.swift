@@ -196,8 +196,12 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             currentAppWindowProjectionsByAppID.removeValue(forKey: payload.summary.appID)
             return
         }
-        let preservedPayload = currentAppWindowPayloadByPreservingPriorCommittedWindowsLocked(
+        let authoritativePayload = currentAppWindowPayloadByApplyingAuthoritativeCGWindowIDsLocked(
             payload,
+            authoritativeCGWindowIDs: authoritativeCGWindowIDs
+        )
+        let preservedPayload = currentAppWindowPayloadByPreservingPriorCommittedWindowsLocked(
+            authoritativePayload,
             authoritativeCGWindowIDs: authoritativeCGWindowIDs
         )
         let normalizedPayload = currentAppWindowPayloadByNormalizingPresentationLocked(preservedPayload)
@@ -1095,6 +1099,54 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 runningApp: payload.context.runningApp,
                 ownerPID: payload.context.ownerPID,
                 windowsByID: windowsByID
+            ),
+            appDirectoryEntries: payload.appDirectoryEntries
+        )
+    }
+
+    private func currentAppWindowPayloadByApplyingAuthoritativeCGWindowIDsLocked(
+        _ payload: RuntimeCurrentAppWindowPayload,
+        authoritativeCGWindowIDs: Set<CGWindowID>?
+    ) -> RuntimeCurrentAppWindowPayload {
+        guard let authoritativeCGWindowIDs else { return payload }
+        let windows = payload.candidate.windows.filter { window in
+            guard let cgWindowID = payload.context.windowsByID[window.id]?.cgWindowID else {
+                return true
+            }
+            return authoritativeCGWindowIDs.contains(cgWindowID)
+        }
+        guard windows.count != payload.candidate.windows.count else {
+            return payload
+        }
+
+        let retainedWindowIDs = Set(windows.map(\.id))
+        let candidate = AppSwitchCandidate(
+            id: payload.candidate.id,
+            displayName: payload.candidate.displayName,
+            groupID: payload.candidate.groupID,
+            lastActiveAt: payload.candidate.lastActiveAt,
+            windows: windows
+        )
+        let summary = RuntimeHomeAppSummary(
+            appID: payload.summary.appID,
+            displayName: payload.summary.displayName,
+            groupID: payload.summary.groupID,
+            lastActiveAt: payload.summary.lastActiveAt,
+            windowCount: windows.count,
+            pid: payload.summary.pid,
+            bundleIdentifier: payload.summary.bundleIdentifier,
+            bundleURL: payload.summary.bundleURL
+        )
+        return RuntimeCurrentAppWindowPayload(
+            summary: summary,
+            candidate: candidate,
+            context: RuntimeAppContext(
+                appID: payload.context.appID,
+                runningApp: payload.context.runningApp,
+                ownerPID: payload.context.ownerPID,
+                windowsByID: payload.context.windowsByID.filter {
+                    retainedWindowIDs.contains($0.key)
+                }
             ),
             appDirectoryEntries: payload.appDirectoryEntries
         )
