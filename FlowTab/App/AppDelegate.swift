@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var workspaceLifecycleObservers: [NSObjectProtocol] = []
     private var appLaunchWindowEvidenceCoordinator:
         (any RuntimeAppLaunchWindowEvidenceCoordinating)?
+    private var appVisibilityReconciliationTask: Task<Void, Never>?
     private var requestedAccessibilityPermissionThisLaunch = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -40,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         FlowTabUITestBootstrapper.prepareIfNeeded(userDefaults: resolvedUserDefaults)
 #endif
         applyActivationPolicyFromPreferences(application: resolvedActivationPolicyApplication)
+        resolvedRuntimeProjectionService.refreshApplicationDirectoryMembershipForPresentation()
         syncLaunchAtLoginPreferenceOnLaunch()
 
         let panelController = makePanelController()
@@ -71,6 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installLanguageObserver()
         appLaunchWindowEvidenceCoordinator = makeAppLaunchWindowEvidenceCoordinator()
         installWorkspaceLifecycleObserver()
+        startAppVisibilityReconciliation()
 
         installStatusItem()
 #if FLOWTAB_TESTING
@@ -128,6 +131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
+        resolvedRuntimeProjectionService.refreshApplicationDirectoryMembershipForPresentation()
         let accessSnapshot = currentHotkeyChordEventAccessSnapshot()
         if lastHotkeyAccessibilityTrusted
             != accessSnapshot.accessibilityTrusted
@@ -170,6 +174,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         appLaunchWindowEvidenceCoordinator?.stop()
         appLaunchWindowEvidenceCoordinator = nil
+        appVisibilityReconciliationTask?.cancel()
+        appVisibilityReconciliationTask = nil
         hotkeyMonitor?.stop()
         inAppWindowHotkeyMonitor?.stop()
 #if FLOWTAB_TESTING
@@ -553,6 +559,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
                 return
             }
+            guard let appDirectoryEntry = RuntimeAppDirectoryFactSource.runningApplicationEntry(
+                for: app
+            ) else {
+                return
+            }
             let appID = RuntimeAppIdentity.appID(for: app)
             self.appLaunchWindowEvidenceCoordinator?.prepareObservation(
                 appID: appID,
@@ -561,8 +572,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.resolvedRuntimeProjectionService.signalAppLaunched(
                 appID: appID,
                 pid: app.processIdentifier,
-                appDirectoryEntry: RuntimeAppDirectoryEntry(app: app)
+                appDirectoryEntry: appDirectoryEntry
             )
+        }
+        let didActivateObserver = resolvedWorkspaceNotificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self else { return }
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
+                return
+            }
+            self.signalWorkspaceAppActivated(app)
         }
         let didTerminateObserver = resolvedWorkspaceNotificationCenter.addObserver(
             forName: NSWorkspace.didTerminateApplicationNotification,
@@ -583,7 +605,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 pid: app.processIdentifier
             )
         }
-        workspaceLifecycleObservers = [didLaunchObserver, didTerminateObserver]
+        workspaceLifecycleObservers = [
+            didLaunchObserver,
+            didActivateObserver,
+            didTerminateObserver,
+        ]
+    }
+
+    private func startAppVisibilityReconciliation() {
+        appVisibilityReconciliationTask?.cancel()
+
+        let recordsProvider: @Sendable () -> [InstalledAppRecord]
+#if FLOWTAB_TESTING
+        if let testRecordsProvider = Self.testHooks.appVisibilityRecordsProvider {
+            recordsProvider = testRecordsProvider
+        } else {
+            guard !FlowTabTestLaunchOptions.isRunningUnitTests else { return }
+            let inventoryService = AppInventoryService()
+            recordsProvider = { inventoryService.installedApps() }
+        }
+#else
+        let inventoryService = AppInventoryService()
+        recordsProvider = { inventoryService.installedApps() }
+#endif
+
+        let userDefaults = resolvedUserDefaults
+        appVisibilityReconciliationTask = Task { [weak self] in
+            let records = await Task.detached(priority: .utility) {
+                recordsProvider()
+            }.value
+            guard
+                !Task.isCancelled,
+                let self,
+                Self.shared === self
+            else { return }
+
+            let configurableAppIDs = Set(
+                records
+                    .filter { $0.visibilityCapability.isConfigurable }
+                    .map(\.id)
+            )
+            let result = AppVisibilityPreferencesStore.reconcileHiddenAppIDs(
+                preferenceConfigurableAppIDs: configurableAppIDs,
+                userDefaults: userDefaults
+            )
+            appVisibilityReconciliationTask = nil
+            if result.didChange {
+                NotificationCenter.default.post(
+                    name: .flowTabAppVisibilityPreferenceChanged,
+                    object: nil
+                )
+            }
+        }
     }
 
     func makeDefaultAppLaunchWindowEvidenceCoordinator()
@@ -732,61 +805,3 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         handleStatusItemQuitAction(application: NSApp)
     }
 }
-
-#if !FLOWTAB_TESTING
-@MainActor
-extension AppDelegate {
-    var resolvedUserDefaults: UserDefaults {
-        .standard
-    }
-
-    var resolvedLaunchAtLoginManager: any LaunchAtLoginManaging {
-        LaunchAtLoginController.shared
-    }
-
-    var resolvedActivationPolicyApplication: any AppActivationPolicyApplying {
-        NSApp
-    }
-
-    var resolvedRuntimeProjectionService: any RuntimeProjectionServing {
-        sharedRuntimeProjectionService
-    }
-
-    var resolvedWorkspaceNotificationCenter: NotificationCenter {
-        NSWorkspace.shared.notificationCenter
-    }
-
-    func makeAppLaunchWindowEvidenceCoordinator()
-        -> any RuntimeAppLaunchWindowEvidenceCoordinating
-    {
-        makeDefaultAppLaunchWindowEvidenceCoordinator()
-    }
-
-    func makePanelController() -> SwitcherPanelController {
-        SwitcherPanelController(
-            model: LiveSwitcherModel(runtimeProjectionService: resolvedRuntimeProjectionService)
-        )
-    }
-
-    func makeHotkeyMonitor(
-        configuration: SwitcherHotkeyConfiguration,
-        signature: OSType,
-        forwardHotkeyID: UInt32,
-        backwardHotkeyID: UInt32
-    ) -> any HotkeyMonitoring {
-        OptionTabHotkeyMonitor(
-            configuration: configuration,
-            signature: signature,
-            forwardHotkeyID: forwardHotkeyID,
-            backwardHotkeyID: backwardHotkeyID,
-            startsMonitoring: false
-        )
-    }
-
-    func currentHotkeyChordEventAccessSnapshot()
-        -> HotkeyChordEventAccessSnapshot
-    {
-        .current()
-    }
-}
-#endif

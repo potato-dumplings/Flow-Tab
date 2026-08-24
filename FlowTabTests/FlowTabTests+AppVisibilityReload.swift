@@ -6,7 +6,90 @@ private enum AppVisibilityReloadWatchdogPolicy {
     static let eventDelivery: TimeInterval = 5
 }
 
+struct StaticAppVisibilityInventory: AppInventoryProviding {
+    let records: [InstalledAppRecord]
+
+    func installedApps() -> [InstalledAppRecord] {
+        records
+    }
+}
+
 extension FlowTabTests {
+    @MainActor
+    func testAppVisibilityManagerReconcilesInventoryAndRejectsSystemManagedMutation() async {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
+
+        let configurableAppID = "com.example.editor"
+        let systemManagedAppID = "com.example.menu-bar"
+        userDefaults.set(true, forKey: AppPreferenceKeys.showInCommandTab)
+        userDefaults.set(
+            [systemManagedAppID, "com.example.helper"],
+            forKey: AppPreferenceKeys.hiddenAppIDs
+        )
+        let inventory = StaticAppVisibilityInventory(
+            records: [
+                InstalledAppRecord(
+                    id: configurableAppID,
+                    displayName: "Editor",
+                    bundleIdentifier: configurableAppID,
+                    path: "/Applications/Editor.app",
+                    isRunning: true
+                ),
+                InstalledAppRecord(
+                    id: systemManagedAppID,
+                    displayName: "Menu Bar",
+                    bundleIdentifier: systemManagedAppID,
+                    path: "/Applications/Menu Bar.app",
+                    isRunning: true,
+                    visibilityCapability: .systemManaged(
+                        reason: .staticBundleDeclaration
+                    )
+                )
+            ]
+        )
+        let model = AppVisibilityManagerModel(
+            inventoryService: inventory,
+            userDefaults: userDefaults
+        )
+        let reloadCompleted = expectation(description: "visibility inventory reconciled")
+        let readinessObservation = model.$inventoryReadiness.sink { readiness in
+            if readiness == .ready {
+                reloadCompleted.fulfill()
+            }
+        }
+        var notificationCount = 0
+        let notificationObserver = NotificationCenter.default.addObserver(
+            forName: .flowTabAppVisibilityPreferenceChanged,
+            object: nil,
+            queue: .main
+        ) { _ in
+            notificationCount += 1
+        }
+        defer {
+            readinessObservation.cancel()
+            NotificationCenter.default.removeObserver(notificationObserver)
+        }
+
+        model.reload()
+        await fulfillment(
+            of: [reloadCompleted],
+            timeout: AppVisibilityReloadWatchdogPolicy.eventDelivery
+        )
+
+        XCTAssertEqual(model.apps.map(\.id), [configurableAppID, systemManagedAppID])
+        XCTAssertTrue(model.hiddenAppIDs.isEmpty)
+        XCTAssertEqual(notificationCount, 1)
+
+        model.setHidden(true, for: systemManagedAppID)
+        XCTAssertTrue(model.hiddenAppIDs.isEmpty)
+        XCTAssertEqual(notificationCount, 1)
+
+        model.setHidden(true, for: configurableAppID)
+        XCTAssertEqual(model.hiddenAppIDs, [configurableAppID])
+        XCTAssertEqual(notificationCount, 2)
+    }
+
     func testAppVisibilityInventoryReadinessAccessibilityIdentifiersAreStable() {
         XCTAssertEqual(
             AppVisibilityInventoryReadiness.idle.accessibilityIdentifier,
@@ -159,7 +242,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testAppVisibilityManagerShowsStoredHiddenAppIDsMissingFromInventory() async {
+    func testAppVisibilityManagerRemovesStoredHiddenAppIDsMissingFromInventory() async {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
         defer { clearIsolatedUserDefaults(userDefaults) }
 
@@ -171,11 +254,14 @@ extension FlowTabTests {
         )
 
         await withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
-            let model = AppVisibilityManagerModel(userDefaults: userDefaults)
+            let model = AppVisibilityManagerModel(
+                inventoryService: StaticAppVisibilityInventory(records: []),
+                userDefaults: userDefaults
+            )
             model.updateFilter(.hidden)
             let reloadCompleted = expectation(
                 description:
-                    "unmetCondition=hiddenAppInventoryLoadingTransitionCompleted expectedVisibleAppIDs=\(missingAppID)"
+                    "unmetCondition=hiddenAppInventoryCleanupTransitionCompleted expectedVisibleAppIDs=empty"
             )
             reloadCompleted.assertForOverFulfill = true
             var observedLoadingStates: [Bool] = []
@@ -249,14 +335,18 @@ extension FlowTabTests {
                 [.idle, .loading, .ready]
             )
             XCTAssertEqual(completionCount, 1)
-            XCTAssertEqual(lastHiddenCount, 1)
-            XCTAssertEqual(lastVisibleAppIDs, [missingAppID])
-            XCTAssertEqual(lastSelectedAppID, missingAppID)
-            XCTAssertEqual(model.hiddenCount, 1)
-            XCTAssertEqual(model.visibleApps.map(\.id), [missingAppID])
-            XCTAssertEqual(model.selectedApp?.id, missingAppID)
-            XCTAssertEqual(model.selectionProjectionGeneration, 1)
-            XCTAssertEqual(observedSelectionGenerations, [0, 1])
+            XCTAssertEqual(lastHiddenCount, 0)
+            XCTAssertTrue(lastVisibleAppIDs.isEmpty)
+            XCTAssertNil(lastSelectedAppID)
+            XCTAssertEqual(model.hiddenCount, 0)
+            XCTAssertTrue(model.visibleApps.isEmpty)
+            XCTAssertNil(model.selectedApp)
+            XCTAssertEqual(model.selectionProjectionGeneration, 0)
+            XCTAssertEqual(observedSelectionGenerations, [0])
+            XCTAssertEqual(
+                userDefaults.stringArray(forKey: AppPreferenceKeys.hiddenAppIDs),
+                []
+            )
         }
     }
 

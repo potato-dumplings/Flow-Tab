@@ -16,14 +16,11 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     let readModelStore: RuntimeReadModelStore
     private let appDirectoryProvider: RuntimeAppDirectoryProviding?
     private let reconciliationDrainer: RuntimeProjectionReconciliationDrainer
-    private let transientRepairObservationDriver:
-        RuntimeTransientRepairObservationDriver
+    private let transientRepairObservationDriver: RuntimeTransientRepairObservationDriver
     private let axWindowRepairAvailability: @Sendable () -> Bool
     private var pendingSearchIndexFreshnessBarrier = false
 
-    private var canScheduleAXWindowRepair: Bool {
-        axWindowRepairAvailability()
-    }
+    private var canScheduleAXWindowRepair: Bool { axWindowRepairAvailability() }
 
     init(
         label: String = "FlowTab.RuntimeProjectionService",
@@ -67,7 +64,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         if let appDirectoryProvider {
             self.appDirectoryProvider = appDirectoryProvider
         } else {
-            self.appDirectoryProvider = repairProvider == nil ? RuntimeWorkspaceAppDirectoryProvider() : nil
+            self.appDirectoryProvider = repairProvider == nil
+                ? RuntimeAppDirectoryProviderFactory.makeDefault()
+                : nil
         }
         self.readModelStore = readModelStore
         reconciliationDrainer = RuntimeProjectionReconciliationDrainer(
@@ -84,6 +83,17 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     deinit {
         maintenanceOwner.cancelPendingPriorityWork()
         transientRepairObservationDriver.cancelAll(reason: "serviceDeinit")
+    }
+
+    func refreshApplicationDirectoryMembershipForPresentation() {
+        guard let evidence = appDirectoryProvider?
+            .appDirectorySnapshotEvidenceForPresentation()
+        else { return }
+        guard readModelStore.commitAppDirectoryPresentationEvidence(evidence) else { return }
+        RuntimeProjectionNotificationPublisher.post(
+            name: .runtimeAppSwitcherProjectionDidUpdate,
+            object: self
+        )
     }
 
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason) {
@@ -286,6 +296,21 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 generation: generation
             )
         }
+    }
+
+    func signalAppActivated(
+        appID: String,
+        pid: pid_t,
+        appDirectoryEntry: RuntimeAppDirectoryEntry
+    ) {
+        guard readModelStore.markAppActivated(
+            appID: appID,
+            pid: pid,
+            appDirectoryEntry: appDirectoryEntry
+        ) else {
+            return
+        }
+        signalSelectedCurrentAppWindowsChanged(appID: appID, pid: pid)
     }
 
     func signalAppWindowsChanged(appID: String, pid: pid_t) {
@@ -645,22 +670,25 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         guard canScheduleAXWindowRepair else {
             return RuntimeProjectionReconciliationDrainResult()
         }
-        let result = reconciliationDrainer.drainReadyRequests(now: now)
-        scheduleTransientRepairObservationsLocked(result.deferredRequests)
-        commitFullRepairEvidenceLocked(
-            result.fullRepairEvidence,
-            generatedAt: now
-        )
-        commitCurrentAppRepairEvidenceLocked(
-            result.currentAppRepairEvidence,
-            generatedAt: now
-        )
-        commitAppSwitcherAfterScopedRepairIfNeededLocked(
-            result,
-            completedCGWindowCleanupPolicy: completedCGWindowCleanupPolicy,
-            generatedAt: now
-        )
-        return result
+        var aggregateResult = RuntimeProjectionReconciliationDrainResult()
+        while true {
+            let result = reconciliationDrainer.drainReadyRequests(
+                now: now,
+                maxRequests: 1
+            )
+            guard !result.startedRequests.isEmpty else { break }
+            scheduleTransientRepairObservationsLocked(result.deferredRequests)
+            commitFullRepairEvidenceLocked(result.fullRepairEvidence, generatedAt: now)
+            commitCurrentAppRepairEvidenceLocked(result.currentAppRepairEvidence, generatedAt: now)
+            commitAppSwitcherAfterScopedRepairIfNeededLocked(
+                result,
+                completedCGWindowCleanupPolicy: completedCGWindowCleanupPolicy,
+                generatedAt: now
+            )
+            aggregateResult.append(result)
+            if result.deferredCount > 0 { break }
+        }
+        return aggregateResult
     }
 
     private func scheduleTransientRepairObservationsLocked(
@@ -806,8 +834,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         if requiresExistingProjectionCoverage,
            let existingProjection = readModelStore.readCommittedAppSwitcherProjectionCacheForMaintenance() {
             let payloadAppIDs = Set(payload.apps.map(\.id))
-            let requiredExistingAppIDs = Set(existingProjection.apps.map(\.id))
-                .subtracting(permittedMissingAppIDs)
+            let requiredExistingAppIDs = readModelStore.requiredExistingSwitcherAppIDs(
+                existingAppIDs: Set(existingProjection.apps.map(\.id)),
+                permittedMissingAppIDs: permittedMissingAppIDs
+            )
             guard requiredExistingAppIDs.isSubset(of: payloadAppIDs) else {
                 return false
             }
@@ -828,11 +858,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     @discardableResult
     private func commitAppDirectoryProviderEvidenceLocked(generatedAt: TimeInterval) -> Int {
-        guard let entries = appDirectoryProvider?.appDirectoryEntriesForRuntimeMaintenance() else {
+        guard let evidence = appDirectoryProvider?
+            .appDirectorySnapshotEvidenceForRuntimeMaintenance()
+        else {
             return 0
         }
-        readModelStore.commitAppDirectoryProviderEvidence(entries, generatedAt: generatedAt)
-        return entries.count
+        readModelStore.commitAppDirectoryProviderEvidence(evidence)
+        return evidence.entries.count
     }
 
     @discardableResult

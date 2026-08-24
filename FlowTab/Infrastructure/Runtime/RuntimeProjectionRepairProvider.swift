@@ -191,12 +191,15 @@ extension RuntimeProjectionRepairProvider {
             from: selectionFacts.appGroup,
             preservingRankFrom: windowFacts.rankByPID
         )
+        let cgWindowIDs = selectionFacts.windows.compactMap(\.cgWindowID)
         let repairEvidence = RuntimeCurrentAppRepairEvidence(
             appID: appID,
             pid: selectionFacts.app.processIdentifier,
             appDirectoryEntries: appDirectoryEntries,
             currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty,
-            authoritativeCGWindowIDs: Set(selectionFacts.windows.compactMap(\.cgWindowID))
+            authoritativeCGWindowIDs: cgWindowIDs.count == selectionFacts.windows.count
+                ? Set(cgWindowIDs)
+                : nil
         )
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
         RuntimeProjectionDiagnostics.logTiming(

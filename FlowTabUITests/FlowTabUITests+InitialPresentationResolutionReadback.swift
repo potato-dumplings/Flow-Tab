@@ -156,6 +156,83 @@ struct FlowTabUITestInitialPresentationResolutionReadback:
     }
 }
 
+struct FlowTabUITestInitialPresentationTerminalReadback:
+    Codable,
+    Equatable
+{
+    enum Outcome: String, Codable, Equatable {
+        case resolution
+        case initialPresentationWatchdogFailure
+    }
+
+    struct WatchdogFailure: Codable, Equatable {
+        let watchdogInterval: TimeInterval
+        let unmetConditions: [String]
+        let lastEvidence: String
+        let finalEvidence: String
+
+        var diagnosticSummary: String {
+            "watchdogSeconds=\(watchdogInterval) "
+                + "unmet=[\(unmetConditions.joined(separator: ","))] "
+                + "last{\(lastEvidence)} "
+                + "final{\(finalEvidence)}"
+        }
+    }
+
+    static let currentSchemaVersion = 1
+
+    let schemaVersion: Int
+    let outcome: Outcome
+    let resolution:
+        FlowTabUITestInitialPresentationResolutionReadback?
+    let watchdogFailure: WatchdogFailure?
+
+    init(
+        resolution:
+            FlowTabUITestInitialPresentationResolutionReadback
+    ) {
+        schemaVersion = Self.currentSchemaVersion
+        outcome = .resolution
+        self.resolution = resolution
+        watchdogFailure = nil
+    }
+
+    init(
+        watchdogFailure: WatchdogFailure
+    ) {
+        schemaVersion = Self.currentSchemaVersion
+        outcome = .initialPresentationWatchdogFailure
+        resolution = nil
+        self.watchdogFailure = watchdogFailure
+    }
+
+    var isWellFormed: Bool {
+        guard schemaVersion == Self.currentSchemaVersion else {
+            return false
+        }
+        switch outcome {
+        case .resolution:
+            return resolution != nil
+                && watchdogFailure == nil
+        case .initialPresentationWatchdogFailure:
+            return resolution == nil
+                && watchdogFailure != nil
+        }
+    }
+
+    var diagnosticSummary: String {
+        let prefix = "terminalSchema=\(schemaVersion) "
+            + "outcome=\(outcome.rawValue) "
+        if let resolution {
+            return prefix + resolution.diagnosticSummary
+        }
+        if let watchdogFailure {
+            return prefix + watchdogFailure.diagnosticSummary
+        }
+        return prefix + "payload=missing"
+    }
+}
+
 struct FlowTabUITestInitialPresentationResolutionExpectation {
     let requiredItemIDs: Set<String>
     let excludedItemIDs: Set<String>
@@ -307,7 +384,8 @@ extension FlowTabUITests {
         )
         launchFlowTabUITestApplication(app)
 
-        guard let resolution = owner.waitForResolution(
+        guard let terminalReadback =
+                owner.waitForTerminalReadback(
             timeout:
                 FlowTabUITestInitialPresentationResolutionPolicy
                     .watchdog
@@ -320,6 +398,17 @@ extension FlowTabUITests {
                     + "excluded="
                     + "[\(expectation.excludedItemIDs.sorted().joined(separator: ","))] "
                     + owner.diagnosticSummary
+            )
+            app.terminate()
+            return nil
+        }
+        guard terminalReadback.outcome == .resolution,
+              let resolution = terminalReadback.resolution
+        else {
+            XCTFail(
+                "Initial Switcher presentation failed. "
+                    + "target=\(targetDescription) "
+                    + terminalReadback.diagnosticSummary
             )
             app.terminate()
             return nil
@@ -378,8 +467,8 @@ extension FlowTabUITests {
 struct FlowTabUITestInitialPresentationResolutionFileReadback {
     let path: String
     let fileExists: Bool
-    let resolution:
-        FlowTabUITestInitialPresentationResolutionReadback?
+    let terminalReadback:
+        FlowTabUITestInitialPresentationTerminalReadback?
     let errorDescription: String?
 
     static func read(from url: URL) -> Self {
@@ -389,36 +478,36 @@ struct FlowTabUITestInitialPresentationResolutionFileReadback {
             return Self(
                 path: url.path,
                 fileExists: false,
-                resolution: nil,
+                terminalReadback: nil,
                 errorDescription: nil
             )
         }
         do {
-            let resolution = try JSONDecoder().decode(
-                FlowTabUITestInitialPresentationResolutionReadback
+            let terminalReadback = try JSONDecoder().decode(
+                FlowTabUITestInitialPresentationTerminalReadback
                     .self,
                 from: Data(contentsOf: url)
             )
             return Self(
                 path: url.path,
                 fileExists: true,
-                resolution: resolution,
+                terminalReadback: terminalReadback,
                 errorDescription: nil
             )
         } catch {
             return Self(
                 path: url.path,
                 fileExists: true,
-                resolution: nil,
+                terminalReadback: nil,
                 errorDescription: String(describing: error)
             )
         }
     }
 
     var diagnosticSummary: String {
-        if let resolution {
+        if let terminalReadback {
             return "path=\(path) "
-                + resolution.diagnosticSummary
+                + terminalReadback.diagnosticSummary
         }
         return "path=\(path) fileExists=\(fileExists) "
             + "error=\(errorDescription ?? "nil")"
@@ -454,10 +543,25 @@ final class
                     .read(from: route.readbackURL)
             },
             isSatisfied: {
-                guard let resolution = $0.resolution else {
+                guard let terminalReadback =
+                        $0.terminalReadback,
+                      terminalReadback.isWellFormed
+                else {
                     return false
                 }
-                return expectation.isSatisfied(by: resolution)
+                switch terminalReadback.outcome {
+                case .resolution:
+                    guard let resolution =
+                            terminalReadback.resolution
+                    else {
+                        return false
+                    }
+                    return expectation.isSatisfied(
+                        by: resolution
+                    )
+                case .initialPresentationWatchdogFailure:
+                    return true
+                }
             },
             describe: \.diagnosticSummary
         )
@@ -470,9 +574,17 @@ final class
     func waitForResolution(
         timeout: TimeInterval
     ) -> FlowTabUITestInitialPresentationResolutionReadback? {
+        waitForTerminalReadback(
+            timeout: timeout
+        )?.resolution
+    }
+
+    func waitForTerminalReadback(
+        timeout: TimeInterval
+    ) -> FlowTabUITestInitialPresentationTerminalReadback? {
         conditionOwner.waitForResolution(
             timeout: timeout
-        )?.value.resolution
+        )?.value.terminalReadback
     }
 
     var diagnosticSummary: String {

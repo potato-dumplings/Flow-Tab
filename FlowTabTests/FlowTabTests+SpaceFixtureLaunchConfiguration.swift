@@ -76,12 +76,14 @@ extension FlowTabTests {
         XCTAssertNil(
             configuration.windowCloseFaultTriggerRoute
         )
+        XCTAssertNil(configuration.windowOpenMutationRoute)
         XCTAssertNil(
             configuration.workflowReadinessRoute
         )
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 0)
         XCTAssertNil(configuration.closeWindowIndex)
         XCTAssertEqual(configuration.closeWindowDelayMilliseconds, 0)
+        XCTAssertNil(configuration.deferredOpenWindowIndex)
     }
 
     func testSpaceFixtureLaunchConfigurationNormalizesInvalidNumericArguments() {
@@ -115,12 +117,43 @@ extension FlowTabTests {
         XCTAssertNil(
             configuration.windowCloseFaultTriggerRoute
         )
+        XCTAssertNil(configuration.windowOpenMutationRoute)
         XCTAssertNil(
             configuration.workflowReadinessRoute
         )
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 0)
         XCTAssertNil(configuration.closeWindowIndex)
         XCTAssertEqual(configuration.closeWindowDelayMilliseconds, 0)
+        XCTAssertNil(configuration.deferredOpenWindowIndex)
+    }
+
+    func testSpaceFixtureLaunchConfigurationParsesDeferredWindowOpenRoute() {
+        let configuration = SpaceFixtureLaunchConfiguration(
+            arguments: [
+                "FlowTabSpaceFixture",
+                "--window-count", "2",
+                "--deferred-open-window-index", "2",
+                "--window-open-evidence-notification-name",
+                "test.fixture.window-open.evidence",
+                "--window-open-trigger-notification-name",
+                "test.fixture.window-open.trigger"
+            ]
+        )
+
+        XCTAssertEqual(configuration.deferredOpenWindowIndex, 2)
+        XCTAssertEqual(
+            configuration.windowOpenMutationRoute,
+            SpaceFixtureWindowOpenMutationRoute(
+                evidenceNotificationName:
+                    Notification.Name(
+                        "test.fixture.window-open.evidence"
+                    ),
+                triggerNotificationName:
+                    Notification.Name(
+                        "test.fixture.window-open.trigger"
+                    )
+            )
+        )
     }
 
     func testSpaceFixtureLaunchConfigurationParsesTerminationAndWindowCloseDelays() {

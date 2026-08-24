@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import FlowTabCore
 
 struct RuntimeAppWindowStats {
     let windowCount: Int
@@ -10,19 +11,30 @@ enum RuntimeApplicationDirectoryFilter {
     static func shouldIncludeRunningApplication(
         activationPolicy: NSApplication.ActivationPolicy,
         isTerminated: Bool,
-        appID: String,
         pid: pid_t,
-        currentPID: pid_t,
-        explicitlyTrackedAppIDs: Set<String>
+        currentPID: pid_t
     ) -> Bool {
-        guard !isTerminated else { return false }
-        return activationPolicy == .regular
-            || pid == currentPID
-            || explicitlyTrackedAppIDs.contains(appID)
+        ApplicationIdentityPolicy.decision(
+            for: ApplicationIdentityFacts(
+                isCurrentProcess: pid == currentPID,
+                isTerminated: isTerminated,
+                runtimeActivationPolicy: activationPolicy.flowTabCorePolicy,
+                bundleSource: .none,
+                isUIElement: false,
+                isBackgroundOnly: false
+            )
+        ).isIncluded
     }
 }
 
 enum RuntimeAppLayerProjectionFilter {
+    static func isEligibleRunningApplication(
+        activationPolicy: NSApplication.ActivationPolicy,
+        isTerminated: Bool
+    ) -> Bool {
+        activationPolicy == .regular && !isTerminated
+    }
+
     static func shouldIncludeRunningApplication(
         activationPolicy: NSApplication.ActivationPolicy,
         isTerminated: Bool,
@@ -30,8 +42,10 @@ enum RuntimeAppLayerProjectionFilter {
         currentPID: pid_t,
         includeCurrentProcessInAppLayer: Bool
     ) -> Bool {
-        activationPolicy == .regular
-            && !isTerminated
+        isEligibleRunningApplication(
+            activationPolicy: activationPolicy,
+            isTerminated: isTerminated
+        )
             && (includeCurrentProcessInAppLayer || pid != currentPID)
     }
 
@@ -84,7 +98,6 @@ enum RuntimeAppDirectoryFactSource {
         from runningApplications: [NSRunningApplication],
         currentPID: pid_t,
         includeCurrentProcessInAppLayer: Bool,
-        explicitlyTrackedAppIDs: Set<String>,
         rankProvider: ([NSRunningApplication]) -> [pid_t: Int] = {
             RuntimeAppRankProvider.collectAppRankByPID(for: $0)
         }
@@ -93,10 +106,8 @@ enum RuntimeAppDirectoryFactSource {
             RuntimeApplicationDirectoryFilter.shouldIncludeRunningApplication(
                 activationPolicy: app.activationPolicy,
                 isTerminated: app.isTerminated,
-                appID: RuntimeAppIdentity.appID(for: app),
                 pid: app.processIdentifier,
-                currentPID: currentPID,
-                explicitlyTrackedAppIDs: explicitlyTrackedAppIDs
+                currentPID: currentPID
             )
         }
         let windowRepairApplications = appLayerRunningApplications(
@@ -121,26 +132,50 @@ enum RuntimeAppDirectoryFactSource {
 
     static func currentMaintenanceFacts(
         includeCurrentProcessInAppLayer: Bool,
-        explicitlyTrackedAppIDs: Set<String>,
         workspace: NSWorkspace = .shared,
         currentPID: pid_t = ProcessInfo.processInfo.processIdentifier
     ) -> RuntimeAppDirectoryMaintenanceFacts {
         maintenanceFacts(
             from: workspace.runningApplications,
             currentPID: currentPID,
-            includeCurrentProcessInAppLayer: includeCurrentProcessInAppLayer,
-            explicitlyTrackedAppIDs: explicitlyTrackedAppIDs
+            includeCurrentProcessInAppLayer: includeCurrentProcessInAppLayer
+        )
+    }
+
+    static func runningApplicationEntry(
+        for app: NSRunningApplication,
+        activationRank: Int? = nil,
+        currentPID: pid_t = ProcessInfo.processInfo.processIdentifier
+    ) -> RuntimeAppDirectoryEntry? {
+        guard RuntimeApplicationDirectoryFilter.shouldIncludeRunningApplication(
+            activationPolicy: app.activationPolicy,
+            isTerminated: app.isTerminated,
+            pid: app.processIdentifier,
+            currentPID: currentPID
+        ) else {
+            return nil
+        }
+        return RuntimeAppDirectoryEntry(
+            app: app,
+            activationRank: activationRank,
+            isEligibleForAppSwitcherProjection:
+                RuntimeAppLayerProjectionFilter.isEligibleRunningApplication(
+                    activationPolicy: app.activationPolicy,
+                    isTerminated: app.isTerminated
+                )
         )
     }
 
     static func entries(
         from runningApplications: [NSRunningApplication],
-        rankByPID: [pid_t: Int] = [:]
+        rankByPID: [pid_t: Int] = [:],
+        currentPID: pid_t = ProcessInfo.processInfo.processIdentifier
     ) -> [RuntimeAppDirectoryEntry] {
-        runningApplications.map { app in
-            RuntimeAppDirectoryEntry(
-                app: app,
-                activationRank: rankByPID[app.processIdentifier]
+        runningApplications.compactMap { app in
+            runningApplicationEntry(
+                for: app,
+                activationRank: rankByPID[app.processIdentifier],
+                currentPID: currentPID
             )
         }
     }
@@ -153,17 +188,18 @@ enum RuntimeAppDirectoryFactSource {
     }
 }
 
-protocol RuntimeAppDirectoryProviding: AnyObject {
-    func appDirectoryEntriesForRuntimeMaintenance() -> [RuntimeAppDirectoryEntry]
-}
-
-final class RuntimeWorkspaceAppDirectoryProvider: RuntimeAppDirectoryProviding {
-    func appDirectoryEntriesForRuntimeMaintenance() -> [RuntimeAppDirectoryEntry] {
-        RuntimeAppDirectoryFactSource.currentMaintenanceFacts(
-            includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab(),
-            explicitlyTrackedAppIDs: AppVisibilityPreferencesStore.loadHiddenAppIDs()
-        )
-        .entries
+extension NSApplication.ActivationPolicy {
+    var flowTabCorePolicy: ApplicationRuntimeActivationPolicy {
+        switch self {
+        case .regular:
+            return .regular
+        case .accessory:
+            return .accessory
+        case .prohibited:
+            return .prohibited
+        @unknown default:
+            return .prohibited
+        }
     }
 }
 
@@ -251,6 +287,35 @@ struct RuntimeAppDirectoryEntry: Equatable {
             activationRank: preservedRank,
             runningApplication: preservedRunningApplication,
             isEligibleForAppSwitcherProjection: preservedAppSwitcherEligibility
+        )
+    }
+
+    func preservingSnapshotMetadata(from existing: RuntimeAppDirectoryEntry?) -> RuntimeAppDirectoryEntry {
+        guard let existing, existing.appID == appID else { return self }
+        return RuntimeAppDirectoryEntry(
+            pid: pid,
+            appID: appID,
+            bundleIdentifier: existing.bundleIdentifier ?? bundleIdentifier,
+            localizedName: existing.localizedName ?? localizedName,
+            bundleURL: existing.bundleURL ?? bundleURL,
+            launchDate: existing.launchDate ?? launchDate,
+            activationRank: existing.activationRank ?? activationRank,
+            runningApplication: existing.runningApplication ?? runningApplication,
+            isEligibleForAppSwitcherProjection: isEligibleForAppSwitcherProjection
+        )
+    }
+
+    func withActivationRank(_ activationRank: Int?) -> RuntimeAppDirectoryEntry {
+        RuntimeAppDirectoryEntry(
+            pid: pid,
+            appID: appID,
+            bundleIdentifier: bundleIdentifier,
+            localizedName: localizedName,
+            bundleURL: bundleURL,
+            launchDate: launchDate,
+            activationRank: activationRank,
+            runningApplication: runningApplication,
+            isEligibleForAppSwitcherProjection: isEligibleForAppSwitcherProjection
         )
     }
 }

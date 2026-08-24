@@ -142,14 +142,6 @@ final class SpyStressRunner: TabSwitchStressRunning {
     }
 }
 
-final class SpyMRUTracker: MRUTracking {
-    private(set) var startCallCount = 0
-
-    func startIfNeeded() {
-        startCallCount += 1
-    }
-}
-
 final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchecked Sendable {
     private let lock = NSLock()
     private var appSwitcherProjection: RuntimeAppSwitcherProjection?
@@ -167,6 +159,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private var focusedCurrentAppWindowProjectionReads = 0
     private var spaceTopologyProjectionReads = 0
     private var committedSearchIndexReads = 0
+    private var appDirectoryMembershipPresentationRefreshes = 0
     private var appSwitcherMaintenanceRequests: [RuntimeProjectionMaintenanceReason] = []
     private var appSwitcherMaintenanceRequestHandler:
         ((RuntimeProjectionMaintenanceReason) -> Void)?
@@ -179,6 +172,9 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     ] = []
     private var appLaunchSignalHandler:
         ((String, pid_t, RuntimeAppDirectoryEntry?) -> Void)?
+    private var appActivationSignals: [
+        (appID: String, pid: pid_t, appDirectoryEntry: RuntimeAppDirectoryEntry)
+    ] = []
     private var appWindowChangeSignals: [(appID: String, pid: pid_t)] = []
     private var selectedCurrentAppWindowChangeSignals: [(appID: String, pid: pid_t)] = []
     private var selectedCurrentAppWindowChangeSignalHandler:
@@ -340,6 +336,12 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         return committedSearchIndexReads
     }
 
+    func appDirectoryMembershipPresentationRefreshCount() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return appDirectoryMembershipPresentationRefreshes
+    }
+
     func installAppSwitcherProjection(
         apps: [AppSwitchCandidate],
         contextsByID: [String: RuntimeAppContext] = [:],
@@ -407,6 +409,14 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.lock()
         appLaunchSignalHandler = handler
         lock.unlock()
+    }
+
+    func appActivationSignalsRecorded() -> [
+        (appID: String, pid: pid_t, appDirectoryEntry: RuntimeAppDirectoryEntry)
+    ] {
+        lock.lock()
+        defer { lock.unlock() }
+        return appActivationSignals
     }
 
     func appWindowChangeSignalsRecorded() -> [(appID: String, pid: pid_t)] {
@@ -489,6 +499,12 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         defer { lock.unlock() }
         appSwitcherProjectionReads += 1
         return appSwitcherProjection
+    }
+
+    func refreshApplicationDirectoryMembershipForPresentation() {
+        lock.lock()
+        appDirectoryMembershipPresentationRefreshes += 1
+        lock.unlock()
     }
 
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection? {
@@ -620,6 +636,17 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         let handler = appLaunchSignalHandler
         lock.unlock()
         handler?(appID, pid, appDirectoryEntry)
+    }
+
+    func signalAppActivated(
+        appID: String,
+        pid: pid_t,
+        appDirectoryEntry: RuntimeAppDirectoryEntry
+    ) {
+        lock.lock()
+        appActivationSignals.append((appID, pid, appDirectoryEntry))
+        lock.unlock()
+        signalSelectedCurrentAppWindowsChanged(appID: appID, pid: pid)
     }
 
     func signalAppWindowsChanged(appID: String, pid: pid_t) {
@@ -775,48 +802,4 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
             }
         )
     }
-}
-
-struct FixedRuntimeCGWindowListProvider: RuntimeCGWindowListProviding {
-    let rawWindowInfo: [[String: Any]]
-
-    func windowInfo(
-        options: CGWindowListOption,
-        relativeToWindow windowID: CGWindowID
-    ) -> [[String: Any]]? {
-        rawWindowInfo
-    }
-}
-
-struct FixedRuntimeSpaceTopologyProvider: RuntimeSpaceTopologyProviding {
-    let snapshot: RuntimeSpaceTopologySnapshot
-
-    func snapshot(for windowIDs: [CGWindowID]) -> RuntimeSpaceTopologySnapshot {
-        snapshot
-    }
-}
-
-func makeRawCGWindowInfo(
-    pid: pid_t,
-    windowID: CGWindowID,
-    title: String,
-    bounds: CGRect = CGRect(x: 10, y: 20, width: 640, height: 480),
-    isOnscreen: Bool = true,
-    layer: Int = 0
-) -> [String: Any] {
-    [
-        kCGWindowOwnerPID as String: pid,
-        kCGWindowLayer as String: layer,
-        kCGWindowNumber as String: NSNumber(value: windowID),
-        kCGWindowName as String: title,
-        kCGWindowBounds as String: [
-            "X": bounds.origin.x,
-            "Y": bounds.origin.y,
-            "Width": bounds.width,
-            "Height": bounds.height
-        ],
-        kCGWindowIsOnscreen as String: NSNumber(value: isOnscreen),
-        kCGWindowAlpha as String: NSNumber(value: 1.0),
-        kCGWindowStoreType as String: NSNumber(value: 1)
-    ]
 }

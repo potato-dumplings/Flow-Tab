@@ -27,7 +27,10 @@ extension FlowTabTests {
         let recorder = SettingsPresentationUpdateRecorder()
         let hostedView = NSHostingView(
             rootView: SettingsPresentationObservedContent(
-                content: AppSettingsView(isActive: true)
+                content: AppSettingsView(
+                    isActive: true,
+                    appVisibilityModel: AppVisibilityManagerModel()
+                )
                     .frame(width: 1_440, height: 900, alignment: .topLeading),
                 recorder: recorder
             )

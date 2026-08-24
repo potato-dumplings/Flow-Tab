@@ -247,8 +247,22 @@ extension FlowTabUITests {
         ) else {
             return
         }
-        postShortcutEventInjection(
+        injectRuntimeKeySet(
             targetProcessID: processID,
+            keyCodes: keyCodes,
+            modifierFlags: modifierFlags,
+            phase: phase
+        )
+    }
+
+    func injectRuntimeKeySet(
+        targetProcessID: pid_t,
+        keyCodes: [CGKeyCode],
+        modifierFlags: XCUIElement.KeyModifierFlags,
+        phase: String
+    ) {
+        postShortcutEventInjection(
+            targetProcessID: targetProcessID,
             userInfo: [
                 FlowTabUITestShortcutEventInjectionTransport.UserInfoKey
                     .keyCodes: keyCodes.map(NSNumber.init(value:)),

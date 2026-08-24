@@ -9,11 +9,13 @@ extension FlowTabTests {
         )
     }
 
+    @MainActor
     func testAppSettingsViewUsesInjectedAppVisibilityNavigationPolicy() {
         let injectedPolicy =
             SettingsAppVisibilityNavigationAnimationPolicy(duration: 0.9)
         let view = AppSettingsView(
             isActive: true,
+            appVisibilityModel: AppVisibilityManagerModel(),
             appVisibilityNavigationAnimationPolicy: injectedPolicy
         )
 

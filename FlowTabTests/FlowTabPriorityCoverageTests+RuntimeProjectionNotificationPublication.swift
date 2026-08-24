@@ -214,46 +214,6 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(diagnostics.pendingRepairScopes.isEmpty)
     }
 
-    func testUITestFrontmostProjectionOverrideRoutesFocusedReadsAndRefreshesToTarget() throws {
-        let runningApp = NSRunningApplication.current
-        let appID = "com.example.fixture.chrome"
-        let baseService = makeCurrentAppWindowProjectionService(
-            appID: appID,
-            runningApp: runningApp,
-            windows: [
-                WindowCandidate(
-                    id: "fixture-window",
-                    title: "Fixture Window",
-                    isMinimized: false,
-                    lastActiveAt: 10
-                )
-            ]
-        )
-        let target = RuntimeUITestFrontmostAppTarget(
-            appID: appID,
-            pid: runningApp.processIdentifier,
-            bundleIdentifier: "com.example.fixture.chrome"
-        )
-        let service = RuntimeUITestFrontmostProjectionService(
-            baseService: baseService,
-            targetProvider: { target }
-        )
-
-        let focusedRead = try XCTUnwrap(service.readFocusedCurrentAppWindowProjection())
-        XCTAssertEqual(focusedRead.appID, appID)
-        XCTAssertEqual(focusedRead.pid, runningApp.processIdentifier)
-        XCTAssertEqual(
-            focusedRead.projection?.currentAppWindowPayload.candidate.windows.map { $0.id },
-            ["fixture-window"]
-        )
-
-        service.signalFocusedCurrentAppWindowsChanged()
-        let selectedSignals = baseService.selectedCurrentAppWindowChangeSignalsRecorded()
-        XCTAssertEqual(selectedSignals.count, 1)
-        XCTAssertEqual(selectedSignals.first?.appID, appID)
-        XCTAssertEqual(selectedSignals.first?.pid, runningApp.processIdentifier)
-    }
-
     func testRuntimeProjectionServiceRepublishesAppSwitcherAfterScopedWindowRepair() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)

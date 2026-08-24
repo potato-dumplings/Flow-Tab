@@ -7,6 +7,37 @@ private enum RuntimeAXRemoteWindowScanLifecycleWatchdogPolicy {
 }
 
 extension FlowTabPriorityCoverageTests {
+    func testRuntimeAXRemoteWindowResolverCancellationKeepsPartialScanNonAuthoritative() {
+        var visitedElementIDs: [UInt64] = []
+        var isCancelled = false
+
+        let result = RuntimeAXRemoteWindowResolverForTesting.scan(
+            for: .interactive,
+            isCancelled: { isCancelled }
+        ) { elementID in
+            visitedElementIDs.append(elementID)
+            if elementID == 24 {
+                isCancelled = true
+            }
+            return nil
+        }
+
+        XCTAssertEqual(visitedElementIDs, Array(UInt64(0)...24))
+        XCTAssertEqual(
+            result.completeness,
+            .cancelled(scanned: 25, maximum: 750)
+        )
+        XCTAssertFalse(
+            RuntimeAXWindowAbsencePolicy.isAbsenceAuthoritative(
+                remoteScanCompleteness: result.completeness
+            )
+        )
+        XCTAssertEqual(
+            AXWindowInspectorForTesting.remoteScanLogDescription(result.completeness),
+            "cancelled scanned=25 maximum=750"
+        )
+    }
+
     func testRuntimeAXRemoteWindowScanLifecycleWatchdogPolicyPreservesEventDeliveryBound() {
         let eventDelivery =
             RuntimeAXRemoteWindowScanLifecycleWatchdogPolicy

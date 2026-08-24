@@ -40,6 +40,50 @@ extension FlowTabUITests {
         }
     }
 
+    func testHomeAndLogsBidirectionalNavigationRemainsResponsive() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        assertHomeAndLogsApplicationIsForegroundReady(app)
+
+        for cycle in 0..<4 {
+            for target in [
+                FlowTabUITestSidebarTabProjectionTarget.logs,
+                .home
+            ] {
+                let startedAt = ProcessInfo.processInfo.systemUptime
+                guard assertSidebarTabProjectionAfterNavigation(
+                    in: app,
+                    target: target,
+                    triggerWatchdog:
+                        FlowTabUITestHomeAndLogsWatchdogPolicy
+                            .bidirectionalNavigationResponsiveness,
+                    projectionWatchdog:
+                        FlowTabUITestHomeAndLogsWatchdogPolicy
+                            .bidirectionalNavigationResponsiveness
+                ) else {
+                    return
+                }
+                let elapsed = ProcessInfo.processInfo.systemUptime - startedAt
+                XCTAssertLessThanOrEqual(
+                    elapsed,
+                    FlowTabUITestHomeAndLogsWatchdogPolicy
+                        .bidirectionalNavigationResponsiveness,
+                    "Sidebar navigation exceeded its responsiveness budget. "
+                        + "cycle=\(cycle) target=\(target.rawValue) "
+                        + "elapsed=\(elapsed)"
+                )
+            }
+        }
+    }
+
     func testStatusItemReopensLastSelectedTabAfterWindowClose() throws {
         let app = makeApp(
             additionalArguments: [

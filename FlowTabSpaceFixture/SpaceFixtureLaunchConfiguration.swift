@@ -70,11 +70,14 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         SpaceFixtureWindowCloseFaultEvidenceRoute?
     let windowCloseFaultTriggerRoute:
         SpaceFixtureWindowCloseFaultTriggerRoute?
+    let windowOpenMutationRoute:
+        SpaceFixtureWindowOpenMutationRoute?
     let workflowReadinessRoute:
         SpaceFixtureWorkflowReadinessRoute?
     let terminationDelayMilliseconds: Int
     let closeWindowIndex: Int?
     let closeWindowDelayMilliseconds: Int
+    let deferredOpenWindowIndex: Int?
     let workflowName: String?
     let workflowAppID: String?
     let workflowAppName: String?
@@ -112,11 +115,14 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             SpaceFixtureWindowCloseFaultEvidenceRoute? = nil,
         windowCloseFaultTriggerRoute:
             SpaceFixtureWindowCloseFaultTriggerRoute? = nil,
+        windowOpenMutationRoute:
+            SpaceFixtureWindowOpenMutationRoute? = nil,
         workflowReadinessRoute:
             SpaceFixtureWorkflowReadinessRoute? = nil,
         terminationDelayMilliseconds: Int = 0,
         closeWindowIndex: Int? = nil,
         closeWindowDelayMilliseconds: Int = 0,
+        deferredOpenWindowIndex: Int? = nil,
         workflowName: String? = nil,
         workflowAppID: String? = nil,
         workflowAppName: String? = nil
@@ -135,11 +141,23 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             windowCloseFaultEvidenceRoute
         self.windowCloseFaultTriggerRoute =
             windowCloseFaultTriggerRoute
+        let normalizedDeferredOpenWindowIndex =
+            deferredOpenWindowIndex.flatMap {
+                windows.indices.contains($0 - 1) ? $0 : nil
+            }
+        self.windowOpenMutationRoute =
+            normalizedDeferredOpenWindowIndex == nil
+                ? nil
+                : windowOpenMutationRoute
         self.workflowReadinessRoute =
             workflowReadinessRoute
         self.terminationDelayMilliseconds = max(0, terminationDelayMilliseconds)
         self.closeWindowIndex = closeWindowIndex.flatMap { windows.indices.contains($0 - 1) ? $0 : nil }
         self.closeWindowDelayMilliseconds = max(0, closeWindowDelayMilliseconds)
+        self.deferredOpenWindowIndex =
+            windowOpenMutationRoute == nil
+                ? nil
+                : normalizedDeferredOpenWindowIndex
         self.workflowName = workflowName
         self.workflowAppID = workflowAppID
         self.workflowAppName = workflowAppName
@@ -161,11 +179,14 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             SpaceFixtureWindowCloseFaultEvidenceRoute? = nil,
         windowCloseFaultTriggerRoute:
             SpaceFixtureWindowCloseFaultTriggerRoute? = nil,
+        windowOpenMutationRoute:
+            SpaceFixtureWindowOpenMutationRoute? = nil,
         workflowReadinessRoute:
             SpaceFixtureWorkflowReadinessRoute? = nil,
         terminationDelayMilliseconds: Int = 0,
         closeWindowIndex: Int? = nil,
-        closeWindowDelayMilliseconds: Int = 0
+        closeWindowDelayMilliseconds: Int = 0,
+        deferredOpenWindowIndex: Int? = nil
     ) {
         let normalizedWindowCount = max(Self.minimumWindowCount, windowCount)
         let normalizedFullscreenWindowIndex: Int?
@@ -209,11 +230,14 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
                 windowCloseFaultEvidenceRoute,
             windowCloseFaultTriggerRoute:
                 windowCloseFaultTriggerRoute,
+            windowOpenMutationRoute:
+                windowOpenMutationRoute,
             workflowReadinessRoute:
                 workflowReadinessRoute,
             terminationDelayMilliseconds: terminationDelayMilliseconds,
             closeWindowIndex: closeWindowIndex,
-            closeWindowDelayMilliseconds: closeWindowDelayMilliseconds
+            closeWindowDelayMilliseconds: closeWindowDelayMilliseconds,
+            deferredOpenWindowIndex: deferredOpenWindowIndex
         )
     }
 
@@ -274,13 +298,22 @@ extension SpaceFixtureLaunchConfiguration {
                 Self.windowCloseFaultTriggerRoute(
                     arguments: arguments
                 ),
+            windowOpenMutationRoute:
+                Self.windowOpenMutationRoute(
+                    arguments: arguments
+                ),
             workflowReadinessRoute:
                 Self.workflowReadinessRoute(
                     arguments: arguments
                 ),
             terminationDelayMilliseconds: normalizedTerminationDelayMilliseconds,
             closeWindowIndex: Self.intValue(after: "--close-window-index", in: arguments),
-            closeWindowDelayMilliseconds: normalizedCloseWindowDelayMilliseconds
+            closeWindowDelayMilliseconds: normalizedCloseWindowDelayMilliseconds,
+            deferredOpenWindowIndex:
+                Self.intValue(
+                    after: "--deferred-open-window-index",
+                    in: arguments
+                )
         )
     }
 
@@ -350,6 +383,10 @@ extension SpaceFixtureLaunchConfiguration {
                 Self.windowCloseFaultTriggerRoute(
                     arguments: arguments
                 ),
+            windowOpenMutationRoute:
+                Self.windowOpenMutationRoute(
+                    arguments: arguments
+                ),
             workflowReadinessRoute:
                 Self.workflowReadinessRoute(
                     arguments: arguments
@@ -363,6 +400,11 @@ extension SpaceFixtureLaunchConfiguration {
                 0,
                 Self.intValue(after: "--close-window-delay-ms", in: arguments) ?? 0
             ),
+            deferredOpenWindowIndex:
+                Self.intValue(
+                    after: "--deferred-open-window-index",
+                    in: arguments
+                ),
             workflowName: workflowConfiguration.workflowName,
             workflowAppID: appConfiguration.appID,
             workflowAppName: appConfiguration.appName
@@ -514,6 +556,34 @@ extension SpaceFixtureLaunchConfiguration {
             notificationName: Notification.Name(
                 notificationName
             )
+        )
+    }
+
+    private static func windowOpenMutationRoute(
+        arguments: [String]
+    ) -> SpaceFixtureWindowOpenMutationRoute? {
+        guard let evidenceName = stringValue(
+            after:
+                SpaceFixtureWindowOpenMutationRoute
+                    .evidenceNotificationArgument,
+            in: arguments
+        )?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !evidenceName.isEmpty,
+        let triggerName = stringValue(
+            after:
+                SpaceFixtureWindowOpenMutationRoute
+                    .triggerNotificationArgument,
+            in: arguments
+        )?.trimmingCharacters(in: .whitespacesAndNewlines),
+        !triggerName.isEmpty
+        else {
+            return nil
+        }
+        return SpaceFixtureWindowOpenMutationRoute(
+            evidenceNotificationName:
+                Notification.Name(evidenceName),
+            triggerNotificationName:
+                Notification.Name(triggerName)
         )
     }
 

@@ -17,6 +17,7 @@ struct FlowTabUITestConditionEvidence<Value> {
 }
 
 final class FlowTabUITestObservationCancellation {
+    private let lock = NSLock()
     private var cancellation: (() -> Void)?
 
     init(_ cancellation: @escaping () -> Void) {
@@ -24,13 +25,43 @@ final class FlowTabUITestObservationCancellation {
     }
 
     func cancel() {
-        guard let cancellation else { return }
+        lock.lock()
+        let cancellation = self.cancellation
         self.cancellation = nil
-        cancellation()
+        lock.unlock()
+        cancellation?()
     }
 
     deinit {
         cancel()
+    }
+}
+
+final class FlowTabUITestObservationScope {
+    static let shared = FlowTabUITestObservationScope()
+
+    private let lock = NSLock()
+    private var cancellations: [FlowTabUITestObservationCancellation] = []
+
+    @discardableResult
+    func track(
+        _ cancellation: FlowTabUITestObservationCancellation
+    ) -> FlowTabUITestObservationCancellation {
+        lock.lock()
+        cancellations.append(cancellation)
+        lock.unlock()
+        return cancellation
+    }
+
+    func cancelAll() {
+        lock.lock()
+        let cancellations = self.cancellations
+        self.cancellations.removeAll()
+        lock.unlock()
+
+        for cancellation in cancellations.reversed() {
+            cancellation.cancel()
+        }
     }
 }
 
@@ -108,6 +139,8 @@ final class FlowTabUITestConditionObservationOwner<Value> {
     private var currentGeneration: UInt64?
     private var activeReadbackGeneration: UInt64?
     private var eventCancellation: FlowTabUITestObservationCancellation?
+    private var testScopeCancellation:
+        FlowTabUITestObservationCancellation?
     private var resolvedExpectation: XCTestExpectation?
     private var lastWaitResult: XCTWaiter.Result?
 
@@ -131,6 +164,13 @@ final class FlowTabUITestConditionObservationOwner<Value> {
 
     func start() {
         cancel()
+        testScopeCancellation =
+            FlowTabUITestObservationScope.shared.track(
+                FlowTabUITestObservationCancellation {
+                    [weak self] in
+                    self?.cancelObservation()
+                }
+            )
         latestEvidence = nil
         resolvedEvidence = nil
         lastWaitResult = nil
@@ -211,6 +251,12 @@ final class FlowTabUITestConditionObservationOwner<Value> {
     }
 
     func cancel() {
+        cancelObservation()
+        testScopeCancellation?.cancel()
+        testScopeCancellation = nil
+    }
+
+    private func cancelObservation() {
         currentGeneration = nil
         stopObservationInputs()
         resolvedExpectation = nil

@@ -231,6 +231,48 @@ test_release_install_wires_both_process_boundaries() (
   fi
 )
 
+test_release_install_reissues_exit_request_before_removal() (
+  local request_call_count
+
+  request_call_count="$(
+    /usr/bin/grep -E -c \
+      '^[[:space:]]*request_flowtab_process_exit[[:space:]]*$' \
+      "${RELEASE_INSTALL_PATH}" \
+      || true
+  )"
+  [[ "${request_call_count}" -eq 2 ]] \
+    || fail "release install must request exit before both process-absence waits"
+
+  /usr/bin/awk '
+    /^[[:space:]]*request_flowtab_process_exit[[:space:]]*$/ {
+      if (first_request == 0) {
+        first_request = NR
+      } else {
+        second_request = NR
+      }
+    }
+    /flowtab_wait_for_process_exit/ {
+      if (first_wait == 0) {
+        first_wait = NR
+      } else {
+        second_wait = NR
+      }
+    }
+    /rm -rf "\$\{INSTALL_PATH\}"/ {
+      removal = NR
+    }
+    END {
+      valid = first_request > 0
+      valid = valid && first_request < first_wait
+      valid = valid && first_wait < second_request
+      valid = valid && second_request < second_wait
+      valid = valid && second_wait < removal
+      exit valid ? 0 : 1
+    }
+  ' "${RELEASE_INSTALL_PATH}" \
+    || fail "each exit request and absence readback must precede app removal"
+)
+
 test_initial_readback_can_resolve_without_polling
 test_polling_resolves_only_from_absence_readback
 test_watchdog_reports_last_observed_process
@@ -238,5 +280,6 @@ test_readback_error_remains_unmet_evidence
 test_zero_polling_interval_is_rejected
 test_real_readback_accepts_exact_absence
 test_release_install_wires_both_process_boundaries
+test_release_install_reissues_exit_request_before_removal
 
 echo "Release process-exit observation checks immediate, conditional, and watchdog evidence."

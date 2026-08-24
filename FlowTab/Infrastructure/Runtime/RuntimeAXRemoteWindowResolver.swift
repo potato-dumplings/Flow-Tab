@@ -3,6 +3,22 @@ import CoreGraphics
 import Darwin
 import Foundation
 
+enum RuntimeAXMessagingTimeoutPolicy {
+    static let perElementSeconds: Float = 0.5
+
+    // AX messaging timeouts belong to one exact element, including each child window element.
+    @discardableResult
+    static func apply(to element: AXUIElement) -> AXError {
+        AXUIElementSetMessagingTimeout(element, perElementSeconds)
+    }
+
+    static func apply(to elements: [AXUIElement]) {
+        for element in elements {
+            apply(to: element)
+        }
+    }
+}
+
 enum RuntimeAXRemoteWindowResolver {
     private typealias CreateWithRemoteTokenFn = @convention(c) (CFData) -> Unmanaged<AXUIElement>?
     typealias AXUIElementID = UInt64
@@ -19,6 +35,7 @@ enum RuntimeAXRemoteWindowResolver {
     enum RemoteScanCompleteness: Equatable {
         case unavailable
         case complete(scanned: Int)
+        case cancelled(scanned: Int, maximum: Int)
     }
 
     enum RemoteAXResolveFailureReason: Equatable {
@@ -124,7 +141,22 @@ enum RuntimeAXRemoteWindowResolver {
     }
 
     static func windowScanResult(forPID pid: pid_t) -> WindowScanResult {
-        windowScanResult(forPID: pid, policy: defaultScanPolicy)
+        windowScanResult(
+            forPID: pid,
+            policy: defaultScanPolicy,
+            isCancelled: { false }
+        )
+    }
+
+    static func windowScanResult(
+        forPID pid: pid_t,
+        isCancelled: () -> Bool
+    ) -> WindowScanResult {
+        windowScanResult(
+            forPID: pid,
+            policy: defaultScanPolicy,
+            isCancelled: isCancelled
+        )
     }
 
     static func windowScanResult(
@@ -133,45 +165,99 @@ enum RuntimeAXRemoteWindowResolver {
     ) -> WindowScanResult {
         windowScanResult(
             forPID: pid,
-            policy: RuntimeAXRemoteScanPolicy.policy(for: useCase)
+            policy: RuntimeAXRemoteScanPolicy.policy(for: useCase),
+            isCancelled: { false }
         )
     }
 
     private static func windowScanResult(
         forPID pid: pid_t,
-        policy: RuntimeAXRemoteScanPolicy
+        policy: RuntimeAXRemoteScanPolicy,
+        isCancelled: () -> Bool
     ) -> WindowScanResult {
         guard let createWithRemoteToken else {
             return WindowScanResult(windows: [], completeness: .unavailable)
         }
 
         var token = remoteToken(pid: pid, elementID: 0)
-        return scanElementIDs(policy: policy) { elementID in
+        let result = scanElementIDs(
+            policy: policy,
+            isCancelled: isCancelled
+        ) { elementID in
             token.replaceSubrange(
                 RemoteTokenLayout.elementIDRange,
                 with: withUnsafeBytes(of: elementID) { Data($0) }
             )
             let element = createWithRemoteToken(token as CFData)?.takeRetainedValue()
+            if let element {
+                RuntimeAXMessagingTimeoutPolicy.apply(to: element)
+            }
             return remoteAXResolveResult(
                 element: element,
                 elementID: elementID,
                 expectedPID: pid
             ).element
         }
+        if case let .cancelled(scanned, maximum) = result.completeness {
+            RuntimeLog.debug(
+                .ax,
+                [
+                    "remote scan cancelled",
+                    "pid=\(pid)",
+                    "useCase=\(policy.useCase)",
+                    "scanned=\(scanned)",
+                    "maximum=\(maximum)",
+                    "windows=\(result.windows.count)"
+                ].joined(separator: " ")
+            )
+        }
+        return result
     }
 
     static func scanElementIDs(
         policy: RuntimeAXRemoteScanPolicy,
+        isCancelled: () -> Bool = { false },
         resolveElement: (AXUIElementID) -> AXUIElement?
     ) -> WindowScanResult {
         var windows: [AXUIElement] = []
+        var scannedCount = 0
         for elementID in policy.elementIDs {
-            guard let resolvedElement = resolveElement(elementID) else { continue }
-            windows.append(resolvedElement)
+            guard !isCancelled() else {
+                return cancelledScanResult(
+                    windows: windows,
+                    scannedCount: scannedCount,
+                    policy: policy
+                )
+            }
+            if let resolvedElement = resolveElement(elementID) {
+                windows.append(resolvedElement)
+            }
+            scannedCount += 1
+            if scannedCount < policy.elementIDs.count, isCancelled() {
+                return cancelledScanResult(
+                    windows: windows,
+                    scannedCount: scannedCount,
+                    policy: policy
+                )
+            }
         }
         return WindowScanResult(
             windows: windows,
-            completeness: .complete(scanned: policy.elementIDs.count)
+            completeness: .complete(scanned: scannedCount)
+        )
+    }
+
+    private static func cancelledScanResult(
+        windows: [AXUIElement],
+        scannedCount: Int,
+        policy: RuntimeAXRemoteScanPolicy
+    ) -> WindowScanResult {
+        WindowScanResult(
+            windows: windows,
+            completeness: .cancelled(
+                scanned: scannedCount,
+                maximum: policy.elementIDs.count
+            )
         )
     }
 

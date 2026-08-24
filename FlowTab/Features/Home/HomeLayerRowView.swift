@@ -54,6 +54,8 @@ struct HomeLayerRowView: View {
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(.orange)
                             .lineLimit(1)
+                            .accessibilityIdentifier(badgeAccessibilityIdentifier ?? "")
+                            .accessibilityLabel(badge)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
                             .background(
@@ -64,7 +66,6 @@ struct HomeLayerRowView: View {
                                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                                     .stroke(Color.orange.opacity(0.28), lineWidth: 1)
                             )
-                            .accessibilityIdentifier(badgeAccessibilityIdentifier ?? "")
                     }
                 }
 

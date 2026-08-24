@@ -3,6 +3,51 @@ import XCTest
 @testable import FlowTab
 
 extension FlowTabPriorityCoverageTests {
+    func testRuntimeAXAppCollectionCoordinatorReturnsCompletedResultsWhenOneCollectionStalls() {
+        let stalledCollection = RuntimeAXCollectionStallGate()
+        let collectionCompletion = DispatchGroup()
+        let resultEvidence = RuntimeAXCollectionResultEvidence()
+        defer { stalledCollection.release() }
+
+        collectionCompletion.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            let results: [Int] = RuntimeAXAppCollectionCoordinator.collect(
+                count: 3,
+                completionWatchdogSeconds:
+                    RuntimeAXCollectionPressureTestPolicy.collectionWatchdog
+            ) { index in
+                guard index == 1 else { return index }
+                return stalledCollection.perform(index: index)
+            }
+            resultEvidence.record(results: results)
+            collectionCompletion.leave()
+        }
+
+        XCTAssertEqual(
+            stalledCollection.waitUntilEntered(
+                timeout: .now() + RuntimeAXCollectionPressureTestPolicy.saturationWatchdog
+            ),
+            .success,
+            stalledCollection.diagnosticSummary
+        )
+
+        let completionResult = collectionCompletion.wait(
+            timeout: .now() + RuntimeAXCollectionPressureTestPolicy.completionWatchdog
+        )
+        let resultsBeforeRelease = resultEvidence.results
+        stalledCollection.release()
+        _ = collectionCompletion.wait(
+            timeout: .now() + RuntimeAXCollectionPressureTestPolicy.cleanupWatchdog
+        )
+
+        XCTAssertEqual(
+            completionResult,
+            .success,
+            "AX collection did not return completed app results after one app stalled."
+        )
+        XCTAssertEqual(resultsBeforeRelease, [0, 2])
+    }
+
     func testRuntimeAXAppCollectionCoordinatorPressureUsesBoundedConcurrencyAndKeepsOrder() {
         let taskCount = 28
         let configuredConcurrency = min(
@@ -111,8 +156,48 @@ extension FlowTabPriorityCoverageTests {
 }
 
 private enum RuntimeAXCollectionPressureTestPolicy {
+    static let collectionWatchdog: TimeInterval = 0.1
     static let saturationWatchdog: DispatchTimeInterval = .seconds(2)
     static let completionWatchdog: DispatchTimeInterval = .seconds(2)
+    static let cleanupWatchdog: DispatchTimeInterval = .seconds(1)
+}
+
+private final class RuntimeAXCollectionStallGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private let entered = DispatchSemaphore(value: 0)
+    private let releaseSignal = DispatchSemaphore(value: 0)
+    private var enteredIndex: Int?
+    private var released = false
+
+    var diagnosticSummary: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return "enteredIndex=\(String(describing: enteredIndex)) released=\(released)"
+    }
+
+    func waitUntilEntered(timeout: DispatchTime) -> DispatchTimeoutResult {
+        entered.wait(timeout: timeout)
+    }
+
+    func perform(index: Int) -> Int {
+        lock.lock()
+        enteredIndex = index
+        lock.unlock()
+        entered.signal()
+        releaseSignal.wait()
+        return index
+    }
+
+    func release() {
+        lock.lock()
+        guard !released else {
+            lock.unlock()
+            return
+        }
+        released = true
+        lock.unlock()
+        releaseSignal.signal()
+    }
 }
 
 private struct RuntimeAXCollectionWorkloadSnapshot {

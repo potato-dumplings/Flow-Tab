@@ -24,6 +24,9 @@ struct FlowTabUITestSettingsCurrentAppActivationProjectionSnapshot:
             && showInCommandTabToggleExists
             && showInCommandTabToggleIsOn == false
             && hiddenCountExists
+            && hiddenCountValue
+                == FlowTabUITestSettingsCurrentAppActivationProjectionPolicy
+                    .expectedHiddenCountText
     }
 
     var diagnosticSummary: String {
@@ -132,10 +135,11 @@ extension FlowTabUITests {
             in: app,
             identifier: Identifier.settingsAppearanceShowInCommandTab
         )
-        let hiddenCount = app.staticTexts[
-            FlowTabUITestSettingsCurrentAppActivationProjectionPolicy
-                .expectedHiddenCountText
-        ]
+        let hiddenCount = element(
+            in: app,
+            identifier:
+                Identifier.settingsAppVisibilityEffectiveHiddenCount
+        )
         var acceptsEvidence = false
         let owner =
             FlowTabUITestSettingsCurrentAppActivationProjectionObservationOwner(
@@ -208,7 +212,9 @@ extension FlowTabUITests {
                     + "expired. target=\(targetDescription) "
                     + "expectedToggleIdentifier="
                     + "\(Identifier.settingsAppearanceShowInCommandTab) "
-                    + "expectedHiddenCount="
+                    + "expectedHiddenCountIdentifier="
+                    + "\(Identifier.settingsAppVisibilityEffectiveHiddenCount) "
+                    + "expectedHiddenCountText="
                     + String(
                         reflecting:
                             FlowTabUITestSettingsCurrentAppActivationProjectionPolicy

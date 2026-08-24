@@ -73,6 +73,86 @@ struct FlowTabUITestRuntimeProjectionDataset {
         variant: String?
     ) -> [UITestAppDefinition] {
         switch variant {
+        case FlowTabUITestApplicationMembershipFixture.variant:
+            return [
+                (
+                    appID: FlowTabUITestApplicationMembershipFixture.stableAppID,
+                    name: "Membership Stable",
+                    windows: [
+                        WindowCandidate(
+                            id: "membership-stable-window",
+                            title: "Stable Document",
+                            isMinimized: false,
+                            lastActiveAt: 400
+                        )
+                    ],
+                    rank: 0,
+                    bundleURL: nil
+                ),
+                (
+                    appID: FlowTabUITestApplicationMembershipFixture.finalAccessoryAppID,
+                    name: "Membership Final Accessory",
+                    windows: [
+                        WindowCandidate(
+                            id: "membership-accessory-window",
+                            title: "Stale Accessory Window",
+                            isMinimized: false,
+                            lastActiveAt: 399
+                        )
+                    ],
+                    rank: 1,
+                    bundleURL: nil
+                )
+            ]
+        case FlowTabUITestAppVisibilityIdentityFixture.closedVariant,
+             FlowTabUITestAppVisibilityIdentityFixture.accessoryVariant:
+            return [
+                (
+                    appID: FlowTabUITestAppVisibilityIdentityFixture.configurableAppID,
+                    name: "Identity Editor",
+                    windows: [
+                        WindowCandidate(
+                            id: "identity-editor-main",
+                            title: "Identity Document",
+                            isMinimized: false,
+                            lastActiveAt: 400
+                        )
+                    ],
+                    rank: 0,
+                    bundleURL: nil
+                )
+            ]
+        case FlowTabUITestAppVisibilityIdentityFixture.regularVariant:
+            return [
+                (
+                    appID: FlowTabUITestAppVisibilityIdentityFixture.configurableAppID,
+                    name: "Identity Editor",
+                    windows: [
+                        WindowCandidate(
+                            id: "identity-editor-main",
+                            title: "Identity Document",
+                            isMinimized: false,
+                            lastActiveAt: 400
+                        )
+                    ],
+                    rank: 0,
+                    bundleURL: nil
+                ),
+                (
+                    appID: FlowTabUITestAppVisibilityIdentityFixture.dynamicAppID,
+                    name: "Identity Dynamic",
+                    windows: [
+                        WindowCandidate(
+                            id: "identity-dynamic-main",
+                            title: "Dynamic Document",
+                            isMinimized: false,
+                            lastActiveAt: 399
+                        )
+                    ],
+                    rank: 1,
+                    bundleURL: nil
+                )
+            ]
         case "search-wrap":
             return (1...10).map { item in
                 let suffix = String(format: "%02d", item)
@@ -642,9 +722,83 @@ struct FlowTabUITestRuntimeProjectionDataset {
 }
 
 final class RuntimeUITestProjectionAppDirectoryProvider: RuntimeAppDirectoryProviding {
+    private let lock = NSLock()
+    private let sourceID = UUID()
+    private let runningApplication: NSRunningApplication?
+    private var revision: UInt64 = 0
+    private var hasCapturedPresentationEvidence = false
+
+    init(attachesRunningApplication: Bool = true) {
+        runningApplication = attachesRunningApplication ? .current : nil
+    }
+
     func appDirectoryEntriesForRuntimeMaintenance() -> [RuntimeAppDirectoryEntry] {
+        lock.lock()
+        defer { lock.unlock() }
+        return entriesForCurrentMembershipLocked()
+    }
+
+    func appDirectorySnapshotEvidenceForPresentation() -> RuntimeAppDirectorySnapshotEvidence {
+        lock.lock()
+        defer { lock.unlock() }
+        hasCapturedPresentationEvidence = true
+        return makeEvidenceLocked()
+    }
+
+    func appDirectorySnapshotEvidenceForRuntimeMaintenance() -> RuntimeAppDirectorySnapshotEvidence {
+        lock.lock()
+        defer { lock.unlock() }
+        return makeEvidenceLocked()
+    }
+
+    private func makeEvidenceLocked() -> RuntimeAppDirectorySnapshotEvidence {
+        revision &+= 1
+        let entries = entriesForCurrentMembershipLocked()
+        var identities = entries.map { entry in
+            RuntimeAppProcessIdentity(
+                appID: entry.appID,
+                pid: entry.pid,
+                isDirectoryMember: true,
+                isSwitcherEligible: true
+            )
+        }
+        if hasCapturedPresentationEvidence,
+           FlowTabTestLaunchOptions.mockRuntimeVariant
+                == FlowTabUITestApplicationMembershipFixture.variant,
+           let excludedEntry = allRuntimeEntriesLocked().first(where: {
+               $0.appID == FlowTabUITestApplicationMembershipFixture.finalAccessoryAppID
+           }) {
+            identities.append(
+                RuntimeAppProcessIdentity(
+                    appID: excludedEntry.appID,
+                    pid: excludedEntry.pid,
+                    isDirectoryMember: false,
+                    isSwitcherEligible: false
+                )
+            )
+        }
+        return RuntimeAppDirectorySnapshotEvidence(
+            sourceID: sourceID,
+            revision: revision,
+            capturedAt: Date.timeIntervalSinceReferenceDate,
+            processIdentities: identities,
+            entries: entries
+        )
+    }
+
+    private func entriesForCurrentMembershipLocked() -> [RuntimeAppDirectoryEntry] {
+        let entries = allRuntimeEntriesLocked()
+        guard hasCapturedPresentationEvidence,
+              FlowTabTestLaunchOptions.mockRuntimeVariant
+                == FlowTabUITestApplicationMembershipFixture.variant
+        else { return entries }
+        return entries.filter {
+            $0.appID != FlowTabUITestApplicationMembershipFixture.finalAccessoryAppID
+        }
+    }
+
+    private func allRuntimeEntriesLocked() -> [RuntimeAppDirectoryEntry] {
         guard let dataset = FlowTabUITestRuntimeProjectionDataset.current() else { return [] }
-        let runningApp = NSRunningApplication.current
         return dataset.appDirectoryEntries.map { entry in
             RuntimeAppDirectoryEntry(
                 pid: entry.pid,
@@ -654,7 +808,7 @@ final class RuntimeUITestProjectionAppDirectoryProvider: RuntimeAppDirectoryProv
                 bundleURL: entry.bundleURL,
                 launchDate: entry.launchDate,
                 activationRank: entry.activationRank,
-                runningApplication: runningApp
+                runningApplication: runningApplication
             )
         }
     }

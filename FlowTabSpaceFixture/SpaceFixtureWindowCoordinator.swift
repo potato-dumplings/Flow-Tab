@@ -34,6 +34,18 @@ final class SpaceFixtureWindowCoordinator {
     typealias ApplicationAccessibilityElementsPublisher = ([Any]) -> Void
     typealias ApplicationIdentityProvider =
         () -> SpaceFixtureApplicationIdentity
+    typealias WindowOpenMutationTriggerObservationFactory =
+        (
+            SpaceFixtureWindowOpenMutationRoute,
+            @escaping @MainActor (
+                SpaceFixtureWindowOpenMutationTrigger
+            ) -> Void
+        ) -> any SpaceFixtureCancellable
+    typealias WindowOpenMutationEvidencePublisher =
+        (
+            SpaceFixtureWindowOpenMutationEvidence,
+            SpaceFixtureWindowOpenMutationRoute
+        ) -> Void
     private static let desktopRefocusWatchdogMilliseconds =
         15_000
     private static let desktopRefocusRetryIntervalMilliseconds =
@@ -57,9 +69,17 @@ final class SpaceFixtureWindowCoordinator {
     private let applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher
     private let applicationIdentityProvider:
         ApplicationIdentityProvider
+    private let windowOpenMutationTriggerObservationFactory:
+        WindowOpenMutationTriggerObservationFactory
+    private let windowOpenMutationEvidencePublisher:
+        WindowOpenMutationEvidencePublisher
 
     private(set) var windows: [any SpaceFixtureWindowing] = []
     private var suppressesApplicationAccessibilityElements = false
+    private var deferredWindowPlan: SpaceFixtureWindowPlan?
+    private var windowOpenMutationTriggerObservation:
+        (any SpaceFixtureCancellable)?
+    private var windowOpenMutationRequestGeneration = 0
 
     var lastDesktopRefocusWatchdogFailure:
         SpaceFixtureDesktopRefocusWatchdogFailure?
@@ -105,7 +125,11 @@ final class SpaceFixtureWindowCoordinator {
         workflowReadinessOwner:
             SpaceFixtureWorkflowReadinessOwner? = nil,
         applicationIdentityProvider:
-            ApplicationIdentityProvider? = nil
+            ApplicationIdentityProvider? = nil,
+        windowOpenMutationTriggerObservationFactory:
+            WindowOpenMutationTriggerObservationFactory? = nil,
+        windowOpenMutationEvidencePublisher:
+            WindowOpenMutationEvidencePublisher? = nil
     ) {
         let resolvedScheduler = scheduler ?? SpaceFixtureScheduler()
         self.configuration = configuration
@@ -171,15 +195,40 @@ final class SpaceFixtureWindowCoordinator {
                     processIdentifier: getpid()
                 )
             }
+        self.windowOpenMutationTriggerObservationFactory =
+            windowOpenMutationTriggerObservationFactory
+            ?? { route, onTrigger in
+                SpaceFixtureWindowOpenMutationTriggerObservation(
+                    route: route,
+                    onTrigger: onTrigger
+                )
+            }
+        self.windowOpenMutationEvidencePublisher =
+            windowOpenMutationEvidencePublisher
+            ?? { evidence, route in
+                SpaceFixtureWindowOpenMutationTransport.publish(
+                    evidence,
+                    route: route
+                )
+            }
     }
 
     func launch() {
         cancelScheduledWork()
         suppressesApplicationAccessibilityElements = false
-        let windowPlans = SpaceFixtureWindowPlanner.makePlans(
+        let allWindowPlans = SpaceFixtureWindowPlanner.makePlans(
             configuration: configuration,
             visibleFrame: visibleFrameProvider()
         )
+        deferredWindowPlan = configuration
+            .deferredOpenWindowIndex.flatMap { deferredIndex in
+                allWindowPlans.first {
+                    $0.index == deferredIndex
+                }
+            }
+        let windowPlans = allWindowPlans.filter {
+            $0.index != deferredWindowPlan?.index
+        }
         windows = windowPlans.map(windowFactory)
         let fullscreenWindows =
             orderedFullscreenWindowsForTransition()
@@ -218,6 +267,9 @@ final class SpaceFixtureWindowCoordinator {
                 observationGeneration:
                     readinessGeneration
             )
+        startWindowOpenMutationIfNeeded(
+            applicationIdentity: applicationIdentity
+        )
         startWindowCloseFaultIfNeeded(
             applicationIdentity: applicationIdentity
         )
@@ -356,6 +408,93 @@ final class SpaceFixtureWindowCoordinator {
                     failure.logFields
                 )
             }
+        )
+    }
+
+    private func startWindowOpenMutationIfNeeded(
+        applicationIdentity: SpaceFixtureApplicationIdentity
+    ) {
+        guard let route = configuration.windowOpenMutationRoute,
+              let deferredWindowPlan
+        else {
+            return
+        }
+        windowOpenMutationRequestGeneration &+= 1
+        let requestGeneration =
+            windowOpenMutationRequestGeneration
+        windowOpenMutationTriggerObservation =
+            windowOpenMutationTriggerObservationFactory(
+                route
+            ) { [weak self] trigger in
+                self?.applyWindowOpenMutation(
+                    trigger,
+                    route: route
+                )
+            }
+        publishWindowOpenMutationEvidence(
+            phase: .ready,
+            requestGeneration: requestGeneration,
+            identity: applicationIdentity,
+            targetPlan: deferredWindowPlan,
+            route: route
+        )
+    }
+
+    private func applyWindowOpenMutation(
+        _ trigger: SpaceFixtureWindowOpenMutationTrigger,
+        route: SpaceFixtureWindowOpenMutationRoute
+    ) {
+        guard trigger.requestGeneration
+                == windowOpenMutationRequestGeneration,
+              trigger.identity == applicationIdentityProvider(),
+              let deferredWindowPlan,
+              trigger.targetWindowPlanIndex
+                == deferredWindowPlan.index,
+              !windows.contains(where: {
+                $0.plan.index == deferredWindowPlan.index
+              })
+        else {
+            return
+        }
+
+        let openedWindow = windowFactory(deferredWindowPlan)
+        self.deferredWindowPlan = nil
+        windows.append(openedWindow)
+        windows.sort { $0.plan.index < $1.plan.index }
+        activateApplication()
+        openedWindow.show(isKey: true)
+        publishApplicationAccessibilityElements()
+        windowOpenMutationTriggerObservation?.cancel()
+        windowOpenMutationTriggerObservation = nil
+        publishWindowOpenMutationEvidence(
+            phase: .applied,
+            requestGeneration: trigger.requestGeneration,
+            identity: trigger.identity,
+            targetPlan: deferredWindowPlan,
+            route: route
+        )
+    }
+
+    private func publishWindowOpenMutationEvidence(
+        phase: SpaceFixtureWindowOpenMutationPhase,
+        requestGeneration: Int,
+        identity: SpaceFixtureApplicationIdentity,
+        targetPlan: SpaceFixtureWindowPlan,
+        route: SpaceFixtureWindowOpenMutationRoute
+    ) {
+        windowOpenMutationEvidencePublisher(
+            SpaceFixtureWindowOpenMutationEvidence(
+                requestGeneration: requestGeneration,
+                phase: phase,
+                identity: identity,
+                snapshot: SpaceFixtureWindowOpenMutationSnapshot(
+                    targetWindowPlanIndex: targetPlan.index,
+                    targetWindowTitle: targetPlan.title,
+                    activeWindowPlanIndices:
+                        windows.map(\.plan.index).sorted()
+                )
+            ),
+            route
         )
     }
 
@@ -504,7 +643,7 @@ final class SpaceFixtureWindowCoordinator {
             route: configuration.applicationAXSuppressionRoute,
             identity: applicationIdentity,
             expectedProjectionWindowCount:
-                configuration.windowCount,
+                windows.count,
             expectedPublishedAXWindowCount:
                 windows.filter(
                     \.plan.publishesApplicationAXWindow
@@ -544,6 +683,9 @@ final class SpaceFixtureWindowCoordinator {
         applicationAXSuppressionOwner.cancel()
         windowCloseFaultOwner.cancel()
         workflowReadinessOwner.cancel()
+        windowOpenMutationTriggerObservation?.cancel()
+        windowOpenMutationTriggerObservation = nil
+        deferredWindowPlan = nil
         SpaceFixtureWorkflowReadinessTransport
             .removeReadbackEvidence(
                 route:

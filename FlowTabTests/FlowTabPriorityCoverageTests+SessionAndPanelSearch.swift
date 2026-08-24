@@ -8,10 +8,11 @@ import FlowTabCore
 extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelStartSessionLoadsProjectionAndCommitActivatesPreferredTarget() {
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherApps: commitScenarioApps()
+        )
         let model = LiveSwitcherModel(
-            runtimeProjectionService: RecordingRuntimeProjectionService(
-                appSwitcherApps: commitScenarioApps()
-            )
+            runtimeProjectionService: runtimeProjectionService
         )
 
         var activatedTarget: ActivationTarget?
@@ -22,6 +23,10 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertEqual(
+            runtimeProjectionService.appDirectoryMembershipPresentationRefreshCount(),
+            1
+        )
         XCTAssertEqual(model.appCount, 3)
         XCTAssertEqual(model.selectedApp?.id, "com.example.code")
         XCTAssertEqual(model.overlayStyle, .appAndWindow)

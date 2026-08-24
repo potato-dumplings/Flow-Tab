@@ -3,6 +3,259 @@ import XCTest
 @testable import FlowTab
 
 extension FlowTabPriorityCoverageTests {
+    func testAXWindowObservationRetryPolicyClassifiesTransientFailuresAndCapsBackoff() {
+        let policy = RuntimeAXWindowObservationRetryPolicy.standard
+
+        XCTAssertEqual(
+            (1...7).map(policy.interval(forAttempt:)),
+            [0.25, 0.5, 1, 2, 4, 4, 4]
+        )
+        for error in [
+            AXError.failure,
+            .cannotComplete,
+            .invalidUIElement,
+            .invalidUIElementObserver
+        ] {
+            XCTAssertTrue(policy.shouldRetry(error), "axError=\(error.rawValue)")
+        }
+        XCTAssertFalse(policy.shouldRetry(.apiDisabled))
+        XCTAssertFalse(policy.shouldRetry(.notificationUnsupported))
+    }
+
+    @MainActor
+    func testAXWindowObservationRetryCoordinatorOwnsOneAttemptPerPIDAndRejectsStaleWork() {
+        let scheduler = ManualAXWindowObservationRetryScheduler()
+        let coordinator = RuntimeAXWindowObservationRetryCoordinator(
+            policy: .standard,
+            scheduler: scheduler
+        )
+        let pid = pid_t(18_417)
+        var firedAttempts: [String] = []
+
+        let first = coordinator.schedule(
+            appID: "com.example.retry-owner",
+            pid: pid,
+            installGeneration: 1,
+            error: .cannotComplete
+        ) { attempt in
+            firedAttempts.append("first:\(attempt)")
+        }
+        let duplicate = coordinator.schedule(
+            appID: "com.example.retry-owner",
+            pid: pid,
+            installGeneration: 1,
+            error: .cannotComplete
+        ) { attempt in
+            firedAttempts.append("duplicate:\(attempt)")
+        }
+
+        XCTAssertEqual(first, duplicate)
+        XCTAssertEqual(scheduler.entries.map(\.interval), [0.25])
+
+        scheduler.fireEntry(at: 0)
+        XCTAssertEqual(firedAttempts, ["first:1"])
+
+        let second = coordinator.schedule(
+            appID: "com.example.retry-owner",
+            pid: pid,
+            installGeneration: 2,
+            error: .failure
+        ) { attempt in
+            firedAttempts.append("second:\(attempt)")
+        }
+        XCTAssertEqual(second?.attempt, 2)
+        XCTAssertEqual(scheduler.entries.map(\.interval), [0.25, 0.5])
+
+        coordinator.retainBindings([pid: "com.example.replacement"])
+        XCTAssertTrue(scheduler.entries[1].token.isCancelled)
+        scheduler.fireEntry(at: 1)
+        XCTAssertEqual(firedAttempts, ["first:1"])
+
+        let replacement = coordinator.schedule(
+            appID: "com.example.replacement",
+            pid: pid,
+            installGeneration: 3,
+            error: .cannotComplete
+        ) { attempt in
+            firedAttempts.append("replacement:\(attempt)")
+        }
+        XCTAssertEqual(replacement?.attempt, 1)
+        scheduler.fireEntry(at: 2)
+        XCTAssertEqual(firedAttempts, ["first:1", "replacement:1"])
+        XCTAssertEqual(
+            coordinator.complete(pid: pid, appID: "com.example.replacement"),
+            1
+        )
+
+        _ = coordinator.schedule(
+            appID: "com.example.success",
+            pid: 18_419,
+            installGeneration: 4,
+            error: .cannotComplete
+        ) { attempt in
+            firedAttempts.append("completed:\(attempt)")
+        }
+        XCTAssertEqual(
+            coordinator.complete(pid: 18_419, appID: "com.example.success"),
+            1
+        )
+        XCTAssertTrue(scheduler.entries[3].token.isCancelled)
+        scheduler.fireEntry(at: 3)
+        XCTAssertEqual(firedAttempts, ["first:1", "replacement:1"])
+
+        _ = coordinator.schedule(
+            appID: "com.example.stop",
+            pid: 18_420,
+            installGeneration: 5,
+            error: .cannotComplete
+        ) { attempt in
+            firedAttempts.append("stop:\(attempt)")
+        }
+        coordinator.stop()
+        XCTAssertTrue(scheduler.entries[4].token.isCancelled)
+        scheduler.fireEntry(at: 4)
+        XCTAssertEqual(firedAttempts, ["first:1", "replacement:1"])
+    }
+
+    @MainActor
+    func testAXWindowChangeMonitorRetriesTransientInstallAndPublishesInitialReadback() async {
+        let workScheduler = ManualAXWindowObservationWorkScheduler()
+        let retryScheduler = ManualAXWindowObservationRetryScheduler()
+        let retryScheduled = expectation(
+            description: "unmetCondition=axObserverTransientFailureScheduledRetry"
+        )
+        retryScheduler.onSchedule = { _ in retryScheduled.fulfill() }
+        let changedReadback = RuntimeAXWindowInitialReadbackEvidence.evaluate(
+            expectedWindowCount: 1,
+            knownSwitchableWindowCount: 2,
+            observedSwitchableWindowCount: 2,
+            exactKnownWindowCount: 2,
+            fetchErrorRawValue: 0,
+            rawValueTypeDescription: "CFArray"
+        )
+        let installer = StubAXWindowObserverInstaller(
+            outcomes: [
+                .unavailable(.cannotComplete),
+                .installed(initialReadback: changedReadback)
+            ]
+        )
+        let monitor = RuntimeAXWindowChangeMonitor(
+            observationWorkScheduler: workScheduler,
+            observerInstaller: installer,
+            retryPolicy: .standard,
+            retryScheduler: retryScheduler,
+            accessibilityTrustProvider: { true }
+        )
+        let delivered = expectation(
+            description: "unmetCondition=axObserverRetryInitialReadbackPublished"
+        )
+        var deliveredEvidence: [RuntimeAXWindowChangeEvidence] = []
+        monitor.onAppWindowChanged = { evidence in
+            deliveredEvidence.append(evidence)
+            delivered.fulfill()
+        }
+        let summary = RuntimeHomeAppSummary(
+            appID: "com.example.transient-observer",
+            displayName: "Transient Observer",
+            groupID: "com.example.transient-observer",
+            lastActiveAt: 1,
+            windowCount: 1,
+            pid: 2_000_000_000
+        )
+
+        monitor.rebind([summary])
+        XCTAssertEqual(workScheduler.workItems.count, 1)
+        workScheduler.fireWorkItem(at: 0)
+        await fulfillment(of: [retryScheduled], timeout: 5)
+
+        XCTAssertEqual(retryScheduler.entries.map(\.interval), [0.25])
+        retryScheduler.fireEntry(at: 0)
+        XCTAssertEqual(workScheduler.workItems.count, 2)
+        workScheduler.fireWorkItem(at: 1)
+        await fulfillment(of: [delivered], timeout: 5)
+
+        XCTAssertEqual(deliveredEvidence.count, 1)
+        XCTAssertEqual(deliveredEvidence[0].appID, summary.appID)
+        XCTAssertEqual(deliveredEvidence[0].pid, summary.pid)
+        XCTAssertEqual(deliveredEvidence[0].source, .initialReadback)
+        XCTAssertEqual(deliveredEvidence[0].initialReadback, changedReadback)
+        XCTAssertTrue(deliveredEvidence[0].requiresReconciliation)
+
+        monitor.stop()
+    }
+
+    @MainActor
+    func testAXWindowChangeMonitorRebindDefersRemoteTransportAndCoalescesRepeatedHomeReads() {
+        let scheduler = ManualAXWindowObservationWorkScheduler()
+        let monitor = RuntimeAXWindowChangeMonitor(
+            observationWorkScheduler: scheduler,
+            accessibilityTrustProvider: { true }
+        )
+        let summary = RuntimeHomeAppSummary(
+            appID: "com.example.home-rebind",
+            displayName: "Home Rebind",
+            groupID: "com.example.home-rebind",
+            lastActiveAt: 1,
+            windowCount: 1,
+            pid: 18_418
+        )
+
+        monitor.rebind([summary])
+        monitor.rebind([summary])
+
+        XCTAssertEqual(scheduler.workItems.count, 1)
+
+        monitor.stop()
+        monitor.rebind([summary])
+
+        XCTAssertEqual(scheduler.workItems.count, 2)
+    }
+
+    func testAXWindowObservationRegistrationBoundsRemoteTransportFailure() {
+        XCTAssertEqual(
+            RuntimeAXMessagingTimeoutPolicy.perElementSeconds,
+            0.5,
+            accuracy: 0.001
+        )
+        let appElement = AXUIElementCreateApplication(18_419)
+        let notifications = [
+            kAXWindowCreatedNotification as CFString,
+            kAXFocusedWindowChangedNotification as CFString,
+            kAXMainWindowChangedNotification as CFString
+        ]
+        var events: [String] = []
+
+        let evidence = RuntimeAXWindowObservationRegistrationPolicy.register(
+            element: appElement,
+            notifications: notifications,
+            applyMessagingTimeout: { element in
+                XCTAssertTrue(CFEqual(element, appElement))
+                events.append("timeout")
+            },
+            addNotification: { element, notification in
+                XCTAssertTrue(CFEqual(element, appElement))
+                events.append(notification as String)
+                return notification as String == kAXWindowCreatedNotification as String
+                    ? .success
+                    : .cannotComplete
+            }
+        )
+
+        XCTAssertEqual(
+            events,
+            [
+                "timeout",
+                kAXWindowCreatedNotification as String,
+                kAXFocusedWindowChangedNotification as String
+            ]
+        )
+        XCTAssertEqual(
+            evidence.registeredNotifications.map { $0 as String },
+            [kAXWindowCreatedNotification as String]
+        )
+        XCTAssertEqual(evidence.lastResult, .cannotComplete)
+    }
+
     @MainActor
     func testAXWindowInitialReadbackCountsExactIdentityWithoutReusingBaselineEntry() {
         let retainedWindow = AXUIElementCreateApplication(18_420)
@@ -351,6 +604,116 @@ private func matchedAXWindowInitialReadbackEvidence(
         fetchErrorRawValue: 0,
         rawValueTypeDescription: "CFArray"
     )
+}
+
+private final class ManualAXWindowObservationWorkScheduler:
+    RuntimeAXWindowObservationWorkScheduling
+{
+    private(set) var workItems: [@Sendable () -> Void] = []
+
+    func schedule(_ work: @escaping @Sendable () -> Void) {
+        workItems.append(work)
+    }
+
+    func fireWorkItem(at index: Int) {
+        workItems[index]()
+    }
+}
+
+private final class StubAXWindowObserverInstaller:
+    RuntimeAXWindowObserverInstalling,
+    @unchecked Sendable
+{
+    enum Outcome {
+        case unavailable(AXError)
+        case installed(initialReadback: RuntimeAXWindowInitialReadbackEvidence)
+    }
+
+    private let lock = NSLock()
+    private var outcomes: [Outcome]
+
+    init(outcomes: [Outcome]) {
+        self.outcomes = outcomes
+    }
+
+    func install(
+        _ request: RuntimeAXWindowObserverInstallRequest
+    ) -> RuntimeAXWindowObserverInstallResult {
+        let outcome = lock.withLock { outcomes.removeFirst() }
+        switch outcome {
+        case .unavailable(let error):
+            return RuntimeAXWindowObserverInstallResult(
+                observer: nil,
+                context: request.context,
+                registeredNotifications: [],
+                lastResult: error,
+                destroyedWindowElements: [:],
+                initialReadback: nil
+            )
+        case .installed(let initialReadback):
+            var observer: AXObserver?
+            let result = AXObserverCreate(
+                request.pid,
+                request.callback,
+                &observer
+            )
+            precondition(result == .success && observer != nil)
+            return RuntimeAXWindowObserverInstallResult(
+                observer: observer,
+                context: request.context,
+                registeredNotifications: [
+                    kAXWindowCreatedNotification as CFString
+                ],
+                lastResult: .success,
+                destroyedWindowElements: [:],
+                initialReadback: initialReadback
+            )
+        }
+    }
+}
+
+@MainActor
+private final class ManualAXWindowObservationRetryToken:
+    RuntimeAXWindowObservationRetryCancellable
+{
+    private(set) var isCancelled = false
+
+    func cancel() {
+        isCancelled = true
+    }
+}
+
+@MainActor
+private final class ManualAXWindowObservationRetryScheduler:
+    RuntimeAXWindowObservationRetryScheduling
+{
+    struct Entry {
+        let interval: TimeInterval
+        let token: ManualAXWindowObservationRetryToken
+        let action: @MainActor @Sendable () -> Void
+    }
+
+    var onSchedule: ((Entry) -> Void)?
+    private(set) var entries: [Entry] = []
+
+    func schedule(
+        after interval: TimeInterval,
+        _ action: @escaping @MainActor @Sendable () -> Void
+    ) -> any RuntimeAXWindowObservationRetryCancellable {
+        let token = ManualAXWindowObservationRetryToken()
+        let entry = Entry(
+            interval: interval,
+            token: token,
+            action: action
+        )
+        entries.append(entry)
+        onSchedule?(entry)
+        return token
+    }
+
+    func fireEntry(at index: Int) {
+        entries[index].action()
+    }
 }
 
 @MainActor

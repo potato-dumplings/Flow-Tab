@@ -177,10 +177,68 @@ struct FlowTabUITestInitialPresentationResolutionReadback:
     }
 }
 
+struct FlowTabUITestInitialPresentationTerminalReadback:
+    Codable,
+    Equatable
+{
+    enum Outcome: String, Codable, Equatable {
+        case resolution
+        case initialPresentationWatchdogFailure
+    }
+
+    struct WatchdogFailure: Codable, Equatable {
+        let watchdogInterval: TimeInterval
+        let unmetConditions: [String]
+        let lastEvidence: String
+        let finalEvidence: String
+
+        init(
+            _ failure:
+                FlowTabUITestInitialPresentationWatchdogFailure
+        ) {
+            watchdogInterval = failure.watchdogInterval
+            unmetConditions = failure.finalEvidence.candidate
+                .unmetConditions
+            lastEvidence = failure.lastEvidence.logFields
+            finalEvidence = failure.finalEvidence.logFields
+        }
+    }
+
+    static let currentSchemaVersion = 1
+
+    let schemaVersion: Int
+    let outcome: Outcome
+    let resolution:
+        FlowTabUITestInitialPresentationResolutionReadback?
+    let watchdogFailure: WatchdogFailure?
+
+    init(
+        resolution:
+            FlowTabUITestInitialPresentationResolutionReadback
+    ) {
+        schemaVersion = Self.currentSchemaVersion
+        outcome = .resolution
+        self.resolution = resolution
+        watchdogFailure = nil
+    }
+
+    init(
+        watchdogFailure:
+            FlowTabUITestInitialPresentationWatchdogFailure
+    ) {
+        schemaVersion = Self.currentSchemaVersion
+        outcome = .initialPresentationWatchdogFailure
+        resolution = nil
+        self.watchdogFailure = WatchdogFailure(
+            watchdogFailure
+        )
+    }
+}
+
 enum FlowTabUITestInitialPresentationResolutionTransport {
     static func post(
         _ readback:
-            FlowTabUITestInitialPresentationResolutionReadback,
+            FlowTabUITestInitialPresentationTerminalReadback,
         route:
             FlowTabUITestInitialPresentationResolutionRoute,
         center:
@@ -210,7 +268,7 @@ enum FlowTabUITestInitialPresentationResolutionTransport {
 
     static func writeReadback(
         _ readback:
-            FlowTabUITestInitialPresentationResolutionReadback,
+            FlowTabUITestInitialPresentationTerminalReadback,
         to readbackURL: URL
     ) throws {
         let encoder = JSONEncoder()

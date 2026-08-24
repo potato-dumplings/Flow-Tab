@@ -140,6 +140,43 @@ extension FlowTabUITests {
         )
     }
 
+    func testInAppSwitcherPanelProjectionTerminatesOnFirstCompleteMismatch() {
+        var callback:
+            ((FlowTabUITestConditionObservationSource) -> Void)?
+        var snapshot = inAppSwitcherPanelMissingTestSnapshot()
+        let owner = makeInAppSwitcherPanelTestOwner(
+            scheduledRegistration: { readback in
+                callback = readback
+                return FlowTabUITestObservationCancellation {}
+            },
+            readback: { snapshot }
+        )
+        XCTAssertTrue(owner.start())
+        defer { owner.cancel() }
+        owner.markTriggerCompleted()
+        snapshot = inAppSwitcherPanelTestSnapshot(
+            apps: "com.example.browser:2",
+            titles: ["Document", "Review"]
+        )
+
+        callback?(.scheduledReadback)
+
+        XCTAssertEqual(
+            owner.terminalMismatchEvidence?.source,
+            .scheduledReadback
+        )
+        XCTAssertNil(
+            owner.waitForResolution(
+                timeout:
+                    FlowTabUITestInAppSwitcherPanelProjectionTestPolicy
+                    .watchdog
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains("terminalMismatch=true")
+        )
+    }
+
     func testInAppSwitcherPanelProjectionCancellationRejectsLateResult() {
         var callback:
             ((FlowTabUITestConditionObservationSource) -> Void)?

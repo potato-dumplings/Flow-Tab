@@ -1,6 +1,28 @@
 #if FLOWTAB_TESTING
 import Foundation
 
+enum FlowTabUITestAppVisibilityIdentityFixture {
+    static let closedVariant = "app-visibility-identity-closed"
+    static let accessoryVariant = "app-visibility-identity-accessory"
+    static let regularVariant = "app-visibility-identity-regular"
+    static let configurableAppID = "com.flowtab.mock.identity-editor"
+    static let dynamicAppID = "com.flowtab.mock.identity-dynamic"
+    static let systemManagedAppID = "com.flowtab.mock.identity-menu-bar"
+    static let auxiliaryProcessID = "com.flowtab.mock.identity-helper"
+
+    static func contains(_ variant: String?) -> Bool {
+        variant == closedVariant
+            || variant == accessoryVariant
+            || variant == regularVariant
+    }
+}
+
+enum FlowTabUITestApplicationMembershipFixture {
+    static let variant = "application-membership-transition"
+    static let stableAppID = "com.flowtab.mock.membership-stable"
+    static let finalAccessoryAppID = "com.flowtab.mock.membership-final-accessory"
+}
+
 enum FlowTabTestLaunchOptions {
     static let uiTestingEnvironmentKey = "FLOWTAB_UI_TESTING"
     static let uiTestingEnvironmentValue = "1"
@@ -23,6 +45,8 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-tab-stress-evidence-notification-name"
     static let shortcutEventInjectionArgument =
         "--flowtab-ui-enable-shortcut-event-injection"
+    static let includeCurrentAppInMockInventoryArgument =
+        "--flowtab-ui-include-current-app-in-inventory"
 
     static var argumentsOverrideForTesting: [String]?
     static var environmentOverrideForTesting: [String: String]?
@@ -36,6 +60,7 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-frontmost-bundle-id",
         homeInitialProjectionApplicationRouteArgument,
         homeInitialProjectionApplicationReadbackPathArgument,
+        includeCurrentAppInMockInventoryArgument,
         initialPresentationResolutionNotificationArgument,
         initialPresentationResolutionReadbackPathArgument,
         "--flowtab-ui-initial-panel-occlusion-stale-ms",
@@ -361,6 +386,10 @@ enum FlowTabTestLaunchOptions {
 
     static var mockRuntimeVariant: String? {
         uiTestValue(after: "--flowtab-ui-mock-runtime-variant")
+    }
+
+    static var includesCurrentAppInMockInventory: Bool {
+        containsUITestArgument(includeCurrentAppInMockInventoryArgument)
     }
 
     static var keepsMockHomeProjectionDegraded: Bool {

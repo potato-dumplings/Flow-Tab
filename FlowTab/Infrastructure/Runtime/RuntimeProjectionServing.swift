@@ -131,6 +131,7 @@ protocol RuntimeProjectionServing: Sendable {
     func readSpaceTopologyProjection() -> RuntimeSpaceTopologyProjection?
     func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead
     func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics
+    func refreshApplicationDirectoryMembershipForPresentation()
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason)
     func requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason)
     func signalSpaceTopologyChanged()
@@ -138,6 +139,11 @@ protocol RuntimeProjectionServing: Sendable {
         appID: String,
         pid: pid_t,
         appDirectoryEntry: RuntimeAppDirectoryEntry?
+    )
+    func signalAppActivated(
+        appID: String,
+        pid: pid_t,
+        appDirectoryEntry: RuntimeAppDirectoryEntry
     )
     func signalAppWindowsChanged(appID: String, pid: pid_t)
     func signalSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t)
@@ -151,6 +157,16 @@ protocol RuntimeProjectionServing: Sendable {
 }
 
 extension RuntimeProjectionServing {
+    func refreshApplicationDirectoryMembershipForPresentation() {}
+
+    func signalAppActivated(
+        appID: String,
+        pid: pid_t,
+        appDirectoryEntry _: RuntimeAppDirectoryEntry
+    ) {
+        signalSelectedCurrentAppWindowsChanged(appID: appID, pid: pid)
+    }
+
     func scheduleWorkspaceAppTerminated(appID: String, pid: pid_t) {
         signalAppTerminated(appID: appID, pid: pid)
     }

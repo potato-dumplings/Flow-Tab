@@ -8,6 +8,7 @@ extension LiveSwitcherModel {
     @discardableResult
     func startSearchSession(triggerDirection: CycleDirection) -> Bool {
         guard SearchInteractionPreferencesStore.loadIsEnabled() else { return false }
+        runtimeProjectionService.refreshApplicationDirectoryMembershipForPresentation()
         invalidateSelectedAppWindowProjection(reason: .startSession)
         clearTerminateSelectedAppAnimation()
         overlayStyle = .appAndWindow

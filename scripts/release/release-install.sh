@@ -142,9 +142,13 @@ reset_tcc_permission() {
   fi
 }
 
+request_flowtab_process_exit() {
+  /usr/bin/osascript -e "quit app \"${APP_DISPLAY_NAME}\"" >/dev/null 2>&1 || true
+  /usr/bin/pkill -x "${APP_PROCESS_NAME}" >/dev/null 2>&1 || true
+}
+
 echo "[${STEP}/${TOTAL_STEPS}] Quit running ${APP_DISPLAY_NAME}"
-osascript -e "quit app \"${APP_DISPLAY_NAME}\"" >/dev/null 2>&1 || true
-pkill -x "${APP_PROCESS_NAME}" >/dev/null 2>&1 || true
+request_flowtab_process_exit
 flowtab_wait_for_process_exit \
   "${APP_PROCESS_NAME}" \
   "${PROCESS_EXIT_WATCHDOG_SECONDS}" \
@@ -179,6 +183,7 @@ fi
 
 STEP=$((STEP + 1))
 echo "[${STEP}/${TOTAL_STEPS}] Remove old app"
+request_flowtab_process_exit
 flowtab_wait_for_process_exit \
   "${APP_PROCESS_NAME}" \
   "${PROCESS_EXIT_WATCHDOG_SECONDS}" \

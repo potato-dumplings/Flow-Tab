@@ -7,6 +7,9 @@ import XCTest
 extension FlowTabTests {
     @MainActor
     func testSettingsRootThemeSwitchMatchesColdDarkLayoutInSwiftUIHost() async throws {
+        for _ in 0..<4 {
+            await Task.yield()
+        }
         let previousSelectedTab = HomeTabState.shared.selectedTab
         let previousLanguageRaw = UserDefaults.standard.string(
             forKey: AppPreferenceKeys.appLanguage
@@ -15,6 +18,19 @@ extension FlowTabTests {
             forKey: AppPreferenceKeys.themeMode
         )
         let previousContext = FlowPresentationState.shared.context
+        guard let switchedAppVisibilityDefaults = makeIsolatedUserDefaults(),
+              let coldAppVisibilityDefaults = makeIsolatedUserDefaults()
+        else {
+            return
+        }
+        let switchedAppVisibilityModel = AppVisibilityManagerModel(
+            inventoryService: StaticAppVisibilityInventory(records: []),
+            userDefaults: switchedAppVisibilityDefaults
+        )
+        let coldAppVisibilityModel = AppVisibilityManagerModel(
+            inventoryService: StaticAppVisibilityInventory(records: []),
+            userDefaults: coldAppVisibilityDefaults
+        )
         HomeTabState.shared.selectedTab = .settings
         FlowPresentationState.shared.setAppLanguage(
             rawValue: AppLanguage.english.rawValue
@@ -23,6 +39,8 @@ extension FlowTabTests {
             rawValue: ThemeMode.light.rawValue
         )
         defer {
+            clearIsolatedUserDefaults(switchedAppVisibilityDefaults)
+            clearIsolatedUserDefaults(coldAppVisibilityDefaults)
             HomeTabState.shared.selectedTab = previousSelectedTab
             FlowPresentationState.shared.setAppLanguage(
                 rawValue: previousContext.appLanguage.rawValue
@@ -41,7 +59,10 @@ extension FlowTabTests {
         }
 
         let recorder = SettingsPresentationUpdateRecorder()
-        let hostedView = makeSettingsPresentationLayoutHost(recorder: recorder)
+        let hostedView = makeSettingsPresentationLayoutHost(
+            recorder: recorder,
+            appVisibilityModel: switchedAppVisibilityModel
+        )
         let baseline = try XCTUnwrap(recorder.latestEvidence)
         XCTAssertEqual(baseline.context.resolvedColorScheme, .light)
         let initialContainer = try settingsPresentationLayoutContainer(
@@ -78,7 +99,8 @@ extension FlowTabTests {
 
         let coldRecorder = SettingsPresentationUpdateRecorder()
         let coldDarkHostedView = makeSettingsPresentationLayoutHost(
-            recorder: coldRecorder
+            recorder: coldRecorder,
+            appVisibilityModel: coldAppVisibilityModel
         )
         let coldEvidence = try XCTUnwrap(coldRecorder.latestEvidence)
         XCTAssertEqual(coldEvidence.context.resolvedColorScheme, .dark)
@@ -122,6 +144,13 @@ extension FlowTabTests {
         )
         let previousAppearance = NSApp.appearance
         let previousContext = FlowPresentationState.shared.context
+        guard let appVisibilityDefaults = makeIsolatedUserDefaults() else {
+            return
+        }
+        let appVisibilityModel = AppVisibilityManagerModel(
+            inventoryService: StaticAppVisibilityInventory(records: []),
+            userDefaults: appVisibilityDefaults
+        )
         HomeTabState.shared.selectedTab = .settings
         NSApp.appearance = aquaAppearance
         postSettingsPresentationSystemAppearanceChanged()
@@ -136,6 +165,7 @@ extension FlowTabTests {
             .light
         )
         defer {
+            clearIsolatedUserDefaults(appVisibilityDefaults)
             HomeTabState.shared.selectedTab = previousSelectedTab
             NSApp.appearance = previousAppearance
             postSettingsPresentationSystemAppearanceChanged()
@@ -156,7 +186,10 @@ extension FlowTabTests {
         }
 
         let recorder = SettingsPresentationUpdateRecorder()
-        let hostedView = makeSettingsPresentationLayoutHost(recorder: recorder)
+        let hostedView = makeSettingsPresentationLayoutHost(
+            recorder: recorder,
+            appVisibilityModel: appVisibilityModel
+        )
         let baseline = try XCTUnwrap(recorder.latestEvidence)
         XCTAssertEqual(baseline.context.resolvedColorScheme, .light)
         let initialContainer = try settingsPresentationLayoutContainer(

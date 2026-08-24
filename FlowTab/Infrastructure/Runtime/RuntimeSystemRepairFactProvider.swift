@@ -167,12 +167,13 @@ final class RuntimeSystemRepairFactProvider {
         cgWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
         allCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
     ) -> [RuntimeAXAppWindowCollection] {
-        RuntimeAXAppCollectionCoordinator.collect(count: runningApps.count) { [self] index in
+        RuntimeAXAppCollectionCoordinator.collect(count: runningApps.count) { [self] index, cancellation in
             collectAXAppWindowCollection(
                 index: index,
                 app: runningApps[index],
                 cgWindowsByPID: cgWindowsByPID,
-                allCGWindowsByPID: allCGWindowsByPID
+                allCGWindowsByPID: allCGWindowsByPID,
+                isCancelled: { cancellation.isCancelled }
             )
         }
     }
@@ -181,7 +182,8 @@ final class RuntimeSystemRepairFactProvider {
         index: Int,
         app: NSRunningApplication,
         cgWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
-        allCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
+        allCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
+        isCancelled: () -> Bool
     ) -> RuntimeAXAppWindowCollection {
         let appStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
@@ -207,11 +209,16 @@ final class RuntimeSystemRepairFactProvider {
         )
         let remoteDecisionReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let windowsFetchResult = shouldIncludeRemoteAXWindows
-            ? AXWindowInspector.windowsFetchResult(for: app, includeRemoteWindows: true)
+            ? AXWindowInspector.windowsFetchResult(
+                for: app,
+                includeRemoteWindows: true,
+                remoteScanCancellation: isCancelled
+            )
             : publicWindowsFetchResult
         let windows = windowsFetchResult.windows
         let finalFetchReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let axEntries = windows.enumerated().compactMap { windowIndex, window -> RuntimeAXWindowEntry? in
+            guard !isCancelled() else { return nil }
             guard AXWindowInspector.isSwitchable(window) else {
                 let role = AXWindowInspector.role(for: window) ?? "unknown"
                 RuntimeLog.debug(.ax, "\(appName) skip[\(windowIndex)] role=\(role)")

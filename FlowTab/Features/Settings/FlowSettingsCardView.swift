@@ -82,9 +82,19 @@ final class FlowSettingsCardView: NSView, FlowSettingsAppearanceRefreshable {
         refreshStyle()
     }
 
-    func updateTitleAccessory(_ text: String?) {
+    func updateTitleAccessory(
+        _ text: String?,
+        accessibilityIdentifier: String? = nil,
+        accessibilityValue: String? = nil
+    ) {
         titleAccessoryLabel.stringValue = text ?? ""
         titleAccessoryLabel.isHidden = text?.isEmpty ?? true
+        if let accessibilityIdentifier {
+            titleAccessoryLabel.setFlowTabTestingIdentifier(
+                accessibilityIdentifier
+            )
+        }
+        titleAccessoryLabel.setAccessibilityValue(accessibilityValue ?? "")
         invalidateIntrinsicContentSize()
     }
 

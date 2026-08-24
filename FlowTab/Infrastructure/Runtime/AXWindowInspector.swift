@@ -241,7 +241,8 @@ enum AXWindowInspector {
 
     static func windowsFetchResult(
         for app: NSRunningApplication,
-        includeRemoteWindows: Bool = false
+        includeRemoteWindows: Bool = false,
+        remoteScanCancellation: () -> Bool = { false }
     ) -> WindowsFetchResult {
         guard AccessibilityPermissionChecker.isTrusted() else {
             return WindowsFetchResult(
@@ -254,6 +255,7 @@ enum AXWindowInspector {
         }
 
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        RuntimeAXMessagingTimeoutPolicy.apply(to: appElement)
         var windowsValue: CFTypeRef?
         let error = AXUIElementCopyAttributeValue(
             appElement,
@@ -265,7 +267,8 @@ enum AXWindowInspector {
         guard error == .success, let windows = windowsValue as? [AXUIElement] else {
             let remoteScanResult = remoteWindowScanResult(
                 forPID: app.processIdentifier,
-                includeRemoteWindows: includeRemoteWindows
+                includeRemoteWindows: includeRemoteWindows,
+                isCancelled: remoteScanCancellation
             )
             return WindowsFetchResult(
                 windows: remoteScanResult?.windows ?? [],
@@ -275,9 +278,11 @@ enum AXWindowInspector {
                 remoteScanCompleteness: remoteScanResult?.completeness
             )
         }
+        RuntimeAXMessagingTimeoutPolicy.apply(to: windows)
         let remoteScanResult = remoteWindowScanResult(
             forPID: app.processIdentifier,
-            includeRemoteWindows: includeRemoteWindows
+            includeRemoteWindows: includeRemoteWindows,
+            isCancelled: remoteScanCancellation
         )
         return WindowsFetchResult(
             windows: RuntimeAXRemoteWindowResolver.mergedWindows(
@@ -293,14 +298,19 @@ enum AXWindowInspector {
 
     private static func remoteWindowScanResult(
         forPID pid: pid_t,
-        includeRemoteWindows: Bool
+        includeRemoteWindows: Bool,
+        isCancelled: () -> Bool
     ) -> RuntimeAXRemoteWindowResolver.WindowScanResult? {
         guard includeRemoteWindows else { return nil }
-        return remoteWindowScanResultOnCurrentThread(forPID: pid)
+        return remoteWindowScanResultOnCurrentThread(
+            forPID: pid,
+            isCancelled: isCancelled
+        )
     }
 
     private static func remoteWindowScanResultOnCurrentThread(
-        forPID pid: pid_t
+        forPID pid: pid_t,
+        isCancelled: () -> Bool
     ) -> RuntimeAXRemoteWindowResolver.WindowScanResult {
         if let remoteWindowScanResultOverrideForTesting {
             return remoteWindowScanResultOverrideForTesting(pid)
@@ -312,7 +322,10 @@ enum AXWindowInspector {
                 completeness: .complete(scanned: windows.count)
             )
         }
-        return RuntimeAXRemoteWindowResolver.windowScanResult(forPID: pid)
+        return RuntimeAXRemoteWindowResolver.windowScanResult(
+            forPID: pid,
+            isCancelled: isCancelled
+        )
     }
 
     static func makeWindowID(pid: pid_t, index: Int) -> String {
@@ -470,6 +483,8 @@ enum AXWindowInspector {
             return "unavailable"
         case .complete(let scanned):
             return "complete scanned=\(scanned)"
+        case let .cancelled(scanned, maximum):
+            return "cancelled scanned=\(scanned) maximum=\(maximum)"
         }
     }
 

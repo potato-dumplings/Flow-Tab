@@ -85,7 +85,7 @@
     {
       "file": "FlowTab/Features/Settings/AppVisibilityManagerView.swift",
       "kind": "swiftui-system-size",
-      "expected_count": 18,
+      "expected_count": 9,
       "classification": "legacy",
       "target": "FlowTypography.swiftUI tokens or named App Visibility roles"
     },

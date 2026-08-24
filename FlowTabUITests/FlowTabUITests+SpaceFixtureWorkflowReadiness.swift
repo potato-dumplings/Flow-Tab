@@ -238,6 +238,7 @@ extension FlowTabUITests {
         identity: SpaceFixtureAppIdentity,
         windowCount: Int,
         fullscreenWindowIndex: Int?,
+        expectedWindowPlanIndices: [Int]? = nil,
         timeout: TimeInterval
     ) -> SpaceFixtureWorkflowReadinessEvidence? {
         guard let configuredEvidence =
@@ -287,7 +288,8 @@ extension FlowTabUITests {
         XCTAssertEqual(
             readyEvidence.snapshot
                 .expectedWindowPlanIndices,
-            Array(1...windowCount)
+            expectedWindowPlanIndices
+                ?? Array(1...windowCount)
         )
         XCTAssertEqual(
             readyEvidence.snapshot

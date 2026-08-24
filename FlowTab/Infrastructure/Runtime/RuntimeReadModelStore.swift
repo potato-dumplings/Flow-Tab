@@ -2,6 +2,15 @@ import CoreGraphics
 import Foundation
 import FlowTabCore
 
+private struct RuntimeAppDirectorySnapshotCommitResult {
+    let membershipChanged: Bool
+    let stateChanged: Bool
+
+    var affectsDirectoryProjection: Bool {
+        membershipChanged || stateChanged
+    }
+}
+
 final class RuntimeReadModelStore: @unchecked Sendable {
     private let lock = NSLock()
     private var generation = RuntimeReadModelGeneration()
@@ -11,6 +20,11 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     private var spaceTopologySignatureSummary: String?
     private var pendingRepairScopes: Set<String> = []
     private var appDirectoryState = RuntimeAppDirectoryState()
+    private var appDirectorySnapshotEvidence: RuntimeAppDirectorySnapshotEvidence?
+    private var suppressedTerminatedProcesses: Set<RuntimeAppProcessKey> = []
+    private let legacyAppDirectoryEvidenceSourceID = UUID()
+    private var legacyAppDirectoryEvidenceRevision: UInt64 = 0
+    private var focusedAppActivationEntry: RuntimeAppDirectoryEntry?
     private var spaceTopologySignature: RuntimeSpaceTopologySignature?
     private var spaceTopologyAffectedCGWindowIDs: Set<CGWindowID> = []
     private var spaceTopologyGeneratedAt: TimeInterval?
@@ -41,11 +55,16 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 dirtyPIDs.remove(clearsDirtyForPID)
             }
         }
+        let membershipFilteredPayload = appDirectorySnapshotEvidence.map {
+            RuntimeApplicationMembershipProjection.appSwitcherPayload(payload, using: $0)
+        } ?? payload
         clearDirtyStateForCompletedCGWindowRequestsLocked(
             clearsDirtyCGWindowIDs,
-            hasCompleteWindowCoverage: payload.hasCompleteWindowCoverage
+            hasCompleteWindowCoverage: membershipFilteredPayload.hasCompleteWindowCoverage
         )
-        let normalizedPayload = mainTableAppSwitcherProjectionPayloadByNormalizingPresentationLocked(payload)
+        let normalizedPayload = mainTableAppSwitcherProjectionPayloadByNormalizingPresentationLocked(
+            membershipFilteredPayload
+        )
         let isCompleteForScope = !isDirtyLocked && normalizedPayload.hasCompleteWindowCoverage
         appSwitcherProjection = RuntimeAppSwitcherProjection(
             apps: normalizedPayload.apps,
@@ -84,12 +103,64 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        if replaceAppDirectoryStateLocked(
-            entries: entries,
-            generatedAt: generatedAt
-        ) {
+        legacyAppDirectoryEvidenceRevision &+= 1
+        let evidence = RuntimeAppDirectorySnapshotEvidence(
+            sourceID: legacyAppDirectoryEvidenceSourceID,
+            revision: legacyAppDirectoryEvidenceRevision,
+            capturedAt: generatedAt,
+            processIdentities: entries.map { entry in
+                RuntimeAppProcessIdentity(
+                    appID: entry.appID,
+                    pid: entry.pid,
+                    isDirectoryMember: true,
+                    isSwitcherEligible: entry.isEligibleForAppSwitcherProjection
+                )
+            },
+            entries: entries
+        )
+        let result = commitAppDirectorySnapshotEvidenceLocked(
+            evidence,
+            replacesAppDirectoryState: true
+        )
+        if result.affectsDirectoryProjection {
             generation.appLifecycle &+= 1
         }
+    }
+
+    @discardableResult
+    func commitAppDirectoryProviderEvidence(
+        _ evidence: RuntimeAppDirectorySnapshotEvidence
+    ) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard shouldAcceptAppDirectorySnapshotEvidenceLocked(evidence) else { return false }
+        let result = commitAppDirectorySnapshotEvidenceLocked(
+            evidence,
+            replacesAppDirectoryState: true
+        )
+        if result.affectsDirectoryProjection {
+            generation.appLifecycle &+= 1
+        }
+        return result.membershipChanged
+    }
+
+    @discardableResult
+    func commitAppDirectoryPresentationEvidence(
+        _ evidence: RuntimeAppDirectorySnapshotEvidence
+    ) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard shouldAcceptAppDirectorySnapshotEvidenceLocked(evidence) else { return false }
+        let result = commitAppDirectorySnapshotEvidenceLocked(
+            evidence,
+            replacesAppDirectoryState: false
+        )
+        if result.membershipChanged {
+            generation.appLifecycle &+= 1
+        }
+        return result.membershipChanged
     }
 
     func commitCurrentAppRepairAppDirectoryEvidence(
@@ -117,8 +188,20 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        let preservedPayload = currentAppWindowPayloadByPreservingPriorCommittedWindowsLocked(
+        if let evidence = appDirectorySnapshotEvidence,
+           !evidence.containsDirectoryProcess(
+                appID: payload.summary.appID,
+                pid: payload.context.ownerPID
+           ) {
+            currentAppWindowProjectionsByAppID.removeValue(forKey: payload.summary.appID)
+            return
+        }
+        let authoritativePayload = currentAppWindowPayloadByApplyingAuthoritativeCGWindowIDsLocked(
             payload,
+            authoritativeCGWindowIDs: authoritativeCGWindowIDs
+        )
+        let preservedPayload = currentAppWindowPayloadByPreservingPriorCommittedWindowsLocked(
+            authoritativePayload,
             authoritativeCGWindowIDs: authoritativeCGWindowIDs
         )
         let normalizedPayload = currentAppWindowPayloadByNormalizingPresentationLocked(preservedPayload)
@@ -149,12 +232,18 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        if payload.hasCompleteWindowCoverage {
+        let membershipFilteredPayload = appDirectorySnapshotEvidence.map {
+            RuntimeApplicationMembershipProjection.searchIndexPayload(
+                payload,
+                using: $0.membership
+            )
+        } ?? payload
+        if membershipFilteredPayload.hasCompleteWindowCoverage {
             clearResolvedSpaceTopologyScopeLocked()
         }
         guard deferredRequestCount == 0,
               !hasPendingRequests,
-              payload.hasCompleteWindowCoverage,
+              membershipFilteredPayload.hasCompleteWindowCoverage,
               !isDirtyLocked
         else {
             return nil
@@ -162,8 +251,8 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         markProjectionCommittedLocked()
         clearDirtyStateLocked()
         committedSearchIndex = RuntimeSearchIndexProjection(
-            appEntries: payload.appEntries,
-            windowEntries: payload.windowEntries,
+            appEntries: membershipFilteredPayload.appEntries,
+            windowEntries: membershipFilteredPayload.windowEntries,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: true)
         )
         return committedSearchIndex
@@ -189,6 +278,35 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 generatedAt: generatedAt
             )
         }
+    }
+
+    @discardableResult
+    func markAppActivated(
+        appID: String,
+        pid: pid_t,
+        appDirectoryEntry: RuntimeAppDirectoryEntry,
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) -> Bool {
+        guard appDirectoryEntry.isEligibleForAppSwitcherProjection,
+              pid != ProcessInfo.processInfo.processIdentifier,
+              appDirectoryEntry.appID == appID && appDirectoryEntry.pid == pid
+        else {
+            return false
+        }
+
+        lock.lock()
+        defer { lock.unlock() }
+
+        generation.appLifecycle &+= 1
+        dirtyAppIDs.insert(appID)
+        dirtyPIDs.insert(pid)
+        pendingRepairScopes.insert("selectedCurrentAppWindows:\(appID)")
+        focusedAppActivationEntry = appDirectoryEntry
+        upsertAppDirectoryStateLocked(
+            entries: [appDirectoryEntry],
+            generatedAt: generatedAt
+        )
+        return true
     }
 
     func markAppWindowsDirty(appID: String, pid: pid_t, pendingScope: String) {
@@ -261,10 +379,15 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
+        if focusedAppActivationEntry?.appID == appID,
+           focusedAppActivationEntry?.pid == pid {
+            focusedAppActivationEntry = nil
+        }
         guard shouldRemoveTerminatedAppLocked(appID: appID, pid: pid) else {
             dirtyPIDs.remove(pid)
             return
         }
+        suppressTerminatedProcessInSnapshotLocked(appID: appID, pid: pid)
         let survivingDirectoryEntries = appDirectoryEntriesLocked(forAppID: appID)
             .filter { $0.pid != pid }
         if !survivingDirectoryEntries.isEmpty {
@@ -311,6 +434,12 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         defer { lock.unlock() }
 
         if var projection = appSwitcherProjection {
+            if let evidence = appDirectorySnapshotEvidence {
+                projection = RuntimeApplicationMembershipProjection.appSwitcherProjection(
+                    projection,
+                    using: evidence
+                )
+            }
             projection.freshness = freshnessLocked(
                 generatedAt: projection.freshness.generatedAt,
                 isCompleteForScope: projection.freshness.isCompleteForScope && !isDirtyLocked
@@ -332,6 +461,12 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         defer { lock.unlock() }
 
         guard var projection = appSwitcherProjection else { return nil }
+        if let evidence = appDirectorySnapshotEvidence {
+            projection = RuntimeApplicationMembershipProjection.appSwitcherProjection(
+                projection,
+                using: evidence
+            )
+        }
         projection.freshness = freshnessLocked(
             generatedAt: projection.freshness.generatedAt,
             isCompleteForScope: projection.freshness.isCompleteForScope && !isDirtyLocked
@@ -344,6 +479,12 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         defer { lock.unlock() }
 
         if var projection = homeSummaryProjection {
+            if let evidence = appDirectorySnapshotEvidence {
+                projection = RuntimeApplicationMembershipProjection.homeSummaryProjection(
+                    projection,
+                    using: evidence
+                )
+            }
             projection.freshness = freshnessLocked(
                 generatedAt: projection.freshness.generatedAt,
                 isCompleteForScope: projection.freshness.isCompleteForScope && !isDirtyLocked
@@ -398,6 +539,13 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         defer { lock.unlock() }
 
         guard var projection = activationTargetProjection else { return nil }
+        if let evidence = appDirectorySnapshotEvidence,
+           !evidence.containsSwitcherEligibleProcess(
+                appID: projection.appID,
+                pid: projection.ownerPID
+           ) {
+            return nil
+        }
         projection.freshness = freshnessLocked(
             generatedAt: projection.freshness.generatedAt,
             isCompleteForScope: false
@@ -440,6 +588,13 @@ final class RuntimeReadModelStore: @unchecked Sendable {
 
     private func currentAppWindowProjectionLocked(appID: String) -> RuntimeCurrentAppWindowProjection? {
         guard var projection = currentAppWindowProjectionsByAppID[appID] else { return nil }
+        if let evidence = appDirectorySnapshotEvidence,
+           !evidence.containsDirectoryProcess(
+                appID: appID,
+                pid: projection.currentAppWindowPayload.context.ownerPID
+           ) {
+            return nil
+        }
         let isScopeDirty = isCurrentAppWindowProjectionScopeDirtyLocked(projection)
         projection.freshness = freshnessLocked(
             generatedAt: projection.freshness.generatedAt,
@@ -449,7 +604,16 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     }
 
     private func focusedCurrentAppDirectoryEntryLocked() -> RuntimeAppDirectoryEntry? {
-        appDirectoryState.entries
+        if let focusedAppActivationEntry {
+            if appDirectorySnapshotEvidence?.containsSwitcherEligibleProcess(
+                appID: focusedAppActivationEntry.appID,
+                pid: focusedAppActivationEntry.pid
+            ) != false {
+                return focusedAppActivationEntry
+            }
+        }
+        return effectiveAppDirectoryEntriesLocked()
+            .filter(\.isEligibleForAppSwitcherProjection)
             .compactMap { entry -> (entry: RuntimeAppDirectoryEntry, rank: Int)? in
                 guard let rank = entry.activationRank else { return nil }
                 return (entry, rank)
@@ -472,6 +636,14 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             return RuntimeSearchIndexRead(
                 projection: nil,
                 readiness: .missingCommittedIndex
+            )
+        }
+        if let membership = appDirectorySnapshotEvidence?.membership {
+            let invalidContextAppIDs = invalidSwitcherContextAppIDsLocked()
+            projection = RuntimeApplicationMembershipProjection.searchIndexProjection(
+                projection,
+                using: membership,
+                excludingWindowAppIDs: invalidContextAppIDs
             )
         }
         let committedSourceGeneration = projection.freshness.sourceGeneration
@@ -500,6 +672,9 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
+        let hasAppDirectoryEvidence = appDirectoryState.isInitialized
+            || appDirectorySnapshotEvidence != nil
+        let appDirectoryEntries = effectiveAppDirectoryEntriesLocked()
         return RuntimeReadModelDiagnostics(
             generation: generation,
             dirtyAppIDs: dirtyAppIDs,
@@ -507,15 +682,16 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             dirtyCGWindowIDs: dirtyCGWindowIDs,
             spaceTopologySignatureSummary: spaceTopologySignatureSummary,
             pendingRepairScopes: pendingRepairScopes,
-            hasAppSwitcherProjection: appSwitcherProjection != nil || appDirectoryState.isInitialized,
-            hasHomeSummaryProjection: homeSummaryProjection != nil || appDirectoryState.isInitialized,
+            hasAppSwitcherProjection: appSwitcherProjection != nil || hasAppDirectoryEvidence,
+            hasHomeSummaryProjection: homeSummaryProjection != nil || hasAppDirectoryEvidence,
             hasCompleteAppSwitcherProjection: appSwitcherProjection?.freshness.isCompleteForScope == true
                 && !isDirtyLocked,
             hasCompleteHomeSummaryProjection: homeSummaryProjection?.freshness.isCompleteForScope == true
                 && !isDirtyLocked,
-            hasAppDirectoryProjection: appDirectoryState.isInitialized,
+            hasAppDirectoryProjection: hasAppDirectoryEvidence,
             hasCompleteAppDirectoryProjection:
-                appDirectoryState.hasCompleteApplicationDirectoryCoverage
+                (appDirectorySnapshotEvidence != nil
+                    || appDirectoryState.hasCompleteApplicationDirectoryCoverage)
                 && !isDirtyLocked,
             hasSpaceTopologyProjection: spaceTopologySignature != nil,
             spaceTopologyTrackedSpaceCount: spaceTopologySignature?.trackedSpaceCount ?? 0,
@@ -524,7 +700,23 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             hasActivationTargetProjection: activationTargetProjection != nil,
             hasCommittedSearchIndex: committedSearchIndex != nil,
             currentAppWindowProjectionAppIDs: Set(currentAppWindowProjectionsByAppID.keys),
-            appDirectoryEntryPIDs: appDirectoryState.entryPIDs
+            appDirectoryEntryPIDs: Set(appDirectoryEntries.map(\.pid))
+        )
+    }
+
+    func requiredExistingSwitcherAppIDs(
+        existingAppIDs: Set<String>,
+        permittedMissingAppIDs: Set<String>
+    ) -> Set<String> {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard let membership = appDirectorySnapshotEvidence?.membership else {
+            return existingAppIDs.subtracting(permittedMissingAppIDs)
+        }
+        return membership.requiredExistingSwitcherAppIDs(
+            existingAppIDs: existingAppIDs,
+            permittedMissingAppIDs: permittedMissingAppIDs
         )
     }
 
@@ -912,6 +1104,54 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         )
     }
 
+    private func currentAppWindowPayloadByApplyingAuthoritativeCGWindowIDsLocked(
+        _ payload: RuntimeCurrentAppWindowPayload,
+        authoritativeCGWindowIDs: Set<CGWindowID>?
+    ) -> RuntimeCurrentAppWindowPayload {
+        guard let authoritativeCGWindowIDs else { return payload }
+        let windows = payload.candidate.windows.filter { window in
+            guard let cgWindowID = payload.context.windowsByID[window.id]?.cgWindowID else {
+                return true
+            }
+            return authoritativeCGWindowIDs.contains(cgWindowID)
+        }
+        guard windows.count != payload.candidate.windows.count else {
+            return payload
+        }
+
+        let retainedWindowIDs = Set(windows.map(\.id))
+        let candidate = AppSwitchCandidate(
+            id: payload.candidate.id,
+            displayName: payload.candidate.displayName,
+            groupID: payload.candidate.groupID,
+            lastActiveAt: payload.candidate.lastActiveAt,
+            windows: windows
+        )
+        let summary = RuntimeHomeAppSummary(
+            appID: payload.summary.appID,
+            displayName: payload.summary.displayName,
+            groupID: payload.summary.groupID,
+            lastActiveAt: payload.summary.lastActiveAt,
+            windowCount: windows.count,
+            pid: payload.summary.pid,
+            bundleIdentifier: payload.summary.bundleIdentifier,
+            bundleURL: payload.summary.bundleURL
+        )
+        return RuntimeCurrentAppWindowPayload(
+            summary: summary,
+            candidate: candidate,
+            context: RuntimeAppContext(
+                appID: payload.context.appID,
+                runningApp: payload.context.runningApp,
+                ownerPID: payload.context.ownerPID,
+                windowsByID: payload.context.windowsByID.filter {
+                    retainedWindowIDs.contains($0.key)
+                }
+            ),
+            appDirectoryEntries: payload.appDirectoryEntries
+        )
+    }
+
     private func currentAppWindowPreservationSourcesLocked(
         for payload: RuntimeCurrentAppWindowPayload
     ) -> [(candidate: AppSwitchCandidate, context: RuntimeAppContext)] {
@@ -1020,6 +1260,80 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         return !wasInitialized || previousEntries != appDirectoryState.entries
     }
 
+    private func shouldAcceptAppDirectorySnapshotEvidenceLocked(
+        _ evidence: RuntimeAppDirectorySnapshotEvidence
+    ) -> Bool {
+        guard let current = appDirectorySnapshotEvidence else { return true }
+        guard current.sourceID == evidence.sourceID else { return true }
+        return evidence.revision > current.revision
+    }
+
+    @discardableResult
+    private func commitAppDirectorySnapshotEvidenceLocked(
+        _ evidence: RuntimeAppDirectorySnapshotEvidence,
+        replacesAppDirectoryState: Bool
+    ) -> RuntimeAppDirectorySnapshotCommitResult {
+        if appDirectorySnapshotEvidence?.sourceID != evidence.sourceID {
+            suppressedTerminatedProcesses.removeAll()
+        }
+        let observedProcessKeys = Set(evidence.processIdentities.map(\.processKey))
+        suppressedTerminatedProcesses.formIntersection(observedProcessKeys)
+        let effectiveEvidence = evidence.excludingProcesses(suppressedTerminatedProcesses)
+        let previousSignature = appDirectorySnapshotEvidence?.processMembershipSignature
+        appDirectorySnapshotEvidence = effectiveEvidence
+        let stateChanged: Bool
+        if replacesAppDirectoryState {
+            stateChanged = replaceAppDirectoryStateLocked(
+                entries: effectiveEvidence.entries,
+                generatedAt: effectiveEvidence.capturedAt
+            )
+        } else {
+            stateChanged = false
+        }
+        pruneProjectionsUsingLatestAppDirectoryEvidenceLocked()
+        return RuntimeAppDirectorySnapshotCommitResult(
+            membershipChanged:
+                previousSignature != effectiveEvidence.processMembershipSignature,
+            stateChanged: stateChanged
+        )
+    }
+
+    private func suppressTerminatedProcessInSnapshotLocked(appID: String, pid: pid_t) {
+        guard let evidence = appDirectorySnapshotEvidence else { return }
+        let processKey = RuntimeAppProcessKey(appID: appID, pid: pid)
+        guard evidence.processIdentities.contains(where: { $0.processKey == processKey }) else {
+            return
+        }
+        suppressedTerminatedProcesses.insert(processKey)
+        appDirectorySnapshotEvidence = evidence.excludingProcesses([processKey])
+        pruneProjectionsUsingLatestAppDirectoryEvidenceLocked()
+    }
+
+    private func pruneProjectionsUsingLatestAppDirectoryEvidenceLocked() {
+        guard let evidence = appDirectorySnapshotEvidence else { return }
+        currentAppWindowProjectionsByAppID = currentAppWindowProjectionsByAppID.filter {
+            appID, projection in
+            evidence.containsDirectoryProcess(
+                appID: appID,
+                pid: projection.currentAppWindowPayload.context.ownerPID
+            )
+        }
+        if let focusedAppActivationEntry,
+           !evidence.containsSwitcherEligibleProcess(
+                appID: focusedAppActivationEntry.appID,
+                pid: focusedAppActivationEntry.pid
+           ) {
+            self.focusedAppActivationEntry = nil
+        }
+        if let activationTargetProjection,
+           !evidence.containsSwitcherEligibleProcess(
+                appID: activationTargetProjection.appID,
+                pid: activationTargetProjection.ownerPID
+           ) {
+            self.activationTargetProjection = nil
+        }
+    }
+
     @discardableResult
     private func upsertAppDirectoryStateLocked(
         entries: [RuntimeAppDirectoryEntry],
@@ -1031,23 +1345,56 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     }
 
     private func appDirectoryProjectionLocked() -> RuntimeAppDirectoryProjection? {
-        appDirectoryState.projection { generatedAt in
-            freshnessLocked(
+        let entries = effectiveAppDirectoryEntriesLocked()
+        guard let generatedAt = appDirectorySnapshotEvidence?.capturedAt
+            ?? appDirectoryState.generatedAt
+        else { return nil }
+        return RuntimeAppDirectoryProjection(
+            entries: entries,
+            freshness: freshnessLocked(
                 generatedAt: generatedAt,
                 isCompleteForScope:
-                    appDirectoryState.hasCompleteApplicationDirectoryCoverage && !isDirtyLocked
+                    (appDirectorySnapshotEvidence != nil
+                        || appDirectoryState.hasCompleteApplicationDirectoryCoverage)
+                    && !isDirtyLocked
             )
-        }
+        )
     }
 
     private func appDirectoryEntriesLocked(forAppID appID: String) -> [RuntimeAppDirectoryEntry] {
-        appDirectoryState.entries(forAppID: appID)
+        effectiveAppDirectoryEntriesLocked().filter { $0.appID == appID }
+    }
+
+    private func effectiveAppDirectoryEntriesLocked() -> [RuntimeAppDirectoryEntry] {
+        guard let evidence = appDirectorySnapshotEvidence else {
+            return appDirectoryState.entries
+        }
+        let storedEntriesByPID = Dictionary(
+            uniqueKeysWithValues: appDirectoryState.entries.map { ($0.pid, $0) }
+        )
+        return evidence.entries.map { entry in
+            entry.preservingSnapshotMetadata(from: storedEntriesByPID[entry.pid])
+        }
+    }
+
+    private func invalidSwitcherContextAppIDsLocked() -> Set<String> {
+        guard let evidence = appDirectorySnapshotEvidence,
+              let appSwitcherProjection
+        else { return [] }
+        return Set(appSwitcherProjection.contextsByID.compactMap { appID, context in
+            evidence.containsSwitcherEligibleProcess(
+                appID: appID,
+                pid: context.ownerPID
+            ) ? nil : appID
+        })
     }
 
     private func appSwitcherProjectionFromAppDirectoryLocked() -> RuntimeAppSwitcherProjection? {
-        guard let generatedAt = appDirectoryState.generatedAt else { return nil }
+        guard let generatedAt = appDirectorySnapshotEvidence?.capturedAt
+            ?? appDirectoryState.generatedAt
+        else { return nil }
 
-        let appSwitcherEntries = appDirectoryState.entries.filter(
+        let appSwitcherEntries = effectiveAppDirectoryEntriesLocked().filter(
             \.isEligibleForAppSwitcherProjection
         )
         let rankByPID = RuntimeAppDirectory.activationRankByPID(from: appSwitcherEntries)
@@ -1097,11 +1444,14 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     }
 
     private func homeSummaryProjectionFromAppDirectoryLocked() -> RuntimeHomeSummaryProjection? {
-        guard let generatedAt = appDirectoryState.generatedAt else { return nil }
+        guard let generatedAt = appDirectorySnapshotEvidence?.capturedAt
+            ?? appDirectoryState.generatedAt
+        else { return nil }
 
-        let rankByPID = RuntimeAppDirectory.activationRankByPID(from: appDirectoryState.entries)
+        let appDirectoryEntries = effectiveAppDirectoryEntriesLocked()
+        let rankByPID = RuntimeAppDirectory.activationRankByPID(from: appDirectoryEntries)
         let selectedEntries = RuntimeAppDirectory.selectPrimaryEntries(
-            from: appDirectoryState.entries,
+            from: appDirectoryEntries,
             windowStatsByPID: [:],
             rankByPID: rankByPID
         )

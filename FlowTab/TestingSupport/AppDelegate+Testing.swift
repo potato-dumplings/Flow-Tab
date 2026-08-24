@@ -21,6 +21,8 @@ struct AppDelegateTestHooks {
     var workspaceNotificationCenter: NotificationCenter? = nil
     var appLaunchWindowEvidenceCoordinator:
         (any RuntimeAppLaunchWindowEvidenceCoordinating)? = nil
+    var appVisibilityRecordsProvider:
+        (@Sendable () -> [InstalledAppRecord])? = nil
 }
 
 @MainActor
@@ -57,6 +59,23 @@ extension AppDelegate {
 
     var resolvedWorkspaceNotificationCenter: NotificationCenter {
         Self.testHooks.workspaceNotificationCenter ?? NSWorkspace.shared.notificationCenter
+    }
+
+    func signalWorkspaceAppActivated(_ app: NSRunningApplication) {
+        guard !FlowTabTestLaunchOptions.usesMockRuntimeProjection else {
+            resolvedRuntimeProjectionService.signalFocusedCurrentAppWindowsChanged()
+            return
+        }
+        guard let appDirectoryEntry = RuntimeAppDirectoryFactSource.runningApplicationEntry(
+            for: app
+        ) else {
+            return
+        }
+        resolvedRuntimeProjectionService.signalAppActivated(
+            appID: RuntimeAppIdentity.appID(for: app),
+            pid: app.processIdentifier,
+            appDirectoryEntry: appDirectoryEntry
+        )
     }
 
     func makeAppLaunchWindowEvidenceCoordinator()

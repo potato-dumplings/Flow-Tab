@@ -137,8 +137,8 @@ extension FlowTabUITests {
             ] + resolutionRoute.launchArguments
         )
         launchFlowTabUITestApplication(relaunchApp)
-        guard let resolution =
-                resolutionOwner.waitForResolution(
+        guard let terminalReadback =
+                resolutionOwner.waitForTerminalReadback(
                     timeout:
                         FlowTabUITestInitialPresentationResolutionPolicy
                             .watchdog
@@ -148,6 +148,15 @@ extension FlowTabUITests {
                 "Disabled-Search initial presentation watchdog "
                     + "expired. "
                     + resolutionOwner.diagnosticSummary
+            )
+            return
+        }
+        guard terminalReadback.outcome == .resolution,
+              let resolution = terminalReadback.resolution
+        else {
+            XCTFail(
+                "Disabled-Search initial presentation failed. "
+                    + terminalReadback.diagnosticSummary
             )
             return
         }
@@ -189,7 +198,11 @@ extension FlowTabUITests {
         )
         setToggle(searchEnabledToggle, to: true)
 
-        selectOption(in: firstLaunchApp, controlIdentifier: Identifier.settingsSearchDefaultScope, optionIdentifier: "window")
+        selectOption(
+            in: firstLaunchApp,
+            controlIdentifier: Identifier.settingsSearchDefaultScope,
+            optionIdentifier: "window"
+        )
         assertValue(of: element(in: firstLaunchApp, identifier: Identifier.settingsSearchDefaultScope), equals: "window")
         firstLaunchApp.terminate()
 
@@ -558,47 +571,7 @@ extension FlowTabUITests {
         )
     }
 
-    func testSettingsCurrentAppActivationPolicyAppearsAsHiddenApp() throws {
-        let app = makeApp(
-            additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)
-        )
-        launchFlowTabUITestApplication(app)
-        guard assertSettingsCurrentAppActivationProjectionAfterNavigation(
-            in: app,
-            targetDescription: "current-App activation-policy Settings",
-            trigger: {
-                openSettingsTab(in: app)
-            }
-        ) else {
-            return
-        }
-
-        guard assertSettingsAppVisibilityInventoryReadinessAfterNavigation(
-            in: app,
-            targetDescription: "current-App inventory"
-        ) else {
-            return
-        }
-
-        guard assertSettingsAppVisibilityHiddenFilterProjection(
-            targetRowIdentifier: Identifier.settingsAppVisibilityCurrentApp,
-            in: app,
-            targetDescription: "current-App Hidden filter projection"
-        ) else {
-            return
-        }
-
-        guard let showToggle = settingsAppVisibilityShowToggleAfterSelecting(
-            rowIdentifier: Identifier.settingsAppVisibilityCurrentApp,
-            in: app,
-            targetDescription: "current-App Hidden detail"
-        ) else {
-            return
-        }
-        XCTAssertFalse(toggleIsOn(showToggle))
-    }
-
-    func testSettingsAppVisibilityHiddenFilterShowsStoredHiddenAppMissingFromInventory() throws {
+    func testSettingsAppVisibilityHiddenFilterRemovesStoredHiddenAppMissingFromInventory() throws {
         let firstLaunchApp = makeApp(
             additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)
         )
@@ -647,24 +620,26 @@ extension FlowTabUITests {
             return
         }
 
-        guard assertSettingsAppVisibilityHiddenFilterProjection(
-            targetRowIdentifier: Identifier.settingsAppVisibilityMockMail,
+        let hiddenFilter = element(
             in: staleInventoryApp,
-            targetDescription: "stale hidden-App filter projection"
-        ) else {
-            return
-        }
-
-        guard let staleShowToggle =
-            settingsAppVisibilityShowToggleAfterSelecting(
-                rowIdentifier: Identifier.settingsAppVisibilityMockMail,
-                in: staleInventoryApp,
-                targetDescription: "stale hidden-App detail"
+            identifier: Identifier.settingsAppVisibilityFilterHidden
+        )
+        let hiddenProjection = staleInventoryApp.descendants(matching: .any)
+            .matching(
+                NSPredicate(
+                    format: "identifier BEGINSWITH %@",
+                    Identifier.settingsAppVisibilityHiddenFilterProjectionPrefix
+                )
             )
-        else {
-            return
-        }
-        XCTAssertFalse(toggleIsOn(staleShowToggle))
+            .firstMatch
+        tapElement(hiddenFilter)
+        XCTAssertTrue(hiddenProjection.waitForExistence(timeout: 6))
+        XCTAssertFalse(
+            element(
+                in: staleInventoryApp,
+                identifier: Identifier.settingsAppVisibilityMockMail
+            ).exists
+        )
     }
 
     private func launchMockSwitcherSearchFromUserPath() -> XCUIApplication {
@@ -771,7 +746,7 @@ extension FlowTabUITests {
         return toggle
     }
 
-    private func appVisibilityRuntimeArguments(
+    func appVisibilityRuntimeArguments(
         resetDefaults: Bool = false,
         mockRuntimeVariant: String? = nil
     ) -> [String] {
