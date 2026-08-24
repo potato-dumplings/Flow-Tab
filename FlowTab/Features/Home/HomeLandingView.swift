@@ -13,12 +13,16 @@ struct HomeLandingView: View {
     let isActive: Bool
     let appLanguage: AppLanguage
     let openSettings: () -> Void
+    private let installedApps: [InstalledAppRecord]
+    private let effectiveHiddenAppIDs: Set<String>
     private let runtimeProjectionService: any RuntimeProjectionServing
 
     init(
         isActive: Bool,
         appLanguage: AppLanguage,
         runtimeProjectionService: any RuntimeProjectionServing = homeRuntimeProjectionService,
+        installedApps: [InstalledAppRecord] = [],
+        effectiveHiddenAppIDs: Set<String>? = nil,
         permissionObservationOwner: HomePermissionObservationOwner? = nil,
         initialProjectionObservationOwner: HomeInitialProjectionObservationOwner? = nil,
         appSummaryProjectionObservationOwner: HomeAppSummaryProjectionObservationOwner? = nil,
@@ -28,6 +32,9 @@ struct HomeLandingView: View {
         self.isActive = isActive
         self.appLanguage = appLanguage
         self.runtimeProjectionService = runtimeProjectionService
+        self.installedApps = installedApps
+        self.effectiveHiddenAppIDs = effectiveHiddenAppIDs
+            ?? AppVisibilityPreferencesStore.loadHiddenAppIDs()
         _permissionObservationOwner = StateObject(
             wrappedValue: permissionObservationOwner
                 ?? HomePermissionObservationOwner(
@@ -73,7 +80,6 @@ struct HomeLandingView: View {
     @StateObject private var appSummaryProjectionObservationOwner: HomeAppSummaryProjectionObservationOwner
     @StateObject private var appDetailProjectionObservationOwner: HomeAppDetailProjectionObservationOwner
     @State private var appSummaries: [RuntimeHomeAppSummary] = []
-    @State private var hiddenAppIDs = AppVisibilityPreferencesStore.loadHiddenAppIDs()
     @State private var windowsByAppID: [String: [WindowCandidate]] = [:]
     @State private var homeDetailProjectionsByAppID: [String: RuntimeHomeAppDetailProjection] = [:]
     @State private var homeSummaryProjectionFreshness: RuntimeProjectionFreshness?
@@ -105,11 +111,18 @@ struct HomeLandingView: View {
     }
 
     private var appVisibilityPresentation: HomeAppVisibilityPresentation {
-        HomeAppVisibilityPresentation(hiddenAppIDs: hiddenAppIDs)
+        HomeAppVisibilityPresentation(hiddenAppIDs: effectiveHiddenAppIDs)
     }
 
-    private var presentedAppSummaries: [RuntimeHomeAppSummary] {
-        appVisibilityPresentation.orderedAppSummaries(appSummaries)
+    private var presentedAppRows: [HomeAppRowPresentation] {
+        appVisibilityPresentation.appRows(
+            runtimeSummaries: appSummaries,
+            installedApps: installedApps
+        )
+    }
+
+    private var presentedRuntimeAppSummaries: [RuntimeHomeAppSummary] {
+        presentedAppRows.compactMap(\.runtimeSummary)
     }
 
     private var permissionGuideMessage: String {
@@ -170,11 +183,6 @@ struct HomeLandingView: View {
             guard isActive else { return }
             requestAppSummaryProjectionMaintenance(reason: "app_active")
         }
-        .onReceive(NotificationCenter.default.publisher(
-            for: .flowTabAppVisibilityPreferenceChanged
-        )) { _ in
-            refreshHomeAppVisibility()
-        }
         .onDisappear {
             teardownActiveState()
         }
@@ -200,8 +208,7 @@ struct HomeLandingView: View {
 
     private var overviewStats: HomeOverviewStats {
         HomeOverviewStats.make(
-            appSummaries: appSummaries,
-            hiddenAppIDs: hiddenAppIDs,
+            appRows: presentedAppRows,
             loadingWindowCountAppIDs: loadingWindowCountAppIDs
         )
     }
@@ -272,10 +279,10 @@ struct HomeLandingView: View {
         FlowPageSectionCard(
             title: AppStrings.text(.homeAppLayerTitle, language: appLanguage),
             subtitle: AppStrings.text(.homeAppLayerSubtitle, language: appLanguage),
-            trailingText: AppStrings.appCount(presentedAppSummaries.count, language: appLanguage),
+            trailingText: AppStrings.appCount(presentedAppRows.count, language: appLanguage),
             trailingAccessibilityIdentifier: "flowtab.home.app.count"
         ) {
-            if appSummaries.isEmpty {
+            if presentedAppRows.isEmpty {
                 HomeLayerRowView(
                     title: AppStrings.text(.homeNoSwitchableApps, language: appLanguage),
                     subtitle: AppStrings.text(
@@ -288,43 +295,21 @@ struct HomeLandingView: View {
                 )
             } else {
                 FlowSnappedListScrollView(
-                    rowCount: presentedAppSummaries.count,
+                    rowCount: presentedAppRows.count,
                     rowHeight: HomePageLayout.appLayerRowHeight,
                     rowSpacing: HomePageLayout.layerListRowSpacing,
                     accessibilityIdentifier: "flowtab.home.app.list"
                 ) {
-                    ForEach(presentedAppSummaries) { app in
-                        let isHidden = appVisibilityPresentation.isHidden(appID: app.appID)
+                    ForEach(presentedAppRows) { app in
                         let isWindowCountLoading = loadingWindowCountAppIDs.contains(app.appID)
-                        let appIDComponent = app.appID.flowTabAccessibilityIdentifierComponent
-                        let hiddenBadge = isHidden
-                            ? AppStrings.text(.homeAppNotShownBadge, language: appLanguage)
-                            : nil
-                        Button {
+                        HomeAppLayerItemView(
+                            app: app,
+                            isSelected: app.appID == currentSelectedAppID,
+                            isWindowCountLoading: isWindowCountLoading,
+                            appLanguage: appLanguage
+                        ) {
                             selectApp(app.appID)
-                        } label: {
-                            HomeLayerRowView(
-                                title: app.displayName,
-                                subtitle: app.appID,
-                                trailing: "\(app.windowCount)w",
-                                icon: HomeAppIconProvider.icon(for: app),
-                                isTrailingLoading: isWindowCountLoading,
-                                badge: hiddenBadge,
-                                badgeAccessibilityIdentifier: isHidden
-                                    ? "flowtab.home.app.hidden-badge.\(appIDComponent)"
-                                    : nil,
-                                isSelected: app.appID == currentSelectedAppID
-                            )
                         }
-                        .buttonStyle(.plain)
-                        .frame(height: HomePageLayout.appLayerRowHeight)
-                        .accessibilityIdentifier("flowtab.home.app.\(appIDComponent)")
-                        .accessibilityLabel(hiddenBadge.map { "\(app.displayName) \($0)" } ?? app.displayName)
-                        .accessibilityValue(appAccessibilityValue(
-                            windowCount: app.windowCount,
-                            isHidden: isHidden,
-                            isWindowCountLoading: isWindowCountLoading
-                        ))
                     }
                 }
             }
@@ -332,8 +317,9 @@ struct HomeLandingView: View {
     }
 
     private var windowLayerCard: some View {
-        let activeApp = presentedAppSummaries.first(where: { $0.appID == currentSelectedAppID })
-            ?? presentedAppSummaries.first
+        let activeApp = presentedRuntimeAppSummaries.first(where: {
+            $0.appID == currentSelectedAppID
+        }) ?? presentedRuntimeAppSummaries.first
         let activeWindows = activeApp.flatMap { windowsByAppID[$0.appID] } ?? []
 
         return FlowPageSectionCard(
@@ -406,7 +392,7 @@ struct HomeLandingView: View {
         if let selectedAppID, appSummaries.contains(where: { $0.appID == selectedAppID }) {
             return selectedAppID
         }
-        return presentedAppSummaries.first?.appID
+        return presentedRuntimeAppSummaries.first?.appID
     }
 
     private func windowTitle(_ title: String, index: Int) -> String {
@@ -454,7 +440,6 @@ struct HomeLandingView: View {
             return
         }
 
-        refreshHomeAppVisibility()
         restoreCachedStateIfNeeded()
 
         if appSummaries.isEmpty || homeSummaryProjectionFreshness?.isCompleteForScope != true {
@@ -516,14 +501,6 @@ struct HomeLandingView: View {
         syncSelectedApp()
     }
 
-    private func refreshHomeAppVisibility() {
-        let latestHiddenAppIDs = AppVisibilityPreferencesStore.loadHiddenAppIDs()
-        guard latestHiddenAppIDs != hiddenAppIDs else { return }
-
-        hiddenAppIDs = latestHiddenAppIDs
-        syncSelectedApp()
-    }
-
     private func startPermissionObservationIfNeeded() {
         permissionObservationOwner.start { evidence in
             requestAppSummaryProjectionMaintenance(
@@ -560,17 +537,6 @@ struct HomeLandingView: View {
             force: windowsByAppID[appID] == nil,
             reason: "manual_select"
         )
-    }
-
-    private func appAccessibilityValue(
-        windowCount: Int,
-        isHidden: Bool,
-        isWindowCountLoading: Bool
-    ) -> String {
-        if isWindowCountLoading {
-            return isHidden ? "loading hidden" : "loading"
-        }
-        return isHidden ? "\(windowCount)w hidden" : "\(windowCount)w"
     }
 
     private func activateWindow(_ appID: String, windowID: String) {

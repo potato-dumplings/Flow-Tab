@@ -7,11 +7,14 @@ import XCTest
 extension FlowTabTests {
     @MainActor
     func makeSettingsPresentationLayoutHost(
-        recorder: SettingsPresentationUpdateRecorder
+        recorder: SettingsPresentationUpdateRecorder,
+        appVisibilityModel: AppVisibilityManagerModel
     ) -> NSHostingView<SettingsPresentationObservedContent<some View>> {
         let hostedView = NSHostingView(
             rootView: SettingsPresentationObservedContent(
-                content: HomeRootView()
+                content: HomeRootView(
+                    appVisibilityModel: appVisibilityModel
+                )
                     .frame(width: 1_440, height: 900, alignment: .topLeading),
                 recorder: recorder
             )

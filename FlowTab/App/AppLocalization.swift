@@ -51,7 +51,6 @@ enum AppStringKey: String {
     case homeConfirmAccessibility
     case homeNoWindowData
     case homeWaitCacheUpdate
-    case homeAppNotShownBadge
     case homeStatsTotalApps
     case homeStatsVisibleApps
     case homeStatsHiddenApps
@@ -220,7 +219,6 @@ enum AppStrings {
             .homeConfirmAccessibility: "请确认辅助功能权限已授权",
             .homeNoWindowData: "暂无窗口数据",
             .homeWaitCacheUpdate: "等待缓存更新",
-            .homeAppNotShownBadge: "不展示",
             .homeStatsTotalApps: "应用总数",
             .homeStatsVisibleApps: "可见应用",
             .homeStatsHiddenApps: "隐藏应用",
@@ -384,7 +382,6 @@ enum AppStrings {
             .homeConfirmAccessibility: "Please confirm Accessibility permission is granted",
             .homeNoWindowData: "No window data",
             .homeWaitCacheUpdate: "Waiting for cache update",
-            .homeAppNotShownBadge: "Not shown",
             .homeStatsTotalApps: "Total Apps",
             .homeStatsVisibleApps: "Visible Apps",
             .homeStatsHiddenApps: "Hidden Apps",

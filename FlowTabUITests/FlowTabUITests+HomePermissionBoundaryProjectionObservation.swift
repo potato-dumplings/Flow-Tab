@@ -7,10 +7,58 @@ enum FlowTabUITestHomePermissionBoundaryProjectionPolicy {
 struct FlowTabUITestHomePermissionBoundaryProjectionExpectation:
     Equatable
 {
+    private enum HiddenAppsExpectation: Equatable {
+        case exact(String)
+        case minimum(Int)
+
+        func accepts(_ value: String?) -> Bool {
+            switch self {
+            case let .exact(expectedValue):
+                return value == expectedValue
+            case let .minimum(minimumCount):
+                guard let value, let count = Int(value) else { return false }
+                return count >= minimumCount
+            }
+        }
+
+        var diagnosticSummary: String {
+            switch self {
+            case let .exact(value):
+                return "hiddenAppsValue=\(value)"
+            case let .minimum(count):
+                return "minimumHiddenApps=\(count)"
+            }
+        }
+    }
+
     let applicationRowIdentifier: String
     let applicationRowValue: String
     let hiddenAppsIdentifier: String
-    let hiddenAppsValue: String
+    private let hiddenAppsExpectation: HiddenAppsExpectation
+
+    init(
+        applicationRowIdentifier: String,
+        applicationRowValue: String,
+        hiddenAppsIdentifier: String,
+        hiddenAppsValue: String
+    ) {
+        self.applicationRowIdentifier = applicationRowIdentifier
+        self.applicationRowValue = applicationRowValue
+        self.hiddenAppsIdentifier = hiddenAppsIdentifier
+        hiddenAppsExpectation = .exact(hiddenAppsValue)
+    }
+
+    init(
+        applicationRowIdentifier: String,
+        applicationRowValue: String,
+        hiddenAppsIdentifier: String,
+        minimumHiddenApps: Int
+    ) {
+        self.applicationRowIdentifier = applicationRowIdentifier
+        self.applicationRowValue = applicationRowValue
+        self.hiddenAppsIdentifier = hiddenAppsIdentifier
+        hiddenAppsExpectation = .minimum(minimumHiddenApps)
+    }
 
     func isSatisfied(
         by snapshot:
@@ -24,14 +72,14 @@ struct FlowTabUITestHomePermissionBoundaryProjectionExpectation:
             && snapshot.hiddenAppsIdentifier
                 == hiddenAppsIdentifier
             && snapshot.hiddenAppsExists
-            && snapshot.hiddenAppsValue == hiddenAppsValue
+            && hiddenAppsExpectation.accepts(snapshot.hiddenAppsValue)
     }
 
     var diagnosticSummary: String {
         "applicationRowIdentifier=\(applicationRowIdentifier) "
             + "applicationRowValue=\(applicationRowValue) "
             + "hiddenAppsIdentifier=\(hiddenAppsIdentifier) "
-            + "hiddenAppsValue=\(hiddenAppsValue)"
+            + hiddenAppsExpectation.diagnosticSummary
     }
 }
 

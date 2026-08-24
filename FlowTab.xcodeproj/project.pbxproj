@@ -577,6 +577,8 @@
 		C30000012FBD100100B0D737 /* HomeRuntimeProjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000112FBD100100B0D737 /* HomeRuntimeProjectionService.swift */; };
 		C30000022FBD100100B0D737 /* HomeAppVisibilityPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000122FBD100100B0D737 /* HomeAppVisibilityPresentation.swift */; };
 		C30000032FBD100100B0D737 /* HomeLayerRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000132FBD100100B0D737 /* HomeLayerRowView.swift */; };
+		A8F100013D2A000100B0D737 /* HomeAppLayerItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F100023D2A000100B0D737 /* HomeAppLayerItemView.swift */; };
+		A8F100033D2A000100B0D737 /* FlowTabTests+HomeAppRowPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F100043D2A000100B0D737 /* FlowTabTests+HomeAppRowPresentation.swift */; };
 		D43000012FFD000100B0D737 /* HomeOverviewComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43000112FFD000100B0D737 /* HomeOverviewComponents.swift */; };
 		D43000022FFD000100B0D737 /* RuntimeAXWindowChangeMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43000122FFD000100B0D737 /* RuntimeAXWindowChangeMonitor.swift */; };
 		D43000032FFD000100B0D737 /* RuntimeAXWindowObservationTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43000132FFD000100B0D737 /* RuntimeAXWindowObservationTransport.swift */; };
@@ -1023,6 +1025,8 @@
 		C30000112FBD100100B0D737 /* HomeRuntimeProjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRuntimeProjectionService.swift; sourceTree = "<group>"; };
 		C30000122FBD100100B0D737 /* HomeAppVisibilityPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeAppVisibilityPresentation.swift; sourceTree = "<group>"; };
 		C30000132FBD100100B0D737 /* HomeLayerRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeLayerRowView.swift; sourceTree = "<group>"; };
+		A8F100023D2A000100B0D737 /* HomeAppLayerItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeAppLayerItemView.swift; sourceTree = "<group>"; };
+		A8F100043D2A000100B0D737 /* FlowTabTests+HomeAppRowPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HomeAppRowPresentation.swift"; sourceTree = "<group>"; };
 		D43000112FFD000100B0D737 /* HomeOverviewComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeOverviewComponents.swift; sourceTree = "<group>"; };
 		D43000122FFD000100B0D737 /* RuntimeAXWindowChangeMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAXWindowChangeMonitor.swift; sourceTree = "<group>"; };
 		D43000132FFD000100B0D737 /* RuntimeAXWindowObservationTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAXWindowObservationTransport.swift; sourceTree = "<group>"; };
@@ -1514,6 +1518,7 @@
 				FAD100053D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift */,
 				FBD100033D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift */,
 				FCD100033D29000100B0D737 /* FlowTabTests+HomeControlPressAnimationPolicy.swift */,
+				A8F100043D2A000100B0D737 /* FlowTabTests+HomeAppRowPresentation.swift */,
 				FDD100033D2A000100B0D737 /* FlowTabTests+SettingsAppVisibilityNavigationAnimationPolicy.swift */,
 				FED100033D2B000100B0D737 /* FlowTabTests+PanelPresentationDiagnosticProbe.swift */,
 				A12000013C00000100B0D737 /* FlowTabTests+RuntimeLogDeletion.swift */,
@@ -2155,6 +2160,7 @@
 				ECD100013D1A000100B0D737 /* HomeAppSummaryProjectionObservationOwner.swift */,
 				EDD100013D1B000100B0D737 /* HomeAppDetailProjectionObservationOwner.swift */,
 				C30000122FBD100100B0D737 /* HomeAppVisibilityPresentation.swift */,
+				A8F100023D2A000100B0D737 /* HomeAppLayerItemView.swift */,
 				C30000132FBD100100B0D737 /* HomeLayerRowView.swift */,
 				D43000112FFD000100B0D737 /* HomeOverviewComponents.swift */,
 				C30000112FBD100100B0D737 /* HomeRuntimeProjectionService.swift */,
@@ -2495,6 +2501,7 @@
 				ECD100023D1A000100B0D737 /* HomeAppSummaryProjectionObservationOwner.swift in Sources */,
 				EDD100023D1B000100B0D737 /* HomeAppDetailProjectionObservationOwner.swift in Sources */,
 				C30000022FBD100100B0D737 /* HomeAppVisibilityPresentation.swift in Sources */,
+				A8F100013D2A000100B0D737 /* HomeAppLayerItemView.swift in Sources */,
 				C30000032FBD100100B0D737 /* HomeLayerRowView.swift in Sources */,
 				D43000012FFD000100B0D737 /* HomeOverviewComponents.swift in Sources */,
 				C30000012FBD100100B0D737 /* HomeRuntimeProjectionService.swift in Sources */,
@@ -2726,6 +2733,7 @@
 				FAD100063D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift in Sources */,
 				FBD100043D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift in Sources */,
 				FCD100043D29000100B0D737 /* FlowTabTests+HomeControlPressAnimationPolicy.swift in Sources */,
+				A8F100033D2A000100B0D737 /* FlowTabTests+HomeAppRowPresentation.swift in Sources */,
 				FDD100043D2A000100B0D737 /* FlowTabTests+SettingsAppVisibilityNavigationAnimationPolicy.swift in Sources */,
 				FED100043D2B000100B0D737 /* FlowTabTests+PanelPresentationDiagnosticProbe.swift in Sources */,
 				A12000113C00000100B0D737 /* FlowTabTests+RuntimeLogDeletion.swift in Sources */,

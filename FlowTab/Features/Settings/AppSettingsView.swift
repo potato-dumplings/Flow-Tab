@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 import FlowTabCore
 
+@MainActor
 struct AppSettingsView: View {
     let isActive: Bool
     let appVisibilityNavigationAnimationPolicy:
@@ -9,10 +10,14 @@ struct AppSettingsView: View {
 
     init(
         isActive: Bool,
+        appVisibilityModel: AppVisibilityManagerModel,
         appVisibilityNavigationAnimationPolicy:
             SettingsAppVisibilityNavigationAnimationPolicy = .default
     ) {
         self.isActive = isActive
+        _appVisibilityModel = ObservedObject(
+            wrappedValue: appVisibilityModel
+        )
         self.appVisibilityNavigationAnimationPolicy =
             appVisibilityNavigationAnimationPolicy
     }
@@ -59,7 +64,7 @@ struct AppSettingsView: View {
         RuntimePermissionObservationCoordinator()
     @StateObject private var hotkeyRegistrationObservationOwner =
         HotkeyRegistrationObservationOwner()
-    @StateObject private var appVisibilityModel = AppVisibilityManagerModel()
+    @ObservedObject private var appVisibilityModel: AppVisibilityManagerModel
     @State private var windowLayerAutoEnterDelayText = ""
     @State private var didInitialize = false
     @State private var isWindowLayerAutoEnterDelayEditing = false
@@ -279,7 +284,6 @@ struct AppSettingsView: View {
             guard isActive else { return }
             refreshAccessibilityStatus()
             refreshScreenCaptureStatus()
-            appVisibilityModel.reload()
         }
         .onReceive(NotificationCenter.default.publisher(
             for: NSApplication.didResignActiveNotification
@@ -325,7 +329,6 @@ struct AppSettingsView: View {
         }
         refreshAccessibilityStatus()
         refreshScreenCaptureStatus()
-        appVisibilityModel.reload()
     }
 
     private func cancelPermissionObservation() {

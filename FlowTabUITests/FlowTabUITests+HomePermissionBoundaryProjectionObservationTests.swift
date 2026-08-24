@@ -136,6 +136,37 @@ extension FlowTabUITests {
         )
     }
 
+    func testHomePermissionBoundaryProjectionAcceptsMinimumHiddenAppCount() {
+        let expectation =
+            FlowTabUITestHomePermissionBoundaryProjectionExpectation(
+                applicationRowIdentifier:
+                    FlowTabUITestHomePermissionBoundaryProjectionTestFixture
+                        .applicationRowIdentifier,
+                applicationRowValue:
+                    FlowTabUITestHomePermissionBoundaryProjectionTestFixture
+                        .applicationRowValue,
+                hiddenAppsIdentifier:
+                    FlowTabUITestHomePermissionBoundaryProjectionTestFixture
+                        .hiddenAppsIdentifier,
+                minimumHiddenApps: 1
+            )
+
+        XCTAssertTrue(
+            expectation.isSatisfied(
+                by:
+                    FlowTabUITestHomePermissionBoundaryProjectionTestFixture
+                        .snapshot(hiddenAppsValue: "2")
+            )
+        )
+        XCTAssertFalse(
+            expectation.isSatisfied(
+                by:
+                    FlowTabUITestHomePermissionBoundaryProjectionTestFixture
+                        .snapshot(hiddenAppsValue: "0")
+            )
+        )
+    }
+
     func testHomePermissionBoundaryProjectionObserverUsesInitialExactSnapshot() {
         let owner =
             FlowTabUITestHomePermissionBoundaryProjectionObservationOwner(

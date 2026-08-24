@@ -47,8 +47,8 @@ extension FlowTabUITests {
                 applicationRowIdentifier: flowTabRowIdentifier,
                 applicationRowValue: "0w hidden",
                 hiddenAppsIdentifier: hiddenAppsIdentifier,
-                hiddenAppsValue: "1"
-            )
+                minimumHiddenApps: 1
+        )
         let projectionObservation =
             FlowTabUITestHomePermissionBoundaryProjectionObservationOwner(
                 expectation: projectionExpectation,

@@ -7,10 +7,22 @@ enum HomeAppIconProvider {
     private static let provider = AppIconProvider()
 
     static func icon(for app: RuntimeHomeAppSummary) -> NSImage {
-        provider.icon(
+        icon(
             appID: app.appID,
             bundleIdentifier: app.bundleIdentifier,
             bundleURL: app.bundleURL
+        )
+    }
+
+    static func icon(
+        appID: String,
+        bundleIdentifier: String?,
+        bundleURL: URL?
+    ) -> NSImage {
+        provider.icon(
+            appID: appID,
+            bundleIdentifier: bundleIdentifier,
+            bundleURL: bundleURL
         ) ?? NSWorkspace.shared.icon(for: .applicationBundle)
     }
 }
@@ -61,20 +73,32 @@ struct HomeOverviewStats: Equatable {
     let totalWindows: HomeWindowTotal
 
     static func make(
+        appRows: [HomeAppRowPresentation],
+        loadingWindowCountAppIDs: Set<String>
+    ) -> HomeOverviewStats {
+        let hiddenCount = appRows.filter(\.isHidden).count
+        let windowTotal: HomeWindowTotal = loadingWindowCountAppIDs.isEmpty
+            ? .ready(appRows.reduce(0) { $0 + $1.windowCount })
+            : .loading
+
+        return HomeOverviewStats(
+            totalApps: appRows.count,
+            visibleApps: appRows.count - hiddenCount,
+            hiddenApps: hiddenCount,
+            totalWindows: windowTotal
+        )
+    }
+
+    static func make(
         appSummaries: [RuntimeHomeAppSummary],
         hiddenAppIDs: Set<String>,
         loadingWindowCountAppIDs: Set<String>
     ) -> HomeOverviewStats {
-        let hiddenCount = appSummaries.filter { hiddenAppIDs.contains($0.appID) }.count
-        let windowTotal: HomeWindowTotal = loadingWindowCountAppIDs.isEmpty
-            ? .ready(appSummaries.reduce(0) { $0 + $1.windowCount })
-            : .loading
-
-        return HomeOverviewStats(
-            totalApps: appSummaries.count,
-            visibleApps: appSummaries.count - hiddenCount,
-            hiddenApps: hiddenCount,
-            totalWindows: windowTotal
+        let rows = HomeAppVisibilityPresentation(hiddenAppIDs: hiddenAppIDs)
+            .appRows(runtimeSummaries: appSummaries, installedApps: [])
+        return make(
+            appRows: rows,
+            loadingWindowCountAppIDs: loadingWindowCountAppIDs
         )
     }
 }

@@ -45,6 +45,8 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-tab-stress-evidence-notification-name"
     static let shortcutEventInjectionArgument =
         "--flowtab-ui-enable-shortcut-event-injection"
+    static let includeCurrentAppInMockInventoryArgument =
+        "--flowtab-ui-include-current-app-in-inventory"
 
     static var argumentsOverrideForTesting: [String]?
     static var environmentOverrideForTesting: [String: String]?
@@ -58,6 +60,7 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-frontmost-bundle-id",
         homeInitialProjectionApplicationRouteArgument,
         homeInitialProjectionApplicationReadbackPathArgument,
+        includeCurrentAppInMockInventoryArgument,
         initialPresentationResolutionNotificationArgument,
         initialPresentationResolutionReadbackPathArgument,
         "--flowtab-ui-initial-panel-occlusion-stale-ms",
@@ -383,6 +386,10 @@ enum FlowTabTestLaunchOptions {
 
     static var mockRuntimeVariant: String? {
         uiTestValue(after: "--flowtab-ui-mock-runtime-variant")
+    }
+
+    static var includesCurrentAppInMockInventory: Bool {
+        containsUITestArgument(includeCurrentAppInMockInventoryArgument)
     }
 
     static var keepsMockHomeProjectionDegraded: Bool {

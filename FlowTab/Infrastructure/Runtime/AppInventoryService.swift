@@ -71,10 +71,12 @@ final class AppInventoryService: AppInventoryProviding, @unchecked Sendable {
 
     func installedApps() -> [InstalledAppRecord] {
 #if FLOWTAB_TESTING
-        if FlowTabUITestAppVisibilityIdentityFixture.contains(
-            FlowTabTestLaunchOptions.mockRuntimeVariant
-        ) {
-            return sortedRecords(uiTestRuntimeRecords())
+        if FlowTabTestLaunchOptions.usesMockRuntimeProjection {
+            var records = uiTestRuntimeRecords()
+            if FlowTabTestLaunchOptions.includesCurrentAppInMockInventory {
+                records.append(uiTestCurrentAppRecord())
+            }
+            return sortedRecords(records)
         }
 #endif
         var recordsByID: [String: InstalledAppRecord] = [:]
@@ -124,13 +126,21 @@ final class AppInventoryService: AppInventoryProviding, @unchecked Sendable {
     private func uiTestRuntimeRecords() -> [InstalledAppRecord] {
         guard let dataset = FlowTabUITestRuntimeProjectionDataset.current() else { return [] }
         var records = dataset.appSwitcherApps.map { app in
-            InstalledAppRecord(
+            let runtimeActivationPolicy: ApplicationRuntimeActivationPolicy =
+                FlowTabTestLaunchOptions.mockRuntimeVariant
+                    == FlowTabUITestApplicationMembershipFixture.variant
+                    && app.id
+                        == FlowTabUITestApplicationMembershipFixture
+                            .finalAccessoryAppID
+                ? .accessory
+                : .regular
+            return InstalledAppRecord(
                 id: app.id,
                 displayName: app.displayName,
                 bundleIdentifier: app.id.hasPrefix("pid:") ? nil : app.id,
                 path: nil,
                 isRunning: true,
-                runtimeActivationPolicy: .regular
+                runtimeActivationPolicy: runtimeActivationPolicy
             )
         }
         let mockRuntimeVariant = FlowTabTestLaunchOptions.mockRuntimeVariant
@@ -169,6 +179,21 @@ final class AppInventoryService: AppInventoryProviding, @unchecked Sendable {
             )
         }
         return records
+    }
+
+    private func uiTestCurrentAppRecord() -> InstalledAppRecord {
+        let bundleIdentifier = Bundle.main.bundleIdentifier
+        let appID = bundleIdentifier
+            ?? AppVisibilityPreferencesStore.currentAppID()
+        return InstalledAppRecord(
+            id: appID,
+            displayName: NSRunningApplication.current.localizedName ?? "FlowTab",
+            bundleIdentifier: bundleIdentifier,
+            path: Bundle.main.bundleURL.standardizedFileURL.path,
+            isRunning: true,
+            isCurrentProcess: true,
+            runtimeActivationPolicy: .accessory
+        )
     }
 #endif
 

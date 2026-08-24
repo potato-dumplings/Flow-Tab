@@ -2,15 +2,21 @@ import SwiftUI
 import AppKit
 import FlowTabCore
 
+@MainActor
 struct HomeRootView: View {
     @ObservedObject private var tabState = HomeTabState.shared
     @ObservedObject private var presentation = FlowPresentationState.shared
+    @StateObject private var appVisibilityModel: AppVisibilityManagerModel
     private let runtimeProjectionService: any RuntimeProjectionServing
 
     init(
-        runtimeProjectionService: any RuntimeProjectionServing = homeRuntimeProjectionService
+        runtimeProjectionService: any RuntimeProjectionServing = homeRuntimeProjectionService,
+        appVisibilityModel: AppVisibilityManagerModel? = nil
     ) {
         self.runtimeProjectionService = runtimeProjectionService
+        _appVisibilityModel = StateObject(
+            wrappedValue: appVisibilityModel ?? AppVisibilityManagerModel()
+        )
     }
 
     private var dividerColor: Color {
@@ -47,7 +53,10 @@ struct HomeRootView: View {
                     HomeLandingView(
                         isActive: tabState.selectedTab == .home,
                         appLanguage: presentation.context.appLanguage,
-                        runtimeProjectionService: runtimeProjectionService
+                        runtimeProjectionService: runtimeProjectionService,
+                        installedApps: appVisibilityModel.apps,
+                        effectiveHiddenAppIDs:
+                            appVisibilityModel.effectiveHiddenAppIDs
                     ) {
                         tabState.selectedTab = .settings
                     }
@@ -60,7 +69,10 @@ struct HomeRootView: View {
                     )
                 }
                 tabContainer(isSelected: tabState.selectedTab == .settings) {
-                    AppSettingsView(isActive: tabState.selectedTab == .settings)
+                    AppSettingsView(
+                        isActive: tabState.selectedTab == .settings,
+                        appVisibilityModel: appVisibilityModel
+                    )
                         .id(
                             "settings-\(presentation.context.appearanceRebuildIdentity)"
                         )
@@ -71,6 +83,29 @@ struct HomeRootView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(presentation.context.resolvedColorScheme)
         .animation(.none, value: presentation.context.resolvedColorScheme)
+        .onAppear {
+            appVisibilityModel.reload()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSApplication.didBecomeActiveNotification
+        )) { _ in
+            appVisibilityModel.reload()
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(
+            for: NSWorkspace.didLaunchApplicationNotification
+        )) { _ in
+            appVisibilityModel.reload()
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(
+            for: NSWorkspace.didTerminateApplicationNotification
+        )) { _ in
+            appVisibilityModel.reload()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: .flowTabAppVisibilityPreferenceChanged
+        )) { _ in
+            appVisibilityModel.refreshStoredPreferences()
+        }
     }
 }
 

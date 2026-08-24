@@ -9,7 +9,9 @@ private enum FlowTabUITestAppVisibilityIdentityVariant {
 extension FlowTabUITests {
     func testSettingsCurrentAppActivationPolicyAppearsAsHiddenApp() throws {
         let app = makeApp(
-            additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)
+            additionalArguments:
+                appVisibilityRuntimeArguments(resetDefaults: true)
+                + ["--flowtab-ui-include-current-app-in-inventory"]
         )
         launchFlowTabUITestApplication(app)
         guard assertSettingsCurrentAppActivationProjectionAfterNavigation(
