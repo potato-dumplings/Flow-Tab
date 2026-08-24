@@ -137,8 +137,8 @@ extension FlowTabUITests {
             ] + resolutionRoute.launchArguments
         )
         launchFlowTabUITestApplication(relaunchApp)
-        guard let resolution =
-                resolutionOwner.waitForResolution(
+        guard let terminalReadback =
+                resolutionOwner.waitForTerminalReadback(
                     timeout:
                         FlowTabUITestInitialPresentationResolutionPolicy
                             .watchdog
@@ -148,6 +148,15 @@ extension FlowTabUITests {
                 "Disabled-Search initial presentation watchdog "
                     + "expired. "
                     + resolutionOwner.diagnosticSummary
+            )
+            return
+        }
+        guard terminalReadback.outcome == .resolution,
+              let resolution = terminalReadback.resolution
+        else {
+            XCTFail(
+                "Disabled-Search initial presentation failed. "
+                    + terminalReadback.diagnosticSummary
             )
             return
         }

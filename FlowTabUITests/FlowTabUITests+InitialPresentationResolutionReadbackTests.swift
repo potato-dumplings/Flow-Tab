@@ -2,6 +2,69 @@ import Foundation
 import XCTest
 
 extension FlowTabUITests {
+    func testInitialPresentationTerminalReadbackResolvesWatchdogFailure()
+        throws
+    {
+        let route =
+            FlowTabUITestInitialPresentationResolutionRoute()
+        try route.prepareReadback()
+        defer { route.removeReadback() }
+        let terminalReadback =
+            FlowTabUITestInitialPresentationTerminalReadback(
+                watchdogFailure: .init(
+                    watchdogInterval: 3,
+                    unmetConditions: [
+                        "projectionComplete"
+                    ],
+                    lastEvidence:
+                        "candidate{projectionComplete=false}",
+                    finalEvidence:
+                        "source=watchdogReadback "
+                        + "candidate{projectionComplete=false}"
+                )
+            )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        try encoder.encode(terminalReadback).write(
+            to: route.readbackURL,
+            options: .atomic
+        )
+        let owner =
+            FlowTabUITestInitialPresentationResolutionObservationOwner(
+                route: route,
+                expectation:
+                    disabledSearchInitialPresentationExpectation(),
+                observationRegistration: { _ in
+                    FlowTabUITestObservationCancellation {}
+                }
+            )
+        owner.start()
+        defer { owner.cancel() }
+
+        let observed = owner.waitForTerminalReadback(
+            timeout:
+                FlowTabUITestInitialPresentationResolutionPolicy
+                    .immediateReadback
+        )
+
+        XCTAssertEqual(observed, terminalReadback)
+        XCTAssertNil(observed?.resolution)
+        XCTAssertEqual(
+            observed?.watchdogFailure?.unmetConditions,
+            ["projectionComplete"]
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "outcome=initialPresentationWatchdogFailure"
+            )
+        )
+        XCTAssertTrue(
+            owner.diagnosticSummary.contains(
+                "source=watchdogReadback"
+            )
+        )
+    }
+
     func testInitialPresentationResolutionReadbackResolvesFromInitialState()
         throws
     {
@@ -463,7 +526,11 @@ extension FlowTabUITests {
     ) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        try encoder.encode(readback).write(
+        try encoder.encode(
+            FlowTabUITestInitialPresentationTerminalReadback(
+                resolution: readback
+            )
+        ).write(
             to: url,
             options: .atomic
         )

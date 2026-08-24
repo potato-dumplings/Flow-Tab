@@ -296,6 +296,24 @@ extension FlowTabUITestBootstrapper {
         )
     }
 
+    static func publishInitialPresentationWatchdogFailureReadbackIfNeeded(
+        _ failure:
+            FlowTabUITestInitialPresentationWatchdogFailure
+    ) {
+        guard let route =
+                FlowTabTestLaunchOptions
+                    .initialPresentationResolutionRoute
+        else {
+            return
+        }
+        FlowTabUITestInitialPresentationResolutionTransport.post(
+            FlowTabUITestInitialPresentationTerminalReadback(
+                watchdogFailure: failure
+            ),
+            route: route
+        )
+    }
+
     private static func postInitialPresentationResolutionReadback(
         _ evidence:
             FlowTabUITestInitialPresentationEvidence,
@@ -321,8 +339,12 @@ extension FlowTabUITestBootstrapper {
             )
             return
         }
-        FlowTabUITestInitialPresentationResolutionTransport
-            .post(readback, route: route)
+        FlowTabUITestInitialPresentationResolutionTransport.post(
+            FlowTabUITestInitialPresentationTerminalReadback(
+                resolution: readback
+            ),
+            route: route
+        )
     }
 }
 

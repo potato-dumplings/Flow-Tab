@@ -148,6 +148,9 @@ extension FlowTabUITestBootstrapper {
             }
             initialPresentationObservationOwner = nil
             stopInitialSearchActivationObservation()
+            publishInitialPresentationWatchdogFailureReadbackIfNeeded(
+                failure
+            )
             RuntimeLog.error(
                 "UITest",
                 "initial presentation watchdog "

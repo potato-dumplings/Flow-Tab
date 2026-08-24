@@ -428,12 +428,25 @@ extension FlowTabPriorityCoverageTests {
                     .searchIndexFreshnessBarrierRequestsRecorded()
                     .isEmpty
             )
-            let readback = try JSONDecoder().decode(
-                FlowTabUITestInitialPresentationResolutionReadback
+            let terminalReadback = try JSONDecoder().decode(
+                FlowTabUITestInitialPresentationTerminalReadback
                     .self,
                 from: Data(
                     contentsOf: resolutionRoute.readbackURL
                 )
+            )
+            XCTAssertEqual(
+                terminalReadback.schemaVersion,
+                FlowTabUITestInitialPresentationTerminalReadback
+                    .currentSchemaVersion
+            )
+            XCTAssertEqual(
+                terminalReadback.outcome,
+                .resolution
+            )
+            XCTAssertNil(terminalReadback.watchdogFailure)
+            let readback = try XCTUnwrap(
+                terminalReadback.resolution
             )
             XCTAssertEqual(
                 readback.schemaVersion,
