@@ -15,7 +15,6 @@ EXPECTED_TEAM_ID=""
 EXPECTED_BUNDLE_ID=""
 EXPECTED_EXECUTABLE=""
 EXPECTED_ENTITLEMENTS_PATH=""
-EXPECTED_DMG_BUNDLES=()
 POSITIONAL_ARGUMENTS=()
 
 usage() {
@@ -24,7 +23,6 @@ Usage: scripts/release/verify-release-distribution.sh \
   --expected-team-id <team-id> \
   [--expected-bundle-id <bundle-id> --expected-executable <name>] \
   [--expected-entitlements <plist>] \
-  [--expected-dmg-bundle <bundle>]... \
   <app-bundle> [signed-notarized-dmg]
 
 Pins the Developer ID Team ID for every code object. For the Flow Tab app,
@@ -53,11 +51,6 @@ while [[ $# -gt 0 ]]; do
     --expected-entitlements)
       [[ $# -ge 2 && -n "$2" ]] || { echo "--expected-entitlements requires a value." >&2; exit 64; }
       EXPECTED_ENTITLEMENTS_PATH="$2"
-      shift 2
-      ;;
-    --expected-dmg-bundle)
-      [[ $# -ge 2 && -n "$2" ]] || { echo "--expected-dmg-bundle requires a value." >&2; exit 64; }
-      EXPECTED_DMG_BUNDLES+=("$2")
       shift 2
       ;;
     -h|--help)
@@ -249,29 +242,18 @@ else
 fi
 flowtab_dmg_mount_record_attach "${ATTACH_OUTPUT}"
 
-SOURCE_BUNDLES=("${APP_PATH}")
-if [[ "${#EXPECTED_DMG_BUNDLES[@]}" -gt 0 ]]; then
-  SOURCE_BUNDLES+=("${EXPECTED_DMG_BUNDLES[@]}")
+APP_BUNDLE_NAME="$(/usr/bin/basename "${APP_PATH}")"
+MOUNTED_APP_PATH="${MOUNT_ROOT}/${APP_BUNDLE_NAME}"
+flowtab_require_distribution_layout "${MOUNT_ROOT}" "${APP_BUNDLE_NAME}"
+
+if [[ ! -d "${MOUNTED_APP_PATH}" ]]; then
+  echo "Expected app is missing from the DMG: ${APP_BUNDLE_NAME}" >&2
+  exit 1
 fi
-SOURCE_BUNDLE_NAMES=()
-for source_bundle in "${SOURCE_BUNDLES[@]}"; do
-  SOURCE_BUNDLE_NAMES+=("$(/usr/bin/basename "${source_bundle}")")
-done
-flowtab_require_distribution_layout "${MOUNT_ROOT}" "${SOURCE_BUNDLE_NAMES[@]}"
-
-for source_bundle in "${SOURCE_BUNDLES[@]}"; do
-  bundle_name="$(/usr/bin/basename "${source_bundle}")"
-  mounted_bundle="${MOUNT_ROOT}/${bundle_name}"
-
-  if [[ ! -d "${mounted_bundle}" ]]; then
-    echo "Expected bundle is missing from the DMG: ${bundle_name}" >&2
-    exit 1
-  fi
-  if [[ "$(flowtab_bundle_tree_digest "${source_bundle}")" != "$(flowtab_bundle_tree_digest "${mounted_bundle}")" ]]; then
-    echo "DMG bundle content does not match the verified staged bundle: ${bundle_name}" >&2
-    exit 1
-  fi
-done
+if [[ "$(flowtab_bundle_tree_digest "${APP_PATH}")" != "$(flowtab_bundle_tree_digest "${MOUNTED_APP_PATH}")" ]]; then
+  echo "DMG app content does not match the verified staged app: ${APP_BUNDLE_NAME}" >&2
+  exit 1
+fi
 
 flowtab_dmg_mount_finish
 

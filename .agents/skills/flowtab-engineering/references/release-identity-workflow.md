@@ -7,7 +7,7 @@ or any delivery expected to preserve Accessibility and Screen Recording grants.
 
 - [Identity Contract](#identity-contract)
 - [Package Modes](#package-modes)
-- [Community Build Naming](#community-build-naming)
+- [Canonical Package Naming](#canonical-package-naming)
 - [Workflow](#workflow)
 - [Continuity Audit](#continuity-audit)
 - [TCC-Safe Upgrade Validation](#tcc-safe-upgrade-validation)
@@ -51,10 +51,10 @@ the last verified artifact and do not create an ad-hoc substitute.
 ### Community Build
 
 Use this mode only when the user explicitly requests an unnotarized open-source community
-artifact. Sign the final App, uninstaller, and DMG with the usable Apple Development identity that
+artifact. Sign the final App and DMG with the usable Apple Development identity that
 matches the preceding community artifact when permission continuity is required. Keep the
 Community Build classification, signing class, notarization state, architectures, and Gatekeeper
-result in the GitHub Release metadata and handoff. Verify the final mounted bundles and run the
+result in the GitHub Release metadata and handoff. Verify the final mounted App and run the
 continuity audit with `--authority-kind apple-development`.
 
 ### Local Upgrade Test
@@ -72,19 +72,22 @@ first stable certificate-signed candidate cannot inherit its TCC grants. Record 
 `--accept-adhoc-migration`, require one user reauthorization after installing the stable App, and
 use that stable App as the baseline for every later version. Do not use the migration flag again.
 
-## Community Build Naming
+## Canonical Package Naming
 
-Normalize the requested version to its numeric and prerelease portion, then derive the canonical
+For every package mode, normalize the requested version to its numeric and prerelease portion, then derive the canonical
 package basename as `FlowTab-v<version>`. Reuse that exact basename for the release directory, DMG
 filename, mounted volume label, DMG signing identifier, and checksum filename prefix. Resolve the
 output path intent as:
 
 ```text
 release/FlowTab-v<version>/FlowTab-v<version>.dmg
-release/FlowTab-v<version>/FlowTab-v<version>.dmg.sha256
+release/FlowTab-v<version>/FlowTab-v<version>.sha256
 ```
 
-Record the target architectures and Community Build classification in release metadata and
+Keep those as the only two files in the versioned release directory. The DMG contains only
+`Flow Tab.app` and the `/Applications` installation link. Archive the matching dSYM privately by
+package basename and DMG SHA-256 below `.build-local/release-symbols/`. Record the target
+architectures and Community Build classification or other package mode in release metadata and
 validation evidence.
 
 ## Workflow
@@ -102,16 +105,18 @@ validation evidence.
 5. Build Release into the fresh root. An unsigned intermediate is allowed only when the final App
    is subsequently signed with the resolved stable identity.
 6. Run `scripts/release/verify-release-binary.sh`, sign nested code from the inside out, and verify
-   the staged App and uninstaller with `codesign --verify --deep --strict`.
+   the staged App with `codesign --verify --deep --strict`.
 7. Run the continuity audit against the baseline and staged candidate before creating the DMG.
-8. Create and sign the DMG. Mount the final DMG, compare its App and uninstaller to the verified
-   staged bundles, then rerun the continuity audit against the mounted App.
+8. Create and sign the DMG. Mount the final DMG, compare its App to the verified staged bundle,
+   then rerun the continuity audit against the mounted App.
 9. For public distribution, complete notarization, stapling, Gatekeeper, and repository
    distribution verification. For a Community Build, verify and report its explicit unnotarized
    delivery state. For a local upgrade test, report those public-distribution checks as not
    applicable to the named local artifact.
 10. Create the final archive only after every required gate passes. Verify its layout and checksum,
-    publish or hand off the new path, and remove the reproducible build root.
+    atomically promote its two-file candidate directory, preserve any same-version predecessor below
+    `.build-local/release-rollback/`, publish or hand off the new path, and remove the reproducible
+    build root.
 
 ## Continuity Audit
 

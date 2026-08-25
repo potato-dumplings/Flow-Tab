@@ -392,8 +392,8 @@ swift test
 ## 脚本分类
 
 - `scripts/release/release-install.sh`：Release 构建并安装到 `/Applications/Flow Tab.app`。
-- `scripts/release/release-dmg.sh`：构建并打包 DMG 到 `release/flowtab-v<version>/`。
-- `scripts/release/uninstall-flowtab.js`：生成 DMG 内可双击的一键卸载器；删除应用前通过 Workspace 终止通知、精确 bundle ID 读回和提权命令内的最终进程读回确认 FlowTab 已退出。
+- `scripts/release/release-dmg.sh`：构建并打包 DMG 到 `release/FlowTab-v<version>/`。
+- `scripts/release/uninstall-flowtab.js`：独立卸载工具源码，不进入发布 DMG；删除应用前通过 Workspace 终止通知、精确 bundle ID 读回和提权命令内的最终进程读回确认 FlowTab 已退出。
 - `scripts/perf/tab-switch-stress.sh`：tab 高频切换性能压测；采样与切换时长属于显式压力协议，子进程清理由精确 PID/启动身份读回和退出状态驱动。
 
 ## 本地签名配置
@@ -433,7 +433,7 @@ chmod +x scripts/release/release-install.sh
 1. 退出正在运行的 `FlowTab`，立即读取进程状态并等待精确进程记录消失；Release 构建完成后再次请求所有同名主应用与 Testing 映像退出，并在读回为空后替换应用
 2. 从 `FLOWTAB_DEVELOPMENT_TEAM` 或 `xcconfigs/LocalSigning.xcconfig` 解析本地签名 team
 3. 重置该应用的辅助功能与屏幕录制授权记录
-4. 无签名构建 Release，避免 Xcode automatic signing 依赖本机不存在的旧证书类型
+4. 无签名构建 Release，生成匹配的 dSYM，并剥离 App 内的本地符号
 5. 替换 `/Applications/Flow Tab.app`
 6. 使用本机 `Apple Development` identity 手动签名并校验 app
 7. 启动新版本
@@ -460,25 +460,30 @@ chmod +x scripts/release/release-dmg.sh
 ```
 
 输出文件：
-- `release/flowtab-v<version>/flowtab-<target>.dmg`（例如 `release/flowtab-v1.0.0/flowtab-universal2-apple-darwin.dmg`）
-- 未指定 `--target` 时：若 Release 产物是通用二进制（`arm64 + x86_64`），会生成一个通用 DMG：`flowtab-universal2-apple-darwin.dmg`。
-- DMG 内会额外包含 `Uninstall Flow Tab.app`，可用于一键卸载 `/Applications/Flow Tab.app`，并清理权限记录与本地偏好设置。
+- `release/FlowTab-v<version>/FlowTab-v<version>.dmg`
+- `release/FlowTab-v<version>/FlowTab-v<version>.sha256`
+
+版本目录只保留以上两个文件。DMG 顶层只包含 `Flow Tab.app` 与指向 `/Applications` 的安装链接。
 
 可选参数：
 - `--version <version>`：显式设置发布版本（支持 `1.2.3`、`v1.2.3`、`flowtab-v1.2.3`）
-- `--target <target>`：覆盖目标名（例如 `aarch64-apple-darwin`）
 - `--skip-build`：跳过构建，直接使用现有 `Release` 产物
 
 说明：
-- `Flow Tab.app` 与 `Uninstall Flow Tab.app` 的内嵌代码会由内到外显式签署，外层 app 使用 Hardened Runtime、安全时间戳与 `Developer ID Application` 身份签署。
+- 每次完整构建使用 `.build-local/release-packaging/` 下的独立候选根；`--skip-build` 才会复用 `.build-local/Build/Products/Release`。
+- 发布校验要求 dSYM 与 App 的所有架构 UUID 完全一致，并为每个架构包含非空 DWARF 调试信息。匹配的 dSYM 按版本和 DMG SHA-256 私下归档到 `.build-local/release-symbols/FlowTab-v<version>-<dmg-sha256>/Flow Tab.app.dSYM`。
+- 最终 App 只保留动态链接与 Swift/Objective-C 运行时需要的符号，并在符号剥离完成后执行签名和公证。
+- `Flow Tab.app` 的内嵌代码会由内到外显式签署，外层 app 使用 Hardened Runtime、安全时间戳与 `Developer ID Application` 身份签署。
 - DMG 使用同一分发身份与安全时间戳签署，提交 Apple 公证服务并等待接受，然后装订、校验公证票据和 Gatekeeper 接受状态。
-- `--target` 只接受 `aarch64-apple-darwin`、`x86_64-apple-darwin` 和 `universal2-apple-darwin`。版本与目标都会先按发行命名契约校验，再从仓库的 `release/` 边界解析输出路径。
-- `Flow Tab.app` 和卸载器都有固定 Bundle ID；最终验证会固定预期 Team ID、Bundle ID、可执行文件和 entitlements，挂载 DMG 后核对顶层布局，并按路径、类型、权限、符号链接目标与文件内容比对其中的 App 和已验证暂存产物。
+- 版本会先按发行命名契约校验，再从仓库的 `release/` 边界解析唯一的 `FlowTab-v<version>` 输出路径。
+- `Flow Tab.app` 使用固定 Bundle ID；最终验证会固定预期 Team ID、Bundle ID、可执行文件和 entitlements，挂载 DMG 后核对安装专用顶层布局，并按路径、类型、权限、符号链接目标与文件内容比对其中的 App 和已验证暂存产物。
+- 脚本生成 `FlowTab-v<version>.sha256` 后会立即读回校验，并要求版本目录中没有第三个发布文件。
+- 全部候选门禁通过后，脚本才会把候选目录提升为最终版本目录；同版本旧目录完整保存在 `.build-local/release-rollback/`。
 - 可通过 `FLOWTAB_CODE_SIGN_IDENTITY` 指定完整的 `Developer ID Application` 身份；脚本只接受该分发身份类型。
-- 任一步骤失败时都会删除当次输出，防止未完成验证的 DMG 被上传。
+- 任一步骤失败时都会清理当次私有候选根，并保留当前发布目录。
 - Apple 流程依据：[Notarizing macOS software before distribution](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)、[Customizing the notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)、[Technical Note TN2206](https://developer.apple.com/library/archive/technotes/tn2206/) 与 [Configuring the hardened runtime](https://developer.apple.com/documentation/xcode/configuring-the-hardened-runtime/)。
 - 推荐 Release tag 命名：`flowtab-v<version>`（例如 `flowtab-v1.0.0`，兼容 `v1.0.0`）。
-- 推荐发布方式与 `openai/codex` 风格一致：tag 承载版本，下载资产名保持稳定平台后缀（不带版本号）。
+- 下载资产统一使用 `FlowTab-v<version>` 作为目录名、DMG 名、卷名、签名标识与校验文件名前缀。
 - `release-dmg.sh` 的版本解析顺序是：`--version` -> `GITHUB_REF_NAME` / 当前 commit 上的 release tag -> 否则失败。
 - `MARKETING_VERSION` 现在只负责 app 内显示版本；脚本会校验它和发布版本一致，但不会再把它当成 DMG 版本来源。
 
@@ -494,8 +499,12 @@ chmod +x scripts/release/release-dmg.sh
 
 ```bash
 TAG="flowtab-v1.0.0"
+PACKAGE="FlowTab-v1.0.0"
 bash scripts/release/release-dmg.sh
-gh release create "${TAG}" release/"${TAG}"/flowtab-universal2-apple-darwin.dmg --title "${TAG}"
+gh release create "${TAG}" \
+  release/"${PACKAGE}"/"${PACKAGE}".dmg \
+  release/"${PACKAGE}"/"${PACKAGE}".sha256 \
+  --title "${TAG}"
 ```
 
 ## 权限说明

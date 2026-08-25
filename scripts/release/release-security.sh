@@ -215,3 +215,174 @@ if not os.path.islink(applications) or os.readlink(applications) != "/Applicatio
     raise SystemExit("DMG Applications entry must be a symbolic link to /Applications")
 ' "${mount_root}" "$@"
 }
+
+flowtab_require_release_artifact_layout() {
+  local release_root="${1-}"
+  local dmg_name="${2-}"
+  local checksum_name="${3-}"
+
+  /usr/bin/python3 -c '
+import os
+import sys
+
+root, dmg_name, checksum_name = sys.argv[1:]
+expected = {dmg_name, checksum_name}
+actual = set(os.listdir(root))
+if actual != expected:
+    missing = sorted(expected - actual)
+    unexpected = sorted(actual - expected)
+    raise SystemExit(f"Release artifact layout mismatch; missing={missing}, unexpected={unexpected}")
+for name in expected:
+    path = os.path.join(root, name)
+    if os.path.islink(path) or not os.path.isfile(path):
+        raise SystemExit(f"Release artifact must be a regular file: {name}")
+' "${release_root}" "${dmg_name}" "${checksum_name}"
+}
+
+flowtab_require_release_checksum() {
+  local release_root="${1-}"
+  local dmg_name="${2-}"
+  local checksum_name="${3-}"
+
+  /usr/bin/python3 -c '
+import hashlib
+import os
+import re
+import sys
+
+root, dmg_name, checksum_name = sys.argv[1:]
+for name in (dmg_name, checksum_name):
+    if not name or name in {".", ".."} or "/" in name:
+        raise SystemExit(f"Release artifact name must be a direct child: {name!r}")
+
+dmg_path = os.path.join(root, dmg_name)
+checksum_path = os.path.join(root, checksum_name)
+if os.path.islink(dmg_path) or not os.path.isfile(dmg_path):
+    raise SystemExit(f"Release DMG must be a regular file: {dmg_name}")
+if os.path.islink(checksum_path) or not os.path.isfile(checksum_path):
+    raise SystemExit(f"Release checksum must be a regular file: {checksum_name}")
+
+with open(checksum_path, "r", encoding="ascii") as stream:
+    lines = stream.read().splitlines()
+if len(lines) != 1:
+    raise SystemExit("Release checksum must contain exactly one entry")
+match = re.fullmatch(r"([0-9a-f]{64})  (.+)", lines[0])
+if match is None or match.group(2) != dmg_name:
+    raise SystemExit("Release checksum entry does not name the canonical DMG")
+
+digest = hashlib.sha256()
+with open(dmg_path, "rb") as stream:
+    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+        digest.update(chunk)
+if digest.hexdigest() != match.group(1):
+    raise SystemExit("Release checksum does not match the canonical DMG")
+' "${release_root}" "${dmg_name}" "${checksum_name}"
+}
+
+flowtab_promote_release_artifact_directory() {
+  local candidate_root="${1-}"
+  local release_parent="${2-}"
+  local package_name="${3-}"
+  local rollback_parent="${4-}"
+  local dmg_name="${5-}"
+  local checksum_name="${6-}"
+  local final_root=""
+  local rollback_root=""
+  local child_name=""
+
+  FLOWTAB_RELEASE_ROLLBACK_PATH=""
+
+  for child_name in "${package_name}" "${dmg_name}" "${checksum_name}"; do
+    if [[ -z "${child_name}" || "${child_name}" == "." \
+      || "${child_name}" == ".." || "${child_name}" == */* ]]; then
+      echo "Release promotion requires direct child names." >&2
+      return 64
+    fi
+  done
+  if [[ ! -d "${candidate_root}" || -L "${candidate_root}" ]]; then
+    echo "Release candidate must be a real directory: ${candidate_root}" >&2
+    return 66
+  fi
+  if [[ ! -d "${release_parent}" || -L "${release_parent}" ]]; then
+    echo "Release parent must be a real directory: ${release_parent}" >&2
+    return 66
+  fi
+  if [[ ! -d "${rollback_parent}" || -L "${rollback_parent}" ]]; then
+    echo "Release rollback parent must be a real directory: ${rollback_parent}" >&2
+    return 66
+  fi
+
+  release_parent="$(cd "${release_parent}" && pwd -P)"
+  rollback_parent="$(cd "${rollback_parent}" && pwd -P)"
+  final_root="${release_parent%/}/${package_name}"
+  if [[ -L "${final_root}" ]]; then
+    echo "Release destination must not be a symbolic link: ${final_root}" >&2
+    return 1
+  fi
+  if [[ -e "${final_root}" && ! -d "${final_root}" ]]; then
+    echo "Release destination is occupied by a non-directory: ${final_root}" >&2
+    return 1
+  fi
+  if [[ "$(cd "${candidate_root}" && pwd -P)" == "${final_root}" ]]; then
+    echo "Release candidate and destination must be different directories." >&2
+    return 64
+  fi
+
+  flowtab_require_release_artifact_layout \
+    "${candidate_root}" \
+    "${dmg_name}" \
+    "${checksum_name}" || return
+  flowtab_require_release_checksum \
+    "${candidate_root}" \
+    "${dmg_name}" \
+    "${checksum_name}" || return
+
+  if [[ -d "${final_root}" ]]; then
+    rollback_root="$(
+      /usr/bin/mktemp -d \
+        "${rollback_parent%/}/${package_name}-pre-replacement.XXXXXX"
+    )"
+    if ! /bin/mv "${final_root}" "${rollback_root}/release-directory"; then
+      /bin/rmdir "${rollback_root}" >/dev/null 2>&1 || true
+      echo "Could not preserve the preceding release directory." >&2
+      return 1
+    fi
+  fi
+
+  if ! /bin/mv "${candidate_root}" "${final_root}"; then
+    if [[ -n "${rollback_root}" ]]; then
+      if ! /bin/mv "${rollback_root}/release-directory" "${final_root}"; then
+        echo "Could not restore the preceding release directory after promotion failed." >&2
+        return 1
+      fi
+      /bin/rmdir "${rollback_root}" >/dev/null 2>&1 || true
+    fi
+    echo "Could not promote the verified release candidate." >&2
+    return 1
+  fi
+
+  if ! flowtab_require_release_artifact_layout \
+      "${final_root}" \
+      "${dmg_name}" \
+      "${checksum_name}" \
+    || ! flowtab_require_release_checksum \
+      "${final_root}" \
+      "${dmg_name}" \
+      "${checksum_name}"; then
+    if ! /bin/mv "${final_root}" "${candidate_root}"; then
+      echo "Could not move the failed release candidate out of the release boundary." >&2
+      return 1
+    fi
+    if [[ -n "${rollback_root}" ]]; then
+      if ! /bin/mv "${rollback_root}/release-directory" "${final_root}"; then
+        echo "Could not restore the preceding release directory after verification failed." >&2
+        return 1
+      fi
+      /bin/rmdir "${rollback_root}" >/dev/null 2>&1 || true
+    fi
+    echo "Promoted release candidate failed final-path verification." >&2
+    return 1
+  fi
+
+  FLOWTAB_RELEASE_ROLLBACK_PATH="${rollback_root}"
+}

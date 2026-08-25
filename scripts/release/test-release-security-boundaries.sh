@@ -35,7 +35,7 @@ assert_rejected_with() {
 }
 
 assert_rejected_with \
-  "Unsupported release target" \
+  "Unknown argument: --target" \
   "${RELEASE_SCRIPT}" --version 1.0 --target '../../../../Documents/flowtab-security-canary'
 
 assert_rejected_with \
@@ -61,15 +61,6 @@ source "${PATH_BOUNDARIES_PATH}"
 # shellcheck source=/dev/null
 source "${RELEASE_SECURITY_PATH}"
 
-for target in \
-  aarch64-apple-darwin \
-  x86_64-apple-darwin \
-  universal2-apple-darwin
-do
-  [[ "$(flowtab_require_release_target "${target}")" == "${target}" ]] \
-    || fail "Supported release target was not preserved: ${target}"
-done
-
 for version in v1.0 v1.2.3 v1.2.3-beta.1; do
   [[ "$(flowtab_require_release_version "${version}")" == "${version}" ]] \
     || fail "Supported release version was not preserved: ${version}"
@@ -78,12 +69,6 @@ done
 for version in '' v1 v1.0/../../outside v1.0+metadata 'v1.0 beta'; do
   if flowtab_require_release_version "${version}" >/dev/null 2>&1; then
     fail "Unsafe release version was accepted: ${version}"
-  fi
-done
-
-for target in '' '.' '..' '../outside' 'arm64/../../outside' '-apple-darwin' 'custom target'; do
-  if flowtab_require_release_target "${target}" >/dev/null 2>&1; then
-    fail "Unsafe release target was accepted: ${target}"
   fi
 done
 
@@ -214,29 +199,109 @@ assert_rejected_with \
   --expected-entitlements "${EXPECTED_ENTITLEMENTS}" \
   "${SIGNED_FIXTURE_APP}"
 
-GENERATED_UNINSTALLER="${TEST_ROOT}/Uninstall Flow Tab.app"
-/usr/bin/osacompile \
-  -l JavaScript \
-  -o "${GENERATED_UNINSTALLER}" \
-  "${ROOT_DIR}/scripts/release/uninstall-flowtab.js" >/dev/null 2>&1
-flowtab_set_bundle_identifier \
-  "${GENERATED_UNINSTALLER}" \
-  io.github.potato-dumplings.flowtab.uninstaller
-flowtab_require_bundle_metadata \
-  "${GENERATED_UNINSTALLER}" \
-  io.github.potato-dumplings.flowtab.uninstaller \
-  applet
-
 DMG_LAYOUT="${TEST_ROOT}/dmg-layout"
-mkdir -p "${DMG_LAYOUT}/Flow Tab.app" "${DMG_LAYOUT}/Uninstall Flow Tab.app"
+mkdir -p "${DMG_LAYOUT}/Flow Tab.app"
 ln -s /Applications "${DMG_LAYOUT}/Applications"
 flowtab_require_distribution_layout \
   "${DMG_LAYOUT}" \
-  "Flow Tab.app" \
-  "Uninstall Flow Tab.app"
+  "Flow Tab.app"
+mkdir -p "${DMG_LAYOUT}/Uninstall Flow Tab.app"
+if flowtab_require_distribution_layout "${DMG_LAYOUT}" "Flow Tab.app" >/dev/null 2>&1; then
+  fail "DMG layout accepted an embedded uninstaller."
+fi
+rmdir "${DMG_LAYOUT}/Uninstall Flow Tab.app"
 touch "${DMG_LAYOUT}/unexpected.txt"
-if flowtab_require_distribution_layout "${DMG_LAYOUT}" "Flow Tab.app" "Uninstall Flow Tab.app" >/dev/null 2>&1; then
+if flowtab_require_distribution_layout "${DMG_LAYOUT}" "Flow Tab.app" >/dev/null 2>&1; then
   fail "Unexpected DMG content was accepted."
 fi
 
-echo "Release security boundaries reject path traversal, pin distribution identity, and detect substituted bundle content."
+RELEASE_LAYOUT="${TEST_ROOT}/release-layout"
+mkdir -p "${RELEASE_LAYOUT}"
+printf 'fixture disk image\n' > "${RELEASE_LAYOUT}/FlowTab-v1.2.3.dmg"
+RELEASE_LAYOUT_DIGEST="$(
+  LC_ALL=C /usr/bin/shasum -a 256 "${RELEASE_LAYOUT}/FlowTab-v1.2.3.dmg" \
+    | /usr/bin/awk '{print $1}'
+)"
+printf '%s  %s\n' \
+  "${RELEASE_LAYOUT_DIGEST}" \
+  'FlowTab-v1.2.3.dmg' \
+  > "${RELEASE_LAYOUT}/FlowTab-v1.2.3.sha256"
+flowtab_require_release_artifact_layout \
+  "${RELEASE_LAYOUT}" \
+  "FlowTab-v1.2.3.dmg" \
+  "FlowTab-v1.2.3.sha256"
+flowtab_require_release_checksum \
+  "${RELEASE_LAYOUT}" \
+  "FlowTab-v1.2.3.dmg" \
+  "FlowTab-v1.2.3.sha256"
+touch "${RELEASE_LAYOUT}/FlowTab-v1.2.3.dmg.sha256"
+if flowtab_require_release_artifact_layout \
+  "${RELEASE_LAYOUT}" \
+  "FlowTab-v1.2.3.dmg" \
+  "FlowTab-v1.2.3.sha256" >/dev/null 2>&1; then
+  fail "Release artifact layout accepted a third output file."
+fi
+/bin/rm -f "${RELEASE_LAYOUT}/FlowTab-v1.2.3.dmg.sha256"
+
+PROMOTION_RELEASE_PARENT="${TEST_ROOT}/promotion-release"
+PROMOTION_ROLLBACK_PARENT="${TEST_ROOT}/promotion-rollback"
+PROMOTION_CANDIDATE="${TEST_ROOT}/promotion-candidate"
+PROMOTION_FINAL="${PROMOTION_RELEASE_PARENT}/FlowTab-v1.2.3"
+mkdir -p \
+  "${PROMOTION_RELEASE_PARENT}" \
+  "${PROMOTION_ROLLBACK_PARENT}" \
+  "${PROMOTION_CANDIDATE}" \
+  "${PROMOTION_FINAL}"
+printf 'preceding release\n' > "${PROMOTION_FINAL}/legacy-marker.txt"
+printf 'verified candidate\n' > "${PROMOTION_CANDIDATE}/FlowTab-v1.2.3.dmg"
+PROMOTION_DIGEST="$(
+  LC_ALL=C /usr/bin/shasum -a 256 "${PROMOTION_CANDIDATE}/FlowTab-v1.2.3.dmg" \
+    | /usr/bin/awk '{print $1}'
+)"
+printf '%s  %s\n' \
+  "${PROMOTION_DIGEST}" \
+  'FlowTab-v1.2.3.dmg' \
+  > "${PROMOTION_CANDIDATE}/FlowTab-v1.2.3.sha256"
+
+flowtab_promote_release_artifact_directory \
+  "${PROMOTION_CANDIDATE}" \
+  "${PROMOTION_RELEASE_PARENT}" \
+  'FlowTab-v1.2.3' \
+  "${PROMOTION_ROLLBACK_PARENT}" \
+  'FlowTab-v1.2.3.dmg' \
+  'FlowTab-v1.2.3.sha256'
+[[ ! -e "${PROMOTION_CANDIDATE}" ]] \
+  || fail "Verified release candidate remained outside the canonical release path."
+[[ -f "${FLOWTAB_RELEASE_ROLLBACK_PATH}/release-directory/legacy-marker.txt" ]] \
+  || fail "Preceding release directory was not preserved for rollback."
+flowtab_require_release_artifact_layout \
+  "${PROMOTION_FINAL}" \
+  'FlowTab-v1.2.3.dmg' \
+  'FlowTab-v1.2.3.sha256'
+flowtab_require_release_checksum \
+  "${PROMOTION_FINAL}" \
+  'FlowTab-v1.2.3.dmg' \
+  'FlowTab-v1.2.3.sha256'
+
+FAILED_PROMOTION_CANDIDATE="${TEST_ROOT}/failed-promotion-candidate"
+FAILED_PROMOTION_FINAL="${PROMOTION_RELEASE_PARENT}/FlowTab-v2.0.0"
+mkdir -p "${FAILED_PROMOTION_CANDIDATE}" "${FAILED_PROMOTION_FINAL}"
+printf 'preceding release remains\n' > "${FAILED_PROMOTION_FINAL}/legacy-marker.txt"
+printf 'invalid candidate\n' > "${FAILED_PROMOTION_CANDIDATE}/FlowTab-v2.0.0.dmg"
+printf '%064d  %s\n' 0 'FlowTab-v2.0.0.dmg' \
+  > "${FAILED_PROMOTION_CANDIDATE}/FlowTab-v2.0.0.sha256"
+if flowtab_promote_release_artifact_directory \
+  "${FAILED_PROMOTION_CANDIDATE}" \
+  "${PROMOTION_RELEASE_PARENT}" \
+  'FlowTab-v2.0.0' \
+  "${PROMOTION_ROLLBACK_PARENT}" \
+  'FlowTab-v2.0.0.dmg' \
+  'FlowTab-v2.0.0.sha256' >/dev/null 2>&1; then
+  fail "Release promotion accepted an invalid candidate checksum."
+fi
+[[ -f "${FAILED_PROMOTION_FINAL}/legacy-marker.txt" ]] \
+  || fail "Failed release promotion changed the preceding release directory."
+[[ -d "${FAILED_PROMOTION_CANDIDATE}" ]] \
+  || fail "Failed release promotion removed its private candidate directory."
+
+echo "Release security boundaries reject path traversal, pin distribution identity, and atomically promote install-only canonical package layouts."

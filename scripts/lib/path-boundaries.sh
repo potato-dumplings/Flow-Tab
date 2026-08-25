@@ -13,21 +13,6 @@ flowtab_require_release_version() {
   return 64
 }
 
-flowtab_require_release_target() {
-  local target="${1-}"
-
-  case "${target}" in
-    aarch64-apple-darwin|x86_64-apple-darwin|universal2-apple-darwin)
-      printf '%s' "${target}"
-      ;;
-    *)
-      echo "Unsupported release target: ${target:-<empty>}." >&2
-      echo "Use aarch64-apple-darwin, x86_64-apple-darwin, or universal2-apple-darwin." >&2
-      return 64
-      ;;
-  esac
-}
-
 flowtab_prepare_direct_child_directory() {
   local boundary="${1-}"
   local child_name="${2-}"

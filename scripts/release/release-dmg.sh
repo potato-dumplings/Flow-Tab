@@ -6,14 +6,10 @@ DERIVED_DATA_PATH="${ROOT_DIR}/.build-local"
 APP_BUNDLE_NAME="Flow Tab.app"
 APP_BUNDLE_ID="io.github.potato-dumplings.flowtab"
 APP_EXECUTABLE_NAME="FlowTab"
-UNINSTALLER_APP_NAME="Uninstall Flow Tab.app"
-UNINSTALLER_BUNDLE_ID="io.github.potato-dumplings.flowtab.uninstaller"
-UNINSTALLER_EXECUTABLE_NAME="applet"
-RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}"
+RELEASE_APP_PATH=""
+RELEASE_DSYM_PATH=""
 RELEASE_DIR="${ROOT_DIR}/release"
 PROJECT_PREFIX="flowtab"
-APP_EXECUTABLE_PATH="${RELEASE_APP_PATH}/Contents/MacOS/${APP_EXECUTABLE_NAME}"
-UNINSTALLER_SOURCE_PATH="${ROOT_DIR}/scripts/release/uninstall-flowtab.js"
 RELEASE_BINARY_VERIFY_PATH="${ROOT_DIR}/scripts/release/verify-release-binary.sh"
 RELEASE_DISTRIBUTION_CONTRACT_PATH="${ROOT_DIR}/scripts/release/test-release-distribution-contract.sh"
 RELEASE_DISTRIBUTION_VERIFY_PATH="${ROOT_DIR}/scripts/release/verify-release-distribution.sh"
@@ -34,11 +30,10 @@ source "${RELEASE_SECURITY_PATH}"
 
 usage() {
   cat <<'EOF'
-Usage: ./scripts/release/release-dmg.sh [--version <version>] [--target <target>] [--skip-build]
+Usage: ./scripts/release/release-dmg.sh [--version <version>] [--skip-build]
 
 Options:
   --version <version>  Override release version (supports 1.2.3, v1.2.3, or flowtab-v1.2.3).
-  --target <target>    Set asset target name (for example aarch64-apple-darwin).
   --skip-build         Reuse existing Release app without rebuilding.
   -h, --help           Show this help message.
 
@@ -54,10 +49,6 @@ Release version resolution:
 - Otherwise read the current release tag from GITHUB_REF_NAME or tags pointing at HEAD.
 - Supported tag forms: flowtab-v<version> (preferred) and v<version>.
 - MARKETING_VERSION is validated against the resolved release version, but is not used as the release source.
-
-When --target is not provided:
-- Single-arch app -> produce one DMG for that architecture.
-- Universal app (arm64 + x86_64) -> produce one universal DMG.
 EOF
 }
 
@@ -281,7 +272,6 @@ detect_app_marketing_version() {
 }
 
 VERSION=""
-TARGET=""
 SKIP_BUILD="false"
 
 while [[ $# -gt 0 ]]; do
@@ -298,14 +288,6 @@ while [[ $# -gt 0 ]]; do
       SKIP_BUILD="true"
       shift
       ;;
-    --target)
-      if [[ $# -lt 2 ]]; then
-        echo "Missing value for --target" >&2
-        exit 1
-      fi
-      TARGET="$2"
-      shift 2
-      ;;
     -h|--help)
       usage
       exit 0
@@ -317,10 +299,6 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-
-if [[ -n "${TARGET}" ]]; then
-  TARGET="$(flowtab_require_release_target "${TARGET}")"
-fi
 
 TAG_VERSION=""
 if ! TAG_VERSION="$(detect_version_from_github_ref)"; then
@@ -359,121 +337,98 @@ if [[ -n "${APP_MARKETING_VERSION}" && "${APP_MARKETING_VERSION}" != "${VERSION#
 fi
 
 RELEASE_TAG="${PROJECT_PREFIX}-${VERSION}"
+PACKAGE_BASENAME="FlowTab-${VERSION}"
 resolve_expected_release_team
 
-default_target_for_uname() {
-  case "$(uname -m)" in
-    arm64)
-      echo "aarch64-apple-darwin"
-      ;;
-    x86_64)
-      echo "x86_64-apple-darwin"
-      ;;
-    *)
-      echo "$(uname -m)-apple-darwin"
-      ;;
-  esac
-}
-
 RELEASE_DIR="$(flowtab_prepare_direct_child_directory "${ROOT_DIR}" "release")"
+RESOLVED_RELEASE_VERSION_DIR="$(
+  flowtab_resolve_direct_child_path "${RELEASE_DIR}" "${PACKAGE_BASENAME}"
+)"
+if [[ -e "${RESOLVED_RELEASE_VERSION_DIR}" \
+  && ! -d "${RESOLVED_RELEASE_VERSION_DIR}" ]]; then
+  echo "Release destination is occupied by a non-directory: ${RESOLVED_RELEASE_VERSION_DIR}" >&2
+  exit 1
+fi
 
-echo "[1/8] Validate distribution identity and notarization credentials"
+echo "[1/10] Validate distribution identity and notarization credentials"
 "${RELEASE_DISTRIBUTION_CONTRACT_PATH}"
 require_notary_profile
 resolve_release_signing_identity
 validate_notary_credentials
 
+ASSET_BASENAME="${PACKAGE_BASENAME}.dmg"
+CHECKSUM_BASENAME="${PACKAGE_BASENAME}.sha256"
+VOLUME_NAME="${PACKAGE_BASENAME}"
+DERIVED_DATA_PATH="$(
+  flowtab_prepare_direct_child_directory "${ROOT_DIR}" ".build-local"
+)"
+PACKAGING_PARENT="$(
+  flowtab_prepare_direct_child_directory "${DERIVED_DATA_PATH}" "release-packaging"
+)"
+ROLLBACK_PARENT="$(
+  flowtab_prepare_direct_child_directory "${DERIVED_DATA_PATH}" "release-rollback"
+)"
+CANDIDATE_BUILD_ROOT="$(
+  /usr/bin/mktemp -d \
+    "${PACKAGING_PARENT%/}/${PACKAGE_BASENAME}-attempt.XXXXXX"
+)"
+CANDIDATE_OUTPUT_ROOT="$(
+  flowtab_prepare_direct_child_directory "${CANDIDATE_BUILD_ROOT}" "final-output"
+)"
+OUTPUT_DMG_PATH="$(flowtab_resolve_direct_child_path "${CANDIDATE_OUTPUT_ROOT}" "${ASSET_BASENAME}")"
+OUTPUT_CHECKSUM_PATH="$(flowtab_resolve_direct_child_path "${CANDIDATE_OUTPUT_ROOT}" "${CHECKSUM_BASENAME}")"
+STAGING_DIR="$(flowtab_resolve_direct_child_path "${CANDIDATE_BUILD_ROOT}" "dmg-staging")"
+STAGED_APP_PATH="${STAGING_DIR}/${APP_BUNDLE_NAME}"
+RW_DMG_PATH="$(flowtab_resolve_direct_child_path "${CANDIDATE_BUILD_ROOT}" "temporary.rw.dmg")"
+SYMBOL_ARCHIVE_TEMP=""
+
+cleanup_release_work_files() {
+  /bin/rm -rf "${CANDIDATE_BUILD_ROOT}"
+  if [[ -n "${SYMBOL_ARCHIVE_TEMP}" ]]; then
+    /bin/rm -rf "${SYMBOL_ARCHIVE_TEMP}"
+  fi
+}
+trap cleanup_release_work_files EXIT
+
 if [[ "${SKIP_BUILD}" != "true" ]]; then
-  echo "[2/8] Build Release with Hardened Runtime configuration"
+  echo "[2/10] Build Release with Hardened Runtime configuration"
+  BUILD_DERIVED_DATA_PATH="${CANDIDATE_BUILD_ROOT}/DerivedData"
   cd "${ROOT_DIR}"
   xcodebuild \
     -project FlowTab.xcodeproj \
     -scheme FlowTab \
     -configuration Release \
-    -derivedDataPath "${DERIVED_DATA_PATH}" \
+    -derivedDataPath "${BUILD_DERIVED_DATA_PATH}" \
     CODE_SIGNING_ALLOWED=NO \
     build
 else
-  echo "[2/8] Reuse existing Release build"
+  echo "[2/10] Reuse existing Release build"
+  BUILD_DERIVED_DATA_PATH="${DERIVED_DATA_PATH}"
 fi
+
+RELEASE_APP_PATH="${BUILD_DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}"
+RELEASE_DSYM_PATH="${BUILD_DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}.dSYM"
 
 if [[ ! -d "${RELEASE_APP_PATH}" ]]; then
   echo "Build output not found: ${RELEASE_APP_PATH}" >&2
   exit 1
 fi
 
-"${RELEASE_BINARY_VERIFY_PATH}" "${RELEASE_APP_PATH}"
+"${RELEASE_BINARY_VERIFY_PATH}" \
+  --dsym "${RELEASE_DSYM_PATH}" \
+  "${RELEASE_APP_PATH}"
 
-TARGET_NAME=""
-if [[ -n "${TARGET}" ]]; then
-  TARGET_NAME="${TARGET}"
-else
-  APP_ARCHS="$(lipo -archs "${APP_EXECUTABLE_PATH}" 2>/dev/null || true)"
-  HAS_ARM64="false"
-  HAS_X86_64="false"
-  for ARCH in ${APP_ARCHS}; do
-    case "${ARCH}" in
-      arm64|arm64e)
-        HAS_ARM64="true"
-        ;;
-      x86_64)
-        HAS_X86_64="true"
-        ;;
-    esac
-  done
-
-  if [[ "${HAS_ARM64}" == "true" && "${HAS_X86_64}" == "true" ]]; then
-    TARGET_NAME="universal2-apple-darwin"
-  elif [[ "${HAS_ARM64}" == "true" ]]; then
-    TARGET_NAME="aarch64-apple-darwin"
-  elif [[ "${HAS_X86_64}" == "true" ]]; then
-    TARGET_NAME="x86_64-apple-darwin"
-  else
-    TARGET_NAME="$(default_target_for_uname)"
-  fi
-fi
-
-TARGET_NAME="$(flowtab_require_release_target "${TARGET_NAME}")"
-
-RESOLVED_RELEASE_VERSION_DIR="$(flowtab_prepare_direct_child_directory "${RELEASE_DIR}" "${RELEASE_TAG}")"
-
-ASSET_BASENAME="${PROJECT_PREFIX}-${TARGET_NAME}.dmg"
-OUTPUT_DMG_PATH="$(flowtab_resolve_direct_child_path "${RESOLVED_RELEASE_VERSION_DIR}" "${ASSET_BASENAME}")"
-VOLUME_NAME="Flow Tab ${VERSION}"
-STAGING_DIR="$(flowtab_resolve_direct_child_path "${RESOLVED_RELEASE_VERSION_DIR}" ".dmg-staging-${TARGET_NAME}")"
-STAGED_APP_PATH="${STAGING_DIR}/${APP_BUNDLE_NAME}"
-STAGED_UNINSTALLER_PATH="${STAGING_DIR}/${UNINSTALLER_APP_NAME}"
-RW_DMG_PATH="$(flowtab_resolve_direct_child_path "${RESOLVED_RELEASE_VERSION_DIR}" ".flowtab-${TARGET_NAME}.temp.rw.dmg")"
-
-RELEASE_SUCCEEDED="false"
-cleanup_release_work_files() {
-  /bin/rm -rf "${STAGING_DIR}" "${RW_DMG_PATH}"
-  if [[ "${RELEASE_SUCCEEDED}" != "true" ]]; then
-    /bin/rm -f "${OUTPUT_DMG_PATH}"
-  fi
-}
-trap cleanup_release_work_files EXIT
-
-echo "[3/8] Prepare and explicitly sign nested distribution code (${TARGET_NAME})"
-/bin/rm -rf "${STAGING_DIR}" "${RW_DMG_PATH}"
-/bin/rm -f "${OUTPUT_DMG_PATH}"
+echo "[3/10] Prepare and explicitly sign nested distribution code"
 mkdir -p "${STAGING_DIR}"
 /usr/bin/ditto "${RELEASE_APP_PATH}" "${STAGED_APP_PATH}"
-/usr/bin/osacompile -l JavaScript -o "${STAGED_UNINSTALLER_PATH}" "${UNINSTALLER_SOURCE_PATH}" >/dev/null
-flowtab_set_bundle_identifier "${STAGED_UNINSTALLER_PATH}" "${UNINSTALLER_BUNDLE_ID}"
 "${SIGN_BUNDLE_PATH}" \
   --identity "${RESOLVED_CODE_SIGN_IDENTITY}" \
   --entitlements "${APP_ENTITLEMENTS_PATH}" \
   --timestamp \
   "${STAGED_APP_PATH}"
-"${SIGN_BUNDLE_PATH}" \
-  --identity "${RESOLVED_CODE_SIGN_IDENTITY}" \
-  --entitlements "${APP_ENTITLEMENTS_PATH}" \
-  --timestamp \
-  "${STAGED_UNINSTALLER_PATH}"
 ln -s /Applications "${STAGING_DIR}/Applications"
 
-echo "[4/8] Create compressed disk image (${TARGET_NAME})"
+echo "[4/10] Create compressed disk image"
 /usr/bin/hdiutil create \
   -volname "${VOLUME_NAME}" \
   -srcfolder "${STAGING_DIR}" \
@@ -486,11 +441,11 @@ echo "[4/8] Create compressed disk image (${TARGET_NAME})"
   -imagekey zlib-level=9 \
   -o "${OUTPUT_DMG_PATH}" >/dev/null
 
-echo "[5/8] Sign disk image with Developer ID and secure timestamp"
+echo "[5/10] Sign disk image with Developer ID and secure timestamp"
 /usr/bin/codesign --force --timestamp --sign "${RESOLVED_CODE_SIGN_IDENTITY}" "${OUTPUT_DMG_PATH}"
 /usr/bin/codesign --verify --strict --verbose=2 "${OUTPUT_DMG_PATH}"
 
-echo "[6/8] Submit disk image to Apple notary service"
+echo "[6/10] Submit disk image to Apple notary service"
 NOTARY_RESULT=""
 if ! NOTARY_RESULT="$(
   /usr/bin/xcrun notarytool submit "${OUTPUT_DMG_PATH}" \
@@ -507,27 +462,77 @@ if [[ "${NOTARY_STATUS}" != "Accepted" ]]; then
   exit 1
 fi
 
-echo "[7/8] Staple and validate notarization ticket"
+echo "[7/10] Staple and validate notarization ticket"
 /usr/bin/xcrun stapler staple "${OUTPUT_DMG_PATH}"
 /usr/bin/xcrun stapler validate "${OUTPUT_DMG_PATH}"
 
-echo "[8/8] Verify app, uninstaller, DMG, and Gatekeeper acceptance"
+echo "[8/10] Verify app, DMG, and Gatekeeper acceptance"
 "${RELEASE_DISTRIBUTION_VERIFY_PATH}" \
   --expected-team-id "${DEVELOPMENT_TEAM}" \
   --expected-bundle-id "${APP_BUNDLE_ID}" \
   --expected-executable "${APP_EXECUTABLE_NAME}" \
   --expected-entitlements "${APP_ENTITLEMENTS_PATH}" \
-  --expected-dmg-bundle "${STAGED_UNINSTALLER_PATH}" \
   "${STAGED_APP_PATH}" \
   "${OUTPUT_DMG_PATH}"
-"${RELEASE_DISTRIBUTION_VERIFY_PATH}" \
-  --expected-team-id "${DEVELOPMENT_TEAM}" \
-  --expected-bundle-id "${UNINSTALLER_BUNDLE_ID}" \
-  --expected-executable "${UNINSTALLER_EXECUTABLE_NAME}" \
-  --expected-entitlements "${APP_ENTITLEMENTS_PATH}" \
-  "${STAGED_UNINSTALLER_PATH}"
 
-RELEASE_SUCCEEDED="true"
+echo "[9/10] Write checksum and archive matching private symbols"
+DMG_SHA256="$(LC_ALL=C /usr/bin/shasum -a 256 "${OUTPUT_DMG_PATH}" | /usr/bin/awk '{print $1}')"
+/usr/bin/printf '%s  %s\n' "${DMG_SHA256}" "${ASSET_BASENAME}" > "${OUTPUT_CHECKSUM_PATH}"
+(
+  cd "${CANDIDATE_OUTPUT_ROOT}"
+  LC_ALL=C /usr/bin/shasum -a 256 -c "${CHECKSUM_BASENAME}"
+)
+flowtab_require_release_artifact_layout \
+  "${CANDIDATE_OUTPUT_ROOT}" \
+  "${ASSET_BASENAME}" \
+  "${CHECKSUM_BASENAME}"
+flowtab_require_release_checksum \
+  "${CANDIDATE_OUTPUT_ROOT}" \
+  "${ASSET_BASENAME}" \
+  "${CHECKSUM_BASENAME}"
+
+SYMBOL_ARCHIVE_PARENT="$(
+  flowtab_prepare_direct_child_directory "${DERIVED_DATA_PATH}" "release-symbols"
+)"
+SYMBOL_ARCHIVE_NAME="${PACKAGE_BASENAME}-${DMG_SHA256}"
+SYMBOL_ARCHIVE_PATH="$(
+  flowtab_resolve_direct_child_path "${SYMBOL_ARCHIVE_PARENT}" "${SYMBOL_ARCHIVE_NAME}"
+)"
+if [[ -e "${SYMBOL_ARCHIVE_PATH}" ]]; then
+  if [[ ! -d "${SYMBOL_ARCHIVE_PATH}" ]]; then
+    echo "Private symbol archive is occupied by a non-directory: ${SYMBOL_ARCHIVE_PATH}" >&2
+    exit 1
+  fi
+  "${RELEASE_BINARY_VERIFY_PATH}" \
+    --dsym "${SYMBOL_ARCHIVE_PATH}/${APP_BUNDLE_NAME}.dSYM" \
+    "${STAGED_APP_PATH}"
+else
+  SYMBOL_ARCHIVE_TEMP="$(
+    /usr/bin/mktemp -d \
+      "${SYMBOL_ARCHIVE_PARENT%/}/.${PACKAGE_BASENAME}-symbols.XXXXXX"
+  )"
+  /usr/bin/ditto \
+    "${RELEASE_DSYM_PATH}" \
+    "${SYMBOL_ARCHIVE_TEMP}/${APP_BUNDLE_NAME}.dSYM"
+  "${RELEASE_BINARY_VERIFY_PATH}" \
+    --dsym "${SYMBOL_ARCHIVE_TEMP}/${APP_BUNDLE_NAME}.dSYM" \
+    "${STAGED_APP_PATH}"
+  /bin/mv "${SYMBOL_ARCHIVE_TEMP}" "${SYMBOL_ARCHIVE_PATH}"
+  SYMBOL_ARCHIVE_TEMP=""
+fi
+/bin/rm -rf "${STAGING_DIR}" "${RW_DMG_PATH}"
+
+echo "[10/10] Promote verified canonical release directory"
+flowtab_promote_release_artifact_directory \
+  "${CANDIDATE_OUTPUT_ROOT}" \
+  "${RELEASE_DIR}" \
+  "${PACKAGE_BASENAME}" \
+  "${ROLLBACK_PARENT}" \
+  "${ASSET_BASENAME}" \
+  "${CHECKSUM_BASENAME}"
+OUTPUT_DMG_PATH="${RESOLVED_RELEASE_VERSION_DIR}/${ASSET_BASENAME}"
+OUTPUT_CHECKSUM_PATH="${RESOLVED_RELEASE_VERSION_DIR}/${CHECKSUM_BASENAME}"
+
 cleanup_release_work_files
 trap - EXIT
 
@@ -536,5 +541,12 @@ echo "Done: ${OUTPUT_DMG_PATH}"
 echo "Release version: ${VERSION}"
 echo "Release tag: ${RELEASE_TAG}"
 echo "Release asset: ${ASSET_BASENAME}"
+echo "Release checksum: ${CHECKSUM_BASENAME}"
 echo "Release directory: ${RESOLVED_RELEASE_VERSION_DIR}"
+echo "Private symbols: ${SYMBOL_ARCHIVE_PATH}/${APP_BUNDLE_NAME}.dSYM"
+if [[ -n "${FLOWTAB_RELEASE_ROLLBACK_PATH}" ]]; then
+  echo "Rollback directory: ${FLOWTAB_RELEASE_ROLLBACK_PATH}/release-directory"
+else
+  echo "Rollback directory: none (no preceding same-version directory)"
+fi
 echo "Distribution verification: Developer ID signed, Hardened Runtime, timestamped, notarized, and stapled"

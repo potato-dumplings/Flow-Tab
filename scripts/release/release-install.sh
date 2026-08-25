@@ -7,6 +7,7 @@ APP_BUNDLE_NAME="Flow Tab.app"
 APP_DISPLAY_NAME="Flow Tab"
 APP_PROCESS_NAME="FlowTab"
 RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}"
+RELEASE_DSYM_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}.dSYM"
 INSTALL_PATH="/Applications/${APP_BUNDLE_NAME}"
 BUNDLE_ID="io.github.potato-dumplings.flowtab"
 LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
@@ -179,7 +180,9 @@ if [[ ! -d "${RELEASE_APP_PATH}" ]]; then
   exit 1
 fi
 
-"${RELEASE_BINARY_VERIFY_PATH}" "${RELEASE_APP_PATH}"
+"${RELEASE_BINARY_VERIFY_PATH}" \
+  --dsym "${RELEASE_DSYM_PATH}" \
+  "${RELEASE_APP_PATH}"
 
 STEP=$((STEP + 1))
 echo "[${STEP}/${TOTAL_STEPS}] Remove old app"
