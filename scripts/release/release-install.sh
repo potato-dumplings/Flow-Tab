@@ -2,18 +2,16 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-DERIVED_DATA_PATH="${ROOT_DIR}/.build-local"
 APP_BUNDLE_NAME="Flow Tab.app"
 APP_DISPLAY_NAME="Flow Tab"
 APP_PROCESS_NAME="FlowTab"
-RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}"
-RELEASE_DSYM_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}.dSYM"
 INSTALL_PATH="/Applications/${APP_BUNDLE_NAME}"
 BUNDLE_ID="io.github.potato-dumplings.flowtab"
 LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
 RELEASE_BINARY_VERIFY_PATH="${ROOT_DIR}/scripts/release/verify-release-binary.sh"
 SIGN_BUNDLE_PATH="${ROOT_DIR}/scripts/release/sign-macos-bundle.sh"
 PROCESS_EXIT_OBSERVATION_PATH="${ROOT_DIR}/scripts/release/lib/process-exit-observation.sh"
+PATH_BOUNDARIES_PATH="${ROOT_DIR}/scripts/lib/path-boundaries.sh"
 APP_ENTITLEMENTS_PATH="${ROOT_DIR}/FlowTab/Resources/FlowTab.entitlements"
 DEVELOPMENT_TEAM="${FLOWTAB_DEVELOPMENT_TEAM:-}"
 CODE_SIGN_IDENTITY="${FLOWTAB_CODE_SIGN_IDENTITY:-Apple Development}"
@@ -23,6 +21,8 @@ PROCESS_EXIT_POLL_INTERVAL_SECONDS=0.1
 
 # shellcheck source=scripts/release/lib/process-exit-observation.sh
 source "${PROCESS_EXIT_OBSERVATION_PATH}"
+# shellcheck source=scripts/lib/path-boundaries.sh
+source "${PATH_BOUNDARIES_PATH}"
 
 for arg in "$@"; do
   case "${arg}" in
@@ -43,7 +43,7 @@ EOF
   esac
 done
 
-TOTAL_STEPS=7
+TOTAL_STEPS=8
 STEP=1
 
 detect_local_development_team() {
@@ -148,30 +148,41 @@ request_flowtab_process_exit() {
   /usr/bin/pkill -x "${APP_PROCESS_NAME}" >/dev/null 2>&1 || true
 }
 
-echo "[${STEP}/${TOTAL_STEPS}] Quit running ${APP_DISPLAY_NAME}"
-request_flowtab_process_exit
-flowtab_wait_for_process_exit \
-  "${APP_PROCESS_NAME}" \
-  "${PROCESS_EXIT_WATCHDOG_SECONDS}" \
-  "${PROCESS_EXIT_POLL_INTERVAL_SECONDS}"
+BUILD_ROOT="$(flowtab_prepare_direct_child_directory "${ROOT_DIR}" ".build-local")"
+RELEASE_INSTALL_PARENT="$(
+  flowtab_prepare_direct_child_directory "${BUILD_ROOT}" "release-install"
+)"
+ATTEMPT_ROOT="$(/usr/bin/mktemp -d "${RELEASE_INSTALL_PARENT%/}/attempt.XXXXXX")"
+DERIVED_DATA_PATH="${ATTEMPT_ROOT}/DerivedData"
+PACKAGE_CACHE_PATH="${ATTEMPT_ROOT}/SourcePackages"
+STAGING_DIR="${ATTEMPT_ROOT}/staging"
+STAGED_APP_PATH="${STAGING_DIR}/${APP_BUNDLE_NAME}"
+RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}"
+RELEASE_DSYM_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}.dSYM"
 
-STEP=$((STEP + 1))
-echo "[${STEP}/${TOTAL_STEPS}] Resolve local signing identity"
-resolve_release_signing_identity
+cleanup_release_install_attempt() {
+  /bin/rm -rf "${ATTEMPT_ROOT}"
+}
+trap cleanup_release_install_attempt EXIT
 
-STEP=$((STEP + 1))
-echo "[${STEP}/${TOTAL_STEPS}] Reset Accessibility and Screen Recording permissions"
-reset_tcc_permission "Accessibility"
-reset_tcc_permission "ScreenCapture"
+/bin/mkdir -p "${DERIVED_DATA_PATH}" "${PACKAGE_CACHE_PATH}" "${STAGING_DIR}"
 
-STEP=$((STEP + 1))
-echo "[${STEP}/${TOTAL_STEPS}] Build Release"
+echo "[${STEP}/${TOTAL_STEPS}] Resolve clean Swift package dependencies"
 cd "${ROOT_DIR}"
 xcodebuild \
-  -project FlowTab.xcodeproj \
+  -resolvePackageDependencies \
+  -project "${ROOT_DIR}/FlowTab.xcodeproj" \
+  -scheme FlowTab \
+  -clonedSourcePackagesDirPath "${PACKAGE_CACHE_PATH}"
+
+STEP=$((STEP + 1))
+echo "[${STEP}/${TOTAL_STEPS}] Build and verify Release"
+xcodebuild \
+  -project "${ROOT_DIR}/FlowTab.xcodeproj" \
   -scheme FlowTab \
   -configuration Release \
   -derivedDataPath "${DERIVED_DATA_PATH}" \
+  -clonedSourcePackagesDirPath "${PACKAGE_CACHE_PATH}" \
   CODE_SIGNING_ALLOWED=NO \
   build
 
@@ -185,21 +196,40 @@ fi
   "${RELEASE_APP_PATH}"
 
 STEP=$((STEP + 1))
-echo "[${STEP}/${TOTAL_STEPS}] Remove old app"
+echo "[${STEP}/${TOTAL_STEPS}] Resolve local signing identity"
+resolve_release_signing_identity
+
+STEP=$((STEP + 1))
+echo "[${STEP}/${TOTAL_STEPS}] Stage and sign verified candidate"
+/usr/bin/ditto "${RELEASE_APP_PATH}" "${STAGED_APP_PATH}"
+"${SIGN_BUNDLE_PATH}" \
+  --identity "${RESOLVED_CODE_SIGN_IDENTITY}" \
+  --entitlements "${APP_ENTITLEMENTS_PATH}" \
+  "${STAGED_APP_PATH}"
+
+STEP=$((STEP + 1))
+echo "[${STEP}/${TOTAL_STEPS}] Quit running ${APP_DISPLAY_NAME}"
 request_flowtab_process_exit
 flowtab_wait_for_process_exit \
   "${APP_PROCESS_NAME}" \
   "${PROCESS_EXIT_WATCHDOG_SECONDS}" \
   "${PROCESS_EXIT_POLL_INTERVAL_SECONDS}"
-rm -rf "${INSTALL_PATH}"
 
 STEP=$((STEP + 1))
-echo "[${STEP}/${TOTAL_STEPS}] Install and sign new app"
-/usr/bin/ditto "${RELEASE_APP_PATH}" "${INSTALL_PATH}"
-"${SIGN_BUNDLE_PATH}" \
-  --identity "${RESOLVED_CODE_SIGN_IDENTITY}" \
-  --entitlements "${APP_ENTITLEMENTS_PATH}" \
-  "${INSTALL_PATH}"
+echo "[${STEP}/${TOTAL_STEPS}] Reset Accessibility and Screen Recording permissions"
+reset_tcc_permission "Accessibility"
+reset_tcc_permission "ScreenCapture"
+
+STEP=$((STEP + 1))
+echo "[${STEP}/${TOTAL_STEPS}] Install verified app"
+request_flowtab_process_exit
+flowtab_wait_for_process_exit \
+  "${APP_PROCESS_NAME}" \
+  "${PROCESS_EXIT_WATCHDOG_SECONDS}" \
+  "${PROCESS_EXIT_POLL_INTERVAL_SECONDS}"
+/bin/rm -rf "${INSTALL_PATH}"
+/usr/bin/ditto "${STAGED_APP_PATH}" "${INSTALL_PATH}"
+/usr/bin/codesign --verify --deep --strict --verbose=2 "${INSTALL_PATH}"
 
 STEP=$((STEP + 1))
 echo "[${STEP}/${TOTAL_STEPS}] Launch app"

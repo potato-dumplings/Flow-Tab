@@ -343,6 +343,18 @@ private final class HomeOverviewStatItemView: NSView {
     }
 }
 
+enum HomeSidebarUpdateLayout {
+    static let updateButtonDiameter: CGFloat = 20
+    static let expandedButtonWidth: CGFloat = 44
+    static let hoverAnimation = Animation.easeInOut(duration: 0.16)
+}
+
+enum HomePermissionStatusLayout {
+    static let leadingInset: CGFloat = 14
+    static let trailingInset: CGFloat = 8
+    static let verticalInset: CGFloat = 12
+}
+
 struct HomePermissionStatusCard: View {
     let accessibilityTrusted: Bool
     let screenCaptureTrusted: Bool
@@ -366,8 +378,9 @@ struct HomePermissionStatusCard: View {
                 accessibilityIdentifier: "flowtab.sidebar.permission.screen-capture"
             )
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.leading, HomePermissionStatusLayout.leadingInset)
+        .padding(.trailing, HomePermissionStatusLayout.trailingInset)
+        .padding(.vertical, HomePermissionStatusLayout.verticalInset)
         .frame(
             maxWidth: .infinity,
             minHeight: HomePageLayout.bottomStatusHeight,
@@ -381,6 +394,7 @@ struct HomePermissionStatusCard: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(Color.primary.opacity(0.14), lineWidth: 1)
         )
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("flowtab.sidebar.permission-status")
     }
 }
@@ -465,5 +479,6 @@ private struct HomePermissionStatusRow: View {
                 "\(accessibilityIdentifier).status"
         )
         .frame(height: 14)
+        .fixedSize(horizontal: true, vertical: false)
     }
 }

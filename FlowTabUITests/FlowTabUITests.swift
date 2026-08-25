@@ -12,6 +12,7 @@ final class FlowTabUITests: XCTestCase {
     private var preservedFlowTabUserDefaultsDomain: [String: Any]?
 
     enum Identifier {
+        static let sidebarHeader = "flowtab.sidebar.header"
         static let homeTabButton = "flowtab.sidebar.tab.home"
         static let logsTabButton = "flowtab.sidebar.tab.logs"
         static let settingsTabButton = "flowtab.sidebar.tab.settings"
@@ -50,6 +51,8 @@ final class FlowTabUITests: XCTestCase {
             "\(sidebarPermissionAccessibility).status"
         static let sidebarPermissionScreenCaptureStatus =
             "\(sidebarPermissionScreenCapture).status"
+        static let sidebarUpdateDownload =
+            "flowtab.sidebar.update.download"
         static let permissionBanner = "flowtab.home.permission.banner"
         static let permissionOpenSettings = "flowtab.home.permission.open-settings"
         static let permissionDismiss = "flowtab.home.permission.dismiss"

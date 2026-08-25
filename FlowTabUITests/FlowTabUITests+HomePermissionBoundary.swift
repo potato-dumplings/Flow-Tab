@@ -1,6 +1,73 @@
 import XCTest
 
+private enum FlowTabUITestHomePermissionLayoutOracle {
+    static let compactTrailingInset: CGFloat = 8
+    static let frameAccuracy: CGFloat = 2
+}
+
 extension FlowTabUITests {
+    func testHomePermissionStatusesUseCompactTrailingInset() {
+        let app = makeApp(
+            additionalArguments: [
+                "-AppleLanguages",
+                "(zh-Hans)",
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "NO"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+
+        let card = element(
+            in: app,
+            identifier: Identifier.sidebarPermissionStatus
+        )
+        XCTAssertTrue(
+            card.waitForExistence(
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .permissionStateProjection
+            )
+        )
+
+        let statuses = [
+            (
+                element(
+                    in: app,
+                    identifier:
+                        Identifier
+                            .sidebarPermissionAccessibilityStatus
+                ),
+                "已授予"
+            ),
+            (
+                element(
+                    in: app,
+                    identifier:
+                        Identifier
+                            .sidebarPermissionScreenCaptureStatus
+                ),
+                "未授权"
+            )
+        ]
+
+        for (status, expectedText) in statuses {
+            XCTAssertTrue(status.exists)
+            XCTAssertEqual(elementStringValue(status), expectedText)
+            XCTAssertEqual(
+                card.frame.maxX - status.frame.maxX,
+                FlowTabUITestHomePermissionLayoutOracle
+                    .compactTrailingInset,
+                accuracy:
+                    FlowTabUITestHomePermissionLayoutOracle
+                        .frameAccuracy
+            )
+        }
+    }
+
     func testHomeKeepsCurrentFlowTabInApplicationDirectoryWithoutAccessibilityPermission() throws {
         let app = makeApp(
             additionalArguments: [

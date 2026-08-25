@@ -13,6 +13,7 @@ PROJECT_PREFIX="flowtab"
 RELEASE_BINARY_VERIFY_PATH="${ROOT_DIR}/scripts/release/verify-release-binary.sh"
 RELEASE_DISTRIBUTION_CONTRACT_PATH="${ROOT_DIR}/scripts/release/test-release-distribution-contract.sh"
 RELEASE_DISTRIBUTION_VERIFY_PATH="${ROOT_DIR}/scripts/release/verify-release-distribution.sh"
+COMMUNITY_RELEASE_PATH="${ROOT_DIR}/scripts/release/release-community-dmg.sh"
 SIGN_BUNDLE_PATH="${ROOT_DIR}/scripts/release/sign-macos-bundle.sh"
 PATH_BOUNDARIES_PATH="${ROOT_DIR}/scripts/lib/path-boundaries.sh"
 RELEASE_SECURITY_PATH="${ROOT_DIR}/scripts/release/release-security.sh"
@@ -30,10 +31,16 @@ source "${RELEASE_SECURITY_PATH}"
 
 usage() {
   cat <<'EOF'
-Usage: ./scripts/release/release-dmg.sh [--version <version>] [--skip-build]
+Usage: ./scripts/release/release-dmg.sh \
+  [--version <version>] \
+  [--distribution <developer-id|community>] \
+  [--baseline-dmg <previous-public-dmg>] \
+  [--skip-build]
 
 Options:
   --version <version>  Override release version (supports 1.2.3, v1.2.3, or flowtab-v1.2.3).
+  --distribution       Select Developer ID or Community distribution. Defaults to developer-id.
+  --baseline-dmg       Required previous public DMG for Community signature continuity.
   --skip-build         Reuse existing Release app without rebuilding.
   -h, --help           Show this help message.
 
@@ -273,6 +280,8 @@ detect_app_marketing_version() {
 
 VERSION=""
 SKIP_BUILD="false"
+DISTRIBUTION="developer-id"
+BASELINE_DMG=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -288,6 +297,22 @@ while [[ $# -gt 0 ]]; do
       SKIP_BUILD="true"
       shift
       ;;
+    --distribution)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --distribution" >&2
+        exit 1
+      fi
+      DISTRIBUTION="$2"
+      shift 2
+      ;;
+    --baseline-dmg)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --baseline-dmg" >&2
+        exit 1
+      fi
+      BASELINE_DMG="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -299,6 +324,15 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+case "${DISTRIBUTION}" in
+  developer-id|community)
+    ;;
+  *)
+    echo "Unsupported distribution: ${DISTRIBUTION}" >&2
+    exit 1
+    ;;
+esac
 
 TAG_VERSION=""
 if ! TAG_VERSION="$(detect_version_from_github_ref)"; then
@@ -333,6 +367,25 @@ APP_MARKETING_VERSION="$(detect_app_marketing_version)"
 if [[ -n "${APP_MARKETING_VERSION}" && "${APP_MARKETING_VERSION}" != "${VERSION#v}" ]]; then
   echo "FlowTab MARKETING_VERSION (${APP_MARKETING_VERSION}) does not match release version (${VERSION#v})." >&2
   echo "Update the app display version before packaging this release." >&2
+  exit 1
+fi
+
+if [[ "${DISTRIBUTION}" == "community" ]]; then
+  if [[ -z "${BASELINE_DMG}" ]]; then
+    echo "--baseline-dmg is required for Community distribution." >&2
+    exit 1
+  fi
+  COMMUNITY_ARGUMENTS=(
+    --version "${VERSION}"
+    --baseline-dmg "${BASELINE_DMG}"
+  )
+  if [[ "${SKIP_BUILD}" == "true" ]]; then
+    COMMUNITY_ARGUMENTS+=(--skip-build)
+  fi
+  exec "${COMMUNITY_RELEASE_PATH}" "${COMMUNITY_ARGUMENTS[@]}"
+fi
+if [[ -n "${BASELINE_DMG}" ]]; then
+  echo "--baseline-dmg is only valid for Community distribution." >&2
   exit 1
 fi
 

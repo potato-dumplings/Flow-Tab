@@ -41,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         FlowTabUITestBootstrapper.prepareIfNeeded(userDefaults: resolvedUserDefaults)
 #endif
         applyActivationPolicyFromPreferences(application: resolvedActivationPolicyApplication)
+        resolvedUpdateCoordinator.startIfNeeded()
         resolvedRuntimeProjectionService.refreshApplicationDirectoryMembershipForPresentation()
         syncLaunchAtLoginPreferenceOnLaunch()
 

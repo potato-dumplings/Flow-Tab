@@ -20,6 +20,10 @@ extension AppDelegate {
         sharedRuntimeProjectionService
     }
 
+    var resolvedUpdateCoordinator: any FlowTabUpdateCoordinating {
+        SparkleUpdateCoordinator.shared
+    }
+
     var resolvedWorkspaceNotificationCenter: NotificationCenter {
         NSWorkspace.shared.notificationCenter
     }

@@ -18,6 +18,7 @@ struct AppDelegateTestHooks {
     var launchAtLoginManager: (any LaunchAtLoginManaging)? = nil
     var activationPolicyApplication: (any AppActivationPolicyApplying)? = nil
     var runtimeProjectionService: (any RuntimeProjectionServing)? = nil
+    var updateCoordinator: (any FlowTabUpdateCoordinating)? = nil
     var workspaceNotificationCenter: NotificationCenter? = nil
     var appLaunchWindowEvidenceCoordinator:
         (any RuntimeAppLaunchWindowEvidenceCoordinating)? = nil
@@ -55,6 +56,11 @@ extension AppDelegate {
 
     var resolvedRuntimeProjectionService: any RuntimeProjectionServing {
         Self.testHooks.runtimeProjectionService ?? sharedRuntimeProjectionService
+    }
+
+    var resolvedUpdateCoordinator: any FlowTabUpdateCoordinating {
+        Self.testHooks.updateCoordinator
+            ?? FlowTabUITestUpdateCoordinator.shared
     }
 
     var resolvedWorkspaceNotificationCenter: NotificationCenter {

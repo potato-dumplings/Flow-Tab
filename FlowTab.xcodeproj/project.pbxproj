@@ -7,6 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A8A001013F10000100B0D737 /* FlowTabUpdatePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8A000013F10000100B0D737 /* FlowTabUpdatePresentation.swift */; };
+		A8A001023F10000100B0D737 /* SparkleUpdateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8A000023F10000100B0D737 /* SparkleUpdateCoordinator.swift */; };
+		A8A001033F10000100B0D737 /* FlowTabUITestUpdateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8A000033F10000100B0D737 /* FlowTabUITestUpdateCoordinator.swift */; };
+		A8A001043F10000100B0D737 /* FlowTabTests+SparkleUpdates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8A000043F10000100B0D737 /* FlowTabTests+SparkleUpdates.swift */; };
+		A8A001053F10000100B0D737 /* FlowTabUITests+SparkleUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8A000053F10000100B0D737 /* FlowTabUITests+SparkleUpdate.swift */; };
+		A8A001063F10000100B0D737 /* SparkleLicense.txt in Resources */ = {isa = PBXBuildFile; fileRef = A8A000063F10000100B0D737 /* SparkleLicense.txt */; };
+		A8A001073F10000100B0D737 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A8A003013F10000100B0D737 /* Sparkle */; };
 		4A6DAE6E2F727AF500B0D737 /* FlowTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */; };
 		4A6DAE702F727AF500B0D737 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE6F2F727AF500B0D737 /* ContentView.swift */; };
 		4A6DAE722F727AF500B0D737 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4A6DAE712F727AF500B0D737 /* Assets.xcassets */; };
@@ -724,6 +731,13 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A8A000013F10000100B0D737 /* FlowTabUpdatePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUpdatePresentation.swift; sourceTree = "<group>"; };
+		A8A000023F10000100B0D737 /* SparkleUpdateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparkleUpdateCoordinator.swift; sourceTree = "<group>"; };
+		A8A000033F10000100B0D737 /* FlowTabUITestUpdateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestUpdateCoordinator.swift; sourceTree = "<group>"; };
+		A8A000043F10000100B0D737 /* FlowTabTests+SparkleUpdates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SparkleUpdates.swift"; sourceTree = "<group>"; };
+		A8A000053F10000100B0D737 /* FlowTabUITests+SparkleUpdate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SparkleUpdate.swift"; sourceTree = "<group>"; };
+		A8A000063F10000100B0D737 /* SparkleLicense.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = SparkleLicense.txt; sourceTree = "<group>"; };
+		A8A000073F10000100B0D737 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		4A6DAE6A2F727AF500B0D737 /* Flow Tab.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Flow Tab.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTab.swift; sourceTree = "<group>"; };
 		4A6DAE6F2F727AF500B0D737 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -1412,6 +1426,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A8A001073F10000100B0D737 /* Sparkle in Frameworks */,
 				4A6DAE9D2F727C0900B0D737 /* FlowTabCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1488,6 +1503,7 @@
 			isa = PBXGroup;
 			children = (
 				4A6DAE7F2F727AF600B0D737 /* FlowTabTests.swift */,
+				A8A000043F10000100B0D737 /* FlowTabTests+SparkleUpdates.swift */,
 				B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */,
 				B10001022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift */,
 				B10001032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift */,
@@ -1656,6 +1672,7 @@
 			isa = PBXGroup;
 			children = (
 				4A6DAE892F727AF600B0D737 /* FlowTabUITests.swift */,
+				A8A000053F10000100B0D737 /* FlowTabUITests+SparkleUpdate.swift */,
 				B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */,
 				A49300013D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift */,
 				A49400013DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift */,
@@ -2019,6 +2036,7 @@
 				F100000D2F74000100B0D737 /* Preferences */,
 				F10000052F74000100B0D737 /* Runtime */,
 				F100000E2F74000100B0D737 /* Support */,
+				A8A004013F10000100B0D737 /* Updates */,
 			);
 			path = Infrastructure;
 			sourceTree = "<group>";
@@ -2114,6 +2132,7 @@
 			children = (
 				E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */,
 				D1A1B1C42A00000100B0D737 /* FlowTabLaunchTesting.swift */,
+				A8A000033F10000100B0D737 /* FlowTabUITestUpdateCoordinator.swift */,
 				D1A1B1C12A00000100B0D737 /* FlowTabUITestBootstrapper.swift */,
 				BEEF00083F01000100B0D737 /* FlowTabUITestShortcutEventInjection.swift */,
 				A46B10013D73000100B0D737 /* FlowTabUITestSwitcherTriggerNotificationObserver.swift */,
@@ -2155,6 +2174,8 @@
 			children = (
 				4A6DAE712F727AF500B0D737 /* Assets.xcassets */,
 				4A6DAE762F727AF500B0D737 /* FlowTab.entitlements */,
+				A8A000073F10000100B0D737 /* Info.plist */,
+				A8A000063F10000100B0D737 /* SparkleLicense.txt */,
 				4A6DAE732F727AF500B0D737 /* Preview Content */,
 			);
 			path = Resources;
@@ -2177,6 +2198,15 @@
 				C20000122FBD000100B0D737 /* HomeWindowRowButton.swift */,
 			);
 			path = Home;
+			sourceTree = "<group>";
+		};
+		A8A004013F10000100B0D737 /* Updates */ = {
+			isa = PBXGroup;
+			children = (
+				A8A000013F10000100B0D737 /* FlowTabUpdatePresentation.swift */,
+				A8A000023F10000100B0D737 /* SparkleUpdateCoordinator.swift */,
+			);
+			path = Updates;
 			sourceTree = "<group>";
 		};
 		F10000092F74000100B0D737 /* Logs */ = {
@@ -2321,6 +2351,7 @@
 			name = FlowTab;
 			packageProductDependencies = (
 				4A6DAE9C2F727C0900B0D737 /* FlowTabCore */,
+				A8A003013F10000100B0D737 /* Sparkle */,
 			);
 			productName = "Flow Tab";
 			productReference = 4A6DAE6A2F727AF500B0D737 /* Flow Tab.app */;
@@ -2416,6 +2447,7 @@
 			mainGroup = 4A6DAE612F727AF500B0D737;
 			packageReferences = (
 				4A6DAE982F727B1900B0D737 /* XCLocalSwiftPackageReference "FlowTabCore" */,
+				A8A002013F10000100B0D737 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			productRefGroup = 4A6DAE6B2F727AF500B0D737 /* Products */;
 			projectDirPath = "";
@@ -2434,6 +2466,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A8A001063F10000100B0D737 /* SparkleLicense.txt in Resources */,
 				4A6DAE752F727AF500B0D737 /* Preview Assets.xcassets in Resources */,
 				4A6DAE722F727AF500B0D737 /* Assets.xcassets in Resources */,
 			);
@@ -2468,6 +2501,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A8A001013F10000100B0D737 /* FlowTabUpdatePresentation.swift in Sources */,
+				A8A001023F10000100B0D737 /* SparkleUpdateCoordinator.swift in Sources */,
+				A8A001033F10000100B0D737 /* FlowTabUITestUpdateCoordinator.swift in Sources */,
 				C10000102F75000100B0D737 /* AppDelegate.swift in Sources */,
 				A82101012FA1000100B0D737 /* AppDelegate+Production.swift in Sources */,
 				FDD100023D2A000100B0D737 /* SettingsAppVisibilityNavigationAnimationPolicy.swift in Sources */,
@@ -2706,6 +2742,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4A6DAE802F727AF600B0D737 /* FlowTabTests.swift in Sources */,
+				A8A001043F10000100B0D737 /* FlowTabTests+SparkleUpdates.swift in Sources */,
 				B10011012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift in Sources */,
 				B10011022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift in Sources */,
 				B10011032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift in Sources */,
@@ -2898,6 +2935,7 @@
 			files = (
 				4A6DAE8C2F727AF600B0D737 /* FlowTabUITestsLaunchTests.swift in Sources */,
 				4A6DAE8A2F727AF600B0D737 /* FlowTabUITests.swift in Sources */,
+				A8A001053F10000100B0D737 /* FlowTabUITests+SparkleUpdate.swift in Sources */,
 				B10012012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift in Sources */,
 				A49300023D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift in Sources */,
 				A49400023DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift in Sources */,
@@ -3402,12 +3440,13 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_ASSET_PATHS = "\"FlowTab/Resources/Preview Content\"";
 				DEVELOPMENT_TEAM = "$(FLOWTAB_DEVELOPMENT_TEAM)";
 				ENABLE_PREVIEWS = YES;
 				EXECUTABLE_NAME = FlowTab;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = FlowTab/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Flow Tab";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Flow Tab uses Apple Events to read the selected tab of the targeted Terminal window and to activate selected supported-app windows.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -3415,7 +3454,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0-alpha.04;
+				MARKETING_VERSION = 0.1.0-alpha.05;
 				PRODUCT_BUNDLE_IDENTIFIER = "io.github.potato-dumplings.flowtab";
 				PRODUCT_MODULE_NAME = FlowTab;
 				PRODUCT_NAME = "Flow Tab";
@@ -3434,12 +3473,13 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_ASSET_PATHS = "\"FlowTab/Resources/Preview Content\"";
 				DEVELOPMENT_TEAM = "$(FLOWTAB_DEVELOPMENT_TEAM)";
 				ENABLE_PREVIEWS = YES;
 				EXECUTABLE_NAME = FlowTab;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = FlowTab/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Flow Tab";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Flow Tab uses Apple Events to read the selected tab of the targeted Terminal window and to activate selected supported-app windows.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -3447,7 +3487,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0-alpha.04;
+				MARKETING_VERSION = 0.1.0-alpha.05;
 				PRODUCT_BUNDLE_IDENTIFIER = "io.github.potato-dumplings.flowtab";
 				PRODUCT_MODULE_NAME = FlowTab;
 				PRODUCT_NAME = "Flow Tab";
@@ -3466,14 +3506,15 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_ASSET_PATHS = "\"FlowTab/Resources/Preview Content\"";
 				DEVELOPMENT_TEAM = "$(FLOWTAB_DEVELOPMENT_TEAM)";
 				DEPLOYMENT_POSTPROCESSING = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				EXECUTABLE_NAME = FlowTab;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = FlowTab/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Flow Tab";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Flow Tab uses Apple Events to read the selected tab of the targeted Terminal window and to activate selected supported-app windows.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -3481,7 +3522,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.0-alpha.04;
+				MARKETING_VERSION = 0.1.0-alpha.05;
 				OTHER_CODE_SIGN_FLAGS = "--timestamp";
 				PRODUCT_BUNDLE_IDENTIFIER = "io.github.potato-dumplings.flowtab";
 				PRODUCT_MODULE_NAME = FlowTab;
@@ -3727,7 +3768,23 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		A8A002013F10000100B0D737 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.9.6;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
+		A8A003013F10000100B0D737 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A8A002013F10000100B0D737 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
 		4A6DAE9C2F727C0900B0D737 /* FlowTabCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 4A6DAE982F727B1900B0D737 /* XCLocalSwiftPackageReference "FlowTabCore" */;

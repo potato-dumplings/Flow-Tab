@@ -20,7 +20,7 @@ FlowTab 是一个 macOS 应用切换器，目标是在接近系统 `Command + Ta
 
 - 通用（Apple Silicon + Intel）：`FlowTab-v<version>.dmg`
 - 使用随包提供的 `FlowTab-v<version>.sha256` 校验文件完整性。
-- 发布资产使用 Developer ID 签名、Hardened Runtime 与安全时间戳，并通过 Apple 公证和票据装订；Gatekeeper 会在打开时验证这些信息。
+- 公开 alpha 资产是通用架构 Community Build，沿用既有 Apple Development 签名身份，当前未公证；首次启动时可在 Finder 中使用“打开”确认运行。
 
 安装步骤：
 

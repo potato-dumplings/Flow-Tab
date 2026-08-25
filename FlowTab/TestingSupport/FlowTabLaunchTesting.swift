@@ -47,6 +47,10 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-enable-shortcut-event-injection"
     static let includeCurrentAppInMockInventoryArgument =
         "--flowtab-ui-include-current-app-in-inventory"
+    static let updateAvailableArgument =
+        "--flowtab-ui-update-available"
+    static let updateActionRouteArgument =
+        "--flowtab-ui-update-action-route"
 
     static var argumentsOverrideForTesting: [String]?
     static var environmentOverrideForTesting: [String: String]?
@@ -86,7 +90,9 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-seed-window-recency-window-id",
         "--flowtab-ui-suppress-home-on-launch",
         "--flowtab-ui-suppress-panel-activation",
-        "--flowtab-ui-switcher-command-payload-path"
+        "--flowtab-ui-switcher-command-payload-path",
+        updateAvailableArgument,
+        updateActionRouteArgument
     ]
 
     private static var arguments: [String] {
@@ -149,6 +155,50 @@ enum FlowTabTestLaunchOptions {
 
     static var frontmostBundleIdentifierOverride: String? {
         uiTestValue(after: "--flowtab-ui-frontmost-bundle-id")
+    }
+
+    static var updateRoute: FlowTabUITestUpdateRoute? {
+        guard isRunningUITests,
+              let availableIndex = arguments.firstIndex(
+                  of: updateAvailableArgument
+              ),
+              availableIndex + 2 < arguments.count,
+              let actionIndex = arguments.firstIndex(
+                  of: updateActionRouteArgument
+              ),
+              actionIndex + 2 < arguments.count
+        else {
+            return nil
+        }
+
+        let displayVersion = arguments[availableIndex + 1]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let buildVersion = arguments[availableIndex + 2]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let notificationName = arguments[actionIndex + 1]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let readbackPath = arguments[actionIndex + 2]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !displayVersion.isEmpty,
+              FlowTabReleaseVersionPolicy.isValidBuild(buildVersion),
+              !notificationName.isEmpty,
+              NSString(string: readbackPath).isAbsolutePath
+        else {
+            return nil
+        }
+
+        return FlowTabUITestUpdateRoute(
+            availableUpdate: FlowTabAvailableUpdate(
+                displayVersion: displayVersion,
+                buildVersion: buildVersion
+            ),
+            notificationName: Notification.Name(notificationName),
+            readbackURL: URL(
+                fileURLWithPath: readbackPath,
+                isDirectory: false
+            ).standardizedFileURL
+        )
     }
 
     static var projectionAcknowledgementRoutes:

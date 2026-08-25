@@ -20,7 +20,7 @@ Download the DMG from GitHub Releases:
 
 - Universal (Apple Silicon + Intel): `FlowTab-v<version>.dmg`
 - Verify it with the accompanying `FlowTab-v<version>.sha256` file.
-- Release assets use Developer ID signing, Hardened Runtime, and secure timestamps, and are notarized and stapled by Apple for Gatekeeper verification.
+- Public alpha assets are universal Community Builds signed with the established Apple Development identity. They are unnotarized, so macOS may ask you to confirm the first launch from Finder's Open action.
 
 Install steps:
 

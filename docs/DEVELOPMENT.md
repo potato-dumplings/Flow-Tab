@@ -393,6 +393,7 @@ swift test
 
 - `scripts/release/release-install.sh`：Release 构建并安装到 `/Applications/Flow Tab.app`。
 - `scripts/release/release-dmg.sh`：构建并打包 DMG 到 `release/FlowTab-v<version>/`。
+- `scripts/release/publish-sparkle-update.sh`：完成 Community DMG、GitHub Release 与签名 appcast 的单入口发布。
 - `scripts/release/uninstall-flowtab.js`：独立卸载工具源码，不进入发布 DMG；删除应用前通过 Workspace 终止通知、精确 bundle ID 读回和提权命令内的最终进程读回确认 FlowTab 已退出。
 - `scripts/perf/tab-switch-stress.sh`：tab 高频切换性能压测；采样与切换时长属于显式压力协议，子进程清理由精确 PID/启动身份读回和退出状态驱动。
 
@@ -443,7 +444,28 @@ chmod +x scripts/release/release-install.sh
 - 在受限沙箱环境中执行会因权限不足失败。
 - 可通过 `FLOWTAB_CODE_SIGN_IDENTITY` 指定本地签名身份，默认使用 `Apple Development`。
 
-## 生成 DMG
+## Sparkle Community 自动更新发布
+
+当前公开 alpha 使用 Community Build，并以公开的上一版 DMG 作为签名连续性基线。完整配置、密钥初始化、发布恢复与 E2E 验证见 [AUTO_UPDATE_RELEASE.md](./AUTO_UPDATE_RELEASE.md)。日常发布入口为：
+
+```bash
+./scripts/release/publish-sparkle-update.sh \
+  --version 0.1.0-alpha.05 \
+  --notes docs/releases/v0.1.0-alpha.05.md
+```
+
+该入口只接受干净工作树。它依次执行本地 Unit、Behavior、UI、20/50ms Pressure 与 Process 门禁，从上一公开 GitHub Release 取得基线 DMG，生成并校验 Community 资产，创建或恢复 draft release，发布并读回资产，最后推进只含 `appcast.xml` 的 `gh-pages`。
+
+单独生成 Community DMG 时显式选择分发模式并提供基线：
+
+```bash
+./scripts/release/release-dmg.sh \
+  --distribution community \
+  --version 0.1.0-alpha.05 \
+  --baseline-dmg /path/to/FlowTab-v0.1.0-alpha.04.dmg
+```
+
+## Developer ID DMG
 
 公开分发需要可用的 `Developer ID Application` 证书，以及通过 `xcrun notarytool store-credentials <profile>` 保存的公证凭据。运行脚本前设置凭据名称：
 
@@ -467,6 +489,7 @@ chmod +x scripts/release/release-dmg.sh
 
 可选参数：
 - `--version <version>`：显式设置发布版本（支持 `1.2.3`、`v1.2.3`、`flowtab-v1.2.3`）
+- `--distribution developer-id`：选择 Developer ID、公证与 Gatekeeper 接受链路
 - `--skip-build`：跳过构建，直接使用现有 `Release` 产物
 
 说明：

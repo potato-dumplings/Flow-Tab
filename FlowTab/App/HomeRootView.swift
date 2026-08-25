@@ -6,14 +6,20 @@ import FlowTabCore
 struct HomeRootView: View {
     @ObservedObject private var tabState = HomeTabState.shared
     @ObservedObject private var presentation = FlowPresentationState.shared
+    @ObservedObject private var updatePresentation:
+        FlowTabUpdatePresentationStore
     @StateObject private var appVisibilityModel: AppVisibilityManagerModel
     private let runtimeProjectionService: any RuntimeProjectionServing
 
     init(
         runtimeProjectionService: any RuntimeProjectionServing = homeRuntimeProjectionService,
-        appVisibilityModel: AppVisibilityManagerModel? = nil
+        appVisibilityModel: AppVisibilityManagerModel? = nil,
+        updatePresentation: FlowTabUpdatePresentationStore? = nil
     ) {
         self.runtimeProjectionService = runtimeProjectionService
+        _updatePresentation = ObservedObject(
+            wrappedValue: updatePresentation ?? .shared
+        )
         _appVisibilityModel = StateObject(
             wrappedValue: appVisibilityModel ?? AppVisibilityManagerModel()
         )
@@ -42,7 +48,9 @@ struct HomeRootView: View {
         HStack(spacing: 0) {
             HomeSidebar(
                 selectedTab: $tabState.selectedTab,
-                presentationContext: presentation.context
+                presentationContext: presentation.context,
+                updateAvailability: updatePresentation.availability,
+                showAvailableUpdate: updatePresentation.showAvailableUpdate
             )
 
             Divider()
@@ -112,8 +120,11 @@ struct HomeRootView: View {
 private struct HomeSidebar: View {
     @Binding var selectedTab: HomeTab
     let presentationContext: FlowPresentationContext
+    let updateAvailability: FlowTabUpdateAvailability
+    let showAvailableUpdate: @MainActor () -> Void
     @State private var accessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
     @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
+    @State private var isUpdateButtonHovered = false
     private let navIconColumnWidth: CGFloat = 24
     private let navItemSpacing: CGFloat = 15
 
@@ -174,21 +185,29 @@ private struct HomeSidebar: View {
             sidebarBackgroundColor
 
             VStack(alignment: .leading, spacing: 17) {
-                HStack(alignment: .center, spacing: 9) {
-                    Image(nsImage: NSApp.applicationIconImage)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 28, height: 28)
-                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                HStack(alignment: .center, spacing: 0) {
+                    HStack(alignment: .center, spacing: 9) {
+                        Image(nsImage: NSApp.applicationIconImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 28, height: 28)
+                            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
 
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text("FlowTab")
-                            .font(.system(size: 20, weight: .semibold))
-                            .lineLimit(1)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text("FlowTab")
+                                .font(.system(size: 20, weight: .semibold))
+                                .lineLimit(1)
+                        }
                     }
+
+                    Spacer(minLength: 4)
+
+                    availableUpdateButton
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 9)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("flowtab.sidebar.header")
 
                 VStack(alignment: .leading, spacing: 7) {
                     ForEach(items, id: \.tab) { item in
@@ -223,6 +242,77 @@ private struct HomeSidebar: View {
             for: NSApplication.didBecomeActiveNotification
         )) { _ in
             refreshPermissionStatus()
+        }
+    }
+
+    @ViewBuilder
+    private var availableUpdateButton: some View {
+        if let update = updateAvailability.availableUpdate {
+            Button {
+                Task { @MainActor in
+                    showAvailableUpdate()
+                }
+            } label: {
+                ZStack {
+                    Image(systemName: "arrow.down.to.line")
+                        .imageScale(.small)
+                        .opacity(isUpdateButtonHovered ? 0 : 1)
+                        .scaleEffect(isUpdateButtonHovered ? 0.75 : 1)
+
+                    Text(
+                        AppStrings.text(
+                            .updateButtonTitle,
+                            language: appLanguage
+                        )
+                    )
+                    .font(FlowTypography.swiftUI(.microEmphasized))
+                    .opacity(isUpdateButtonHovered ? 1 : 0)
+                    .scaleEffect(isUpdateButtonHovered ? 1 : 0.85)
+                }
+                .foregroundStyle(Color.white)
+                .frame(
+                    width: isUpdateButtonHovered
+                        ? HomeSidebarUpdateLayout.expandedButtonWidth
+                        : HomeSidebarUpdateLayout.updateButtonDiameter,
+                    height: HomeSidebarUpdateLayout.updateButtonDiameter
+                )
+                .background(
+                    Capsule().fill(Color(nsColor: .systemBlue))
+                )
+                .clipShape(Capsule())
+                .animation(
+                    HomeSidebarUpdateLayout.hoverAnimation,
+                    value: isUpdateButtonHovered
+                )
+            }
+            .buttonStyle(.plain)
+            .contentShape(Capsule())
+            .onHover { isHovered in
+                isUpdateButtonHovered = isHovered
+            }
+            .accessibilityIdentifier("flowtab.sidebar.update.download")
+            .accessibilityLabel(
+                AppStrings.text(
+                    .updateDownloadVersion,
+                    replacements: ["version": update.displayVersion],
+                    language: appLanguage
+                )
+            )
+            .accessibilityValue(
+                isUpdateButtonHovered
+                    ? AppStrings.text(
+                        .updateButtonTitle,
+                        language: appLanguage
+                    )
+                    : ""
+            )
+            .help(
+                AppStrings.text(
+                    .updateDownloadHelp,
+                    replacements: ["version": update.displayVersion],
+                    language: appLanguage
+                )
+            )
         }
     }
 

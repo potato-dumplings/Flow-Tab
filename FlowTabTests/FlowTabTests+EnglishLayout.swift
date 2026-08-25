@@ -378,6 +378,62 @@ extension FlowTabTests {
         XCTAssertLessThanOrEqual(hostedView.fittingSize.height, 100)
     }
 
+    @MainActor
+    func testSidebarPermissionStatusUsesCompactTrailingInset() throws {
+        XCTAssertEqual(HomePermissionStatusLayout.leadingInset, 14)
+        XCTAssertEqual(HomePermissionStatusLayout.trailingInset, 8)
+        XCTAssertEqual(HomePermissionStatusLayout.verticalInset, 12)
+        XCTAssertLessThan(
+            HomePermissionStatusLayout.trailingInset,
+            HomePermissionStatusLayout.leadingInset
+        )
+
+        let hostedView = NSHostingView(
+            rootView: HomePermissionStatusCard(
+                accessibilityTrusted: true,
+                screenCaptureTrusted: false,
+                language: .simplifiedChinese,
+                colorScheme: .dark
+            )
+            .frame(
+                width: 180,
+                height: HomePageLayout.bottomStatusHeight
+            )
+        )
+        hostedView.frame = NSRect(
+            x: 0,
+            y: 0,
+            width: 180,
+            height: HomePageLayout.bottomStatusHeight
+        )
+        hostedView.layoutSubtreeIfNeeded()
+
+        for identifier in [
+            "flowtab.sidebar.permission.accessibility.status",
+            "flowtab.sidebar.permission.screen-capture.status"
+        ] {
+            let statusLabel: NSTextField = try XCTUnwrap(
+                descendant(in: hostedView, identifier: identifier)
+            )
+            let statusFrame = statusLabel.convert(
+                statusLabel.bounds,
+                to: hostedView
+            )
+            XCTAssertEqual(
+                hostedView.bounds.maxX - statusFrame.maxX,
+                HomePermissionStatusLayout.trailingInset,
+                accuracy: 2
+            )
+            XCTAssertLessThanOrEqual(
+                statusFrame.width,
+                statusLabel.intrinsicContentSize.width + 4,
+                "Status label contains trailing blank layout space: "
+                    + "frame=\(statusFrame) intrinsic="
+                    + "\(statusLabel.intrinsicContentSize)"
+            )
+        }
+    }
+
     private func makeEnglishSettingsPageState(
         hiddenAppCount: Int,
         accessibilityTrusted: Bool = false,

@@ -41,6 +41,18 @@ struct FlowTabApp: App {
         .windowStyle(.hiddenTitleBar)
 
         .commands {
+            CommandGroup(after: .appInfo) {
+                Button(
+                    AppStrings.text(
+                        .menuCheckForUpdates,
+                        language: presentation.context.appLanguage
+                    )
+                ) {
+                    FlowTabUpdatePresentationStore.shared
+                        .showAvailableUpdate()
+                }
+            }
+
             CommandGroup(replacing: .appSettings) {
                 Button(AppStrings.text(.menuSettings, language: presentation.context.appLanguage)) {
                     AppWindowCoordinator.openSettings()

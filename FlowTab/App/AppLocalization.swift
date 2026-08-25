@@ -19,6 +19,7 @@ enum AppStringKey: String {
     case themeLight
     case themeDark
     case menuSettings
+    case menuCheckForUpdates
     case menuLogs
     case menuOpenLogs
     case menuOpenSettings
@@ -62,6 +63,9 @@ enum AppStringKey: String {
     case homePermissionScreenCapture
     case homePermissionGranted
     case homePermissionMissing
+    case updateButtonTitle
+    case updateDownloadVersion
+    case updateDownloadHelp
     case hotkeyCommandTabTakeoverActive
     case hotkeyCommandTabTakeoverInactive
     case hotkeyConflict
@@ -186,6 +190,7 @@ enum AppStrings {
             .themeLight: "浅色",
             .themeDark: "深色",
             .menuSettings: "设置",
+            .menuCheckForUpdates: "检查更新…",
             .menuLogs: "日志",
             .menuOpenLogs: "打开日志",
             .menuOpenSettings: "打开设置",
@@ -229,6 +234,9 @@ enum AppStrings {
             .homePermissionScreenCapture: "屏幕录制",
             .homePermissionGranted: "已授予",
             .homePermissionMissing: "未授权",
+            .updateButtonTitle: "更新",
+            .updateDownloadVersion: "下载 {version} 更新",
+            .updateDownloadHelp: "打开 {version} 更新说明与下载",
             .hotkeyCommandTabTakeoverActive: "已接管系统 Command + Tab / Command + Shift + Tab，退出 FlowTab 后会自动恢复。",
             .hotkeyCommandTabTakeoverInactive: "检测到 Command + Tab 组合：FlowTab 会自动尝试接管系统 Command + Tab / Command + Shift + Tab。",
             .hotkeyConflict: "已被使用",
@@ -348,6 +356,7 @@ enum AppStrings {
             .themeLight: "Light",
             .themeDark: "Dark",
             .menuSettings: "Settings",
+            .menuCheckForUpdates: "Check for Updates…",
             .menuLogs: "Logs",
             .menuOpenLogs: "Open Logs",
             .menuOpenSettings: "Open Settings",
@@ -391,6 +400,9 @@ enum AppStrings {
             .homePermissionScreenCapture: "Screen Recording",
             .homePermissionGranted: "Granted",
             .homePermissionMissing: "Missing",
+            .updateButtonTitle: "Update",
+            .updateDownloadVersion: "Download update {version}",
+            .updateDownloadHelp: "Open update {version} details and download",
             .hotkeyCommandTabTakeoverActive: "System Command + Tab / Command + Shift + Tab is now taken over and will be restored after FlowTab exits.",
             .hotkeyCommandTabTakeoverInactive: "Command + Tab combination detected: FlowTab will try to take over system Command + Tab / Command + Shift + Tab.",
             .hotkeyConflict: "Already in use",
