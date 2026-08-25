@@ -3,7 +3,6 @@ import SwiftUI
 
 struct AppKitSettingsPageContent: NSViewRepresentable {
     let isActive: Bool
-    @Binding var showShortcutHint: Bool
     @Binding var showInCommandTab: Bool
     @Binding var themeModeRaw: String
     @Binding var appLanguageRaw: String
@@ -44,7 +43,6 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: AppKitSettingsPageContainerView, context: Context) {
-        let showShortcutHint = $showShortcutHint
         let showInCommandTab = $showInCommandTab
         let themeModeRaw = $themeModeRaw
         let appLanguageRaw = $appLanguageRaw
@@ -83,7 +81,6 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
             pageView?.updateHotkeyContent(with: currentHotkeyValues())
         }
 
-        pageView.onShowShortcutHintChanged = { showShortcutHint.wrappedValue = $0 }
         pageView.onShowInCommandTabChanged = { showInCommandTab.wrappedValue = $0 }
         pageView.onThemeModeChanged = { themeModeRaw.wrappedValue = $0 }
         pageView.onAppLanguageChanged = { appLanguageRaw.wrappedValue = $0 }
@@ -193,7 +190,6 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
         pageView.onScreenCaptureAction = onScreenCaptureAction
         nsView.update(
             with: AppKitSettingsPageState(
-                showShortcutHint: showShortcutHint.wrappedValue,
                 showInCommandTab: showInCommandTab.wrappedValue,
                 themeModeRaw: themeModeRaw.wrappedValue,
                 appLanguageRaw: appLanguageRaw.wrappedValue,

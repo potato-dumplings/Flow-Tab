@@ -35,17 +35,6 @@ extension FlowTabUITests {
         )
         XCTAssertFalse(
             settingsAppearanceControlsProjectionSnapshot(
-                shortcutExists: false,
-                shortcutIsOn: nil
-            ).isExactProjection
-        )
-        XCTAssertFalse(
-            settingsAppearanceControlsProjectionSnapshot(
-                shortcutIsOn: nil
-            ).isExactProjection
-        )
-        XCTAssertFalse(
-            settingsAppearanceControlsProjectionSnapshot(
                 currentAppExists: false,
                 currentAppIsOn: nil
             ).isExactProjection
@@ -122,8 +111,6 @@ extension FlowTabUITests {
         var snapshot =
             settingsAppearanceControlsProjectionSnapshot(
                 settingsContentExists: false,
-                shortcutExists: false,
-                shortcutIsOn: nil,
                 currentAppExists: false,
                 currentAppIsOn: nil,
                 currentAppTitleExists: false,
@@ -246,10 +233,6 @@ extension FlowTabUITests {
     private func settingsAppearanceControlsProjectionSnapshot(
         appState: XCUIApplication.State = .runningForeground,
         settingsContentExists: Bool = true,
-        shortcutExists: Bool = true,
-        shortcutHittable: Bool = true,
-        shortcutIsOn: Bool? = true,
-        shortcutValue: String? = "1",
         currentAppExists: Bool = true,
         currentAppHittable: Bool = true,
         currentAppIsOn: Bool? = false,
@@ -263,10 +246,6 @@ extension FlowTabUITests {
         FlowTabUITestSettingsAppearanceControlsProjectionSnapshot(
             appState: appState,
             settingsContentExists: settingsContentExists,
-            shortcutHintToggleExists: shortcutExists,
-            shortcutHintToggleHittable: shortcutHittable,
-            shortcutHintToggleIsOn: shortcutIsOn,
-            shortcutHintToggleValue: shortcutValue,
             currentAppToggleExists: currentAppExists,
             currentAppToggleHittable: currentAppHittable,
             currentAppToggleIsOn: currentAppIsOn,

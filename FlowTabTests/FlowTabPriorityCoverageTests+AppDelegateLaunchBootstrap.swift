@@ -104,10 +104,6 @@ extension FlowTabPriorityCoverageTests {
         }
 
         userDefaults.set(
-            false,
-            forKey: AppPreferenceKeys.showShortcutHint
-        )
-        userDefaults.set(
             RuntimeLogLevel.error.rawValue,
             forKey: AppPreferenceKeys.runtimeLogLevel
         )
@@ -334,12 +330,6 @@ extension FlowTabPriorityCoverageTests {
                     minimumLevel: .debug
                 )
 
-        XCTAssertNil(
-            userDefaults.object(
-                forKey:
-                    AppPreferenceKeys.showShortcutHint
-            )
-        )
         XCTAssertFalse(
             userDefaults.bool(
                 forKey:

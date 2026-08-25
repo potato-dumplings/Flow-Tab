@@ -99,7 +99,6 @@ extension FlowTabTests {
 
         let content = AppKitSettingsPageContent(
             isActive: true,
-            showShortcutHint: state.binding(\.showShortcutHint),
             showInCommandTab: state.binding(\.showInCommandTab),
             themeModeRaw: state.binding(\.themeModeRaw),
             appLanguageRaw: state.binding(\.appLanguageRaw),
@@ -676,7 +675,6 @@ extension FlowTabTests {
 
 @MainActor
 private final class HotkeySettingsBridgeBindingState {
-    var showShortcutHint = true
     var showInCommandTab = false
     var themeModeRaw = ThemeMode.followSystem.rawValue
     var appLanguageRaw = AppLanguage.simplifiedChinese.rawValue

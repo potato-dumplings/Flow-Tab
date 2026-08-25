@@ -97,7 +97,6 @@ enum AppStringKey: String {
     case settingsCardHotkeyTitle
     case settingsCardHotkeySubtitle
     case appearanceDescription
-    case appearanceShowShortcutHint
     case appearanceShowAppWindow
     case appearanceThemeMode
     case appearanceLanguage
@@ -265,7 +264,6 @@ enum AppStrings {
             .settingsCardHotkeyTitle: "快捷键",
             .settingsCardHotkeySubtitle: "主切换、应用内窗口与结束应用按键",
             .appearanceDescription: "关闭后，当前应用将仅作为菜单栏辅助应用运行。",
-            .appearanceShowShortcutHint: "显示快捷键提示",
             .appearanceShowAppWindow: "像普通应用一样显示",
             .appearanceThemeMode: "主题模式",
             .appearanceLanguage: "语言",
@@ -428,7 +426,6 @@ enum AppStrings {
             .settingsCardHotkeyTitle: "Hotkeys",
             .settingsCardHotkeySubtitle: "Main switch, in-app windows, and quit app keys",
             .appearanceDescription: "When turned off, this app runs only as a menu bar helper.",
-            .appearanceShowShortcutHint: "Show shortcut hint",
             .appearanceShowAppWindow: "Show like a regular app",
             .appearanceThemeMode: "Theme mode",
             .appearanceLanguage: "Language",

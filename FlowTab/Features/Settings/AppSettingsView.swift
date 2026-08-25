@@ -23,7 +23,6 @@ struct AppSettingsView: View {
     }
 
     @ObservedObject private var presentation = FlowPresentationState.shared
-    @AppStorage(AppPreferenceKeys.showShortcutHint) private var showShortcutHint = true
     @AppStorage(AppPreferenceKeys.showInCommandTab)
     private var showInCommandTab = AppVisibilityPreferencesStore.defaultShowInCommandTab
     @AppStorage(AppPreferenceKeys.showPermissionReminder) private var showPermissionReminder = true
@@ -172,7 +171,6 @@ struct AppSettingsView: View {
 
             AppKitSettingsPageContent(
                 isActive: isActive && !showsAppVisibilityManager,
-                showShortcutHint: $showShortcutHint,
                 showInCommandTab: showInCommandTabPreference,
                 themeModeRaw: themeModeBinding,
                 appLanguageRaw: appLanguageBinding,

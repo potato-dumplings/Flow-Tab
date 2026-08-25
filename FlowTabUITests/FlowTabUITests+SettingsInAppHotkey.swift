@@ -153,15 +153,15 @@ extension FlowTabUITests {
             )
         )
         XCTAssertTrue(conflictStatus.waitForExistence(timeout: 5))
-        let shortcutHintToggle = element(
+        let currentAppToggle = element(
             in: app,
-            identifier: Identifier.settingsAppearanceShowShortcutHint
+            identifier: Identifier.settingsAppearanceShowInCommandTab
         )
         assertElementDoesNotExistAfterTrigger(
             conflictStatus,
             timeout: 5,
             description: "Hotkey conflict feedback click-away dismissal",
-            trigger: { tapElement(shortcutHintToggle) }
+            trigger: { tapElement(currentAppToggle) }
         )
         assertValue(
             of: element(

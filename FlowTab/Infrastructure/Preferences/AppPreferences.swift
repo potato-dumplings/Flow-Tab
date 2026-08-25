@@ -2,7 +2,6 @@ import Foundation
 import FlowTabCore
 
 enum AppPreferenceKeys {
-    static let showShortcutHint = "showShortcutHint"
     static let showInCommandTab = "showInCommandTab"
     static let showPermissionReminder = "showPermissionReminder"
     static let allowLaunchAtLogin = "allowLaunchAtLogin"
@@ -26,7 +25,6 @@ enum AppPreferenceKeys {
     static let appLanguage = "appLanguage"
 
     static let allKeys: [String] = [
-        showShortcutHint,
         showInCommandTab,
         showPermissionReminder,
         allowLaunchAtLogin,

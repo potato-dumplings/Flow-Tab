@@ -399,7 +399,6 @@ extension FlowTabTests {
         screenCaptureTrusted: Bool = false
     ) -> AppKitSettingsPageState {
         AppKitSettingsPageState(
-            showShortcutHint: true,
             showInCommandTab: true,
             themeModeRaw: themeMode.rawValue,
             appLanguageRaw: language.rawValue,

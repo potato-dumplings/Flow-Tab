@@ -1229,7 +1229,6 @@ extension FlowTabTests {
         language: AppLanguage = .simplifiedChinese
     ) -> AppKitSettingsPageState {
         AppKitSettingsPageState(
-            showShortcutHint: true,
             showInCommandTab: true,
             themeModeRaw: ThemeMode.followSystem.rawValue,
             appLanguageRaw: language.rawValue,

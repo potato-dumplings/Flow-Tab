@@ -41,7 +41,7 @@ extension FlowTabUITests {
         )
     }
 
-    func testSettingsAppearanceTogglesCanBeChanged() throws {
+    func testSettingsCurrentAppAppearanceToggleCanBeChanged() throws {
         let app = makeApp(
             additionalArguments: [
                 "--flowtab-ui-reset-defaults",
@@ -69,16 +69,12 @@ extension FlowTabUITests {
             return
         }
 
-        let showShortcutHintToggle = controls.shortcutHintToggle
         let showInCommandTabToggle = controls.currentAppToggle
         XCTAssertFalse(toggleIsOn(showInCommandTabToggle))
 
-        let targetShortcutHint = !toggleIsOn(showShortcutHintToggle)
         let targetShowInCommandTab = !toggleIsOn(showInCommandTabToggle)
-        setToggle(showShortcutHintToggle, to: targetShortcutHint)
         setToggle(showInCommandTabToggle, to: targetShowInCommandTab)
 
-        XCTAssertEqual(toggleIsOn(showShortcutHintToggle), targetShortcutHint)
         XCTAssertEqual(toggleIsOn(showInCommandTabToggle), targetShowInCommandTab)
     }
 

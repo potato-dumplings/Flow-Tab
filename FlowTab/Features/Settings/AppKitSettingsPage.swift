@@ -3,7 +3,6 @@ import AppKit
 import FlowTabCore
 
 struct AppKitSettingsPageState: Equatable {
-    let showShortcutHint: Bool
     let showInCommandTab: Bool
     let themeModeRaw: String
     let appLanguageRaw: String
@@ -243,7 +242,6 @@ final class AppKitSettingsPageContainerView: NSView {
 }
 
 final class AppKitSettingsPageView: NSView {
-    var onShowShortcutHintChanged: ((Bool) -> Void)?
     var onShowInCommandTabChanged: ((Bool) -> Void)?
     var onThemeModeChanged: ((String) -> Void)?
     var onAppLanguageChanged: ((String) -> Void)?
@@ -396,7 +394,6 @@ final class AppKitSettingsPageView: NSView {
 
         appearanceContent.update(
             with: AppearanceSettingsCardState(
-                showShortcutHint: state.showShortcutHint,
                 showInCommandTab: state.showInCommandTab,
                 themeModeRaw: state.themeModeRaw,
                 appLanguageRaw: state.appLanguageRaw
@@ -626,10 +623,6 @@ final class AppKitSettingsPageView: NSView {
     }
 
     private func wireCallbacks() {
-        appearanceContent.onShowShortcutHintChanged = { [weak self] in
-            self?.notifyPageInteraction()
-            self?.onShowShortcutHintChanged?($0)
-        }
         appearanceContent.onShowInCommandTabChanged = { [weak self] in
             self?.notifyPageInteraction()
             self?.onShowInCommandTabChanged?($0)

@@ -5,43 +5,33 @@ import FlowTabCore
 struct AppKitAppearanceSettingsCardContent: AppKitSettingsCardRepresentable {
     typealias NSViewType = AppearanceSettingsCardAppKitView
 
-    @Binding var showShortcutHint: Bool
     @Binding var showInCommandTab: Bool
     @Binding var themeModeRaw: String
     @Binding var appLanguageRaw: String
 
     final class Coordinator {
-        var showShortcutHint: Binding<Bool>
         var showInCommandTab: Binding<Bool>
         var themeModeRaw: Binding<String>
         var appLanguageRaw: Binding<String>
 
         init(
-            showShortcutHint: Binding<Bool>,
             showInCommandTab: Binding<Bool>,
             themeModeRaw: Binding<String>,
             appLanguageRaw: Binding<String>
         ) {
-            self.showShortcutHint = showShortcutHint
             self.showInCommandTab = showInCommandTab
             self.themeModeRaw = themeModeRaw
             self.appLanguageRaw = appLanguageRaw
         }
 
         func update(
-            showShortcutHint: Binding<Bool>,
             showInCommandTab: Binding<Bool>,
             themeModeRaw: Binding<String>,
             appLanguageRaw: Binding<String>
         ) {
-            self.showShortcutHint = showShortcutHint
             self.showInCommandTab = showInCommandTab
             self.themeModeRaw = themeModeRaw
             self.appLanguageRaw = appLanguageRaw
-        }
-
-        func setShowShortcutHint(_ value: Bool) {
-            showShortcutHint.wrappedValue = value
         }
 
         func setShowInCommandTab(_ value: Bool) {
@@ -59,7 +49,6 @@ struct AppKitAppearanceSettingsCardContent: AppKitSettingsCardRepresentable {
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
-            showShortcutHint: $showShortcutHint,
             showInCommandTab: $showInCommandTab,
             themeModeRaw: $themeModeRaw,
             appLanguageRaw: $appLanguageRaw
@@ -72,7 +61,6 @@ struct AppKitAppearanceSettingsCardContent: AppKitSettingsCardRepresentable {
 
     func updateCoordinator(_ coordinator: Coordinator) {
         coordinator.update(
-            showShortcutHint: $showShortcutHint,
             showInCommandTab: $showInCommandTab,
             themeModeRaw: $themeModeRaw,
             appLanguageRaw: $appLanguageRaw
@@ -80,7 +68,6 @@ struct AppKitAppearanceSettingsCardContent: AppKitSettingsCardRepresentable {
     }
 
     func connect(_ view: AppearanceSettingsCardAppKitView, coordinator: Coordinator) {
-        view.onShowShortcutHintChanged = { coordinator.setShowShortcutHint($0) }
         view.onShowInCommandTabChanged = { coordinator.setShowInCommandTab($0) }
         view.onThemeModeChanged = { coordinator.setThemeMode(rawValue: $0) }
         view.onAppLanguageChanged = { coordinator.setAppLanguage(rawValue: $0) }
@@ -88,7 +75,6 @@ struct AppKitAppearanceSettingsCardContent: AppKitSettingsCardRepresentable {
 
     func makeState() -> AppearanceSettingsCardState {
         AppearanceSettingsCardState(
-            showShortcutHint: showShortcutHint,
             showInCommandTab: showInCommandTab,
             themeModeRaw: themeModeRaw,
             appLanguageRaw: appLanguageRaw
@@ -97,7 +83,6 @@ struct AppKitAppearanceSettingsCardContent: AppKitSettingsCardRepresentable {
 }
 
 struct AppearanceSettingsCardState: Equatable {
-    let showShortcutHint: Bool
     let showInCommandTab: Bool
     let themeModeRaw: String
     let appLanguageRaw: String
@@ -112,12 +97,10 @@ struct AppearanceSettingsCardState: Equatable {
 }
 
 final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSettingsCardStateView {
-    var onShowShortcutHintChanged: ((Bool) -> Void)?
     var onShowInCommandTabChanged: ((Bool) -> Void)?
     var onThemeModeChanged: ((String) -> Void)?
     var onAppLanguageChanged: ((String) -> Void)?
 
-    private let showShortcutHintSwitch = NSSwitch()
     private let showInCommandTabSwitch = NSSwitch()
     private let themeModeControl = FlowSettingsSegmentedControl(
         options: AppearanceSettingsCardAppKitView.themeOptions(
@@ -126,10 +109,6 @@ final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
     )
     private let appLanguageSelect = FlowSettingsSelectControl(frame: .zero)
     private let descriptionLabel = AppKitSettingsCardBaseView.makeBodyLabel()
-    private lazy var showShortcutHintRow = AppKitSettingsCardBaseView.makeControlRow(
-        title: "",
-        control: showShortcutHintSwitch
-    )
     private lazy var showInCommandTabRow = AppKitSettingsCardBaseView.makeControlRow(
         title: "",
         control: showInCommandTabSwitch
@@ -189,7 +168,6 @@ final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
         let language = state.resolvedAppLanguage
 
         isApplyingState = true
-        showShortcutHintSwitch.state = state.showShortcutHint ? .on : .off
         showInCommandTabSwitch.state = state.showInCommandTab ? .on : .off
         themeModeControl.configure(options: Self.themeOptions(language: language))
         appLanguageSelect.configure(options: Self.languageOptions(language: language))
@@ -197,7 +175,6 @@ final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
         AppKitSettingsCardBaseView.selectItem(in: appLanguageSelect, rawValue: state.resolvedAppLanguage.rawValue)
         isApplyingState = false
 
-        showShortcutHintRow.updateTitle(AppStrings.text(.appearanceShowShortcutHint, language: language))
         showInCommandTabRow.updateTitle(AppStrings.text(.appearanceShowAppWindow, language: language))
         languageRow.updateTitle(AppStrings.text(.appearanceLanguage, language: language))
         themeModeRow.updateTitle(AppStrings.text(.appearanceThemeMode, language: language))
@@ -206,11 +183,8 @@ final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
     }
 
     private func buildViewHierarchy() {
-        showShortcutHintSwitch.target = self
-        showShortcutHintSwitch.action = #selector(handleShowShortcutHintChanged)
         showInCommandTabSwitch.target = self
         showInCommandTabSwitch.action = #selector(handleShowInCommandTabChanged)
-        showShortcutHintSwitch.setFlowTabTestingIdentifier("flowtab.settings.appearance.show-shortcut-hint")
         showInCommandTabSwitch.setFlowTabTestingIdentifier("flowtab.settings.appearance.show-in-command-tab")
         themeModeControl.setFlowTabTestingIdentifier("flowtab.settings.appearance.theme-mode")
         appLanguageSelect.setFlowTabTestingIdentifier("flowtab.settings.appearance.app-language")
@@ -227,16 +201,10 @@ final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
             options: Self.languageOptions(language: AppLanguagePreferencesStore.load())
         )
 
-        addFullWidthArrangedSubview(showShortcutHintRow)
         addFullWidthArrangedSubview(showInCommandTabRow)
         addFullWidthArrangedSubview(descriptionLabel)
         addFullWidthArrangedSubview(languageRow)
         addFullWidthArrangedSubview(themeModeRow)
-    }
-
-    @objc private func handleShowShortcutHintChanged(_ sender: NSSwitch) {
-        guard !isApplyingState else { return }
-        onShowShortcutHintChanged?(sender.state == .on)
     }
 
     @objc private func handleShowInCommandTabChanged(_ sender: NSSwitch) {

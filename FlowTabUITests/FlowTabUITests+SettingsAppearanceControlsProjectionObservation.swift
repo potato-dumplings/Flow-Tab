@@ -13,10 +13,6 @@ struct FlowTabUITestSettingsAppearanceControlsProjectionSnapshot:
 {
     let appState: XCUIApplication.State
     let settingsContentExists: Bool
-    let shortcutHintToggleExists: Bool
-    let shortcutHintToggleHittable: Bool
-    let shortcutHintToggleIsOn: Bool?
-    let shortcutHintToggleValue: String?
     let currentAppToggleExists: Bool
     let currentAppToggleHittable: Bool
     let currentAppToggleIsOn: Bool?
@@ -29,8 +25,6 @@ struct FlowTabUITestSettingsAppearanceControlsProjectionSnapshot:
     var isExactProjection: Bool {
         appState == .runningForeground
             && settingsContentExists
-            && shortcutHintToggleExists
-            && shortcutHintToggleIsOn != nil
             && currentAppToggleExists
             && currentAppToggleIsOn == false
             && currentAppTitleExists
@@ -41,12 +35,6 @@ struct FlowTabUITestSettingsAppearanceControlsProjectionSnapshot:
         "isExactProjection=\(isExactProjection) "
             + "appState=\(String(describing: appState)) "
             + "settingsContentExists=\(settingsContentExists) "
-            + "shortcutHintToggleExists=\(shortcutHintToggleExists) "
-            + "shortcutHintToggleHittable=\(shortcutHintToggleHittable) "
-            + "shortcutHintToggleIsOn="
-            + "\(String(describing: shortcutHintToggleIsOn)) "
-            + "shortcutHintToggleValue="
-            + "\(String(reflecting: shortcutHintToggleValue)) "
             + "currentAppToggleExists=\(currentAppToggleExists) "
             + "currentAppToggleHittable=\(currentAppToggleHittable) "
             + "currentAppToggleIsOn="
@@ -64,7 +52,6 @@ struct FlowTabUITestSettingsAppearanceControlsProjectionSnapshot:
 }
 
 struct FlowTabUITestSettingsAppearanceControls {
-    let shortcutHintToggle: XCUIElement
     let currentAppToggle: XCUIElement
 }
 
@@ -207,8 +194,6 @@ extension FlowTabUITests {
             XCTFail(
                 "Settings Appearance controls projection watchdog expired. "
                     + "target=\(targetDescription) "
-                    + "shortcutIdentifier="
-                    + "\(Identifier.settingsAppearanceShowShortcutHint) "
                     + "currentAppIdentifier="
                     + "\(Identifier.settingsAppearanceShowInCommandTab) "
                     + "expectedTitle="
@@ -240,11 +225,6 @@ extension FlowTabUITests {
                 identifier: Identifier.settingsTabContent
             ),
             controls: FlowTabUITestSettingsAppearanceControls(
-                shortcutHintToggle: element(
-                    in: app,
-                    identifier:
-                        Identifier.settingsAppearanceShowShortcutHint
-                ),
                 currentAppToggle: element(
                     in: app,
                     identifier:
@@ -267,30 +247,12 @@ extension FlowTabUITests {
         elements: FlowTabUITestSettingsAppearanceProjectionElements
     ) -> () -> FlowTabUITestSettingsAppearanceControlsProjectionSnapshot {
         {
-            let shortcutExists = elements.controls.shortcutHintToggle.exists
             let currentAppExists = elements.controls.currentAppToggle.exists
             let titleExists = elements.currentAppTitle.exists
             let descriptionExists = elements.currentAppDescription.exists
             return FlowTabUITestSettingsAppearanceControlsProjectionSnapshot(
                 appState: app.state,
                 settingsContentExists: elements.settingsContent.exists,
-                shortcutHintToggleExists: shortcutExists,
-                shortcutHintToggleHittable:
-                    shortcutExists
-                        && elements.controls.shortcutHintToggle.isHittable,
-                shortcutHintToggleIsOn:
-                    shortcutExists
-                        ? self.toggleIsOn(
-                            elements.controls.shortcutHintToggle
-                        )
-                        : nil,
-                shortcutHintToggleValue:
-                    shortcutExists
-                        ? String(
-                            describing:
-                                elements.controls.shortcutHintToggle.value
-                        )
-                        : nil,
                 currentAppToggleExists: currentAppExists,
                 currentAppToggleHittable:
                     currentAppExists

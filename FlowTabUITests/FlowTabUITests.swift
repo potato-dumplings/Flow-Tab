@@ -64,7 +64,6 @@ final class FlowTabUITests: XCTestCase {
         static let logsSeededInfoLine = "flowtab.logs.line.seeded.info"
         static let logsSeededWarnLine = "flowtab.logs.line.seeded.warn"
         static let logsSeededErrorLine = "flowtab.logs.line.seeded.error"
-        static let settingsAppearanceShowShortcutHint = "flowtab.settings.appearance.show-shortcut-hint"
         static let settingsAppearanceShowInCommandTab = "flowtab.settings.appearance.show-in-command-tab"
         static let settingsAppearanceThemeMode = "flowtab.settings.appearance.theme-mode"
         static let settingsAppearanceAppLanguage = "flowtab.settings.appearance.app-language"
