@@ -1562,7 +1562,10 @@ extension FlowTabTests {
         samples.reserveCapacity(iterations)
         for _ in 0..<iterations {
             let start = DispatchTime.now().uptimeNanoseconds
-            XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+            XCTAssertEqual(
+                model.startFocusedAppWindowSession(triggerDirection: .forward),
+                .ready
+            )
             samples.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000.0)
             XCTAssertEqual(model.session?.selectedApp.windows.count ?? -1, windowCount)
             model.cancelSelection()

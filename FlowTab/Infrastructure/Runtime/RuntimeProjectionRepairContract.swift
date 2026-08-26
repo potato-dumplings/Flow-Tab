@@ -56,7 +56,7 @@ struct RuntimeAppWindowReconciliationResult {
     let affectedCGWindowIDs: Set<CGWindowID>
     let knownAffectedCGWindowIDs: Set<CGWindowID>
     let exactAffectedCGWindowIDs: Set<CGWindowID>
-    let pendingDestroyedCGWindowIDs: Set<CGWindowID>
+    let isWindowTopologyConvergencePending: Bool
     let currentAppRepairEvidence: RuntimeCurrentAppRepairEvidence?
     let isTransientEmptyCurrentAppWindowPayload: Bool
 }
@@ -71,12 +71,6 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
     ) -> [RuntimeAppWindowReconciliationResult]
     func fullRepairEvidence() -> RuntimeFullRepairEvidence
     func recordSpaceTopologyChanged(now: TimeInterval) -> RuntimeSpaceTopologySignalFacts
-    func signalAXWindowDestroyed(
-        appID: String,
-        processIdentifier pid: pid_t,
-        axWindowID: String,
-        now: TimeInterval
-    ) -> CGWindowID?
     func recordAppTerminated(appID: String, processIdentifier pid: pid_t) -> Bool
     func recordWindowFocusVerification(
         _ verification: RuntimeWindowFocusVerification,
@@ -88,7 +82,12 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
     ) -> Set<CGWindowID>
     func recordSearchWindowCoverageNeeded(appID: String, pid: pid_t, now: TimeInterval)
     func recordAppLaunched(appID: String, pid: pid_t, now: TimeInterval)
-    func recordAppWindowsChanged(appID: String, pid: pid_t, now: TimeInterval)
+    func recordAppWindowsChanged(
+        appID: String,
+        pid: pid_t,
+        changeKinds: Set<RuntimeAXWindowChangeEvidence.ChangeKind>,
+        now: TimeInterval
+    )
     func recordSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t, now: TimeInterval)
     func hasPendingReconciliationRequests(includeFullRepair: Bool) -> Bool
     func pendingScopedReconciliationAffectedCGWindowIDs() -> Set<CGWindowID>

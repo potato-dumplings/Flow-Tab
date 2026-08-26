@@ -154,6 +154,38 @@ struct SpaceFixtureCurrentAppProjectionAcceptanceSnapshot {
     }
 }
 
+struct SpaceFixtureCurrentAppProjectionAcceptanceExpectation:
+    Equatable
+{
+    enum Mutation: Equatable {
+        case created
+        case closed
+        case closedWithSurvivorRebind
+    }
+
+    let baselineWindowCount: Int
+    let targetWindowCount: Int
+    let mutation: Mutation
+
+    static let closedTwoToOne = Self(
+        baselineWindowCount: 2,
+        targetWindowCount: 1,
+        mutation: .closed
+    )
+
+    static let createdTwoToThree = Self(
+        baselineWindowCount: 2,
+        targetWindowCount: 3,
+        mutation: .created
+    )
+
+    static let closedThreeToTwo = Self(
+        baselineWindowCount: 3,
+        targetWindowCount: 2,
+        mutation: .closedWithSurvivorRebind
+    )
+}
+
 final class SpaceFixtureCurrentAppProjectionAcceptanceState {
     enum Phase {
         case baseline
@@ -196,6 +228,9 @@ final class SpaceFixtureCurrentAppProjectionAcceptanceState {
         route:
             SpaceFixtureCurrentAppProjectionAcceptanceRoute,
         expectedPID: pid_t,
+        expectation:
+            SpaceFixtureCurrentAppProjectionAcceptanceExpectation =
+                .closedTwoToOne,
         generation: UInt64
     ) -> Bool {
         guard activeGeneration == generation else {
@@ -207,6 +242,7 @@ final class SpaceFixtureCurrentAppProjectionAcceptanceState {
             route: route,
             expectedPID: expectedPID
         ),
+        evidence.isCompleteForScope,
         Set(evidence.windowIDs).count
             == evidence.windowIDs.count
         else {
@@ -214,7 +250,9 @@ final class SpaceFixtureCurrentAppProjectionAcceptanceState {
         }
         switch phase {
         case .baseline:
-            guard evidence.windowIDs.count == 2 else {
+            guard evidence.windowIDs.count
+                    == expectation.baselineWindowCount
+            else {
                 return false
             }
             baseline = evidence
@@ -228,11 +266,13 @@ final class SpaceFixtureCurrentAppProjectionAcceptanceState {
                     .isStrictlyLater(
                         than: baseline.sourceGeneration
                     ),
-                  evidence.windowIDs.count == 1,
-                  Set(evidence.windowIDs)
-                    .isSubset(of: Set(baseline.windowIDs)),
-                  baseline.windowIDs.count
-                    - evidence.windowIDs.count == 1
+                  evidence.windowIDs.count
+                    == expectation.targetWindowCount,
+                  acceptsMutation(
+                    expectation.mutation,
+                    baselineWindowIDs: baseline.windowIDs,
+                    targetWindowIDs: evidence.windowIDs
+                  )
             else {
                 return false
             }
@@ -248,6 +288,9 @@ final class SpaceFixtureCurrentAppProjectionAcceptanceState {
         route:
             SpaceFixtureCurrentAppProjectionAcceptanceRoute,
         expectedPID: pid_t,
+        expectation:
+            SpaceFixtureCurrentAppProjectionAcceptanceExpectation =
+                .closedTwoToOne,
         generation: UInt64
     ) {
         guard activeGeneration == generation else { return }
@@ -258,6 +301,7 @@ final class SpaceFixtureCurrentAppProjectionAcceptanceState {
                 phase: phase,
                 route: route,
                 expectedPID: expectedPID,
+                expectation: expectation,
                 generation: generation
             )
         }
@@ -279,6 +323,29 @@ final class SpaceFixtureCurrentAppProjectionAcceptanceState {
         nextGeneration &+= 1
         activeGeneration = generation
         return generation
+    }
+
+    private func acceptsMutation(
+        _ mutation:
+            SpaceFixtureCurrentAppProjectionAcceptanceExpectation
+                .Mutation,
+        baselineWindowIDs: [String],
+        targetWindowIDs: [String]
+    ) -> Bool {
+        let baseline = Set(baselineWindowIDs)
+        let target = Set(targetWindowIDs)
+        switch mutation {
+        case .created:
+            return baseline.isSubset(of: target)
+                && target.count - baseline.count == 1
+        case .closed:
+            return target.isSubset(of: baseline)
+                && baseline.count - target.count == 1
+        case .closedWithSurvivorRebind:
+            return !baseline.isDisjoint(with: target)
+                && !baseline.subtracting(target).isEmpty
+                && !target.subtracting(baseline).isEmpty
+        }
     }
 
     private func exactIdentity(
@@ -305,6 +372,8 @@ final class SpaceFixtureCurrentAppProjectionAcceptanceOwner {
     private let route:
         SpaceFixtureCurrentAppProjectionAcceptanceRoute
     private let expectedPID: pid_t
+    private let expectation:
+        SpaceFixtureCurrentAppProjectionAcceptanceExpectation
     private let eventRegistration:
         SpaceFixtureCurrentAppProjectionEventRegistration
     private let scheduledRegistration:
@@ -326,6 +395,9 @@ final class SpaceFixtureCurrentAppProjectionAcceptanceOwner {
         route:
             SpaceFixtureCurrentAppProjectionAcceptanceRoute,
         expectedPID: pid_t,
+        expectation:
+            SpaceFixtureCurrentAppProjectionAcceptanceExpectation =
+                .closedTwoToOne,
         center: DistributedNotificationCenter = .default(),
         eventRegistration:
             SpaceFixtureCurrentAppProjectionEventRegistration? = nil,
@@ -336,6 +408,7 @@ final class SpaceFixtureCurrentAppProjectionAcceptanceOwner {
     ) {
         self.route = route
         self.expectedPID = expectedPID
+        self.expectation = expectation
         self.eventRegistration = eventRegistration
             ?? Self.distributedRegistration(
                 route: route,
@@ -485,6 +558,7 @@ final class SpaceFixtureCurrentAppProjectionAcceptanceOwner {
         let state = self.state
         let route = self.route
         let expectedPID = self.expectedPID
+        let expectation = self.expectation
         let eventRegistration = self.eventRegistration
         let scheduledRegistration = self.scheduledRegistration
         let evidenceReadback = self.evidenceReadback
@@ -497,6 +571,7 @@ final class SpaceFixtureCurrentAppProjectionAcceptanceOwner {
                             phase: phase,
                             route: route,
                             expectedPID: expectedPID,
+                            expectation: expectation,
                             generation: generation
                         )
                         readback(.notificationReadback)
@@ -514,6 +589,7 @@ final class SpaceFixtureCurrentAppProjectionAcceptanceOwner {
                     phase: phase,
                     route: route,
                     expectedPID: expectedPID,
+                    expectation: expectation,
                     generation: generation
                 )
                 return state.snapshot

@@ -87,7 +87,8 @@ fixture/evidence boundaries and do not become normal runtime read sources.
 | Switcher normal paths read projection/Search APIs or send dirty signals | `scripts/audit/runtime-projection-exit-contract.sh` verifies Switcher references `readAppSwitcherProjection`, `readCurrentAppWindowProjection`, `readCommittedSearchIndexForSearch`, and `requestSearchIndexFreshnessBarrier`, while rejecting legacy snapshot, repair-provider, CG, and AX sampling APIs in Switcher hot paths. | Proven by source audit |
 | Switcher fullscreen presentation reads runtime Space topology projection, not frontmost/AX fullscreen probes | The exit audit now separately rejects `NSWorkspace.shared.frontmostApplication`, focused-window attributes, AX fullscreen probes, CG window-list sampling, and AX app creation inside `SwitcherPanelController+Presentation`, while requiring `readSpaceTopologyProjection()` / `signalSpaceTopologyChanged()` evidence. `testSwitcherPanelPresentationReadsRuntimeSpaceTopologyProjectionForFullscreenLevel`, `testSwitcherPanelPresentationSignalsRuntimeWhenSpaceTopologyProjectionIsMissing`, and `testSwitcherPanelPresentationFailsClosedForIncompleteSpaceTopologyProjection` prove the panel elevates only from a complete/current runtime Space topology projection, sends the dirty signal when projection is missing, and keeps the normal level without extra dirty signaling when projection freshness is incomplete/pending. | Proven by source audit and behavior tests |
 | Open Switcher app-layer sessions refresh while window layers remain session snapshots | `RuntimeProjectionService` continues posting app-switcher and current-app window projection commits after `RuntimeReadModelStore` commits. `SwitcherPanelController` observes them without creating surface-local scheduler/retry state or calling snapshot/CG/AX sampling. `testSwitcherPanelControllerAppSwitcherProjectionCommitRefreshesOpenSession` and `testSwitcherPanelControllerCurrentAppProjectionCommitAppliesPendingManualWindowLayerEntry` prove app-cycle refresh and pending-entry completion. Once `windowCycle` is presented, `LiveSwitcherModel` keeps the session's card set, order, selection, and frozen preview unchanged; `testSwitcherPanelControllerKeepsWindowLayerSnapshotWhenUnselectedWindowCloses`, `testSwitcherPanelControllerKeepsWindowLayerSnapshotWhenSelectedWindowCloses`, `testLiveSwitcherModelKeepsWindowLayerSnapshotWhenCurrentAppProjectionRefreshes`, and `testLiveSwitcherModelKeepsWindowLayerSnapshotWhenAppSwitcherProjectionRefreshes` cover both commit sources and both close positions. `testSwitcherPanelKeepsOpenWindowLayerSnapshotAfterRealFixtureWindowSetMutation`, `testSwitcherPanelKeepsWindowLayerWhenSelectedFixtureWindowCloses`, `testSwitcherPanelKeepsOpenWorkflowAppWindowLayerSnapshotAfterMultiAppWindowSetMutation`, and `testSwitcherPanelKeepsOpenFullscreenWorkflowAppWindowLayerSnapshotAfterTargetWindowCloses` bind the same two-card UI snapshot to exact fixture-close and runtime reconciliation evidence while preserving selected-app isolation. | Proven by behavior and real UI tests |
-| A new Control+Tab session reads window mutations committed while the panel is closed | AX observer installation retries are bounded per PID and validate appID, PID, and binding generation before publishing evidence. A successful retry immediately reads back the AX window collection. `testRuntimeProjectionServiceYieldsReadyTopologyWorkAfterScopedRepairDefers` proves a scoped evidence wait yields the maintenance queue before unrelated topology work, while `testRuntimeProjectionServiceCommitsScopedRepairBeforeNextReadyTopologyRequestCompletes` proves each completed repair is committed before the next ready request. `testLiveSwitcherModelNextSessionReadsExpandedAndContractedWindowProjection` covers both topology directions at the behavior boundary. `testNextControlTabSessionUsesWindowCreatedWhilePanelIsClosed` and `testNextControlTabSessionUsesWindowClosedWhilePanelIsClosed` drive the real Control+Tab path and assert the exact card count and unique titles. | Proven by behavior and real UI tests |
+| The first Switcher interaction is Control+Tab and reads window mutations committed while the panel is closed | FlowTab starts with runtime-truth input and an exact complete current-app baseline while the panel remains absent. Chrome-like fixture mode covers a transient-window 2→3 mutation and a 3→2 mutation with AX order reversal, survivor handle/CG identity replacement, and repeated destroyed notifications. Raw transition evidence immediately marks the projection dirty; trailing evidence coalesces repair, and complete AX/CG convergence commits a strictly later projection. `testAXObservedTransitionPublishesBeforeTrailingReadback`, `testRuntimeWindowRecordStoreConvergesDestroyedTopologyByRemovingAbsentWindowAndRebindingSurvivor`, `testLiveSwitcherModelFocusedWindowSessionWaitsForStrictlyLaterCompleteProjection`, `testFirstSwitcherSessionControlTabUsesWindowCreatedWhilePanelIsClosed`, and `testFirstSwitcherSessionControlTabUsesWindowClosedWhilePanelIsClosed` cover the handoff from raw evidence to the first physical Control+Tab panel. | Proven by behavior and real UI tests |
+| Control+Tab reads the latest window projection after a completed Option+Tab session | The UI flow completes one physical Option+Tab session, releases the injected keys as soon as its baseline projection appears, dismisses the panel, reactivates the fixture, and applies the same Chrome-like receipt-backed mutation. A 2-second named watchdog bounds preparation. Dirty or incomplete focused projection reads return `.awaitingFreshProjection`; the panel stays closed until a strictly later complete projection arrives while Control remains held. Key release or the focused-session watchdog cancels pending presentation. `testLiveSwitcherModelCancelsPendingFocusedWindowSessionOnModifierRelease`, `testFocusedWindowSessionFreshnessObservationCancelsPendingSessionAfterWatchdog`, `testControlTabUsesWindowCreatedAfterCompletedOptionTabSession`, and `testControlTabUsesWindowClosedAfterCompletedOptionTabSession` cover this state. | Proven by behavior and real UI tests |
 | Current-app sibling preservation is runtime-owned and activation/dirty gated | `scripts/audit/runtime-projection-exit-contract.sh` rejects Switcher-owned current-app sibling preservation helpers and app-switcher projection as a current-app sibling fact source. The positive contract requires `RuntimeReadModelStore` to own `currentAppWindowPayloadByPreservingPriorCommittedWindowsLocked(...)`, use prior committed current-app projection state for sibling preservation, keep activation-action gating through `useForAXActivation` / `useForCGActivationFallback`, and reject dirty `CGWindowID`s. `testRuntimeReadModelStorePreservesCommittedCurrentAppSiblingRowsUntilDirtyCGInvalidatesThem`, `testRuntimeReadModelStoreDoesNotPreserveCurrentAppSiblingsFromCommittedAppSwitcherProjection`, and `testLiveSwitcherModelAppliesCommittedRuntimeWindowRecencyWhenProjectionOrderChanges` prove runtime-owned sibling preservation, invalidation, recency application between sessions, and independence of an already-presented window-layer snapshot. | Proven by source audit and behavior tests |
 | Control+Tab focused-current-app path does not synchronously sample frontmost/focused app state | The exit audit now separately rejects `NSWorkspace.shared.frontmostApplication`, `kAXFocusedWindowAttribute`, old focused snapshot/frontmost resolver seams, and the removed frontmost bundle launch override in the Switcher/TestingSupport hot path. It also requires `readFocusedCurrentAppWindowProjection()` and `signalFocusedCurrentAppWindowsChanged()` evidence, proving the focused path either reads runtime projection or sends a dirty signal. | Proven by source audit |
 | Home normal paths read projection APIs or send dirty signals | The exit audit verifies Home references `readHomeSummaryProjection`, `readHomeAppDetailProjection`, `readCurrentAppWindowProjection`, and `signalAppWindowsChanged`, while rejecting legacy snapshot, repair-provider, CG, and AX sampling APIs in Home hot paths. | Proven by source audit |
@@ -449,44 +450,92 @@ The previous app-hosted mock dataset segv is now superseded by the 7-test
 FlowTabTests run above. No production runtime behavior or TestingSupport
 semantics changed to obtain that proof.
 
-## Phase 7 Control+Tab Degraded Current-App Read
+## Phase 7 Control+Tab Focused-Projection Freshness Gate
 
-This slice closes the Control+Tab read-path gap exposed by the repaired UI
-runner. `LiveSwitcherModel.startFocusedAppWindowSession(...)` still reads only
-the focused current-app projection from `RuntimeReadModelStore`; when that
-projection is stale but contains committed windows, it opens the window layer as
-`degradedStaleCommitted` and sends `signalFocusedCurrentAppWindowsChanged()` for
-background maintenance. It does not synchronously wait for CG/AX/Space sampling
-and it does not describe the stale order as fresh, complete, latest, or
-current-generation.
+`LiveSwitcherModel.startFocusedAppWindowSession(...)` reads only the focused
+current-app projection from `RuntimeReadModelStore`. A complete matching
+projection returns `.ready`. A dirty, incomplete, or missing projection returns
+`.awaitingFreshProjection`, records the app/PID, direction, and baseline
+generation, and requests high-priority focused repair. The panel remains closed
+until a strictly later complete projection arrives while Control is still held;
+modifier release and the two-second named watchdog cancel pending presentation.
 
 Validation:
 
 ```bash
 ./scripts/testing/run-flowtabtests-local.sh \
-  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testLiveSwitcherModelFocusedWindowSessionUsesStaleCommittedProjectionAsDegradedRead
-
-./scripts/testing/install-ui-test-app.sh
-
-./scripts/testing/run-ui-tests-local.sh \
-  -only-testing:FlowTabUITests/FlowTabUITests/testInAppWindowSwitcherControlTabRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testLiveSwitcherModelFocusedWindowSessionWaitsForStrictlyLaterCompleteProjection \
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testLiveSwitcherModelCancelsPendingFocusedWindowSessionOnModifierRelease \
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testFocusedWindowSessionFreshnessObservationCancelsPendingSessionAfterWatchdog
 ```
 
-The behavior test passed 1 selected FlowTabTests test with 0 failures. The
-fixed-path UI app was rebuilt and Apple Development signed; after one pre-test
-automation-mode timeout and one stale-order oracle correction, the targeted
-Noisy Control+Tab UI proof passed 1 selected test with 0 failures in 39.785s
-(`40.657s` XCTest elapsed). Runtime logs show reopen using
-`startFocusedWindowSession result=degradedStaleCommitted ... windows=4`, and the
-UI proof verifies the four real workflow windows, filtered noisy CG/fullscreen
-artifacts, sticky/runtime-owned window source logs, exact selected `CGWindowID`
-activation, and verified focus readback.
+The deterministic coverage requires a projection generation strictly later than
+the recorded baseline and verifies both cancellation paths. It also proves that
+the pending state does not synchronously sample CG/AX/Space on the Switcher hot
+path.
 
 Search is unchanged in this slice. Before a bounded freshness barrier
 successfully commits a new generation, Search remains `missingCommittedIndex` or
 a degraded/stale committed result with dirty/freshness metadata; it is not a
 fresh, complete, latest, current-generation committed, or newest complete
 result.
+
+## Phase 8 Control+Tab Closed-Panel Window Mutation
+
+The real fixture coverage distinguishes two runtime histories. In the first,
+FlowTab has never presented a Switcher panel and the first physical Switcher
+gesture is Control+Tab. In the second, one physical Option+Tab session has
+completed before the fixture window mutation and the later Control+Tab session.
+Both histories derive frontmost identity from fixture activation and compare the
+panel against the fixture mutation receipt, real window existence, final
+plan-index-to-title/CG mappings, a strictly newer complete projection, exact
+card titles, and per-card preview presence.
+
+Chrome-like fixture mode starts creation from a committed two-window baseline,
+emits an unrelated transient window lifecycle, and settles at three windows.
+Closure starts from three windows, closes the middle window, reverses AX order,
+rebuilds a survivor with a new AX/CG identity, and emits repeated destroyed
+notifications before settling at two windows. Raw transition evidence marks the
+projection dirty/incomplete before queued work; the 0.16-second trailing readback
+coalesces event kinds into one repair. Destroyed evidence advances one app-level
+topology invalidation generation, and complete AX plus `.optionAll` CG facts
+remove absent records, rebind survivors, and clear it. Incomplete facts schedule
+`.windowTopologyConvergence`.
+
+Validation:
+
+```bash
+./scripts/testing/install-ui-test-app.sh
+
+./scripts/testing/run-ui-tests-local.sh \
+  -only-testing:FlowTabUITests/FlowTabUITests/testFirstSwitcherSessionControlTabUsesWindowCreatedWhilePanelIsClosed \
+  -only-testing:FlowTabUITests/FlowTabUITests/testFirstSwitcherSessionControlTabUsesWindowClosedWhilePanelIsClosed \
+  -only-testing:FlowTabUITests/FlowTabUITests/testControlTabUsesWindowCreatedAfterCompletedOptionTabSession \
+  -only-testing:FlowTabUITests/FlowTabUITests/testControlTabUsesWindowClosedAfterCompletedOptionTabSession
+```
+
+The fixed-path, Apple Development signed run passed all 4 selected tests with 0
+failures in 38.768 seconds. The completed-Option+Tab creation and closure cases
+took 10.755 and 11.537 seconds; the first-session cases took 8.160 and 8.316
+seconds. The retained result bundle is under
+`.build-local/control-tab-window-mutation/after/ui-four-016/results/FlowTabUITests.xcresult`.
+The adjacent physical-hotkey, real fixture lifecycle, and strengthened
+projection-acceptance run passed 5/5 under
+`.build-local/control-tab-window-mutation/after/ui-adjacent-017`.
+
+The complete canonical `FlowTabTests` run passed 1,257 tests with 0 failures in
+57.359 seconds. Its result bundle is under
+`.build-local/control-tab-window-mutation/after/full-014/results/FlowTabTests.xcresult`.
+Runtime-topology pressure then exercised the real noisy fullscreen/off-Space
+fixture path at 0.5-second cadence. The warm repeat passed 1/1 UI test with
+22/22 process-identity matches, a 5,145 ms stable identity window, and exact app
+and process cleanup. CPU average/p95/max was 96.55/178.00/182.80%, and RSS
+average/p95/max was 163.09/216.56/223.64 MB. Against the nearest same-machine,
+same-path baseline, CPU changed by +5.05/+4.60/+0.30 percentage points and RSS
+by +6.33/+18.17/+8.55 MB. RSS fell from about 150.1 MB in the first sample to
+145.2 MB in the last sample, so the run showed no sustained growth. The pressure
+evidence root is
+`.build-local/control-tab-window-mutation/after/pressure-runtime-topology-022`.
 
 ## Remaining Gaps
 

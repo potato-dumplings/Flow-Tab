@@ -1,3 +1,4 @@
+import CoreGraphics
 import Darwin
 import Foundation
 import XCTest
@@ -22,6 +23,7 @@ enum SpaceFixtureWindowOpenMutationUITestPolicy {
     static let fixtureWindowReadbackWatchdog: TimeInterval = 8
     static let panelDismissalWatchdog: TimeInterval = 5
     static let switcherProjectionWatchdog: TimeInterval = 25
+    static let completedOptionTabSessionWatchdog: TimeInterval = 2
 }
 
 private enum SpaceFixtureWindowOpenMutationUITestPhase: String {
@@ -38,6 +40,8 @@ struct SpaceFixtureWindowOpenMutationUITestEvidence: Equatable {
     let targetWindowPlanIndex: Int
     let targetWindowTitle: String
     let activeWindowPlanIndices: [Int]
+    let activeWindowTitlesByPlanIndex: [Int: String]
+    let activeCGWindowIDsByPlanIndex: [Int: CGWindowID]
 
     var diagnosticSummary: String {
         "generation=\(requestGeneration) "
@@ -61,6 +65,10 @@ final class SpaceFixtureWindowOpenMutationObservationOwner {
         static let targetWindowPlanIndex = "targetWindowPlanIndex"
         static let targetWindowTitle = "targetWindowTitle"
         static let activeWindowPlanIndices = "activeWindowPlanIndices"
+        static let activeWindowTitlesByPlanIndex =
+            "activeWindowTitlesByPlanIndex"
+        static let activeCGWindowIDsByPlanIndex =
+            "activeCGWindowIDsByPlanIndex"
     }
 
     private let route: SpaceFixtureWindowOpenMutationUITestRoute
@@ -244,7 +252,19 @@ final class SpaceFixtureWindowOpenMutationObservationOwner {
               !targetWindowTitle.isEmpty,
               let activeWindowPlanIndices = normalizedPlanIndices(
                 userInfo[UserInfoKey.activeWindowPlanIndices]
-              )
+              ),
+              let activeWindowTitlesByPlanIndex =
+                normalizedStringDictionary(
+                    userInfo[
+                        UserInfoKey.activeWindowTitlesByPlanIndex
+                    ]
+                ),
+              let activeCGWindowIDsByPlanIndex =
+                normalizedCGWindowIDDictionary(
+                    userInfo[
+                        UserInfoKey.activeCGWindowIDsByPlanIndex
+                    ]
+                )
         else {
             return nil
         }
@@ -255,7 +275,11 @@ final class SpaceFixtureWindowOpenMutationObservationOwner {
             processIdentifier: processIdentifier,
             targetWindowPlanIndex: targetWindowPlanIndex,
             targetWindowTitle: targetWindowTitle,
-            activeWindowPlanIndices: activeWindowPlanIndices
+            activeWindowPlanIndices: activeWindowPlanIndices,
+            activeWindowTitlesByPlanIndex:
+                activeWindowTitlesByPlanIndex,
+            activeCGWindowIDsByPlanIndex:
+                activeCGWindowIDsByPlanIndex
         )
     }
 
@@ -281,6 +305,47 @@ final class SpaceFixtureWindowOpenMutationObservationOwner {
             return nil
         }
         return indices
+    }
+
+    private static func normalizedStringDictionary(
+        _ value: Any?
+    ) -> [Int: String]? {
+        guard let values = value as? [String: String]
+        else {
+            return nil
+        }
+        var normalized: [Int: String] = [:]
+        for (key, value) in values {
+            guard let planIndex = Int(key),
+                  planIndex > 0,
+                  !value.isEmpty
+            else {
+                return nil
+            }
+            normalized[planIndex] = value
+        }
+        return normalized
+    }
+
+    private static func normalizedCGWindowIDDictionary(
+        _ value: Any?
+    ) -> [Int: CGWindowID]? {
+        guard let values = value as? [String: NSNumber]
+        else {
+            return nil
+        }
+        var normalized: [Int: CGWindowID] = [:]
+        for (key, value) in values {
+            guard let planIndex = Int(key),
+                  planIndex > 0,
+                  value.uint64Value > 0,
+                  value.uint64Value <= UInt64(CGWindowID.max)
+            else {
+                return nil
+            }
+            normalized[planIndex] = value.uint32Value
+        }
+        return normalized
     }
 }
 

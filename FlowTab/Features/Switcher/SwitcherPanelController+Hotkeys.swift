@@ -181,6 +181,14 @@ extension SwitcherPanelController {
             modifierReleaseObservationOwner.observeInputTransition()
             return
         }
+        if pendingFocusedWindowSessionPresentation != nil,
+           !isHotkeyHoldSetPressed(receipt)
+        {
+            cancelPendingFocusedWindowSessionPresentation(
+                reason: "hotkeyReleased"
+            )
+            return
+        }
         guard isPanelPresented else { return }
         guard activeHotkeySessionKind == .inAppWindowSwitcher else { return }
         guard !isHotkeyHoldSetPressed(receipt) else { return }

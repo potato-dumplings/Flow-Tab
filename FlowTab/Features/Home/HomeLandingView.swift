@@ -468,21 +468,8 @@ struct HomeLandingView: View {
         windowChangeMonitor.onAppWindowChanged = { evidence in
             guard evidence.requiresReconciliation else { return }
             requestAppDetailProjection(
-                .appWindowsChanged(
-                    appID: evidence.appID,
-                    pid: evidence.pid
-                ),
+                .appWindowsChanged(evidence),
                 reason: "ax_window_changed"
-            )
-        }
-        windowChangeMonitor.onAXWindowDestroyed = { appID, pid, axWindowID in
-            requestAppDetailProjection(
-                .axWindowDestroyed(
-                    appID: appID,
-                    pid: pid,
-                    axWindowID: axWindowID
-                ),
-                reason: "ax_window_destroyed"
             )
         }
         windowChangeMonitor.rebind(appSummaries)

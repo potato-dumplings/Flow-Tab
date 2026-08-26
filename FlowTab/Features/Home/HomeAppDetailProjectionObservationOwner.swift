@@ -3,28 +3,23 @@ import Foundation
 
 enum HomeAppDetailProjectionRequest {
     case selected(appID: String, pid: pid_t)
-    case appWindowsChanged(appID: String, pid: pid_t)
-    case axWindowDestroyed(
-        appID: String,
-        pid: pid_t,
-        axWindowID: String
-    )
+    case appWindowsChanged(RuntimeAXWindowChangeEvidence)
 
     var appID: String {
         switch self {
-        case let .selected(appID, _),
-             let .appWindowsChanged(appID, _),
-             let .axWindowDestroyed(appID, _, _):
+        case let .selected(appID, _):
             appID
+        case let .appWindowsChanged(evidence):
+            evidence.appID
         }
     }
 
     var pid: pid_t {
         switch self {
-        case let .selected(_, pid),
-             let .appWindowsChanged(_, pid),
-             let .axWindowDestroyed(_, pid, _):
+        case let .selected(_, pid):
             pid
+        case let .appWindowsChanged(evidence):
+            evidence.pid
         }
     }
 
@@ -35,14 +30,13 @@ enum HomeAppDetailProjectionRequest {
                 appID: appID,
                 pid: pid
             )
-        case let .appWindowsChanged(appID, pid):
-            service.signalAppWindowsChanged(appID: appID, pid: pid)
-        case let .axWindowDestroyed(appID, pid, axWindowID):
-            service.signalAXWindowDestroyed(
-                appID: appID,
-                pid: pid,
-                axWindowID: axWindowID
-            )
+        case let .appWindowsChanged(evidence):
+            switch evidence.source {
+            case .observedTransition:
+                service.markAppWindowsDirty(evidence)
+            case .initialReadback, .trailingReadback:
+                service.signalAppWindowsChanged(evidence)
+            }
         }
     }
 }

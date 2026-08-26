@@ -1,4 +1,5 @@
 import Darwin
+import CoreGraphics
 import Foundation
 
 struct SpaceFixtureWindowOpenMutationRoute: Equatable {
@@ -26,13 +27,32 @@ struct SpaceFixtureWindowOpenMutationSnapshot: Equatable {
     let targetWindowPlanIndex: Int
     let targetWindowTitle: String
     let activeWindowPlanIndices: [Int]
+    let activeWindowTitlesByPlanIndex: [Int: String]
+    let activeCGWindowIDsByPlanIndex: [Int: CGWindowID]
+
+    init(
+        targetWindowPlanIndex: Int,
+        targetWindowTitle: String,
+        activeWindowPlanIndices: [Int],
+        activeWindowTitlesByPlanIndex: [Int: String] = [:],
+        activeCGWindowIDsByPlanIndex: [Int: CGWindowID] = [:]
+    ) {
+        self.targetWindowPlanIndex = targetWindowPlanIndex
+        self.targetWindowTitle = targetWindowTitle
+        self.activeWindowPlanIndices = activeWindowPlanIndices
+        self.activeWindowTitlesByPlanIndex =
+            activeWindowTitlesByPlanIndex
+        self.activeCGWindowIDsByPlanIndex =
+            activeCGWindowIDsByPlanIndex
+    }
 
     var logFields: String {
         "targetPlanIndex=\(targetWindowPlanIndex) "
             + "targetTitle=\(targetWindowTitle) "
             + "activePlanIndices=["
             + activeWindowPlanIndices.map(String.init).joined(separator: ",")
-            + "]"
+            + "] titles=\(activeWindowTitlesByPlanIndex) "
+            + "cgWindowIDs=\(activeCGWindowIDsByPlanIndex)"
     }
 }
 
@@ -60,6 +80,10 @@ enum SpaceFixtureWindowOpenMutationTransport {
         static let targetWindowPlanIndex = "targetWindowPlanIndex"
         static let targetWindowTitle = "targetWindowTitle"
         static let activeWindowPlanIndices = "activeWindowPlanIndices"
+        static let activeWindowTitlesByPlanIndex =
+            "activeWindowTitlesByPlanIndex"
+        static let activeCGWindowIDsByPlanIndex =
+            "activeCGWindowIDsByPlanIndex"
     }
 
     static func publish(
@@ -130,7 +154,21 @@ enum SpaceFixtureWindowOpenMutationTransport {
             snapshot: SpaceFixtureWindowOpenMutationSnapshot(
                 targetWindowPlanIndex: targetWindowPlanIndex,
                 targetWindowTitle: targetWindowTitle,
-                activeWindowPlanIndices: activeWindowPlanIndices
+                activeWindowPlanIndices: activeWindowPlanIndices,
+                activeWindowTitlesByPlanIndex:
+                    stringDictionary(
+                        userInfo[
+                            UserInfoKey
+                                .activeWindowTitlesByPlanIndex
+                        ]
+                    ),
+                activeCGWindowIDsByPlanIndex:
+                    cgWindowIDDictionary(
+                        userInfo[
+                            UserInfoKey
+                                .activeCGWindowIDsByPlanIndex
+                        ]
+                    )
             )
         )
     }
@@ -172,7 +210,26 @@ enum SpaceFixtureWindowOpenMutationTransport {
             UserInfoKey.targetWindowTitle:
                 evidence.snapshot.targetWindowTitle,
             UserInfoKey.activeWindowPlanIndices:
-                evidence.snapshot.activeWindowPlanIndices.map(NSNumber.init)
+                evidence.snapshot.activeWindowPlanIndices.map(NSNumber.init),
+            UserInfoKey.activeWindowTitlesByPlanIndex:
+                Dictionary(
+                    uniqueKeysWithValues:
+                        evidence.snapshot
+                            .activeWindowTitlesByPlanIndex
+                            .map { (String($0.key), $0.value) }
+                ),
+            UserInfoKey.activeCGWindowIDsByPlanIndex:
+                Dictionary(
+                    uniqueKeysWithValues:
+                        evidence.snapshot
+                            .activeCGWindowIDsByPlanIndex
+                            .map {
+                                (
+                                    String($0.key),
+                                    NSNumber(value: $0.value)
+                                )
+                            }
+                )
         ]
     }
 
@@ -217,6 +274,44 @@ enum SpaceFixtureWindowOpenMutationTransport {
             return nil
         }
         return indices
+    }
+
+    private static func stringDictionary(
+        _ value: Any?
+    ) -> [Int: String] {
+        guard let values = value as? [String: String] else {
+            return [:]
+        }
+        return Dictionary(
+            uniqueKeysWithValues:
+                values.compactMap { key, value in
+                    guard let index = Int(key), index > 0,
+                          !value.isEmpty
+                    else {
+                        return nil
+                    }
+                    return (index, value)
+                }
+        )
+    }
+
+    private static func cgWindowIDDictionary(
+        _ value: Any?
+    ) -> [Int: CGWindowID] {
+        guard let values = value as? [String: NSNumber] else {
+            return [:]
+        }
+        return Dictionary(
+            uniqueKeysWithValues:
+                values.compactMap { key, value in
+                    guard let index = Int(key), index > 0,
+                          value.uint32Value > 0
+                    else {
+                        return nil
+                    }
+                    return (index, value.uint32Value)
+                }
+        )
     }
 }
 

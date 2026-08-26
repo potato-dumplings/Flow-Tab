@@ -98,7 +98,7 @@ extension FlowTabPriorityCoverageTests {
             lock.unlock()
             return currentCount == 1
                 ? .waitingForEvidence([
-                    .destroyedWindowResolution
+                    .windowTopologyConvergence
                 ])
                 : .completed
         }

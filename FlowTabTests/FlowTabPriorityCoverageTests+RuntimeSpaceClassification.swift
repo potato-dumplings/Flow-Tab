@@ -674,7 +674,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
         let globalWindowIDs = model.session?.apps.first(where: { $0.id == appID })?.windows.map(\.id) ?? []
         model.cancelSelection()
-        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(
+            model.startFocusedAppWindowSession(triggerDirection: .forward),
+            .ready
+        )
         XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
         XCTAssertTrue(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().isEmpty)
         let focusedWindowIDs = model.session?.apps.first?.windows.map(\.id) ?? []

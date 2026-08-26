@@ -7,8 +7,10 @@ import Foundation
 protocol SpaceFixtureWindowing: AnyObject {
     var plan: SpaceFixtureWindowPlan { get }
     var applicationAccessibilityElement: Any { get }
+    var currentCGWindowID: CGWindowID { get }
     func show(isKey: Bool)
     func close()
+    func postDestroyedAccessibilityNotification()
     func windowCloseTopologySnapshot(
         remainingWindowPlanIndices: [Int]
     ) -> SpaceFixtureWindowCloseTopologySnapshot
@@ -80,6 +82,10 @@ final class SpaceFixtureWindowCoordinator {
     private var windowOpenMutationTriggerObservation:
         (any SpaceFixtureCancellable)?
     private var windowOpenMutationRequestGeneration = 0
+    private var windowMutationNoiseTokens:
+        [any SpaceFixtureCancellable] = []
+    private var windowMutationNoiseWindows:
+        [any SpaceFixtureWindowing] = []
 
     var lastDesktopRefocusWatchdogFailure:
         SpaceFixtureDesktopRefocusWatchdogFailure?
@@ -381,26 +387,51 @@ final class SpaceFixtureWindowCoordinator {
                 configuration
                     .windowCloseFaultTriggerRoute,
             snapshotProvider: { [weak self, targetWindow] in
-                targetWindow.windowCloseTopologySnapshot(
+                let targetSnapshot =
+                    targetWindow.windowCloseTopologySnapshot(
                     remainingWindowPlanIndices:
                         self?.windows
                             .map(\.plan.index) ?? []
                 )
+                let currentWindows = self?.windows ?? []
+                return SpaceFixtureWindowCloseTopologySnapshot(
+                    targetWindowPlanIndex:
+                        targetSnapshot.targetWindowPlanIndex,
+                    targetWindowNumber:
+                        targetSnapshot.targetWindowNumber,
+                    targetWindowIsVisible:
+                        targetSnapshot.targetWindowIsVisible,
+                    targetCGWindowIsOnScreen:
+                        targetSnapshot.targetCGWindowIsOnScreen,
+                    remainingWindowPlanIndices:
+                        targetSnapshot.remainingWindowPlanIndices,
+                    remainingWindowTitlesByPlanIndex:
+                        self?.configuration
+                            .usesChromeLikeWindowMutationNoise == true
+                        ? Dictionary(
+                            uniqueKeysWithValues:
+                                currentWindows.map {
+                                    ($0.plan.index, $0.plan.title)
+                                }
+                        ) : [:],
+                    remainingCGWindowIDsByPlanIndex:
+                        self?.configuration
+                            .usesChromeLikeWindowMutationNoise == true
+                        ? Dictionary(
+                            uniqueKeysWithValues:
+                                currentWindows.compactMap {
+                                    let windowID =
+                                        $0.currentCGWindowID
+                                    guard windowID > 0 else {
+                                        return nil
+                                    }
+                                    return ($0.plan.index, windowID)
+                                }
+                        ) : [:]
+                )
             },
             applyClose: { [weak self, targetWindow] in
-                guard let self,
-                      let index = self.windows.firstIndex(
-                        where: {
-                            $0.plan.index
-                                == targetWindow.plan.index
-                        }
-                      )
-                else {
-                    return
-                }
-                targetWindow.close()
-                self.windows.remove(at: index)
-                self.publishApplicationAccessibilityElements()
+                self?.applyWindowClose(targetWindow)
             },
             onWatchdog: { failure in
                 NSLog(
@@ -457,22 +488,129 @@ final class SpaceFixtureWindowCoordinator {
             return
         }
 
-        let openedWindow = windowFactory(deferredWindowPlan)
+        windowOpenMutationTriggerObservation?.cancel()
+        windowOpenMutationTriggerObservation = nil
+        if configuration.usesChromeLikeWindowMutationNoise {
+            beginChromeLikeWindowOpenNoise(
+                trigger: trigger,
+                route: route,
+                targetPlan: deferredWindowPlan
+            )
+            return
+        }
+        finishWindowOpenMutation(
+            trigger: trigger,
+            route: route,
+            targetPlan: deferredWindowPlan
+        )
+    }
+
+    private func finishWindowOpenMutation(
+        trigger: SpaceFixtureWindowOpenMutationTrigger,
+        route: SpaceFixtureWindowOpenMutationRoute,
+        targetPlan: SpaceFixtureWindowPlan
+    ) {
+        guard trigger.requestGeneration
+                == windowOpenMutationRequestGeneration,
+              deferredWindowPlan?.index == targetPlan.index
+        else {
+            return
+        }
+        let openedWindow = windowFactory(targetPlan)
         self.deferredWindowPlan = nil
         windows.append(openedWindow)
         windows.sort { $0.plan.index < $1.plan.index }
         activateApplication()
         openedWindow.show(isKey: true)
         publishApplicationAccessibilityElements()
-        windowOpenMutationTriggerObservation?.cancel()
-        windowOpenMutationTriggerObservation = nil
         publishWindowOpenMutationEvidence(
             phase: .applied,
             requestGeneration: trigger.requestGeneration,
             identity: trigger.identity,
-            targetPlan: deferredWindowPlan,
+            targetPlan: targetPlan,
             route: route
         )
+    }
+
+    private func beginChromeLikeWindowOpenNoise(
+        trigger: SpaceFixtureWindowOpenMutationTrigger,
+        route: SpaceFixtureWindowOpenMutationRoute,
+        targetPlan: SpaceFixtureWindowPlan
+    ) {
+        let transientPlan = SpaceFixtureWindowPlan(
+            index: targetPlan.index + 10_000,
+            totalWindowCount: targetPlan.totalWindowCount,
+            configuredTitle: "AX Transient",
+            fixtureAppName: targetPlan.fixtureAppName,
+            title: "\(targetPlan.title) AX Transient",
+            frame: targetPlan.frame.offsetBy(dx: 18, dy: -18),
+            isFullscreenTarget: false,
+            tabs: [],
+            noisyCGSiblings: false,
+            publishesApplicationAXWindow: true
+        )
+        let transientWindow = windowFactory(transientPlan)
+        windowMutationNoiseWindows = [transientWindow]
+        windows.append(transientWindow)
+        activateApplication()
+        transientWindow.show(isKey: false)
+        publishApplicationAccessibilityElements()
+        let token = scheduler.schedule(afterMilliseconds: 35) {
+            [weak self, weak transientWindow] in
+            guard let self, let transientWindow else { return }
+            transientWindow.close()
+            transientWindow.postDestroyedAccessibilityNotification()
+            self.windows.removeAll {
+                $0 === transientWindow
+            }
+            self.windowMutationNoiseWindows.removeAll()
+            self.publishApplicationAccessibilityElements()
+            self.finishWindowOpenMutation(
+                trigger: trigger,
+                route: route,
+                targetPlan: targetPlan
+            )
+        }
+        windowMutationNoiseTokens.append(token)
+    }
+
+    private func applyWindowClose(
+        _ targetWindow: any SpaceFixtureWindowing
+    ) {
+        guard let targetIndex = windows.firstIndex(where: {
+            $0 === targetWindow
+        }) else {
+            return
+        }
+        guard configuration.usesChromeLikeWindowMutationNoise,
+              let retiredSurvivor = windows.first(where: {
+                $0.plan.index > targetWindow.plan.index
+              })
+        else {
+            targetWindow.close()
+            windows.remove(at: targetIndex)
+            publishApplicationAccessibilityElements()
+            return
+        }
+
+        let survivorPlan = retiredSurvivor.plan
+        targetWindow.close()
+        windows.removeAll { $0 === targetWindow }
+        windows.reverse()
+        publishApplicationAccessibilityElements()
+
+        retiredSurvivor.close()
+        windows.removeAll { $0 === retiredSurvivor }
+        publishApplicationAccessibilityElements()
+        targetWindow.postDestroyedAccessibilityNotification()
+        targetWindow.postDestroyedAccessibilityNotification()
+        retiredSurvivor.postDestroyedAccessibilityNotification()
+
+        let rebuiltSurvivor = windowFactory(survivorPlan)
+        windows.insert(rebuiltSurvivor, at: 0)
+        activateApplication()
+        rebuiltSurvivor.show(isKey: true)
+        publishApplicationAccessibilityElements()
     }
 
     private func publishWindowOpenMutationEvidence(
@@ -491,7 +629,27 @@ final class SpaceFixtureWindowCoordinator {
                     targetWindowPlanIndex: targetPlan.index,
                     targetWindowTitle: targetPlan.title,
                     activeWindowPlanIndices:
-                        windows.map(\.plan.index).sorted()
+                        windows.map(\.plan.index).sorted(),
+                    activeWindowTitlesByPlanIndex:
+                        configuration.usesChromeLikeWindowMutationNoise
+                        ? Dictionary(
+                            uniqueKeysWithValues: windows.map {
+                                ($0.plan.index, $0.plan.title)
+                            }
+                        ) : [:],
+                    activeCGWindowIDsByPlanIndex:
+                        configuration.usesChromeLikeWindowMutationNoise
+                        ? Dictionary(
+                            uniqueKeysWithValues:
+                                windows.compactMap {
+                                    let windowID =
+                                        $0.currentCGWindowID
+                                    guard windowID > 0 else {
+                                        return nil
+                                    }
+                                    return ($0.plan.index, windowID)
+                                }
+                        ) : [:]
                 )
             ),
             route
@@ -685,6 +843,10 @@ final class SpaceFixtureWindowCoordinator {
         workflowReadinessOwner.cancel()
         windowOpenMutationTriggerObservation?.cancel()
         windowOpenMutationTriggerObservation = nil
+        windowMutationNoiseTokens.forEach { $0.cancel() }
+        windowMutationNoiseTokens.removeAll()
+        windowMutationNoiseWindows.forEach { $0.close() }
+        windowMutationNoiseWindows.removeAll()
         deferredWindowPlan = nil
         SpaceFixtureWorkflowReadinessTransport
             .removeReadbackEvidence(

@@ -139,6 +139,14 @@ final class RuntimeUITestFrontmostProjectionService: RuntimeProjectionServing, @
         signalFocusedCurrentAppWindowsChanged()
     }
 
+    func markAppWindowsDirty(_ evidence: RuntimeAXWindowChangeEvidence) {
+        baseService.markAppWindowsDirty(evidence)
+    }
+
+    func signalAppWindowsChanged(_ evidence: RuntimeAXWindowChangeEvidence) {
+        baseService.signalAppWindowsChanged(evidence)
+    }
+
     func signalAppWindowsChanged(appID: String, pid: pid_t) {
         baseService.signalAppWindowsChanged(appID: appID, pid: pid)
     }
@@ -156,10 +164,6 @@ final class RuntimeUITestFrontmostProjectionService: RuntimeProjectionServing, @
             appID: target.appID,
             pid: target.pid
         )
-    }
-
-    func signalAXWindowDestroyed(appID: String, pid: pid_t, axWindowID: String) {
-        baseService.signalAXWindowDestroyed(appID: appID, pid: pid, axWindowID: axWindowID)
     }
 
     func signalAppTerminated(appID: String, pid: pid_t) {

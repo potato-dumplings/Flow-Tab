@@ -65,12 +65,38 @@ struct RuntimeAXWindowChangeEvidence: Equatable, Sendable {
         case trailingReadback
     }
 
+    enum ChangeKind: String, Hashable, Sendable {
+        case created
+        case destroyed
+        case focus
+        case visibility
+    }
+
     let appID: String
     let pid: pid_t
     let generation: UInt64
     let source: Source
     let observedTransitionCount: Int
+    let changeKinds: Set<ChangeKind>
     let initialReadback: RuntimeAXWindowInitialReadbackEvidence?
+
+    init(
+        appID: String,
+        pid: pid_t,
+        generation: UInt64,
+        source: Source,
+        observedTransitionCount: Int,
+        changeKinds: Set<ChangeKind> = [],
+        initialReadback: RuntimeAXWindowInitialReadbackEvidence?
+    ) {
+        self.appID = appID
+        self.pid = pid
+        self.generation = generation
+        self.source = source
+        self.observedTransitionCount = observedTransitionCount
+        self.changeKinds = changeKinds
+        self.initialReadback = initialReadback
+    }
 
     var requiresReconciliation: Bool {
         initialReadback?.requiresReconciliation ?? true
@@ -161,6 +187,7 @@ final class RuntimeAXWindowChangeDeliveryCoordinator {
         let bindingGeneration: UInt64
         var latestEvidenceGeneration: UInt64
         var observedTransitionCount: Int
+        var changeKinds: Set<RuntimeAXWindowChangeEvidence.ChangeKind>
         var token: any RuntimeAXWindowChangeDeliveryCancellable
     }
 
@@ -207,6 +234,7 @@ final class RuntimeAXWindowChangeDeliveryCoordinator {
             bindingGeneration: bindingGeneration,
             source: .initialReadback,
             observedTransitionCount: 0,
+            changeKinds: [],
             initialReadback: readback
         ) else {
             return
@@ -214,22 +242,29 @@ final class RuntimeAXWindowChangeDeliveryCoordinator {
         publish(evidence)
     }
 
-    func recordObservedTransition(pid: pid_t, bindingGeneration: UInt64) {
+    func recordObservedTransition(
+        pid: pid_t,
+        bindingGeneration: UInt64,
+        changeKind: RuntimeAXWindowChangeEvidence.ChangeKind
+    ) {
         guard let evidence = makeEvidence(
             pid: pid,
             bindingGeneration: bindingGeneration,
             source: .observedTransition,
             observedTransitionCount: 1,
+            changeKinds: [changeKind],
             initialReadback: nil
         ) else {
             return
         }
+        publish(evidence)
 
         if var pending = pendingByPID[pid],
            pending.bindingGeneration == bindingGeneration {
             pending.token.cancel()
             pending.latestEvidenceGeneration = evidence.generation
             pending.observedTransitionCount += 1
+            pending.changeKinds.insert(changeKind)
             pending.token = scheduleTrailingReadback(
                 pid: pid,
                 bindingGeneration: bindingGeneration,
@@ -243,6 +278,7 @@ final class RuntimeAXWindowChangeDeliveryCoordinator {
             bindingGeneration: bindingGeneration,
             latestEvidenceGeneration: evidence.generation,
             observedTransitionCount: 1,
+            changeKinds: [changeKind],
             token: scheduleTrailingReadback(
                 pid: pid,
                 bindingGeneration: bindingGeneration,
@@ -272,6 +308,7 @@ final class RuntimeAXWindowChangeDeliveryCoordinator {
         bindingGeneration: UInt64,
         source: RuntimeAXWindowChangeEvidence.Source,
         observedTransitionCount: Int,
+        changeKinds: Set<RuntimeAXWindowChangeEvidence.ChangeKind>,
         initialReadback: RuntimeAXWindowInitialReadbackEvidence?
     ) -> RuntimeAXWindowChangeEvidence? {
         guard let binding = bindingsByPID[pid],
@@ -286,6 +323,7 @@ final class RuntimeAXWindowChangeDeliveryCoordinator {
             generation: generation,
             source: source,
             observedTransitionCount: observedTransitionCount,
+            changeKinds: changeKinds,
             initialReadback: initialReadback
         )
         nextEvidenceGenerationByPID[pid] = generation &+ 1
@@ -316,6 +354,7 @@ final class RuntimeAXWindowChangeDeliveryCoordinator {
                 generation: pending.latestEvidenceGeneration,
                 source: .trailingReadback,
                 observedTransitionCount: pending.observedTransitionCount,
+                changeKinds: pending.changeKinds,
                 initialReadback: nil
             )
         )
@@ -350,6 +389,7 @@ final class RuntimeAXWindowChangeDeliveryCoordinator {
                 "generation=\(evidence.generation)",
                 "source=\(evidence.source.rawValue)",
                 "observedTransitions=\(evidence.observedTransitionCount)",
+                "changeKinds=\(evidence.changeKinds.map(\.rawValue).sorted().joined(separator: ","))",
                 "requiresReconciliation=\(evidence.requiresReconciliation ? 1 : 0)",
                 initialReadbackLogDetails(evidence.initialReadback)
             ].joined(separator: " ")

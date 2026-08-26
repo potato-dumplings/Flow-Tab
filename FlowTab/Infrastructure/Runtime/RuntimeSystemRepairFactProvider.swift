@@ -41,7 +41,8 @@ final class RuntimeSystemRepairFactProvider {
     func collectAXWindowData(
         for runningApps: [NSRunningApplication],
         cgWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
-        allCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]] = [:]
+        allCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]] = [:],
+        allCGCollectionIsComplete: Bool
     ) -> [pid_t: [RuntimeWindowListEntry]] {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         guard AccessibilityPermissionChecker.isTrusted() else {
@@ -102,7 +103,10 @@ final class RuntimeSystemRepairFactProvider {
                 cgWindows: collection.allCGWindows,
                 pid: app.processIdentifier,
                 appName: appName,
-                remoteScanCompleteness: windowsFetchResult.remoteScanCompleteness
+                remoteScanCompleteness: windowsFetchResult.remoteScanCompleteness,
+                axCollectionIsComplete:
+                    windowsFetchResult.error == .success,
+                cgCollectionIsComplete: allCGCollectionIsComplete
             )
             let resolveReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
             totalRawWindows += windows.count
@@ -269,7 +273,9 @@ final class RuntimeSystemRepairFactProvider {
         cgWindows: [RuntimeCGWindowEntry],
         pid: pid_t,
         appName: String,
-        remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil
+        remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil,
+        axCollectionIsComplete: Bool,
+        cgCollectionIsComplete: Bool
     ) -> [RuntimeWindowListEntry] {
         RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
             windowRecordStore: windowRecordStore,
@@ -277,7 +283,9 @@ final class RuntimeSystemRepairFactProvider {
             cgWindows: cgWindows,
             pid: pid,
             appName: appName,
-            remoteScanCompleteness: remoteScanCompleteness
+            remoteScanCompleteness: remoteScanCompleteness,
+            axCollectionIsComplete: axCollectionIsComplete,
+            cgCollectionIsComplete: cgCollectionIsComplete
         )
     }
 
@@ -300,7 +308,11 @@ final class RuntimeSystemRepairFactProvider {
                     ("totalMs", FactDiagnostics.formatMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
                 ]
             )
-            return RuntimeCGWindowCollection(windowsByPID: [:], spaceTopologyDiff: nil)
+            return RuntimeCGWindowCollection(
+                windowsByPID: [:],
+                spaceTopologyDiff: nil,
+                isComplete: false
+            )
         }
         let copyReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
 
@@ -385,7 +397,8 @@ final class RuntimeSystemRepairFactProvider {
         )
         return RuntimeCGWindowCollection(
             windowsByPID: enrichedWindowsByPID,
-            spaceTopologyDiff: spaceTopologyDiff
+            spaceTopologyDiff: spaceTopologyDiff,
+            isComplete: true
         )
     }
 

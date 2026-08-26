@@ -76,14 +76,12 @@ extension FlowTabPriorityCoverageTests {
     func testAppLaunchWindowEvidenceUsesImmediateObserverInstallation() {
         let monitor = ManualAppLaunchWindowMonitor(installEvidence: [.installed])
         let retryScheduler = ManualAppLaunchObservationRetryScheduler()
-        var windowChangeSignals: [(String, pid_t)] = []
-        var destroyedSignals: [(String, pid_t, String)] = []
+        var evidence: [RuntimeAXWindowChangeEvidence] = []
         let coordinator = RuntimeAppLaunchWindowEvidenceCoordinator(
             monitor: monitor,
             retryScheduler: retryScheduler,
             currentPID: 99_999,
-            onAppWindowChanged: { windowChangeSignals.append(($0, $1)) },
-            onAXWindowDestroyed: { destroyedSignals.append(($0, $1, $2)) }
+            onAppWindowEvidence: { evidence.append($0) }
         )
 
         coordinator.prepareObservation(
@@ -93,19 +91,33 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(monitor.observations.map(\.appID), ["com.example.immediate"])
         XCTAssertEqual(monitor.observations.map(\.pid), [18_410])
-        XCTAssertTrue(retryScheduler.entries.isEmpty)
+        XCTAssertEqual(retryScheduler.entries.count, 1)
+        retryScheduler.fireEntry(at: 0)
+        XCTAssertEqual(monitor.observations.map(\.appID), [
+            "com.example.immediate",
+            "com.example.immediate"
+        ])
+        XCTAssertEqual(evidence.map(\.appID), ["com.example.immediate"])
 
-        monitor.sendWindowChanged(appID: "com.example.immediate", pid: 18_410)
-        monitor.sendWindowDestroyed(
+        monitor.sendWindowChanged(
             appID: "com.example.immediate",
             pid: 18_410,
-            axWindowID: "ax:18410:1"
+            changeKind: .created
         )
-        XCTAssertEqual(windowChangeSignals.map(\.0), ["com.example.immediate"])
-        XCTAssertEqual(windowChangeSignals.map(\.1), [18_410])
-        XCTAssertEqual(destroyedSignals.map(\.0), ["com.example.immediate"])
-        XCTAssertEqual(destroyedSignals.map(\.1), [18_410])
-        XCTAssertEqual(destroyedSignals.map(\.2), ["ax:18410:1"])
+        monitor.sendWindowDestroyed(
+            appID: "com.example.immediate",
+            pid: 18_410
+        )
+        XCTAssertEqual(evidence.map(\.appID), [
+            "com.example.immediate",
+            "com.example.immediate",
+            "com.example.immediate"
+        ])
+        XCTAssertEqual(evidence.map(\.pid), [18_410, 18_410, 18_410])
+        XCTAssertEqual(
+            evidence.map(\.changeKinds),
+            [[], [.created], [.destroyed]]
+        )
     }
 
     @MainActor
@@ -113,14 +125,13 @@ extension FlowTabPriorityCoverageTests {
         let monitor = ManualAppLaunchWindowMonitor(
             installEvidence: [.installed]
         )
-        var changedEvents: [(String, pid_t)] = []
+        var changedEvents: [RuntimeAXWindowChangeEvidence] = []
         let pid: pid_t = 18_410
         let coordinator = RuntimeAppLaunchWindowEvidenceCoordinator(
             monitor: monitor,
             retryScheduler: ManualAppLaunchObservationRetryScheduler(),
             currentPID: 99_999,
-            onAppWindowChanged: { changedEvents.append(($0, $1)) },
-            onAXWindowDestroyed: { _, _, _ in }
+            onAppWindowEvidence: { changedEvents.append($0) }
         )
         coordinator.prepareObservation(
             appID: "com.example.early-events",
@@ -135,11 +146,11 @@ extension FlowTabPriorityCoverageTests {
             pid: pid
         )
 
-        XCTAssertEqual(changedEvents.map(\.0), [
+        XCTAssertEqual(changedEvents.map(\.appID), [
             "com.example.early-events",
             "com.example.early-events"
         ])
-        XCTAssertEqual(changedEvents.map(\.1), [pid, pid])
+        XCTAssertEqual(changedEvents.map(\.pid), [pid, pid])
     }
 
     @MainActor
@@ -151,13 +162,12 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let retryScheduler = ManualAppLaunchObservationRetryScheduler()
-        var windowChangeSignals: [(String, pid_t)] = []
+        var windowChangeSignals: [RuntimeAXWindowChangeEvidence] = []
         let coordinator = RuntimeAppLaunchWindowEvidenceCoordinator(
             monitor: monitor,
             retryScheduler: retryScheduler,
             currentPID: 99_999,
-            onAppWindowChanged: { windowChangeSignals.append(($0, $1)) },
-            onAXWindowDestroyed: { _, _, _ in }
+            onAppWindowEvidence: { windowChangeSignals.append($0) }
         )
 
         coordinator.prepareObservation(
@@ -171,12 +181,13 @@ extension FlowTabPriorityCoverageTests {
         retryScheduler.fireEntry(at: 0)
 
         XCTAssertEqual(monitor.observations.count, 2)
-        XCTAssertEqual(windowChangeSignals.map(\.0), ["com.example.delayed"])
-        XCTAssertEqual(windowChangeSignals.map(\.1), [18_411])
+        XCTAssertEqual(windowChangeSignals.map(\.appID), ["com.example.delayed"])
+        XCTAssertEqual(windowChangeSignals.map(\.pid), [18_411])
+        XCTAssertEqual(retryScheduler.entries.count, 2)
 
-        retryScheduler.fireEntry(at: 0)
-        XCTAssertEqual(monitor.observations.count, 2)
-        XCTAssertEqual(windowChangeSignals.count, 1)
+        retryScheduler.fireEntry(at: 1)
+        XCTAssertEqual(monitor.observations.count, 3)
+        XCTAssertEqual(windowChangeSignals.count, 2)
     }
 
     @MainActor
@@ -185,13 +196,12 @@ extension FlowTabPriorityCoverageTests {
             installEvidence: [.unavailable(error: .cannotComplete)]
         )
         let retryScheduler = ManualAppLaunchObservationRetryScheduler()
-        var windowChangeSignals: [(String, pid_t)] = []
+        var windowChangeSignals: [RuntimeAXWindowChangeEvidence] = []
         let coordinator = RuntimeAppLaunchWindowEvidenceCoordinator(
             monitor: monitor,
             retryScheduler: retryScheduler,
             currentPID: 99_999,
-            onAppWindowChanged: { windowChangeSignals.append(($0, $1)) },
-            onAXWindowDestroyed: { _, _, _ in }
+            onAppWindowEvidence: { windowChangeSignals.append($0) }
         )
 
         coordinator.prepareObservation(
@@ -219,8 +229,7 @@ extension FlowTabPriorityCoverageTests {
             monitor: monitor,
             retryScheduler: ManualAppLaunchObservationRetryScheduler(),
             currentPID: 99_999,
-            onAppWindowChanged: { _, _ in },
-            onAXWindowDestroyed: { _, _, _ in }
+            onAppWindowEvidence: { _ in }
         )
         let reusedPID: pid_t = 18_413
 
@@ -244,8 +253,7 @@ extension FlowTabPriorityCoverageTests {
             monitor: monitor,
             retryScheduler: retryScheduler,
             currentPID: 99_999,
-            onAppWindowChanged: { _, _ in },
-            onAXWindowDestroyed: { _, _, _ in }
+            onAppWindowEvidence: { _ in }
         )
 
         coordinator.prepareObservation(appID: "com.example.shutdown", pid: 18_414)
@@ -264,13 +272,12 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let retryScheduler = ManualAppLaunchObservationRetryScheduler()
-        var windowChangeSignals: [(String, pid_t)] = []
+        var windowChangeSignals: [RuntimeAXWindowChangeEvidence] = []
         let coordinator = RuntimeAppLaunchWindowEvidenceCoordinator(
             monitor: monitor,
             retryScheduler: retryScheduler,
             currentPID: 99_999,
-            onAppWindowChanged: { windowChangeSignals.append(($0, $1)) },
-            onAXWindowDestroyed: { _, _, _ in }
+            onAppWindowEvidence: { windowChangeSignals.append($0) }
         )
 
         coordinator.prepareObservation(appID: "com.example.first", pid: 18_413)
@@ -312,7 +319,6 @@ final class SpyAppLaunchWindowEvidenceCoordinator:
 @MainActor
 private final class ManualAppLaunchWindowMonitor: RuntimeAXWindowChangeMonitoring {
     var onAppWindowChanged: ((RuntimeAXWindowChangeEvidence) -> Void)?
-    var onAXWindowDestroyed: ((String, pid_t, String) -> Void)?
     private var installEvidence: [RuntimeAXWindowObservationInstallEvidence]
     private(set) var observations: [(appID: String, pid: pid_t)] = []
     private(set) var stoppedPIDs: [pid_t] = []
@@ -338,7 +344,11 @@ private final class ManualAppLaunchWindowMonitor: RuntimeAXWindowChangeMonitorin
         stopCallCount += 1
     }
 
-    func sendWindowChanged(appID: String, pid: pid_t) {
+    func sendWindowChanged(
+        appID: String,
+        pid: pid_t,
+        changeKind: RuntimeAXWindowChangeEvidence.ChangeKind = .visibility
+    ) {
         onAppWindowChanged?(
             RuntimeAXWindowChangeEvidence(
                 appID: appID,
@@ -346,13 +356,18 @@ private final class ManualAppLaunchWindowMonitor: RuntimeAXWindowChangeMonitorin
                 generation: 1,
                 source: .observedTransition,
                 observedTransitionCount: 1,
+                changeKinds: [changeKind],
                 initialReadback: nil
             )
         )
     }
 
-    func sendWindowDestroyed(appID: String, pid: pid_t, axWindowID: String) {
-        onAXWindowDestroyed?(appID, pid, axWindowID)
+    func sendWindowDestroyed(appID: String, pid: pid_t) {
+        sendWindowChanged(
+            appID: appID,
+            pid: pid,
+            changeKind: .destroyed
+        )
     }
 }
 

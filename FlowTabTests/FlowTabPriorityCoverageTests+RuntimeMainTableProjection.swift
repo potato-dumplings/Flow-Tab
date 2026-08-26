@@ -1956,7 +1956,7 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
-    func testRuntimeProjectionServiceCommitsAXDestroyedProjectionFromMainTablesAsStale() throws {
+    func testRuntimeProjectionServiceCommitsDestroyedTopologyProjectionAsStale() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)
         let pid = runningApp.processIdentifier
@@ -2025,10 +2025,16 @@ extension FlowTabPriorityCoverageTests {
             }
         )
 
-        service.signalAXWindowDestroyed(
-            appID: appID,
-            pid: pid,
-            axWindowID: axWindowID
+        service.signalAppWindowsChanged(
+            RuntimeAXWindowChangeEvidence(
+                appID: appID,
+                pid: pid,
+                generation: 1,
+                source: .trailingReadback,
+                observedTransitionCount: 1,
+                changeKinds: [.destroyed],
+                initialReadback: nil
+            )
         )
         service.waitForMaintenanceQueueForTesting()
 
@@ -2044,11 +2050,11 @@ extension FlowTabPriorityCoverageTests {
         )
         let contextWindow = projection.currentAppWindowPayload.context.windowsByID[projectedWindowID]
         XCTAssertEqual(contextWindow?.cgWindowID, cgWindowID)
-        XCTAssertNil(contextWindow?.axWindow)
+        XCTAssertNotNil(contextWindow?.axWindow)
         XCTAssertFalse(projection.freshness.isCompleteForScope)
         XCTAssertEqual(projection.freshness.dirtyAppIDs, [appID])
         XCTAssertEqual(projection.freshness.dirtyPIDs, [pid])
-        XCTAssertTrue(projection.freshness.pendingRepairScopes.contains("axWindowDestroyed:\(appID)"))
+        XCTAssertTrue(projection.freshness.pendingRepairScopes.contains("appWindows:\(appID)"))
 
         let homeDetailProjection = try XCTUnwrap(
             readModelStore.readHomeAppDetailProjection(appID: appID)
@@ -2056,12 +2062,20 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(homeDetailProjection.candidate.windows.map(\.id), [
             RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
         ])
-        XCTAssertNil(homeDetailProjection.context.windowsByID[projectedWindowID]?.axWindow)
+        XCTAssertNotNil(homeDetailProjection.context.windowsByID[projectedWindowID]?.axWindow)
 
-        let downgradedRecord = windowRecordStore.state(for: pid)?
+        let retainedRecord = windowRecordStore.state(for: pid)?
             .windowRecordsByCGWindowID[cgWindowID]
-        XCTAssertNil(downgradedRecord?.currentAXAttachment)
-        XCTAssertTrue(downgradedRecord?.needsReconciliation == true)
+        XCTAssertNotNil(retainedRecord?.currentAXAttachment)
+        XCTAssertEqual(
+            retainedRecord?.lastConfirmationSource,
+            .verifiedFocusReadback
+        )
+        XCTAssertNotNil(
+            windowRecordStore.pendingWindowTopologyInvalidationGeneration(
+                processIdentifier: pid
+            )
+        )
         requestLock.lock()
         let startedTargets = startedRequests.map(\.target)
         requestLock.unlock()

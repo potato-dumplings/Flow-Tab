@@ -88,7 +88,7 @@ final class RuntimeAppLaunchWindowEvidenceCoordinator:
     private let monitor: any RuntimeAXWindowChangeMonitoring
     private let retryScheduler: any RuntimeAppLaunchObservationRetryScheduling
     private let currentPID: pid_t
-    private let onAppWindowChanged: (String, pid_t) -> Void
+    private let onAppWindowEvidence: (RuntimeAXWindowChangeEvidence) -> Void
     private var nextGeneration: UInt64 = 1
     private var activeAppIDsByPID: [pid_t: String] = [:]
     private var pendingObservationsByPID: [pid_t: PendingObservation] = [:]
@@ -97,23 +97,20 @@ final class RuntimeAppLaunchWindowEvidenceCoordinator:
         monitor: any RuntimeAXWindowChangeMonitoring,
         retryScheduler: any RuntimeAppLaunchObservationRetryScheduling,
         currentPID: pid_t = ProcessInfo.processInfo.processIdentifier,
-        onAppWindowChanged: @escaping (String, pid_t) -> Void,
-        onAXWindowDestroyed: @escaping (String, pid_t, String) -> Void
+        onAppWindowEvidence:
+            @escaping (RuntimeAXWindowChangeEvidence) -> Void
     ) {
         self.monitor = monitor
         self.retryScheduler = retryScheduler
         self.currentPID = currentPID
-        self.onAppWindowChanged = onAppWindowChanged
-        monitor.onAppWindowChanged = { evidence in
-            onAppWindowChanged(evidence.appID, evidence.pid)
-        }
-        monitor.onAXWindowDestroyed = onAXWindowDestroyed
+        self.onAppWindowEvidence = onAppWindowEvidence
+        monitor.onAppWindowChanged = onAppWindowEvidence
     }
 
     convenience init(
         currentPID: pid_t = ProcessInfo.processInfo.processIdentifier,
-        onAppWindowChanged: @escaping (String, pid_t) -> Void,
-        onAXWindowDestroyed: @escaping (String, pid_t, String) -> Void
+        onAppWindowEvidence:
+            @escaping (RuntimeAXWindowChangeEvidence) -> Void
     ) {
         self.init(
             monitor: RuntimeAXWindowChangeMonitor(
@@ -121,8 +118,7 @@ final class RuntimeAppLaunchWindowEvidenceCoordinator:
             ),
             retryScheduler: RuntimeAppLaunchObservationRetryScheduler(),
             currentPID: currentPID,
-            onAppWindowChanged: onAppWindowChanged,
-            onAXWindowDestroyed: onAXWindowDestroyed
+            onAppWindowEvidence: onAppWindowEvidence
         )
     }
 
@@ -136,6 +132,11 @@ final class RuntimeAppLaunchWindowEvidenceCoordinator:
 
         switch monitor.observe(appID: appID, pid: pid) {
         case .installed:
+            scheduleInitialReadbackRefresh(
+                appID: appID,
+                pid: pid,
+                generation: generation
+            )
             RuntimeLog.debug(
                 .projection,
                 "appLaunchWindowEvidence observerInstalled appID=\(appID) pid=\(pid) initialReadback=appLaunchRepair"
@@ -201,11 +202,27 @@ final class RuntimeAppLaunchWindowEvidenceCoordinator:
         switch monitor.observe(appID: pending.appID, pid: pid) {
         case .installed:
             pendingObservationsByPID.removeValue(forKey: pid)
+            if pending.lastInstallError != .success {
+                scheduleInitialReadbackRefresh(
+                    appID: pending.appID,
+                    pid: pid,
+                    generation: generation
+                )
+            }
             RuntimeLog.debug(
                 .projection,
                 "appLaunchWindowEvidence observerInstalled appID=\(pending.appID) pid=\(pid) initialReadback=appWindowsChanged"
             )
-            onAppWindowChanged(pending.appID, pid)
+            onAppWindowEvidence(
+                RuntimeAXWindowChangeEvidence(
+                    appID: pending.appID,
+                    pid: pid,
+                    generation: generation,
+                    source: .trailingReadback,
+                    observedTransitionCount: 0,
+                    initialReadback: nil
+                )
+            )
         case .unavailable(let error):
             pending.lastInstallError = error
             pendingObservationsByPID[pid] = pending
@@ -216,6 +233,20 @@ final class RuntimeAppLaunchWindowEvidenceCoordinator:
     private func invalidatePendingObservation(pid: pid_t) {
         let pending = pendingObservationsByPID.removeValue(forKey: pid)
         pending?.retry?.cancel()
+    }
+
+    private func scheduleInitialReadbackRefresh(
+        appID: String,
+        pid: pid_t,
+        generation: UInt64
+    ) {
+        pendingObservationsByPID[pid] = PendingObservation(
+            appID: appID,
+            generation: generation,
+            lastInstallError: .success,
+            retry: nil
+        )
+        scheduleRetry(pid: pid, generation: generation)
     }
 }
 

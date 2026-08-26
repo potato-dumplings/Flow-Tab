@@ -61,6 +61,28 @@ struct SpaceFixtureWindowCloseTopologySnapshot:
     let targetWindowIsVisible: Bool
     let targetCGWindowIsOnScreen: Bool
     let remainingWindowPlanIndices: [Int]
+    let remainingWindowTitlesByPlanIndex: [Int: String]
+    let remainingCGWindowIDsByPlanIndex: [Int: CGWindowID]
+
+    init(
+        targetWindowPlanIndex: Int,
+        targetWindowNumber: CGWindowID,
+        targetWindowIsVisible: Bool,
+        targetCGWindowIsOnScreen: Bool,
+        remainingWindowPlanIndices: [Int],
+        remainingWindowTitlesByPlanIndex: [Int: String] = [:],
+        remainingCGWindowIDsByPlanIndex: [Int: CGWindowID] = [:]
+    ) {
+        self.targetWindowPlanIndex = targetWindowPlanIndex
+        self.targetWindowNumber = targetWindowNumber
+        self.targetWindowIsVisible = targetWindowIsVisible
+        self.targetCGWindowIsOnScreen = targetCGWindowIsOnScreen
+        self.remainingWindowPlanIndices = remainingWindowPlanIndices
+        self.remainingWindowTitlesByPlanIndex =
+            remainingWindowTitlesByPlanIndex
+        self.remainingCGWindowIDsByPlanIndex =
+            remainingCGWindowIDsByPlanIndex
+    }
 
     func isResolved(
         expectedTargetWindowPlanIndex: Int
@@ -106,7 +128,8 @@ struct SpaceFixtureWindowCloseTopologySnapshot:
             + remainingWindowPlanIndices
                 .map(String.init)
                 .joined(separator: ",")
-            + "]"
+            + "] titles=\(remainingWindowTitlesByPlanIndex) "
+            + "cgWindowIDs=\(remainingCGWindowIDsByPlanIndex)"
     }
 }
 
@@ -170,6 +193,10 @@ enum SpaceFixtureWindowCloseFaultEvidenceTransport {
             "targetCGWindowIsOnScreen"
         static let remainingWindowPlanIndices =
             "remainingWindowPlanIndices"
+        static let remainingWindowTitlesByPlanIndex =
+            "remainingWindowTitlesByPlanIndex"
+        static let remainingCGWindowIDsByPlanIndex =
+            "remainingCGWindowIDsByPlanIndex"
     }
 
     static func publish(
@@ -272,7 +299,21 @@ enum SpaceFixtureWindowCloseFaultEvidenceTransport {
                 targetCGWindowIsOnScreen:
                     targetCGWindowIsOnScreen,
                 remainingWindowPlanIndices:
-                    remainingWindowPlanIndices
+                    remainingWindowPlanIndices,
+                remainingWindowTitlesByPlanIndex:
+                    stringDictionary(
+                        userInfo[
+                            UserInfoKey
+                                .remainingWindowTitlesByPlanIndex
+                        ]
+                    ),
+                remainingCGWindowIDsByPlanIndex:
+                    cgWindowIDDictionary(
+                        userInfo[
+                            UserInfoKey
+                                .remainingCGWindowIDsByPlanIndex
+                        ]
+                    )
             )
         guard phase != .applied
             || snapshot.isResolved(
@@ -345,7 +386,26 @@ enum SpaceFixtureWindowCloseFaultEvidenceTransport {
             UserInfoKey.remainingWindowPlanIndices:
                 evidence.snapshot
                     .remainingWindowPlanIndices
-                    .map { NSNumber(value: $0) }
+                    .map { NSNumber(value: $0) },
+            UserInfoKey.remainingWindowTitlesByPlanIndex:
+                Dictionary(
+                    uniqueKeysWithValues:
+                        evidence.snapshot
+                            .remainingWindowTitlesByPlanIndex
+                            .map { (String($0.key), $0.value) }
+                ),
+            UserInfoKey.remainingCGWindowIDsByPlanIndex:
+                Dictionary(
+                    uniqueKeysWithValues:
+                        evidence.snapshot
+                            .remainingCGWindowIDsByPlanIndex
+                            .map {
+                                (
+                                    String($0.key),
+                                    NSNumber(value: $0.value)
+                                )
+                            }
+                )
         ]
     }
 
@@ -385,6 +445,44 @@ enum SpaceFixtureWindowCloseFaultEvidenceTransport {
             return nil
         }
         return planIndices
+    }
+
+    private static func stringDictionary(
+        _ value: Any?
+    ) -> [Int: String] {
+        guard let values = value as? [String: String] else {
+            return [:]
+        }
+        return Dictionary(
+            uniqueKeysWithValues:
+                values.compactMap { key, value in
+                    guard let index = Int(key), index > 0,
+                          !value.isEmpty
+                    else {
+                        return nil
+                    }
+                    return (index, value)
+                }
+        )
+    }
+
+    private static func cgWindowIDDictionary(
+        _ value: Any?
+    ) -> [Int: CGWindowID] {
+        guard let values = value as? [String: NSNumber] else {
+            return [:]
+        }
+        return Dictionary(
+            uniqueKeysWithValues:
+                values.compactMap { key, value in
+                    guard let index = Int(key), index > 0,
+                          value.uint32Value > 0
+                    else {
+                        return nil
+                    }
+                    return (index, value.uint32Value)
+                }
+        )
     }
 }
 

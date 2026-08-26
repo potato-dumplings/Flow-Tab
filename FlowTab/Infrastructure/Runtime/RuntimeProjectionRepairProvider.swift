@@ -191,15 +191,22 @@ extension RuntimeProjectionRepairProvider {
             from: selectionFacts.appGroup,
             preservingRankFrom: windowFacts.rankByPID
         )
-        let cgWindowIDs = selectionFacts.windows.compactMap(\.cgWindowID)
+        let authoritativeCGWindowIDs =
+            windowFacts.authoritativeCGWindowIDsByPID.map {
+                cgWindowIDsByPID in
+                selectionFacts.appGroup.reduce(into: Set<CGWindowID>()) {
+                    result, runningApp in
+                    result.formUnion(
+                        cgWindowIDsByPID[runningApp.processIdentifier] ?? []
+                    )
+                }
+            }
         let repairEvidence = RuntimeCurrentAppRepairEvidence(
             appID: appID,
             pid: selectionFacts.app.processIdentifier,
             appDirectoryEntries: appDirectoryEntries,
             currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty,
-            authoritativeCGWindowIDs: cgWindowIDs.count == selectionFacts.windows.count
-                ? Set(cgWindowIDs)
-                : nil
+            authoritativeCGWindowIDs: authoritativeCGWindowIDs
         )
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
         RuntimeProjectionDiagnostics.logTiming(
@@ -229,27 +236,6 @@ extension RuntimeProjectionRepairProvider {
 }
 
 extension RuntimeProjectionRepairProvider {
-    func signalAXWindowDestroyed(
-        appID: String,
-        processIdentifier pid: pid_t,
-        axWindowID: String,
-        now: TimeInterval
-    ) -> CGWindowID? {
-        let affectedCGWindowID = windowRecordStore.clearDestroyedAXAttachment(
-            processIdentifier: pid,
-            axWindowID: axWindowID,
-            now: now
-        )
-        reconciliationCoordinator.markAppDirty(
-            appID: appID,
-            pid: pid,
-            reason: .axNotification,
-            affectedCGWindowIDs: affectedCGWindowID.map { Set([$0]) } ?? [],
-            now: now
-        )
-        return affectedCGWindowID
-    }
-
     func recordAppTerminated(appID: String, processIdentifier pid: pid_t) -> Bool {
         if let pendingAppID = reconciliationCoordinator.pendingAppID(pid: pid),
            pendingAppID != appID {
@@ -340,7 +326,21 @@ extension RuntimeProjectionRepairProvider {
         )
     }
 
-    func recordAppWindowsChanged(appID: String, pid: pid_t, now: TimeInterval) {
+    func recordAppWindowsChanged(
+        appID: String,
+        pid: pid_t,
+        changeKinds: Set<RuntimeAXWindowChangeEvidence.ChangeKind>,
+        now: TimeInterval
+    ) {
+        if changeKinds.contains(.destroyed) {
+            let generation = windowRecordStore.invalidateWindowTopology(
+                processIdentifier: pid
+            )
+            RuntimeLog.debug(
+                .projection,
+                "windowTopologyInvalidated appID=\(appID) pid=\(pid) generation=\(generation)"
+            )
+        }
         reconciliationCoordinator.markAppDirty(
             appID: appID,
             pid: pid,
@@ -426,8 +426,11 @@ extension RuntimeProjectionRepairProvider {
             affectedCGWindowIDs: affectedCGWindowIDs,
             knownAffectedCGWindowIDs: affectedWindowEvidence.knownAffectedCGWindowIDs,
             exactAffectedCGWindowIDs: affectedWindowEvidence.exactAffectedCGWindowIDs,
-            pendingDestroyedCGWindowIDs:
-                affectedWindowEvidence.pendingDestroyedCGWindowIDs,
+            isWindowTopologyConvergencePending:
+                windowRecordStore
+                    .pendingWindowTopologyInvalidationGeneration(
+                        processIdentifier: pid
+                    ) != nil,
             currentAppRepairEvidence: focusedRepairEvidence.repairEvidence,
             isTransientEmptyCurrentAppWindowPayload: mappingState?
                 .isTransientEmptyCurrentAppWindowPayload(

@@ -1874,7 +1874,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests().isEmpty)
     }
 
-    func testRuntimeProjectionServiceSignalsDestroyedAXWindowThroughCoordinator() throws {
+    func testRuntimeProjectionServiceSignalsDestroyedTopologyThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
         let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
@@ -1917,24 +1917,36 @@ extension FlowTabPriorityCoverageTests {
             }
         )
 
-        service.signalAXWindowDestroyed(
-            appID: "com.example.editor",
-            pid: pid,
-            axWindowID: axWindowID
+        service.signalAppWindowsChanged(
+            RuntimeAXWindowChangeEvidence(
+                appID: "com.example.editor",
+                pid: pid,
+                generation: 1,
+                source: .trailingReadback,
+                observedTransitionCount: 1,
+                changeKinds: [.destroyed],
+                initialReadback: nil
+            )
         )
-        _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting()
+        service.waitForMaintenanceQueueForTesting()
 
         let request = try XCTUnwrap(executedRequests.first)
-        let downgradedRecord = windowRecordStore.state(for: pid)?
+        let retainedRecord = windowRecordStore.state(for: pid)?
             .windowRecordsByCGWindowID[cgWindowID]
         XCTAssertEqual(request.target, .app(pid))
         XCTAssertEqual(request.appID, "com.example.editor")
         XCTAssertEqual(request.reasons, [.axNotification])
-        XCTAssertEqual(request.affectedCGWindowIDs, [cgWindowID])
-        XCTAssertNil(downgradedRecord?.currentAXAttachment)
-        XCTAssertNil(downgradedRecord?.lastConfirmationSource)
-        XCTAssertEqual(downgradedRecord?.bindingConfidence, .sticky)
-        XCTAssertTrue(downgradedRecord?.needsReconciliation == true)
+        XCTAssertTrue(request.affectedCGWindowIDs.isEmpty)
+        XCTAssertNotNil(retainedRecord?.currentAXAttachment)
+        XCTAssertEqual(
+            retainedRecord?.lastConfirmationSource,
+            .publicExactMatch
+        )
+        XCTAssertNotNil(
+            windowRecordStore.pendingWindowTopologyInvalidationGeneration(
+                processIdentifier: pid
+            )
+        )
     }
 
     func testRuntimeProjectionServiceDrainsLaunchedAppThroughCoordinator() throws {

@@ -40,7 +40,7 @@ struct RuntimeAXWindowObserverInstallResult: @unchecked Sendable {
     let context: RuntimeAXWindowChangeMonitor.ObserverContext
     let registeredNotifications: [CFString]
     let lastResult: AXError
-    let destroyedWindowElements: [String: AXUIElement]
+    let destroyedWindowElements: [AXUIElement]
     let initialReadback: RuntimeAXWindowInitialReadbackEvidence?
 
     var isInstalled: Bool {
@@ -73,7 +73,7 @@ final class RuntimeAXWindowObserverInstaller:
                 context: request.context,
                 registeredNotifications: [],
                 lastResult: createResult == .success ? .failure : createResult,
-                destroyedWindowElements: [:],
+                destroyedWindowElements: [],
                 initialReadback: nil
             )
         }
@@ -99,7 +99,7 @@ final class RuntimeAXWindowObserverInstaller:
                 context: request.context,
                 registeredNotifications: [],
                 lastResult: registration.lastResult,
-                destroyedWindowElements: [:],
+                destroyedWindowElements: [],
                 initialReadback: nil
             )
         }
@@ -111,8 +111,8 @@ final class RuntimeAXWindowObserverInstaller:
             RuntimeAXWindowChangeMonitor.synchronizeDestroyedWindowRegistrations(
                 observer: observerRef,
                 context: request.context,
-                currentWindows: knownWindowElements,
-                observedWindows: [:]
+                currentWindows: Array(knownWindowElements.values),
+                observedWindows: []
             )
         return RuntimeAXWindowObserverInstallResult(
             observer: observerRef,
@@ -126,6 +126,28 @@ final class RuntimeAXWindowObserverInstaller:
                 knownWindowElements: Array(knownWindowElements.values)
             )
         )
+    }
+}
+
+extension RuntimeAXWindowChangeMonitor {
+    nonisolated static func currentDestroyedWindowElements(
+        pid: pid_t
+    ) -> [AXUIElement] {
+        let appElement = AXUIElementCreateApplication(pid)
+        RuntimeAXMessagingTimeoutPolicy.apply(to: appElement)
+        var rawWindows: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            appElement,
+            kAXWindowsAttribute as CFString,
+            &rawWindows
+        ) == .success,
+        let windows = rawWindows as? [AXUIElement]
+        else {
+            return []
+        }
+
+        RuntimeAXMessagingTimeoutPolicy.apply(to: windows)
+        return windows
     }
 }
 

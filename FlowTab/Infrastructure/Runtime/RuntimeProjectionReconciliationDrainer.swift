@@ -134,9 +134,9 @@ func runtimeProjectionDefaultReconciliationExecutor(
                 .currentAppWindowPayloadNonEmpty
             )
         }
-        if !result.pendingDestroyedCGWindowIDs.isEmpty {
+        if result.isWindowTopologyConvergencePending {
             evidenceRequirements.insert(
-                .destroyedWindowResolution
+                .windowTopologyConvergence
             )
         }
         if !evidenceRequirements.isEmpty {

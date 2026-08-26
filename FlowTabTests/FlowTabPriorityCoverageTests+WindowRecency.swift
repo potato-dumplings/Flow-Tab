@@ -794,7 +794,10 @@ extension FlowTabPriorityCoverageTests {
             context: context
         )
 
-        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(
+            model.startFocusedAppWindowSession(triggerDirection: .forward),
+            .ready
+        )
 
         assertCurrentAppWindowProjectionRead(from: runtimeProjectionService, appID: appID)
         XCTAssertEqual(

@@ -211,6 +211,43 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(scheduler.workItems.count, 2)
     }
 
+    @MainActor
+    func testAXWindowChangeMonitorRefreshesDestroyedWindowObservationAfterWindowCreation() async {
+        let workScheduler = ManualAXWindowObservationWorkScheduler()
+        let installer = StubAXWindowObserverInstaller(outcomes: [
+            .installed(initialReadback: matchedAXWindowInitialReadbackEvidence(windowCount: 0))
+        ])
+        let monitor = RuntimeAXWindowChangeMonitor(
+            observationWorkScheduler: workScheduler,
+            observerInstaller: installer,
+            accessibilityTrustProvider: { true }
+        )
+        let pid = pid_t(2_000_000_001)
+        let appID = "com.example.created-window-observation"
+        monitor.rebind([
+            RuntimeHomeAppSummary(
+                appID: appID, displayName: "Created Window Observation",
+                groupID: appID, lastActiveAt: 1, windowCount: 0, pid: pid
+            )
+        ])
+        workScheduler.fireWorkItem(at: 0)
+        for _ in 0..<2 { await Task.yield() }
+
+        for _ in 0..<2 {
+            monitor.handleAXNotification(
+                appID: appID, pid: pid,
+                notification: kAXWindowCreatedNotification as CFString,
+                element: AXUIElementCreateApplication(pid), bindingGeneration: 1
+            )
+        }
+
+        XCTAssertEqual(workScheduler.workItems.count, 2)
+        workScheduler.fireWorkItem(at: 1)
+        for _ in 0..<2 { await Task.yield() }
+        XCTAssertEqual(workScheduler.workItems.count, 3)
+        monitor.stop()
+    }
+
     func testAXWindowObservationRegistrationBoundsRemoteTransportFailure() {
         XCTAssertEqual(
             RuntimeAXMessagingTimeoutPolicy.perElementSeconds,
@@ -406,14 +443,67 @@ extension FlowTabPriorityCoverageTests {
 
         coordinator.recordObservedTransition(
             pid: 18_431,
-            bindingGeneration: binding
+            bindingGeneration: binding,
+            changeKind: .created
         )
 
-        XCTAssertTrue(evidence.isEmpty)
+        XCTAssertEqual(evidence.map(\.source), [.observedTransition])
+        XCTAssertEqual(evidence.map(\.changeKinds), [[.created]])
         XCTAssertEqual(scheduler.entries.map(\.interval), [0.16])
         scheduler.fireEntry(at: 0)
-        XCTAssertEqual(evidence.map(\.generation), [1])
-        XCTAssertEqual(evidence.map(\.source), [.trailingReadback])
+        XCTAssertEqual(evidence.map(\.generation), [1, 1])
+        XCTAssertEqual(
+            evidence.map(\.source),
+            [.observedTransition, .trailingReadback]
+        )
+    }
+
+    @MainActor
+    func testAXObservedTransitionPublishesBeforeTrailingReadback() {
+        let scheduler = ManualAXWindowChangeDeliveryScheduler()
+        let coordinator = RuntimeAXWindowChangeDeliveryCoordinator(
+            policy: .standardCoalesced,
+            scheduler: scheduler
+        )
+        var evidence: [RuntimeAXWindowChangeEvidence] = []
+        coordinator.onEvidence = { evidence.append($0) }
+        let binding = coordinator.bind(
+            appID: "com.example.immediate-transition",
+            pid: 18_439
+        )
+
+        coordinator.recordObservedTransition(
+            pid: 18_439,
+            bindingGeneration: binding,
+            changeKind: .created
+        )
+
+        XCTAssertEqual(evidence.map(\.source), [.observedTransition])
+        XCTAssertEqual(scheduler.entries.map(\.interval), [0.16])
+        scheduler.fireEntry(at: 0)
+        XCTAssertEqual(
+            evidence.map(\.source),
+            [.observedTransition, .trailingReadback]
+        )
+    }
+
+    @MainActor
+    func testDestroyedObserverRegistrationTracksElementEqualityAcrossArrayReorder() {
+        let retainedElement = AXUIElementCreateApplication(18_440)
+        let retiredElement = AXUIElementCreateApplication(18_441)
+        let replacementElement = AXUIElementCreateApplication(18_442)
+
+        let diff = RuntimeAXWindowElementRegistrationDiff.resolve(
+            currentWindows: [replacementElement, retainedElement],
+            observedWindows: [retainedElement, retiredElement]
+        )
+
+        XCTAssertEqual(diff.retained.count, 1)
+        XCTAssertTrue(CFEqual(diff.retained[0], retainedElement))
+        XCTAssertEqual(diff.removed.count, 1)
+        XCTAssertTrue(CFEqual(diff.removed[0], retiredElement))
+        XCTAssertEqual(diff.added.count, 1)
+        XCTAssertTrue(CFEqual(diff.added[0], replacementElement))
     }
 
     @MainActor
@@ -432,29 +522,39 @@ extension FlowTabPriorityCoverageTests {
 
         coordinator.recordObservedTransition(
             pid: 18_432,
-            bindingGeneration: binding
+            bindingGeneration: binding,
+            changeKind: .created
         )
         coordinator.recordObservedTransition(
             pid: 18_432,
-            bindingGeneration: binding
+            bindingGeneration: binding,
+            changeKind: .destroyed
         )
         coordinator.recordObservedTransition(
             pid: 18_432,
-            bindingGeneration: binding
+            bindingGeneration: binding,
+            changeKind: .focus
         )
 
-        XCTAssertTrue(evidence.isEmpty)
+        XCTAssertEqual(
+            evidence.map(\.source),
+            Array(repeating: .observedTransition, count: 3)
+        )
         XCTAssertEqual(scheduler.entries.count, 3)
         XCTAssertTrue(scheduler.entries[0].token.isCancelled)
         XCTAssertTrue(scheduler.entries[1].token.isCancelled)
         scheduler.fireEntry(at: 0)
         scheduler.fireEntry(at: 1)
-        XCTAssertTrue(evidence.isEmpty)
+        XCTAssertEqual(evidence.count, 3)
         scheduler.fireEntry(at: 2)
 
-        XCTAssertEqual(evidence.map(\.generation), [3])
-        XCTAssertEqual(evidence.map(\.source), [.trailingReadback])
+        XCTAssertEqual(evidence.map(\.generation), [1, 2, 3, 3])
+        XCTAssertEqual(evidence.last?.source, .trailingReadback)
         XCTAssertEqual(evidence.last?.observedTransitionCount, 3)
+        XCTAssertEqual(
+            evidence.last?.changeKinds,
+            [.created, .destroyed, .focus]
+        )
     }
 
     @MainActor
@@ -473,13 +573,17 @@ extension FlowTabPriorityCoverageTests {
 
         coordinator.recordObservedTransition(
             pid: 18_433,
-            bindingGeneration: binding
+            bindingGeneration: binding,
+            changeKind: .visibility
         )
         scheduler.fireEntry(at: 0)
 
-        XCTAssertEqual(evidence.map(\.generation), [1])
-        XCTAssertEqual(evidence.map(\.source), [.trailingReadback])
-        XCTAssertEqual(evidence.map(\.observedTransitionCount), [1])
+        XCTAssertEqual(evidence.map(\.generation), [1, 1])
+        XCTAssertEqual(
+            evidence.map(\.source),
+            [.observedTransition, .trailingReadback]
+        )
+        XCTAssertEqual(evidence.map(\.observedTransitionCount), [1, 1])
     }
 
     @MainActor
@@ -497,11 +601,13 @@ extension FlowTabPriorityCoverageTests {
         )
         coordinator.recordObservedTransition(
             pid: 18_434,
-            bindingGeneration: binding
+            bindingGeneration: binding,
+            changeKind: .created
         )
         coordinator.recordObservedTransition(
             pid: 18_434,
-            bindingGeneration: binding
+            bindingGeneration: binding,
+            changeKind: .destroyed
         )
 
         coordinator.unbind(pid: 18_434, bindingGeneration: binding)
@@ -509,7 +615,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(scheduler.entries.allSatisfy(\.token.isCancelled))
         scheduler.fireEntry(at: 0)
         scheduler.fireEntry(at: 1)
-        XCTAssertTrue(evidence.isEmpty)
+        XCTAssertEqual(
+            evidence.map(\.source),
+            [.observedTransition, .observedTransition]
+        )
     }
 
     @MainActor
@@ -529,11 +638,13 @@ extension FlowTabPriorityCoverageTests {
             let binding = coordinator.bind(appID: appID, pid: pid)
             coordinator.recordObservedTransition(
                 pid: pid,
-                bindingGeneration: binding
+                bindingGeneration: binding,
+                changeKind: .focus
             )
             coordinator.recordObservedTransition(
                 pid: pid,
-                bindingGeneration: binding
+                bindingGeneration: binding,
+                changeKind: .visibility
             )
         }
 
@@ -545,7 +656,10 @@ extension FlowTabPriorityCoverageTests {
         scheduler.fireEntry(at: 1)
         scheduler.fireEntry(at: 2)
         scheduler.fireEntry(at: 3)
-        XCTAssertTrue(evidence.isEmpty)
+        XCTAssertEqual(evidence.count, 4)
+        XCTAssertTrue(
+            evidence.allSatisfy { $0.source == .observedTransition }
+        )
     }
 
     @MainActor
@@ -563,11 +677,13 @@ extension FlowTabPriorityCoverageTests {
         )
         coordinator.recordObservedTransition(
             pid: 18_435,
-            bindingGeneration: oldBinding
+            bindingGeneration: oldBinding,
+            changeKind: .created
         )
         coordinator.recordObservedTransition(
             pid: 18_435,
-            bindingGeneration: oldBinding
+            bindingGeneration: oldBinding,
+            changeKind: .destroyed
         )
 
         let newBinding = coordinator.bind(
@@ -582,12 +698,18 @@ extension FlowTabPriorityCoverageTests {
         scheduler.fireEntry(at: 0)
 
         XCTAssertEqual(evidence.map(\.appID), [
+            "com.example.previous-pid-owner",
+            "com.example.previous-pid-owner",
             "com.example.current-pid-owner"
         ])
-        XCTAssertEqual(evidence.map(\.generation), [3])
+        XCTAssertEqual(evidence.map(\.generation), [1, 2, 3])
         XCTAssertEqual(
             evidence.map(\.source),
-            [.initialReadback]
+            [
+                .observedTransition,
+                .observedTransition,
+                .initialReadback
+            ]
         )
     }
 
@@ -647,7 +769,7 @@ private final class StubAXWindowObserverInstaller:
                 context: request.context,
                 registeredNotifications: [],
                 lastResult: error,
-                destroyedWindowElements: [:],
+                destroyedWindowElements: [],
                 initialReadback: nil
             )
         case .installed(let initialReadback):
@@ -665,7 +787,7 @@ private final class StubAXWindowObserverInstaller:
                     kAXWindowCreatedNotification as CFString
                 ],
                 lastResult: .success,
-                destroyedWindowElements: [:],
+                destroyedWindowElements: [],
                 initialReadback: initialReadback
             )
         }

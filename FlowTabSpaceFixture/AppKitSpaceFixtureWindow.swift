@@ -17,6 +17,10 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         window
     }
 
+    var currentCGWindowID: CGWindowID {
+        CGWindowID(max(0, window.windowNumber))
+    }
+
     init(plan: SpaceFixtureWindowPlan) {
         self.plan = plan
         let contentView = SpaceFixtureWindowContentView(plan: plan)
@@ -81,6 +85,13 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         desktopPresentationObservation = nil
         noisyCGSiblings?.close()
         window.close()
+    }
+
+    func postDestroyedAccessibilityNotification() {
+        NSAccessibility.post(
+            element: window,
+            notification: .uiElementDestroyed
+        )
     }
 
     func windowCloseTopologySnapshot(

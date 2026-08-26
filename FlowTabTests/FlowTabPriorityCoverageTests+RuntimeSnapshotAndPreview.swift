@@ -3531,7 +3531,10 @@ extension FlowTabPriorityCoverageTests {
             )
         }
 
-        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(
+            model.startFocusedAppWindowSession(triggerDirection: .forward),
+            .ready
+        )
         assertFocusedPreviewCurrentAppProjectionRead(
             from: runtimeProjectionService,
             appID: appID
@@ -3589,7 +3592,10 @@ extension FlowTabPriorityCoverageTests {
             )
         }
 
-        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(
+            model.startFocusedAppWindowSession(triggerDirection: .forward),
+            .ready
+        )
         assertFocusedPreviewCurrentAppProjectionRead(
             from: runtimeProjectionService,
             appID: appID
@@ -3679,7 +3685,10 @@ extension FlowTabPriorityCoverageTests {
             }
         }
 
-        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(
+            model.startFocusedAppWindowSession(triggerDirection: .forward),
+            .ready
+        )
         assertFocusedPreviewCurrentAppProjectionRead(
             from: runtimeProjectionService,
             appID: appID
@@ -3701,7 +3710,10 @@ extension FlowTabPriorityCoverageTests {
         model.cancelSelection()
         XCTAssertNil(model.session)
 
-        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(
+            model.startFocusedAppWindowSession(triggerDirection: .forward),
+            .ready
+        )
         assertFocusedPreviewCurrentAppProjectionRead(
             from: runtimeProjectionService,
             appID: appID,
@@ -3745,7 +3757,10 @@ extension FlowTabPriorityCoverageTests {
             return nil
         }
 
-        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(
+            model.startFocusedAppWindowSession(triggerDirection: .forward),
+            .ready
+        )
         assertFocusedPreviewCurrentAppProjectionRead(
             from: runtimeProjectionService,
             appID: appID
@@ -3822,7 +3837,10 @@ extension FlowTabPriorityCoverageTests {
             )
         }
 
-        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(
+            model.startFocusedAppWindowSession(triggerDirection: .forward),
+            .ready
+        )
         assertFocusedPreviewCurrentAppProjectionRead(
             from: runtimeProjectionService,
             appID: appID

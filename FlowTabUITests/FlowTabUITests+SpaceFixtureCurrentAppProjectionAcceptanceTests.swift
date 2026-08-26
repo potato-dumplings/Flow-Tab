@@ -68,8 +68,7 @@ extension FlowTabUITests {
         let target = currentAppProjectionEvidence(
             evidenceGeneration: 5,
             projectionGeneration: 9,
-            windowIDs: ["window-1"],
-            isCompleteForScope: false
+            windowIDs: ["window-1"]
         )
         try writeCurrentAppProjectionEvidence(
             target,
@@ -84,7 +83,144 @@ extension FlowTabUITests {
             ),
             target
         )
-        XCTAssertFalse(target.isCompleteForScope)
+        XCTAssertTrue(target.isCompleteForScope)
+    }
+
+    func testSpaceFixtureCurrentAppProjectionAcceptanceRequiresCompleteCreatedTopology() {
+        let route = currentAppProjectionRoute()
+        let state = SpaceFixtureCurrentAppProjectionAcceptanceState()
+        let expectation =
+            SpaceFixtureCurrentAppProjectionAcceptanceExpectation
+                .createdTwoToThree
+        let baselineGeneration = state.beginBaseline()
+        let baseline = currentAppProjectionEvidence(
+            evidenceGeneration: 10,
+            projectionGeneration: 20,
+            windowIDs: ["cg:1", "cg:2"]
+        )
+        XCTAssertTrue(
+            state.observe(
+                baseline,
+                phase: .baseline,
+                route: route,
+                expectedPID: baseline.processIdentifier,
+                expectation: expectation,
+                generation: baselineGeneration
+            )
+        )
+
+        let targetGeneration = state.beginTarget()!
+        XCTAssertFalse(
+            state.observe(
+                currentAppProjectionEvidence(
+                    evidenceGeneration: 11,
+                    projectionGeneration: 21,
+                    windowIDs: ["cg:1", "cg:2", "cg:3"],
+                    isCompleteForScope: false
+                ),
+                phase: .target,
+                route: route,
+                expectedPID: baseline.processIdentifier,
+                expectation: expectation,
+                generation: targetGeneration
+            )
+        )
+        XCTAssertFalse(
+            state.observe(
+                currentAppProjectionEvidence(
+                    evidenceGeneration: 12,
+                    projectionGeneration: 22,
+                    windowIDs: ["cg:1", "cg:3", "cg:4"]
+                ),
+                phase: .target,
+                route: route,
+                expectedPID: baseline.processIdentifier,
+                expectation: expectation,
+                generation: targetGeneration
+            )
+        )
+        XCTAssertTrue(
+            state.observe(
+                currentAppProjectionEvidence(
+                    evidenceGeneration: 13,
+                    projectionGeneration: 23,
+                    windowIDs: ["cg:1", "cg:2", "cg:3"]
+                ),
+                phase: .target,
+                route: route,
+                expectedPID: baseline.processIdentifier,
+                expectation: expectation,
+                generation: targetGeneration
+            )
+        )
+    }
+
+    func testSpaceFixtureCurrentAppProjectionAcceptanceRequiresClosedTopologyWithSurvivorRebind() {
+        let route = currentAppProjectionRoute()
+        let state = SpaceFixtureCurrentAppProjectionAcceptanceState()
+        let expectation =
+            SpaceFixtureCurrentAppProjectionAcceptanceExpectation
+                .closedThreeToTwo
+        let baselineGeneration = state.beginBaseline()
+        let baseline = currentAppProjectionEvidence(
+            evidenceGeneration: 30,
+            projectionGeneration: 40,
+            windowIDs: ["cg:1", "cg:2", "cg:3"]
+        )
+        XCTAssertTrue(
+            state.observe(
+                baseline,
+                phase: .baseline,
+                route: route,
+                expectedPID: baseline.processIdentifier,
+                expectation: expectation,
+                generation: baselineGeneration
+            )
+        )
+
+        let targetGeneration = state.beginTarget()!
+        XCTAssertFalse(
+            state.observe(
+                currentAppProjectionEvidence(
+                    evidenceGeneration: 31,
+                    projectionGeneration: 41,
+                    windowIDs: ["cg:1", "cg:3"]
+                ),
+                phase: .target,
+                route: route,
+                expectedPID: baseline.processIdentifier,
+                expectation: expectation,
+                generation: targetGeneration
+            )
+        )
+        XCTAssertFalse(
+            state.observe(
+                currentAppProjectionEvidence(
+                    evidenceGeneration: 32,
+                    projectionGeneration: 42,
+                    windowIDs: ["cg:4", "cg:5"]
+                ),
+                phase: .target,
+                route: route,
+                expectedPID: baseline.processIdentifier,
+                expectation: expectation,
+                generation: targetGeneration
+            )
+        )
+        XCTAssertTrue(
+            state.observe(
+                currentAppProjectionEvidence(
+                    evidenceGeneration: 33,
+                    projectionGeneration: 43,
+                    windowIDs: ["cg:1", "cg:4"]
+                ),
+                phase: .target,
+                route: route,
+                expectedPID: baseline.processIdentifier,
+                expectation: expectation,
+                generation: targetGeneration
+            )
+        )
     }
 
     func testSpaceFixtureCurrentAppProjectionAcceptanceResolvesSynchronousRegistration() {

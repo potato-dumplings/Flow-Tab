@@ -9,14 +9,18 @@ enum RuntimeWindowMappingPresentationAssembler {
         cgWindows: [RuntimeCGWindowEntry],
         pid: pid_t,
         appName: String,
-        remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil
+        remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil,
+        axCollectionIsComplete: Bool = true,
+        cgCollectionIsComplete: Bool = true
     ) -> [RuntimeWindowListEntry] {
         let mappingResolution = windowRecordStore.resolveStableWindowMapping(
             axWindows: axWindows,
             cgWindows: cgWindows,
             pid: pid,
             appName: appName,
-            remoteScanCompleteness: remoteScanCompleteness
+            remoteScanCompleteness: remoteScanCompleteness,
+            axCollectionIsComplete: axCollectionIsComplete,
+            cgCollectionIsComplete: cgCollectionIsComplete
         )
         let windowLayerCGWindows = mappingResolution.windowLayerCGWindows
         let cgWindowOrderByID = Dictionary(

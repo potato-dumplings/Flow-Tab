@@ -8,9 +8,11 @@ final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
     let applicationAccessibilityElement: Any
     let desktopPresentationProbe:
         SpaceFixtureDesktopPresentationProbe
+    let currentCGWindowID: CGWindowID
 
     private(set) var showCalls: [Bool] = []
     private(set) var closeCallCount = 0
+    private(set) var destroyedAccessibilityPostCount = 0
     private(set) var isVisibleForCloseReadback = true
     private(set) var isCGWindowOnScreenForCloseReadback =
         true
@@ -24,11 +26,14 @@ final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
 
     init(
         plan: SpaceFixtureWindowPlan,
+        currentCGWindowID: CGWindowID? = nil,
         completesFullScreenImmediately: Bool = false,
         showRecorder:
             @escaping @MainActor (Int, Bool) -> Void = { _, _ in }
     ) {
         self.plan = plan
+        self.currentCGWindowID = currentCGWindowID
+            ?? CGWindowID(1_000 + plan.index)
         self.applicationAccessibilityElement = "ax-element-\(plan.index)"
         self.desktopPresentationProbe =
             SpaceFixtureDesktopPresentationProbe(
@@ -50,13 +55,16 @@ final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
         isCGWindowOnScreenForCloseReadback = false
     }
 
+    func postDestroyedAccessibilityNotification() {
+        destroyedAccessibilityPostCount += 1
+    }
+
     func windowCloseTopologySnapshot(
         remainingWindowPlanIndices: [Int]
     ) -> SpaceFixtureWindowCloseTopologySnapshot {
         SpaceFixtureWindowCloseTopologySnapshot(
             targetWindowPlanIndex: plan.index,
-            targetWindowNumber:
-                CGWindowID(1_000 + plan.index),
+            targetWindowNumber: currentCGWindowID,
             targetWindowIsVisible:
                 isVisibleForCloseReadback,
             targetCGWindowIsOnScreen:
@@ -699,6 +707,176 @@ extension FlowTabTests {
         )
         XCTAssertEqual(windowSpies.count, 2)
         XCTAssertEqual(observedEvidence.count, 2)
+    }
+
+    @MainActor
+    func testSpaceFixtureWindowCoordinatorChromeLikeOpenNoisePublishesFinalThreeWindowReceipt() {
+        let route = SpaceFixtureWindowOpenMutationRoute(
+            evidenceNotificationName:
+                Notification.Name("test.noisy-window-open.evidence"),
+            triggerNotificationName:
+                Notification.Name("test.noisy-window-open.trigger")
+        )
+        let identity = SpaceFixtureApplicationIdentity(
+            bundleIdentifier: "test.noisy-open.fixture",
+            processIdentifier: 4_331
+        )
+        let configuration = SpaceFixtureLaunchConfiguration(
+            windowCount: 3,
+            fullscreenWindowIndex: nil,
+            windowTitlePrefix: "Noisy Open",
+            usesStaggeredLayout: true,
+            enterFullscreenDelayMilliseconds: 0,
+            preservesDesktopAfterFullscreen: false,
+            windowOpenMutationRoute: route,
+            deferredOpenWindowIndex: 3,
+            usesChromeLikeWindowMutationNoise: true
+        )
+        let scheduler = ManualSpaceFixtureScheduler()
+        var nextCGWindowID: CGWindowID = 2_100
+        var windowSpies: [SpaceFixtureWindowSpy] = []
+        var observedEvidence:
+            [SpaceFixtureWindowOpenMutationEvidence] = []
+        var triggerHandler:
+            (@MainActor (SpaceFixtureWindowOpenMutationTrigger) -> Void)?
+
+        let coordinator = SpaceFixtureWindowCoordinator(
+            configuration: configuration,
+            visibleFrameProvider: {
+                CGRect(x: 0, y: 0, width: 1440, height: 900)
+            },
+            windowFactory: { plan in
+                defer { nextCGWindowID += 1 }
+                let spy = SpaceFixtureWindowSpy(
+                    plan: plan,
+                    currentCGWindowID: nextCGWindowID
+                )
+                windowSpies.append(spy)
+                return spy
+            },
+            scheduler: scheduler,
+            applicationIdentityProvider: { identity },
+            windowOpenMutationTriggerObservationFactory: {
+                _, onTrigger in
+                triggerHandler = onTrigger
+                return ManualSpaceFixtureCancellable()
+            },
+            windowOpenMutationEvidencePublisher: {
+                evidence, _ in observedEvidence.append(evidence)
+            }
+        )
+
+        coordinator.launch()
+        XCTAssertEqual(
+            observedEvidence.first?.snapshot
+                .activeWindowTitlesByPlanIndex,
+            [1: "Noisy Open 1", 2: "Noisy Open 2"]
+        )
+        XCTAssertEqual(
+            observedEvidence.first?.snapshot
+                .activeCGWindowIDsByPlanIndex,
+            [1: 2_100, 2: 2_101]
+        )
+
+        triggerHandler?(
+            SpaceFixtureWindowOpenMutationTrigger(
+                requestGeneration: 1,
+                identity: identity,
+                targetWindowPlanIndex: 3
+            )
+        )
+        XCTAssertEqual(
+            coordinator.windows.map(\.plan.index),
+            [1, 2, 10_003]
+        )
+        XCTAssertEqual(scheduler.scheduledDelays, [35])
+        XCTAssertEqual(observedEvidence.map(\.phase), [.ready])
+
+        XCTAssertTrue(scheduler.fire(at: 0))
+        XCTAssertEqual(coordinator.windows.map(\.plan.index), [1, 2, 3])
+        XCTAssertEqual(windowSpies[2].closeCallCount, 1)
+        XCTAssertEqual(
+            windowSpies[2].destroyedAccessibilityPostCount,
+            1
+        )
+        XCTAssertEqual(observedEvidence.map(\.phase), [.ready, .applied])
+        XCTAssertEqual(
+            observedEvidence.last?.snapshot
+                .activeWindowTitlesByPlanIndex,
+            [
+                1: "Noisy Open 1",
+                2: "Noisy Open 2",
+                3: "Noisy Open 3"
+            ]
+        )
+        XCTAssertEqual(
+            observedEvidence.last?.snapshot
+                .activeCGWindowIDsByPlanIndex,
+            [1: 2_100, 2: 2_101, 3: 2_103]
+        )
+    }
+
+    @MainActor
+    func testSpaceFixtureWindowCoordinatorChromeLikeCloseNoiseRebuildsSurvivorAndRepeatsDestroyed() {
+        let configuration = SpaceFixtureLaunchConfiguration(
+            windowCount: 3,
+            fullscreenWindowIndex: nil,
+            windowTitlePrefix: "Noisy Close",
+            usesStaggeredLayout: true,
+            enterFullscreenDelayMilliseconds: 0,
+            preservesDesktopAfterFullscreen: false,
+            closeWindowIndex: 2,
+            closeWindowDelayMilliseconds: 0,
+            usesChromeLikeWindowMutationNoise: true
+        )
+        let scheduler = ManualSpaceFixtureScheduler()
+        var nextCGWindowID: CGWindowID = 3_100
+        var windowSpies: [SpaceFixtureWindowSpy] = []
+
+        let coordinator = SpaceFixtureWindowCoordinator(
+            configuration: configuration,
+            visibleFrameProvider: {
+                CGRect(x: 0, y: 0, width: 1440, height: 900)
+            },
+            windowFactory: { plan in
+                defer { nextCGWindowID += 1 }
+                let spy = SpaceFixtureWindowSpy(
+                    plan: plan,
+                    currentCGWindowID: nextCGWindowID
+                )
+                windowSpies.append(spy)
+                return spy
+            },
+            scheduler: scheduler
+        )
+
+        coordinator.launch()
+        XCTAssertEqual(
+            coordinator.lastWindowCloseFaultEvidence?.snapshot
+                .remainingCGWindowIDsByPlanIndex,
+            [1: 3_100, 2: 3_101, 3: 3_102]
+        )
+        XCTAssertTrue(scheduler.fire(at: 0))
+
+        XCTAssertEqual(coordinator.windows.map(\.plan.index), [3, 1])
+        XCTAssertEqual(windowSpies.map(\.plan.index), [1, 2, 3, 3])
+        XCTAssertEqual(windowSpies[1].destroyedAccessibilityPostCount, 2)
+        XCTAssertEqual(windowSpies[2].destroyedAccessibilityPostCount, 1)
+        XCTAssertEqual(
+            coordinator.lastWindowCloseFaultEvidence?.snapshot
+                .remainingWindowTitlesByPlanIndex,
+            [1: "Noisy Close 1", 3: "Noisy Close 3"]
+        )
+        XCTAssertEqual(
+            coordinator.lastWindowCloseFaultEvidence?.snapshot
+                .remainingCGWindowIDsByPlanIndex,
+            [1: 3_100, 3: 3_103]
+        )
+        XCTAssertFalse(
+            coordinator.lastWindowCloseFaultEvidence?.snapshot
+                .remainingCGWindowIDsByPlanIndex.values
+                .contains(3_101) ?? true
+        )
     }
 }
 

@@ -18,12 +18,10 @@ struct RuntimeWindowRecordDerivedIndexes: Equatable {
 struct RuntimeWindowRecordAffectedEvidence: Equatable {
     let knownAffectedCGWindowIDs: Set<CGWindowID>
     let exactAffectedCGWindowIDs: Set<CGWindowID>
-    let pendingDestroyedCGWindowIDs: Set<CGWindowID>
 
     static let empty = RuntimeWindowRecordAffectedEvidence(
         knownAffectedCGWindowIDs: [],
-        exactAffectedCGWindowIDs: [],
-        pendingDestroyedCGWindowIDs: []
+        exactAffectedCGWindowIDs: []
     )
 }
 
@@ -39,6 +37,7 @@ struct RuntimeWindowMappingResolution {
         [CGWindowID: RuntimeWindowRecord]
     let validCGWindows: [RuntimeCGWindowEntry]
     let allowSpaceOneWithoutCurrentAXHandle: Bool
+    let isWindowTopologyConvergencePending: Bool
     let bindingDiagnostics: [WindowBindingDiagnostic]
 
     var knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry] {
@@ -69,22 +68,10 @@ struct RuntimeWindowRecordLifecyclePolicy: Equatable {
     )
 }
 
-extension RuntimeWindowRecord {
-    func exactMatchClearsPendingDestroyedEvidence(
-        _ axWindow: RuntimeAXWindowEntry
-    ) -> Bool {
-        guard let pendingDestroyedAXWindowID else { return false }
-        if pendingDestroyedAXWindowID != axWindow.id {
-            return true
-        }
-        return lastExactAXWindow.map {
-            !CFEqual($0, axWindow.window)
-        } ?? false
-    }
-}
-
 final class RuntimeWindowRecordStore {
     private var mappingStatesByPID: [pid_t: RuntimeWindowMappingState]
+    private var windowTopologyInvalidationGenerationByPID: [pid_t: UInt64] = [:]
+    private var nextWindowTopologyInvalidationGeneration: UInt64 = 1
 
     init(mappingStatesByPID: [pid_t: RuntimeWindowMappingState] = [:]) {
         self.mappingStatesByPID = mappingStatesByPID
@@ -108,6 +95,24 @@ final class RuntimeWindowRecordStore {
 
     func removeState(for pid: pid_t) {
         mappingStatesByPID.removeValue(forKey: pid)
+        windowTopologyInvalidationGenerationByPID.removeValue(forKey: pid)
+    }
+
+    @discardableResult
+    func invalidateWindowTopology(processIdentifier pid: pid_t) -> UInt64 {
+        if let generation = windowTopologyInvalidationGenerationByPID[pid] {
+            return generation
+        }
+        let generation = nextWindowTopologyInvalidationGeneration
+        nextWindowTopologyInvalidationGeneration &+= 1
+        windowTopologyInvalidationGenerationByPID[pid] = generation
+        return generation
+    }
+
+    func pendingWindowTopologyInvalidationGeneration(
+        processIdentifier pid: pid_t
+    ) -> UInt64? {
+        windowTopologyInvalidationGenerationByPID[pid]
     }
 
     func projectedWindowEntries(
@@ -171,23 +176,13 @@ final class RuntimeWindowRecordStore {
         )
     }
 
-    @discardableResult
-    func clearDestroyedAXAttachment(
-        processIdentifier pid: pid_t,
-        axWindowID: String,
-        now: TimeInterval
-    ) -> CGWindowID? {
-        RuntimeWindowRecordEvidence.clearDestroyedAXAttachment(
-            processIdentifier: pid,
-            axWindowID: axWindowID,
-            now: now,
-            mappingStatesByPID: &mappingStatesByPID
-        )
-    }
-
     func cleanup(keepingRunningApps runningApps: [NSRunningApplication]) {
         let runningPIDs = Set(runningApps.map(\.processIdentifier))
         mappingStatesByPID = mappingStatesByPID.filter { runningPIDs.contains($0.key) }
+        windowTopologyInvalidationGenerationByPID =
+            windowTopologyInvalidationGenerationByPID.filter {
+                runningPIDs.contains($0.key)
+            }
     }
 
     func resolveStableWindowMapping(
@@ -195,7 +190,9 @@ final class RuntimeWindowRecordStore {
         cgWindows: [RuntimeCGWindowEntry],
         pid: pid_t,
         appName: String,
-        remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil
+        remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil,
+        axCollectionIsComplete: Bool = true,
+        cgCollectionIsComplete: Bool = true
     ) -> RuntimeWindowMappingResolution {
         let validCGWindows = RuntimeWindowListSupplementer.selectSupplementalOffSpaceCGWindows(
             existingCGWindowIDs: [],
@@ -208,7 +205,7 @@ final class RuntimeWindowRecordStore {
         let hasAXWindowsInCurrentCollection = !axWindows.isEmpty
         let axWindowAbsenceIsAuthoritative = RuntimeAXWindowAbsencePolicy.isAbsenceAuthoritative(
             remoteScanCompleteness: remoteScanCompleteness
-        )
+        ) && axCollectionIsComplete
         var mappingState = previousState
         mappingState.recordAXCollectionPresence(
             hasAXWindowsInCurrentCollection: hasAXWindowsInCurrentCollection,
@@ -369,6 +366,15 @@ final class RuntimeWindowRecordStore {
         )
 
         mappingState.windowRecordsByCGWindowID = windowRecordsByCGWindowID
+        reconcileInvalidatedWindowTopologyIfPossible(
+            pid: pid,
+            axWindows: axWindows,
+            validCGWindowIDs: validCGWindowIDs,
+            exactMatchesByAXWindowID: exactMatchesByAXWindowID,
+            axCollectionIsComplete: axCollectionIsComplete,
+            cgCollectionIsComplete: cgCollectionIsComplete,
+            mappingState: &mappingState
+        )
         mappingState.updateFallbackDisplayStateForRecords()
         mappingState.reconcileWindowRecordLifecycle(
             validCGWindowIDs: validCGWindowIDs,
@@ -411,8 +417,59 @@ final class RuntimeWindowRecordStore {
             windowRecordsByCGWindowID: windowRecordsByCGWindowID,
             validCGWindows: validCGWindows,
             allowSpaceOneWithoutCurrentAXHandle: allowSpaceOneWithoutCurrentAXHandle,
+            isWindowTopologyConvergencePending:
+                windowTopologyInvalidationGenerationByPID[pid] != nil,
             bindingDiagnostics: bindingDiagnostics
         )
+    }
+
+    private func reconcileInvalidatedWindowTopologyIfPossible(
+        pid: pid_t,
+        axWindows: [RuntimeAXWindowEntry],
+        validCGWindowIDs: Set<CGWindowID>,
+        exactMatchesByAXWindowID: [String: CGWindowID],
+        axCollectionIsComplete: Bool,
+        cgCollectionIsComplete: Bool,
+        mappingState: inout RuntimeWindowMappingState
+    ) {
+        guard windowTopologyInvalidationGenerationByPID[pid] != nil,
+              axCollectionIsComplete,
+              cgCollectionIsComplete
+        else {
+            return
+        }
+
+        for cgWindowID in Array(mappingState.windowRecordsByCGWindowID.keys)
+        where !validCGWindowIDs.contains(cgWindowID) {
+            guard let record = mappingState.windowRecordsByCGWindowID[cgWindowID]
+            else { continue }
+            let equivalentCurrentAXWindow = record.lastExactAXWindow.flatMap {
+                lastWindow in
+                axWindows.first { CFEqual($0.window, lastWindow) }
+            }
+            let wasReboundToCurrentCGWindow = equivalentCurrentAXWindow.flatMap {
+                exactMatchesByAXWindowID[$0.id]
+            } != nil
+            if equivalentCurrentAXWindow == nil || wasReboundToCurrentCGWindow {
+                mappingState.windowRecordsByCGWindowID.removeValue(
+                    forKey: cgWindowID
+                )
+            }
+        }
+
+        let retainsMissingCGRecord =
+            mappingState.windowRecordsByCGWindowID.keys.contains {
+                !validCGWindowIDs.contains($0)
+            }
+        let allCurrentAXWindowsRebound = axWindows.allSatisfy {
+            exactMatchesByAXWindowID[$0.id] != nil
+        }
+        guard !retainsMissingCGRecord,
+              allCurrentAXWindowsRebound
+        else {
+            return
+        }
+        windowTopologyInvalidationGenerationByPID.removeValue(forKey: pid)
     }
 }
 
@@ -666,23 +723,6 @@ private enum RuntimeWindowRecordEvidence {
             hasObservedAXWindowHandle: mappingState.hasObservedAXWindowHandle,
             consecutiveAXCollectionMisses: mappingState.consecutiveAXCollectionMisses
         )
-    }
-
-    @discardableResult
-    static func clearDestroyedAXAttachment(
-        processIdentifier pid: pid_t,
-        axWindowID: String,
-        now: TimeInterval,
-        mappingStatesByPID: inout [pid_t: RuntimeWindowMappingState]
-    ) -> CGWindowID? {
-        guard var mappingState = mappingStatesByPID[pid] else { return nil }
-        let affectedCGWindowID = mappingState.clearDestroyedAXAttachment(
-            axWindowID: axWindowID,
-            observedAt: now
-        )
-        guard affectedCGWindowID != nil else { return nil }
-        mappingStatesByPID[pid] = mappingState
-        return affectedCGWindowID
     }
 
     private static func markWindowRecordsForSpaceTopologyReconciliation(

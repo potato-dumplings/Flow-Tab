@@ -314,17 +314,70 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func signalAppWindowsChanged(appID: String, pid: pid_t) {
+        scheduleAppWindowsRepair(
+            appID: appID,
+            pid: pid,
+            changeKinds: [],
+            marksNewDirtyGeneration: true
+        )
+    }
+
+    func markAppWindowsDirty(_ evidence: RuntimeAXWindowChangeEvidence) {
         guard canScheduleAXWindowRepair else { return }
+        let pendingScope = "appWindows:\(evidence.appID)"
+        readModelStore.markAppWindowsDirty(
+            appID: evidence.appID,
+            pid: evidence.pid,
+            pendingScope: pendingScope
+        )
+        publishCurrentAppWindowProjectionUpdate(
+            appID: evidence.appID
+        )
+    }
+
+    func signalAppWindowsChanged(
+        _ evidence: RuntimeAXWindowChangeEvidence
+    ) {
+        scheduleAppWindowsRepair(
+            appID: evidence.appID,
+            pid: evidence.pid,
+            changeKinds: evidence.changeKinds,
+            marksNewDirtyGeneration:
+                evidence.source != .trailingReadback
+        )
+    }
+
+    private func scheduleAppWindowsRepair(
+        appID: String,
+        pid: pid_t,
+        changeKinds: Set<RuntimeAXWindowChangeEvidence.ChangeKind>,
+        marksNewDirtyGeneration: Bool
+    ) {
+        guard canScheduleAXWindowRepair else { return }
+        let pendingScope = "appWindows:\(appID)"
+        if marksNewDirtyGeneration {
+            readModelStore.markAppWindowsDirty(
+                appID: appID,
+                pid: pid,
+                pendingScope: pendingScope
+            )
+        } else {
+            readModelStore.ensureAppWindowsDirty(
+                appID: appID,
+                pid: pid,
+                pendingScope: pendingScope
+            )
+        }
         maintenanceOwner.enqueue { [self] in
+            readModelStore.ensureAppWindowsDirty(
+                appID: appID,
+                pid: pid,
+                pendingScope: pendingScope
+            )
             let now = Date.timeIntervalSinceReferenceDate
             transientRepairObservationDriver.cancel(
                 target: .app(pid),
                 reason: "appWindowsChanged"
-            )
-            readModelStore.markAppWindowsDirty(
-                appID: appID,
-                pid: pid,
-                pendingScope: "appWindows:\(appID)"
             )
             commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             commitMainTableCurrentAppProjectionLocked(
@@ -333,23 +386,34 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 clearsDirtyState: false,
                 generatedAt: now
             )
-            repairProvider.recordAppWindowsChanged(appID: appID, pid: pid, now: now)
+            repairProvider.recordAppWindowsChanged(
+                appID: appID,
+                pid: pid,
+                changeKinds: changeKinds,
+                now: now
+            )
             drainReadyReconciliationRequestsLocked(now: now)
         }
     }
 
     func signalSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t) {
         guard canScheduleAXWindowRepair else { return }
+        let pendingScope = "selectedCurrentAppWindows:\(appID)"
+        readModelStore.markAppWindowsDirty(
+            appID: appID,
+            pid: pid,
+            pendingScope: pendingScope
+        )
         maintenanceOwner.enqueue { [self] in
+            readModelStore.ensureAppWindowsDirty(
+                appID: appID,
+                pid: pid,
+                pendingScope: pendingScope
+            )
             let now = Date.timeIntervalSinceReferenceDate
             transientRepairObservationDriver.cancel(
                 target: .app(pid),
                 reason: "selectedCurrentAppWindowsChanged"
-            )
-            readModelStore.markAppWindowsDirty(
-                appID: appID,
-                pid: pid,
-                pendingScope: "selectedCurrentAppWindows:\(appID)"
             )
             commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             commitMainTableCurrentAppProjectionLocked(
@@ -399,39 +463,6 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 appID: focusedRead.appID,
                 pid: focusedRead.pid,
                 now: now
-            )
-            drainReadyReconciliationRequestsLocked(now: now)
-        }
-    }
-
-    func signalAXWindowDestroyed(appID: String, pid: pid_t, axWindowID: String) {
-        maintenanceOwner.enqueue { [self] in
-            let now = Date.timeIntervalSinceReferenceDate
-            transientRepairObservationDriver.cancel(
-                target: .app(pid),
-                reason: "axWindowDestroyed"
-            )
-            let affectedCGWindowID = repairProvider.signalAXWindowDestroyed(
-                appID: appID,
-                processIdentifier: pid,
-                axWindowID: axWindowID,
-                now: now
-            )
-            readModelStore.markAppWindowsDirty(
-                appID: appID,
-                pid: pid,
-                pendingScope: "axWindowDestroyed:\(appID)"
-            )
-            commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
-            commitMainTableCurrentAppProjectionLocked(
-                appID: appID,
-                pid: pid,
-                clearsDirtyState: false,
-                generatedAt: now
-            )
-            RuntimeLog.debug(
-                .projection,
-                "runtimeAXDestroyed appID=\(appID) pid=\(pid) axWindowID=\(axWindowID) affectedCGWindowID=\(affectedCGWindowID.map(String.init) ?? "none")"
             )
             drainReadyReconciliationRequestsLocked(now: now)
         }
@@ -975,6 +1006,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             authoritativeCGWindowIDs: authoritativeCGWindowIDs,
             generatedAt: generatedAt
         )
+        publishCurrentAppWindowProjectionUpdate(appID: appID)
+        return true
+    }
+
+    private func publishCurrentAppWindowProjectionUpdate(
+        appID: String
+    ) {
         var userInfo: [AnyHashable: Any] = [
             RuntimeProjectionNotificationUserInfoKey.appID: appID
         ]
@@ -995,7 +1033,6 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             object: self,
             userInfo: userInfo
         )
-        return true
     }
 
     @discardableResult

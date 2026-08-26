@@ -387,6 +387,15 @@ extension SwitcherPanelController {
                 for: sessionKind
             )
         }
+        if pendingFocusedWindowSessionPresentation != nil,
+           matchingSessionKinds.contains(.inAppWindowSwitcher),
+           !isHotkeyHoldSetPressed(for: .inAppWindowSwitcher)
+        {
+            cancelPendingFocusedWindowSessionPresentation(
+                reason: "modifierReleased"
+            )
+            return
+        }
         guard isPanelPresented,
               let activeHotkeySessionKind,
               matchingSessionKinds.contains(activeHotkeySessionKind)
@@ -544,6 +553,12 @@ extension SwitcherPanelController {
         appID: String?,
         evidence: RuntimeCurrentAppWindowProjectionUpdateEvidence? = nil
     ) -> Bool {
+        if resolvePendingFocusedWindowSessionPresentation(
+            appID: appID,
+            evidence: evidence
+        ) {
+            return true
+        }
         guard isPanelPresented else { return false }
         let manualEntrySettled =
             observeManualWindowLayerProjectionUpdate(

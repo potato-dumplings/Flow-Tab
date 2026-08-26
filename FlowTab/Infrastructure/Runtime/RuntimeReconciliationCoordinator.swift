@@ -52,7 +52,7 @@ enum RuntimeReconciliationState: String, Equatable {
 
 enum RuntimeReconciliationEvidenceRequirement: String, Hashable {
     case currentAppWindowPayloadNonEmpty
-    case destroyedWindowResolution
+    case windowTopologyConvergence
 }
 
 struct RuntimeReconciliationRequest: Equatable, Identifiable {

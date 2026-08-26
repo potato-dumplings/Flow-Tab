@@ -158,6 +158,14 @@ final class RetainingTerminatedAppRuntimeProjectionService:
         )
     }
 
+    func markAppWindowsDirty(_ evidence: RuntimeAXWindowChangeEvidence) {
+        recording.markAppWindowsDirty(evidence)
+    }
+
+    func signalAppWindowsChanged(_ evidence: RuntimeAXWindowChangeEvidence) {
+        recording.signalAppWindowsChanged(evidence)
+    }
+
     func signalAppWindowsChanged(appID: String, pid: pid_t) {
         recording.signalAppWindowsChanged(appID: appID, pid: pid)
     }
@@ -174,18 +182,6 @@ final class RetainingTerminatedAppRuntimeProjectionService:
 
     func signalFocusedCurrentAppWindowsChanged() {
         recording.signalFocusedCurrentAppWindowsChanged()
-    }
-
-    func signalAXWindowDestroyed(
-        appID: String,
-        pid: pid_t,
-        axWindowID: String
-    ) {
-        recording.signalAXWindowDestroyed(
-            appID: appID,
-            pid: pid,
-            axWindowID: axWindowID
-        )
     }
 
     func signalAppTerminated(appID: String, pid: pid_t) {

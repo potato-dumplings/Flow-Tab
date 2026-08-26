@@ -8,10 +8,39 @@ enum RuntimeAXWindowObservationInstallEvidence: Equatable {
     case unavailable(error: AXError)
 }
 
+struct RuntimeAXWindowElementRegistrationDiff {
+    let retained: [AXUIElement]
+    let removed: [AXUIElement]
+    let added: [AXUIElement]
+
+    static func resolve(
+        currentWindows: [AXUIElement],
+        observedWindows: [AXUIElement]
+    ) -> RuntimeAXWindowElementRegistrationDiff {
+        var unmatchedCurrentWindows = currentWindows
+        var retained: [AXUIElement] = []
+        var removed: [AXUIElement] = []
+        for observedElement in observedWindows {
+            guard let currentIndex = unmatchedCurrentWindows.firstIndex(
+                where: { CFEqual($0, observedElement) }
+            ) else {
+                removed.append(observedElement)
+                continue
+            }
+            retained.append(observedElement)
+            unmatchedCurrentWindows.remove(at: currentIndex)
+        }
+        return RuntimeAXWindowElementRegistrationDiff(
+            retained: retained,
+            removed: removed,
+            added: unmatchedCurrentWindows
+        )
+    }
+}
+
 @MainActor
 protocol RuntimeAXWindowChangeMonitoring: AnyObject {
     var onAppWindowChanged: ((RuntimeAXWindowChangeEvidence) -> Void)? { get set }
-    var onAXWindowDestroyed: ((String, pid_t, String) -> Void)? { get set }
 
     func observe(appID: String, pid: pid_t) -> RuntimeAXWindowObservationInstallEvidence
     func stopObserving(pid: pid_t)
@@ -52,33 +81,32 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
         let context: ObserverContext
         let pid: pid_t
         let registeredNotifications: [CFString]
-        let destroyedWindowElements: [String: AXUIElement]
+        let destroyedWindowElements: [AXUIElement]
     }
 
     private struct DestroyedWindowSyncWork: @unchecked Sendable {
         let observer: AXObserver
         let context: ObserverContext
-        let currentWindowElements: [String: AXUIElement]
-        let observedWindowElements: [String: AXUIElement]
+        let observedWindowElements: [AXUIElement]
     }
 
     private struct DestroyedWindowSyncWorkResult: @unchecked Sendable {
-        let observedWindowElements: [String: AXUIElement]
+        let observedWindowElements: [AXUIElement]
     }
 
     var onAppWindowChanged: ((RuntimeAXWindowChangeEvidence) -> Void)?
-    var onAXWindowDestroyed: ((String, pid_t, String) -> Void)?
 
     private var observersByPID: [pid_t: AXObserver] = [:]
     private var observerContextByPID: [pid_t: ObserverContext] = [:]
     private var appIDByPID: [pid_t: String] = [:]
     private var registeredNotificationsByPID: [pid_t: [CFString]] = [:]
-    private var destroyedWindowElementsByPID: [pid_t: [String: AXUIElement]] = [:]
+    private var destroyedWindowElementsByPID: [pid_t: [AXUIElement]] = [:]
     private var desiredAppIDsByPID: [pid_t: String] = [:]
     private var desiredWindowCountsByPID: [pid_t: Int] = [:]
     private var pendingObserverInstallsByPID: [pid_t: PendingObserverInstall] = [:]
     private var terminalUnavailableAppIDsByPID: [pid_t: String] = [:]
     private var pendingDestroyedWindowSyncContextsByPID: [pid_t: ObserverContext] = [:]
+    private var pendingDestroyedWindowSyncRefreshPIDs: Set<pid_t> = []
     private var nextObserverInstallGeneration: UInt64 = 1
     private let deliveryCoordinator: RuntimeAXWindowChangeDeliveryCoordinator
     private let observationWorkScheduler: any RuntimeAXWindowObservationWorkScheduling
@@ -199,6 +227,7 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
             removeObserver(pid: pid)
         }
         pendingDestroyedWindowSyncContextsByPID.removeAll()
+        pendingDestroyedWindowSyncRefreshPIDs.removeAll()
         deliveryCoordinator.stop()
     }
 
@@ -210,6 +239,7 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
         invalidatePendingObserverInstall(pid: pid)
         terminalUnavailableAppIDsByPID.removeValue(forKey: pid)
         if observersByPID[pid] != nil, appIDByPID[pid] == appID {
+            syncDestroyedWindowObservers(pid: pid)
             return .installed
         }
         if observersByPID[pid] != nil {
@@ -447,11 +477,12 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
             registeredNotificationsByPID.removeValue(forKey: pid)
             destroyedWindowElementsByPID.removeValue(forKey: pid)
             pendingDestroyedWindowSyncContextsByPID.removeValue(forKey: pid)
+            pendingDestroyedWindowSyncRefreshPIDs.remove(pid)
             return
         }
         let context = observerContextByPID.removeValue(forKey: pid)
         let registeredNotifications = registeredNotificationsByPID.removeValue(forKey: pid) ?? []
-        let destroyedWindowElements = destroyedWindowElementsByPID.removeValue(forKey: pid) ?? [:]
+        let destroyedWindowElements = destroyedWindowElementsByPID.removeValue(forKey: pid) ?? []
 
         CFRunLoopRemoveSource(
             CFRunLoopGetMain(),
@@ -462,6 +493,7 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
         if pendingDestroyedWindowSyncContextsByPID[pid] === context {
             pendingDestroyedWindowSyncContextsByPID.removeValue(forKey: pid)
         }
+        pendingDestroyedWindowSyncRefreshPIDs.remove(pid)
         deliveryCoordinator.unbind(
             pid: pid,
             bindingGeneration: context?.bindingGeneration
@@ -480,17 +512,18 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
     }
 
     private func syncDestroyedWindowObservers(pid: pid_t) {
-        guard
-            let observer = observersByPID[pid],
-            let context = observerContextByPID[pid],
-            pendingDestroyedWindowSyncContextsByPID[pid] == nil
+        guard let observer = observersByPID[pid],
+              let context = observerContextByPID[pid]
         else { return }
+        guard pendingDestroyedWindowSyncContextsByPID[pid] == nil else {
+            pendingDestroyedWindowSyncRefreshPIDs.insert(pid)
+            return
+        }
 
         let work = DestroyedWindowSyncWork(
             observer: observer,
             context: context,
-            currentWindowElements: AXLiveWindowRegistry.shared.windows(forPID: pid),
-            observedWindowElements: destroyedWindowElementsByPID[pid] ?? [:]
+            observedWindowElements: destroyedWindowElementsByPID[pid] ?? []
         )
         pendingDestroyedWindowSyncContextsByPID[pid] = context
         observationWorkScheduler.schedule { [weak self] in
@@ -498,7 +531,9 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
                 observedWindowElements: Self.synchronizeDestroyedWindowRegistrations(
                     observer: work.observer,
                     context: work.context,
-                    currentWindows: work.currentWindowElements,
+                    currentWindows: Self.currentDestroyedWindowElements(
+                        pid: work.context.pid
+                    ),
                     observedWindows: work.observedWindowElements
                 )
             )
@@ -517,9 +552,13 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
         work: DestroyedWindowSyncWork,
         result: DestroyedWindowSyncWorkResult
     ) {
-        if pendingDestroyedWindowSyncContextsByPID[pid] === work.context {
+        let completedCurrentSync =
+            pendingDestroyedWindowSyncContextsByPID[pid] === work.context
+        if completedCurrentSync {
             pendingDestroyedWindowSyncContextsByPID.removeValue(forKey: pid)
         }
+        let refreshRequested = completedCurrentSync
+            && pendingDestroyedWindowSyncRefreshPIDs.remove(pid) != nil
         guard observerContextByPID[pid] === work.context else {
             scheduleDestroyedWindowRegistrationCleanup(
                 observer: work.observer,
@@ -529,35 +568,35 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
             return
         }
         destroyedWindowElementsByPID[pid] = result.observedWindowElements
+        if refreshRequested {
+            syncDestroyedWindowObservers(pid: pid)
+        }
     }
 
     nonisolated static func synchronizeDestroyedWindowRegistrations(
         observer: AXObserver,
         context: ObserverContext,
-        currentWindows: [String: AXUIElement],
-        observedWindows: [String: AXUIElement]
-    ) -> [String: AXUIElement] {
-        var synchronizedWindows = observedWindows
-        for (windowID, observedElement) in synchronizedWindows {
-            guard let currentElement = currentWindows[windowID],
-                  CFEqual(currentElement, observedElement)
-            else {
-                RuntimeAXMessagingTimeoutPolicy.apply(to: observedElement)
-                AXObserverRemoveNotification(
-                    observer,
-                    observedElement,
-                    kAXUIElementDestroyedNotification as CFString
-                )
-                synchronizedWindows.removeValue(forKey: windowID)
-                continue
-            }
+        currentWindows: [AXUIElement],
+        observedWindows: [AXUIElement]
+    ) -> [AXUIElement] {
+        let diff = RuntimeAXWindowElementRegistrationDiff.resolve(
+            currentWindows: currentWindows,
+            observedWindows: observedWindows
+        )
+        for removedElement in diff.removed {
+            RuntimeAXMessagingTimeoutPolicy.apply(to: removedElement)
+            AXObserverRemoveNotification(
+                observer,
+                removedElement,
+                kAXUIElementDestroyedNotification as CFString
+            )
         }
 
+        var synchronizedWindows = diff.retained
         let contextPointer = UnsafeMutableRawPointer(
             Unmanaged.passUnretained(context).toOpaque()
         )
-        for (windowID, windowElement) in currentWindows
-        where synchronizedWindows[windowID] == nil {
+        for windowElement in diff.added {
             let registration = RuntimeAXWindowObservationRegistrationPolicy.register(
                 element: windowElement,
                 notifications: [kAXUIElementDestroyedNotification as CFString]
@@ -570,7 +609,7 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
                 )
             }
             guard !registration.registeredNotifications.isEmpty else { continue }
-            synchronizedWindows[windowID] = windowElement
+            synchronizedWindows.append(windowElement)
         }
         return synchronizedWindows
     }
@@ -587,7 +626,7 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
     private func scheduleDestroyedWindowRegistrationCleanup(
         observer: AXObserver,
         context: ObserverContext,
-        windowElements: [String: AXUIElement]
+        windowElements: [AXUIElement]
     ) {
         guard !windowElements.isEmpty else { return }
         let work = ObserverRemovalWork(
@@ -606,7 +645,7 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
         _ work: ObserverRemovalWork
     ) {
         withExtendedLifetime(work.context) {
-            for windowElement in work.destroyedWindowElements.values {
+            for windowElement in work.destroyedWindowElements {
                 RuntimeAXMessagingTimeoutPolicy.apply(to: windowElement)
                 AXObserverRemoveNotification(
                     work.observer,
@@ -705,25 +744,45 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
         appID: String,
         pid: pid_t,
         notification: CFString,
-        element: AXUIElement,
+        element _: AXUIElement,
         bindingGeneration: UInt64
     ) {
-        if notification as String == kAXUIElementDestroyedNotification as String {
-            if let axWindowID = AXLiveWindowRegistry.shared.windowID(forKnownWindow: element, expectedPID: pid),
-               let onAXWindowDestroyed {
-                RuntimeLog.debug(
-                    .axObserver,
-                    "homeAXDestroyed known appID=\(appID) pid=\(pid) axWindowID=\(axWindowID)"
-                )
-                onAXWindowDestroyed(appID, pid, axWindowID)
-                return
-            }
-            RuntimeLog.debug(.axObserver, "homeAXDestroyed unresolved appID=\(appID) pid=\(pid)")
+        guard let changeKind = Self.changeKind(for: notification) else {
+            return
+        }
+        if changeKind == .created {
+            syncDestroyedWindowObservers(pid: pid)
+        }
+        if changeKind == .destroyed {
+            RuntimeLog.debug(
+                .axObserver,
+                "homeAXDestroyed topologyInvalidated appID=\(appID) pid=\(pid)"
+            )
         }
         deliveryCoordinator.recordObservedTransition(
             pid: pid,
-            bindingGeneration: bindingGeneration
+            bindingGeneration: bindingGeneration,
+            changeKind: changeKind
         )
+    }
+
+    nonisolated static func changeKind(
+        for notification: CFString
+    ) -> RuntimeAXWindowChangeEvidence.ChangeKind? {
+        switch notification as String {
+        case kAXWindowCreatedNotification as String:
+            .created
+        case kAXUIElementDestroyedNotification as String:
+            .destroyed
+        case kAXFocusedWindowChangedNotification as String,
+             kAXMainWindowChangedNotification as String:
+            .focus
+        case kAXWindowMiniaturizedNotification as String,
+             kAXWindowDeminiaturizedNotification as String:
+            .visibility
+        default:
+            nil
+        }
     }
 
     private static let callback: AXObserverCallback = { _, element, notification, refcon in

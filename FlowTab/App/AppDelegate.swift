@@ -664,18 +664,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         -> any RuntimeAppLaunchWindowEvidenceCoordinating
     {
         RuntimeAppLaunchWindowEvidenceCoordinator(
-            onAppWindowChanged: { [weak self] appID, pid in
-                self?.resolvedRuntimeProjectionService.signalAppWindowsChanged(
-                    appID: appID,
-                    pid: pid
-                )
-            },
-            onAXWindowDestroyed: { [weak self] appID, pid, axWindowID in
-                self?.resolvedRuntimeProjectionService.signalAXWindowDestroyed(
-                    appID: appID,
-                    pid: pid,
-                    axWindowID: axWindowID
-                )
+            onAppWindowEvidence: { [weak self] evidence in
+                guard let service = self?.resolvedRuntimeProjectionService
+                else { return }
+                switch evidence.source {
+                case .observedTransition:
+                    service.markAppWindowsDirty(evidence)
+                case .initialReadback, .trailingReadback:
+                    guard evidence.requiresReconciliation else { return }
+                    service.signalAppWindowsChanged(evidence)
+                }
             }
         )
     }

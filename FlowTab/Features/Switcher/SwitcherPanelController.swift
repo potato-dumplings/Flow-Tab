@@ -30,6 +30,13 @@ struct ModifierReleaseConfirmationPolicy: Equatable {
 
 @MainActor
 final class SwitcherPanelController {
+    struct PendingFocusedWindowSessionPresentation {
+        let request: PendingFocusedAppWindowSession
+        let initialKeyInput: KeyInput?
+        let showStartMilliseconds: Double
+        let observationGeneration: Int
+    }
+
     enum HotkeySessionKind {
         case globalAppSwitcher
         case inAppWindowSwitcher
@@ -117,6 +124,8 @@ final class SwitcherPanelController {
         TerminateInterruptionProtectionObservationOwner
     let delayedWindowLayerEntryObservationOwner:
         DelayedWindowLayerEntryObservationOwner
+    let focusedWindowSessionFreshnessObservationOwner:
+        FocusedWindowSessionFreshnessObservationOwner
     let manualWindowLayerEntryObservationOwner:
         ManualWindowLayerEntryObservationOwner
     let terminatePressFeedbackCompletionOwner:
@@ -233,6 +242,8 @@ final class SwitcherPanelController {
     let maxAppTileSpacing: CGFloat = 10
     let minAppTileSize: CGFloat = 1
     var activeHotkeySessionKind: HotkeySessionKind?
+    var pendingFocusedWindowSessionPresentation:
+        PendingFocusedWindowSessionPresentation?
     var activePresentationScreen: NSScreen?
     var suppressModifierReleaseConfirmationForTesting = false
 
@@ -303,6 +314,8 @@ final class SwitcherPanelController {
             (any TerminateInterruptionProtectionScheduling)? = nil,
         delayedWindowLayerEntryScheduler:
             (any DelayedWindowLayerEntryScheduling)? = nil,
+        focusedWindowSessionFreshnessScheduler:
+            (any FocusedWindowSessionFreshnessScheduling)? = nil,
         terminatePressFeedbackScheduler:
             (any TerminatePressFeedbackScheduling)? = nil,
         initialWindowOnlyPreviewRevealScheduler:
@@ -343,6 +356,10 @@ final class SwitcherPanelController {
         delayedWindowLayerEntryObservationOwner =
             DelayedWindowLayerEntryObservationOwner(
                 scheduler: delayedWindowLayerEntryScheduler
+            )
+        focusedWindowSessionFreshnessObservationOwner =
+            FocusedWindowSessionFreshnessObservationOwner(
+                scheduler: focusedWindowSessionFreshnessScheduler
             )
         manualWindowLayerEntryObservationOwner =
             ManualWindowLayerEntryObservationOwner()
@@ -571,7 +588,9 @@ final class SwitcherPanelController {
     func beginInAppWindowHotkeySessionForTesting(
         triggerDirection: CycleDirection = .forward
     ) -> Bool {
-        guard model.startFocusedAppWindowSession(triggerDirection: triggerDirection) else { return false }
+        guard model.startFocusedAppWindowSession(
+            triggerDirection: triggerDirection
+        ) == .ready else { return false }
         _ = model.prewarmWindowOnlySessionPreviews()
         beginPresentationSession(kind: .inAppWindowSwitcher, trigger: "testing_in_app_show")
         panelVisibilityOverride = true
@@ -671,6 +690,10 @@ final class SwitcherPanelController {
             appID: appID,
             evidence: evidence
         )
+    }
+
+    var hasPendingFocusedWindowSessionForTesting: Bool {
+        pendingFocusedWindowSessionPresentation != nil
     }
 
     @discardableResult

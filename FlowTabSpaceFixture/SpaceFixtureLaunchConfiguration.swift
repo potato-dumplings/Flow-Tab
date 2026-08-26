@@ -78,6 +78,7 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
     let closeWindowIndex: Int?
     let closeWindowDelayMilliseconds: Int
     let deferredOpenWindowIndex: Int?
+    let usesChromeLikeWindowMutationNoise: Bool
     let workflowName: String?
     let workflowAppID: String?
     let workflowAppName: String?
@@ -123,6 +124,7 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         closeWindowIndex: Int? = nil,
         closeWindowDelayMilliseconds: Int = 0,
         deferredOpenWindowIndex: Int? = nil,
+        usesChromeLikeWindowMutationNoise: Bool = false,
         workflowName: String? = nil,
         workflowAppID: String? = nil,
         workflowAppName: String? = nil
@@ -158,6 +160,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             windowOpenMutationRoute == nil
                 ? nil
                 : normalizedDeferredOpenWindowIndex
+        self.usesChromeLikeWindowMutationNoise =
+            usesChromeLikeWindowMutationNoise
         self.workflowName = workflowName
         self.workflowAppID = workflowAppID
         self.workflowAppName = workflowAppName
@@ -186,7 +190,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         terminationDelayMilliseconds: Int = 0,
         closeWindowIndex: Int? = nil,
         closeWindowDelayMilliseconds: Int = 0,
-        deferredOpenWindowIndex: Int? = nil
+        deferredOpenWindowIndex: Int? = nil,
+        usesChromeLikeWindowMutationNoise: Bool = false
     ) {
         let normalizedWindowCount = max(Self.minimumWindowCount, windowCount)
         let normalizedFullscreenWindowIndex: Int?
@@ -237,7 +242,9 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             terminationDelayMilliseconds: terminationDelayMilliseconds,
             closeWindowIndex: closeWindowIndex,
             closeWindowDelayMilliseconds: closeWindowDelayMilliseconds,
-            deferredOpenWindowIndex: deferredOpenWindowIndex
+            deferredOpenWindowIndex: deferredOpenWindowIndex,
+            usesChromeLikeWindowMutationNoise:
+                usesChromeLikeWindowMutationNoise
         )
     }
 
@@ -313,6 +320,10 @@ extension SpaceFixtureLaunchConfiguration {
                 Self.intValue(
                     after: "--deferred-open-window-index",
                     in: arguments
+                ),
+            usesChromeLikeWindowMutationNoise:
+                arguments.contains(
+                    "--chrome-like-window-mutation-noise"
                 )
         )
     }
@@ -404,6 +415,10 @@ extension SpaceFixtureLaunchConfiguration {
                 Self.intValue(
                     after: "--deferred-open-window-index",
                     in: arguments
+                ),
+            usesChromeLikeWindowMutationNoise:
+                arguments.contains(
+                    "--chrome-like-window-mutation-noise"
                 ),
             workflowName: workflowConfiguration.workflowName,
             workflowAppID: appConfiguration.appID,

@@ -33,7 +33,7 @@ extension FlowTabPriorityCoverageTests {
                 switch request.target {
                 case .app:
                     return .waitingForEvidence([
-                        .destroyedWindowResolution
+                        .windowTopologyConvergence
                     ])
                 case .spaceTopology, .fullRepair:
                     return .completed

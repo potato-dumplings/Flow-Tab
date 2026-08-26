@@ -2,286 +2,296 @@ import AppKit
 import CoreGraphics
 import XCTest
 @testable import FlowTab
+import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
-    func testRuntimeWindowRecordLifecycleRemovesDestroyedWindowAfterAuthoritativeAbsence() {
+    func testWindowTopologyConvergenceRemovesAbsentRecordAndRebindsReorderedSurvivor() {
         let pid = pid_t(18_405)
-        let axWindowID = "ax:\(pid):destroyed"
-        let cgWindowID = CGWindowID(250_010)
-        let axWindow = AXUIElementCreateApplication(pid)
-        let cgWindow = RuntimeCGWindowEntry(
-            id: cgWindowID,
-            title: "Closing Window",
-            bounds: CGRect(x: 20, y: 30, width: 800, height: 600),
-            isOnscreen: true,
-            alpha: 1.0,
-            storeType: 1,
-            spaceIDs: [RuntimeWindowTopologyClassifier.desktopSpaceID]
+        let retiredCGWindowID = CGWindowID(250_010)
+        let survivorCGWindowID = CGWindowID(250_011)
+        let retiredAXElement = AXUIElementCreateApplication(18_451)
+        let originalSurvivorAXElement = AXUIElementCreateApplication(18_452)
+        let rebuiltSurvivorAXElement = AXUIElementCreateApplication(18_453)
+        let retiredCGWindow = makeTopologyCGWindow(
+            id: retiredCGWindowID,
+            title: "Retired Window",
+            x: 20
         )
-        var record = RuntimeWindowRecord(
-            cgWindowID: cgWindowID,
-            stableWindowID:
-                RuntimeWindowListEntry.cgStableWindowID(
+        let survivorCGWindow = makeTopologyCGWindow(
+            id: survivorCGWindowID,
+            title: "Survivor Window",
+            x: 940
+        )
+        let store = RuntimeWindowRecordStore()
+
+        let baseline = store.resolveStableWindowMapping(
+            axWindows: [
+                makeTopologyAXWindow(
+                    index: 0,
                     pid: pid,
-                    cgWindowID: cgWindowID
+                    title: "Retired Window",
+                    element: retiredAXElement,
+                    frame: retiredCGWindow.bounds
                 ),
-            firstSeenAt: 10
-        )
-        record.refreshCGState(from: cgWindow, observedAt: 10)
-        record.currentAXAttachment = RuntimeCurrentAXAttachment(
-            axWindowID: axWindowID,
-            axWindow: axWindow,
-            title: "Closing Window",
-            frame: cgWindow.bounds,
-            state: RuntimeAXWindowState(
-                isMinimized: false,
-                isFocused: false,
-                isMain: false
-            )
-        )
-        record.lastExactAXWindowID = axWindowID
-        record.lastExactAXWindow = axWindow
-        record.lastConfirmationSource = .publicExactMatch
-        let store = RuntimeWindowRecordStore(
-            mappingStatesByPID: [
-                pid: RuntimeWindowMappingState(
-                    windowRecordsByCGWindowID: [
-                        cgWindowID: record
-                    ],
-                    currentAXToCG: [axWindowID: cgWindowID],
-                    validCGWindowIDs: [cgWindowID],
-                    lastAXWindowIDs: [axWindowID],
-                    hasObservedAXWindowHandle: true
-                )
-            ]
-        )
-
-        XCTAssertEqual(
-            store.clearDestroyedAXAttachment(
-                processIdentifier: pid,
-                axWindowID: axWindowID,
-                now: 11
-            ),
-            cgWindowID
-        )
-
-        let closingResolution = store.resolveStableWindowMapping(
-            axWindows: [],
-            cgWindows: [cgWindow],
-            pid: pid,
-            appName: "Closing App"
-        )
-        XCTAssertNotNil(
-            closingResolution.windowRecordsByCGWindowID[cgWindowID]
-        )
-        XCTAssertEqual(
-            store.state(for: pid)?.affectedWindowEvidence(
-                for: [cgWindowID]
-            ).pendingDestroyedCGWindowIDs,
-            [cgWindowID]
-        )
-
-        let absentResolution = store.resolveStableWindowMapping(
-            axWindows: [],
-            cgWindows: [],
-            pid: pid,
-            appName: "Closing App"
-        )
-
-        XCTAssertTrue(
-            absentResolution.windowRecordsByCGWindowID.isEmpty
-        )
-    }
-
-    func testRuntimeWindowRecordStoreResolvesDestroyedAXFromUniqueExactHistory() {
-        let pid = pid_t(18_405)
-        let axWindowID = "ax:\(pid):historical-destroyed"
-        let cgWindowID = CGWindowID(250_012)
-        var record = RuntimeWindowRecord(
-            cgWindowID: cgWindowID,
-            stableWindowID:
-                RuntimeWindowListEntry.cgStableWindowID(
+                makeTopologyAXWindow(
+                    index: 1,
                     pid: pid,
-                    cgWindowID: cgWindowID
-                ),
-            firstSeenAt: 10
-        )
-        record.lastExactAXWindowID = axWindowID
-        record.lastExactAXWindow = AXUIElementCreateApplication(pid)
-        let store = RuntimeWindowRecordStore(
-            mappingStatesByPID: [
-                pid: RuntimeWindowMappingState(
-                    windowRecordsByCGWindowID: [
-                        cgWindowID: record
-                    ],
-                    validCGWindowIDs: [cgWindowID]
+                    title: "Survivor Window",
+                    element: originalSurvivorAXElement,
+                    frame: survivorCGWindow.bounds
                 )
-            ]
+            ],
+            cgWindows: [retiredCGWindow, survivorCGWindow],
+            pid: pid,
+            appName: "Chrome Style App"
         )
+        XCTAssertEqual(baseline.windowRecordsByCGWindowID.count, 2)
+        _ = store.invalidateWindowTopology(processIdentifier: pid)
 
-        XCTAssertEqual(
-            store.clearDestroyedAXAttachment(
-                processIdentifier: pid,
-                axWindowID: axWindowID,
-                now: 11
-            ),
-            cgWindowID
-        )
-        XCTAssertEqual(
-            store.state(for: pid)?
-                .windowRecordsByCGWindowID[cgWindowID]?
-                .pendingDestroyedAXWindowID,
-            axWindowID
-        )
-    }
-
-    func testRuntimeWindowRecordStoreRejectsAmbiguousDestroyedAXHistory() {
-        let pid = pid_t(18_405)
-        let axWindowID = "ax:\(pid):ambiguous-destroyed"
-        let firstCGWindowID = CGWindowID(250_013)
-        let secondCGWindowID = CGWindowID(250_014)
-        let records = [firstCGWindowID, secondCGWindowID].reduce(
-            into: [CGWindowID: RuntimeWindowRecord]()
-        ) { records, cgWindowID in
-            var record = RuntimeWindowRecord(
-                cgWindowID: cgWindowID,
-                stableWindowID:
-                    RuntimeWindowListEntry.cgStableWindowID(
-                        pid: pid,
-                        cgWindowID: cgWindowID
-                    ),
-                firstSeenAt: 10
-            )
-            record.lastExactAXWindowID = axWindowID
-            record.lastExactAXWindow =
-                AXUIElementCreateApplication(pid)
-            records[cgWindowID] = record
-        }
-        let store = RuntimeWindowRecordStore(
-            mappingStatesByPID: [
-                pid: RuntimeWindowMappingState(
-                    windowRecordsByCGWindowID: records,
-                    validCGWindowIDs: [
-                        firstCGWindowID,
-                        secondCGWindowID
-                    ]
+        let converged = store.resolveStableWindowMapping(
+            axWindows: [
+                makeTopologyAXWindow(
+                    index: 0,
+                    pid: pid,
+                    title: "Survivor Window",
+                    element: rebuiltSurvivorAXElement,
+                    frame: survivorCGWindow.bounds
                 )
-            ]
+            ],
+            cgWindows: [survivorCGWindow],
+            pid: pid,
+            appName: "Chrome Style App",
+            axCollectionIsComplete: true,
+            cgCollectionIsComplete: true
         )
 
         XCTAssertNil(
-            store.clearDestroyedAXAttachment(
-                processIdentifier: pid,
-                axWindowID: axWindowID,
-                now: 11
-            )
+            converged.windowRecordsByCGWindowID[retiredCGWindowID]
+        )
+        let survivor = converged.windowRecordsByCGWindowID[
+            survivorCGWindowID
+        ]
+        XCTAssertNotNil(survivor)
+        XCTAssertEqual(
+            converged.exactMatchesByAXWindowID["ax:\(pid):0"],
+            survivorCGWindowID
         )
         XCTAssertTrue(
-            store.state(for: pid)?
-                .windowRecordsByCGWindowID.values
-                .allSatisfy {
-                    !$0.hasPendingDestroyedAXEvidence
-                } == true
+            survivor?.currentAXAttachment.map {
+                CFEqual($0.axWindow, rebuiltSurvivorAXElement)
+            } == true
+        )
+        XCTAssertFalse(converged.isWindowTopologyConvergencePending)
+        XCTAssertNil(
+            store.pendingWindowTopologyInvalidationGeneration(
+                processIdentifier: pid
+            )
         )
     }
 
-    func testRuntimeWindowRecordDestroyedEvidenceClearsAfterExactRebinding() {
-        let pid = pid_t(18_405)
-        let cgWindowID = CGWindowID(250_011)
-        let cgWindow = RuntimeCGWindowEntry(
+    func testWindowTopologyConvergenceWaitsForCompleteAXAndCGFacts() {
+        let pid = pid_t(18_406)
+        let cgWindowID = CGWindowID(250_020)
+        let cgWindow = makeTopologyCGWindow(
             id: cgWindowID,
-            title: "Rebound Window",
-            bounds: CGRect(x: 30, y: 40, width: 900, height: 700),
-            isOnscreen: true,
-            alpha: 1.0,
-            storeType: 1,
-            spaceIDs: [RuntimeWindowTopologyClassifier.desktopSpaceID]
+            title: "Closing Window",
+            x: 30
         )
-        var record = RuntimeWindowRecord(
-            cgWindowID: cgWindowID,
-            stableWindowID:
-                RuntimeWindowListEntry.cgStableWindowID(
+        let store = RuntimeWindowRecordStore()
+        _ = store.resolveStableWindowMapping(
+            axWindows: [
+                makeTopologyAXWindow(
+                    index: 0,
                     pid: pid,
-                    cgWindowID: cgWindowID
-                ),
-            firstSeenAt: 10
+                    title: "Closing Window",
+                    element: AXUIElementCreateApplication(18_461),
+                    frame: cgWindow.bounds
+                )
+            ],
+            cgWindows: [cgWindow],
+            pid: pid,
+            appName: "Incomplete Facts App"
         )
-        record.clearDestroyedAXAttachment(
-            axWindowID: "ax:\(pid):destroyed",
-            observedAt: 11
-        )
-        XCTAssertTrue(record.hasPendingDestroyedAXEvidence)
+        _ = store.invalidateWindowTopology(processIdentifier: pid)
 
-        let reboundAXWindow = RuntimeAXWindowEntry(
-            index: 0,
-            id: "ax:\(pid):rebound",
-            title: "Rebound Window",
-            sourceTitle: "Rebound Window",
-            isMinimized: false,
-            window: AXUIElementCreateApplication(pid),
-            frame: cgWindow.bounds
-        )
-        record.applyExactMatch(
-            axWindow: reboundAXWindow,
-            resolvedTitle: "Rebound Window",
-            confirmationSource: .publicExactMatch,
-            observedAt: 12,
-            matchedCGWindow: cgWindow
+        let incomplete = store.resolveStableWindowMapping(
+            axWindows: [],
+            cgWindows: [],
+            pid: pid,
+            appName: "Incomplete Facts App",
+            axCollectionIsComplete: false,
+            cgCollectionIsComplete: true
         )
 
-        XCTAssertFalse(record.hasPendingDestroyedAXEvidence)
+        XCTAssertTrue(incomplete.isWindowTopologyConvergencePending)
+        XCTAssertNotNil(
+            incomplete.windowRecordsByCGWindowID[cgWindowID]
+        )
+
+        let complete = store.resolveStableWindowMapping(
+            axWindows: [],
+            cgWindows: [],
+            pid: pid,
+            appName: "Incomplete Facts App",
+            axCollectionIsComplete: true,
+            cgCollectionIsComplete: true
+        )
+
+        XCTAssertFalse(complete.isWindowTopologyConvergencePending)
+        XCTAssertTrue(complete.windowRecordsByCGWindowID.isEmpty)
+    }
+
+    func testRepeatedDestroyedEvidenceUsesOneApplicationTopologyInvalidationGeneration() {
+        let pid = pid_t(18_407)
+        let store = RuntimeWindowRecordStore()
+        let provider = RuntimeProjectionRepairProvider(
+            windowRecordStore: store,
+            reconciliationCoordinator: RuntimeReconciliationCoordinator()
+        )
+
+        provider.recordAppWindowsChanged(
+            appID: "com.example.repeated-destroyed",
+            pid: pid,
+            changeKinds: [.destroyed],
+            now: 10
+        )
+        let firstGeneration = store
+            .pendingWindowTopologyInvalidationGeneration(
+                processIdentifier: pid
+            )
+        provider.recordAppWindowsChanged(
+            appID: "com.example.repeated-destroyed",
+            pid: pid,
+            changeKinds: [.destroyed],
+            now: 11
+        )
+
+        XCTAssertNotNil(firstGeneration)
         XCTAssertEqual(
-            record.currentAXWindowID,
-            reboundAXWindow.id
+            store.pendingWindowTopologyInvalidationGeneration(
+                processIdentifier: pid
+            ),
+            firstGeneration
         )
     }
 
-    func testRuntimeWindowRecordDestroyedEvidenceSurvivesStaleExactReadback() {
-        let pid = pid_t(18_405)
-        let axWindowID = "ax:\(pid):destroyed"
-        let cgWindowID = CGWindowID(250_015)
-        let axWindow = AXUIElementCreateApplication(pid)
-        let cgWindow = RuntimeCGWindowEntry(
-            id: cgWindowID,
-            title: "Stale Destroyed Window",
-            bounds: CGRect(x: 40, y: 50, width: 800, height: 600),
+    func testObservedDestroyedEvidencePublishesDirtyProjectionBeforeTrailingRepair() throws {
+        let runningApp = NSRunningApplication.current
+        let pid = runningApp.processIdentifier
+        let appID = "com.example.destroyed-window-freshness"
+        let window = WindowCandidate(
+            id: "destroyed-window",
+            title: "Destroyed Window",
+            isMinimized: false,
+            lastActiveAt: 10
+        )
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Destroyed Window App",
+            groupID: "destroyed-window-app",
+            lastActiveAt: 10,
+            windows: [window]
+        )
+        let context = makeRuntimeAppContext(
+            appID: appID,
+            runningApp: runningApp,
+            windows: [window]
+        )
+        let directoryEntry = RuntimeAppDirectoryEntry(
+            pid: pid,
+            appID: appID,
+            bundleIdentifier: appID,
+            localizedName: candidate.displayName,
+            launchDate: nil
+        )
+        let store = RuntimeReadModelStore()
+        store.commitFullRepairAppDirectoryEvidence(
+            [directoryEntry],
+            generatedAt: 10
+        )
+        store.commitCurrentAppWindowProjection(
+            RuntimeCurrentAppWindowPayload(
+                summary: RuntimeHomeAppSummary(
+                    appID: appID,
+                    displayName: candidate.displayName,
+                    groupID: candidate.groupID,
+                    lastActiveAt: candidate.lastActiveAt,
+                    windowCount: 1,
+                    pid: pid
+                ),
+                candidate: candidate,
+                context: context,
+                appDirectoryEntries: [directoryEntry]
+            ),
+            clearsDirtyState: true,
+            generatedAt: 10
+        )
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.DestroyedWindowFreshness.Service",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: RuntimeWindowRecordStore(),
+                reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            readModelStore: store,
+            reconciliationExecutor: { _, _ in .completed }
+        )
+
+        service.markAppWindowsDirty(
+            RuntimeAXWindowChangeEvidence(
+                appID: appID,
+                pid: pid,
+                generation: 1,
+                source: .observedTransition,
+                observedTransitionCount: 1,
+                changeKinds: [.destroyed],
+                initialReadback: nil
+            )
+        )
+
+        let projection = try XCTUnwrap(
+            store.readCurrentAppWindowProjection(appID: appID)
+        )
+        XCTAssertFalse(projection.freshness.isCompleteForScope)
+        XCTAssertEqual(projection.freshness.dirtyAppIDs, [appID])
+        XCTAssertEqual(projection.freshness.dirtyPIDs, [pid])
+        XCTAssertEqual(
+            projection.freshness.pendingRepairScopes,
+            ["appWindows:\(appID)"]
+        )
+        XCTAssertEqual(projection.freshness.sourceGeneration.axDirty, 1)
+    }
+
+    private func makeTopologyCGWindow(
+        id: CGWindowID,
+        title: String,
+        x: CGFloat
+    ) -> RuntimeCGWindowEntry {
+        RuntimeCGWindowEntry(
+            id: id,
+            title: title,
+            bounds: CGRect(x: x, y: 40, width: 800, height: 600),
             isOnscreen: true,
-            alpha: 1.0,
+            alpha: 1,
             storeType: 1,
             spaceIDs: [RuntimeWindowTopologyClassifier.desktopSpaceID]
         )
-        var record = RuntimeWindowRecord(
-            cgWindowID: cgWindowID,
-            stableWindowID:
-                RuntimeWindowListEntry.cgStableWindowID(
-                    pid: pid,
-                    cgWindowID: cgWindowID
-                ),
-            firstSeenAt: 10
-        )
-        record.lastExactAXWindowID = axWindowID
-        record.lastExactAXWindow = axWindow
-        record.clearDestroyedAXAttachment(
-            axWindowID: axWindowID,
-            observedAt: 11
-        )
+    }
 
-        record.applyExactMatch(
-            axWindow: RuntimeAXWindowEntry(
-                index: 0,
-                id: axWindowID,
-                title: "Stale Destroyed Window",
-                sourceTitle: "Stale Destroyed Window",
-                isMinimized: false,
-                window: axWindow,
-                frame: cgWindow.bounds
-            ),
-            resolvedTitle: "Stale Destroyed Window",
-            confirmationSource: .publicExactMatch,
-            observedAt: 12,
-            matchedCGWindow: cgWindow
+    private func makeTopologyAXWindow(
+        index: Int,
+        pid: pid_t,
+        title: String,
+        element: AXUIElement,
+        frame: CGRect?
+    ) -> RuntimeAXWindowEntry {
+        RuntimeAXWindowEntry(
+            index: index,
+            id: "ax:\(pid):\(index)",
+            title: title,
+            sourceTitle: title,
+            isMinimized: false,
+            window: element,
+            frame: frame
         )
-
-        XCTAssertTrue(record.hasPendingDestroyedAXEvidence)
     }
 }

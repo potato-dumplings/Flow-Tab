@@ -319,6 +319,15 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         pendingRepairScopes.insert(pendingScope)
     }
 
+    func ensureAppWindowsDirty(appID: String, pid: pid_t, pendingScope: String) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        dirtyAppIDs.insert(appID)
+        dirtyPIDs.insert(pid)
+        pendingRepairScopes.insert(pendingScope)
+    }
+
     func markSpaceTopologyDirty(
         affectedCGWindowIDs: Set<CGWindowID>,
         signature: RuntimeSpaceTopologySignature? = nil,

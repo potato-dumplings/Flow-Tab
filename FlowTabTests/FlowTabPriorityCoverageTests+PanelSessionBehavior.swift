@@ -1261,7 +1261,10 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(
+            model.startFocusedAppWindowSession(triggerDirection: .forward),
+            .ready
+        )
 
         XCTAssertEqual(runtimeProjectionService.focusedCurrentAppWindowProjectionReadCount(), 1)
         XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
@@ -1282,7 +1285,11 @@ extension FlowTabPriorityCoverageTests {
             )
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        XCTAssertFalse(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        guard case .awaitingFreshProjection = model.startFocusedAppWindowSession(
+            triggerDirection: .forward
+        ) else {
+            return XCTFail("Missing focused projection must defer the session")
+        }
 
         XCTAssertTrue(runtimeProjectionService.appWindowChangeSignalsRecorded().isEmpty)
         XCTAssertEqual(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().map(\.appID), [appID])
@@ -1296,7 +1303,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelFocusedWindowSessionUsesStaleCommittedProjectionAsDegradedRead() {
+    func testLiveSwitcherModelFocusedWindowSessionDefersStaleCommittedProjectionUntilFresh() {
         let runningApp = NSRunningApplication.current
         let appID = runningApp.bundleIdentifier ?? "pid:\(runningApp.processIdentifier)"
         let windows = [
@@ -1342,7 +1349,11 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        guard case .awaitingFreshProjection = model.startFocusedAppWindowSession(
+            triggerDirection: .forward
+        ) else {
+            return XCTFail("Dirty focused projection must defer the session")
+        }
 
         XCTAssertEqual(runtimeProjectionService.focusedCurrentAppWindowProjectionReadCount(), 1)
         XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
@@ -1351,11 +1362,7 @@ extension FlowTabPriorityCoverageTests {
             runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().map(\.pid),
             [runningApp.processIdentifier]
         )
-        XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
-        XCTAssertEqual(
-            model.session?.selectedApp.windows.map(\.id),
-            ["stale-focused-projected-1", "stale-focused-projected-2"]
-        )
+        XCTAssertNil(model.session)
     }
 
     @MainActor

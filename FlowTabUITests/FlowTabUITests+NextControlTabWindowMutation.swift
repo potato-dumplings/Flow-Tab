@@ -2,12 +2,77 @@ import AppKit
 import Carbon
 import XCTest
 
+private enum FlowTabUITestWindowMutationPriorSession {
+    case none
+    case completedOptionTab
+
+    var traceComponent: String {
+        switch self {
+        case .none:
+            "first-session"
+        case .completedOptionTab:
+            "after-option-tab"
+        }
+    }
+}
+
 extension FlowTabUITests {
-    func testNextControlTabSessionUsesWindowCreatedWhilePanelIsClosed()
+    func testFirstSwitcherSessionControlTabUsesWindowCreatedWhilePanelIsClosed()
         throws
     {
+        try runWindowCreatedMutation(
+            priorSession: .none
+        )
+    }
+
+    func testFirstSwitcherSessionControlTabUsesWindowClosedWhilePanelIsClosed()
+        throws
+    {
+        try runWindowClosedMutation(
+            priorSession: .none
+        )
+    }
+
+    func testControlTabUsesWindowCreatedAfterCompletedOptionTabSession()
+        throws
+    {
+        try runWindowCreatedMutation(
+            priorSession: .completedOptionTab
+        )
+    }
+
+    func testControlTabUsesWindowClosedAfterCompletedOptionTabSession()
+        throws
+    {
+        try runWindowClosedMutation(
+            priorSession: .completedOptionTab
+        )
+    }
+
+    private func runWindowCreatedMutation(
+        priorSession: FlowTabUITestWindowMutationPriorSession
+    ) throws {
         let identity = spaceFixtureAppIdentity
-        guard assertSpaceFixtureWorkflowPermissionsAvailable() else {
+        let traceLabel =
+            "window-created.\(priorSession.traceComponent)"
+        let projectionRoute =
+            makeSpaceFixtureCurrentAppProjectionAcceptanceRoute(
+                bundleIdentifier: identity.bundleIdentifier
+            )
+        defer { projectionRoute.removeReadback() }
+        let app = launchWindowMutationFlowTab(
+            traceLabel: traceLabel,
+            projectionRoute: projectionRoute
+        )
+        defer {
+            if app.state == .runningForeground
+                || app.state == .runningBackground
+            {
+                app.terminate()
+            }
+        }
+        guard assertSpaceFixtureWorkflowPermissionsAvailable(in: app)
+        else {
             return
         }
 
@@ -21,13 +86,14 @@ extension FlowTabUITests {
 
         let fixtureApp = launchSpaceFixtureWorkflow(
             identity: identity,
-            windowCount: 2,
+            windowCount: 3,
             fullscreenWindowIndex: nil,
             titlePrefix: "Created While Closed",
             enterFullscreenDelayMilliseconds: 0,
-            deferredOpenWindowIndex: 2,
+            deferredOpenWindowIndex: 3,
             fixtureAdditionalArguments:
                 route.fixtureLaunchArguments
+                + ["--chrome-like-window-mutation-noise"]
         )
         defer {
             if fixtureApp.state == .runningForeground
@@ -53,35 +119,57 @@ extension FlowTabUITests {
             readyEvidence.bundleIdentifier,
             identity.bundleIdentifier
         )
-        XCTAssertEqual(readyEvidence.targetWindowPlanIndex, 2)
+        XCTAssertEqual(readyEvidence.targetWindowPlanIndex, 3)
         XCTAssertEqual(
             readyEvidence.targetWindowTitle,
-            "Created While Closed 2"
+            "Created While Closed 3"
         )
-        XCTAssertEqual(readyEvidence.activeWindowPlanIndices, [1])
-
-        let app = launchWindowMutationFlowTab(
-            identity: identity,
-            initialWindowCount: 1,
+        XCTAssertEqual(readyEvidence.activeWindowPlanIndices, [1, 2])
+        XCTAssertEqual(
+            readyEvidence.activeWindowTitlesByPlanIndex,
+            [
+                1: "Created While Closed 1",
+                2: "Created While Closed 2"
+            ]
+        )
+        XCTAssertEqual(
+            readyEvidence.activeCGWindowIDsByPlanIndex.count,
+            2
+        )
+        let projectionAcceptance =
+            SpaceFixtureCurrentAppProjectionAcceptanceOwner(
+                route: projectionRoute,
+                expectedPID:
+                    readyEvidence.processIdentifier,
+                expectation: .createdTwoToThree
+            )
+        projectionAcceptance.start()
+        defer { projectionAcceptance.cancel() }
+        guard prepareWindowMutationFixture(
+            in: app,
             fixtureApp: fixtureApp,
-            traceLabel: "window-created"
-        )
-        defer {
-            if app.state == .runningForeground
-                || app.state == .runningBackground
-            {
-                app.terminate()
-            }
+            identity: identity,
+            initialWindowCount: 2,
+            priorSession: priorSession,
+            traceLabel: traceLabel,
+            projectionAcceptance: projectionAcceptance,
+            expectedPID:
+                readyEvidence.processIdentifier
+        ) else { return }
+        guard projectionAcceptance.startTargetObservation() else {
+            return XCTFail(
+                "Could not arm created-window projection target for \(traceLabel)."
+            )
         }
 
         let openedFixtureWindow = fixtureApp.windows[
-            "flowtab.spacefixture.window.2"
+            "flowtab.spacefixture.window.3"
         ]
         XCTAssertFalse(openedFixtureWindow.exists)
         let openedFixtureWindowObservation =
             startElementExistenceObservation(
                 in: fixtureApp,
-                identifier: "flowtab.spacefixture.window.2",
+                identifier: "flowtab.spacefixture.window.3",
                 requiresInitialAbsence: true
             )
         defer { openedFixtureWindowObservation.cancel() }
@@ -92,7 +180,7 @@ extension FlowTabUITests {
                 SpaceFixtureWindowOpenMutationUITestPolicy
                     .fixtureWindowReadbackWatchdog,
             description:
-                "Deferred fixture Window 2 creation"
+                "Deferred fixture Window 3 creation"
         )
         let appliedEvidence = try XCTUnwrap(
             mutation.waitForApplied(
@@ -107,26 +195,60 @@ extension FlowTabUITests {
         )
         XCTAssertEqual(
             appliedEvidence.activeWindowPlanIndices,
-            [1, 2]
+            [1, 2, 3]
+        )
+        XCTAssertEqual(
+            appliedEvidence.activeWindowTitlesByPlanIndex,
+            [
+                1: "Created While Closed 1",
+                2: "Created While Closed 2",
+                3: "Created While Closed 3"
+            ]
+        )
+        XCTAssertEqual(
+            appliedEvidence.activeCGWindowIDsByPlanIndex.count,
+            3
         )
 
-        assertNextPhysicalControlTabSession(
+        assertPhysicalControlTabSession(
             in: app,
-            fixtureApp: fixtureApp,
             identity: identity,
             expectedTitles: [
                 "Created While Closed 1",
-                "Created While Closed 2"
+                "Created While Closed 2",
+                "Created While Closed 3"
             ],
-            traceLabel: "window-created"
+            traceLabel: traceLabel,
+            projectionAcceptance: projectionAcceptance,
+            expectedPID:
+                readyEvidence.processIdentifier
         )
     }
 
-    func testNextControlTabSessionUsesWindowClosedWhilePanelIsClosed()
-        throws
-    {
+    private func runWindowClosedMutation(
+        priorSession: FlowTabUITestWindowMutationPriorSession
+    ) throws {
         let identity = spaceFixtureAppIdentity
-        guard assertSpaceFixtureWorkflowPermissionsAvailable() else {
+        let traceLabel =
+            "window-closed.\(priorSession.traceComponent)"
+        let projectionRoute =
+            makeSpaceFixtureCurrentAppProjectionAcceptanceRoute(
+                bundleIdentifier: identity.bundleIdentifier
+            )
+        defer { projectionRoute.removeReadback() }
+        let app = launchWindowMutationFlowTab(
+            traceLabel: traceLabel,
+            projectionRoute: projectionRoute
+        )
+        defer {
+            if app.state == .runningForeground
+                || app.state == .runningBackground
+            {
+                app.terminate()
+            }
+        }
+        guard assertSpaceFixtureWorkflowPermissionsAvailable(in: app)
+        else {
             return
         }
 
@@ -139,7 +261,7 @@ extension FlowTabUITests {
 
         let fixtureApp = launchSpaceFixtureWorkflow(
             identity: identity,
-            windowCount: 2,
+            windowCount: 3,
             fullscreenWindowIndex: nil,
             titlePrefix: "Closed While Hidden",
             enterFullscreenDelayMilliseconds: 0,
@@ -147,6 +269,7 @@ extension FlowTabUITests {
             closeWindowDelayMilliseconds: 0,
             fixtureAdditionalArguments:
                 route.fixtureLaunchArguments
+                + ["--chrome-like-window-mutation-noise"]
         )
         defer {
             if fixtureApp.state == .runningForeground
@@ -174,21 +297,44 @@ extension FlowTabUITests {
         )
         XCTAssertEqual(
             scheduledClose.snapshot.remainingWindowPlanIndices,
-            [1, 2]
+            [1, 2, 3]
         )
-
-        let app = launchWindowMutationFlowTab(
-            identity: identity,
-            initialWindowCount: 2,
+        XCTAssertEqual(
+            scheduledClose.snapshot.remainingWindowTitlesByPlanIndex,
+            [
+                1: "Closed While Hidden 1",
+                2: "Closed While Hidden 2",
+                3: "Closed While Hidden 3"
+            ]
+        )
+        XCTAssertEqual(
+            scheduledClose.snapshot.remainingCGWindowIDsByPlanIndex.count,
+            3
+        )
+        let projectionAcceptance =
+            SpaceFixtureCurrentAppProjectionAcceptanceOwner(
+                route: projectionRoute,
+                expectedPID:
+                    scheduledClose.identity.processIdentifier,
+                expectation: .closedThreeToTwo
+            )
+        projectionAcceptance.start()
+        defer { projectionAcceptance.cancel() }
+        guard prepareWindowMutationFixture(
+            in: app,
             fixtureApp: fixtureApp,
-            traceLabel: "window-closed"
-        )
-        defer {
-            if app.state == .runningForeground
-                || app.state == .runningBackground
-            {
-                app.terminate()
-            }
+            identity: identity,
+            initialWindowCount: 3,
+            priorSession: priorSession,
+            traceLabel: traceLabel,
+            projectionAcceptance: projectionAcceptance,
+            expectedPID:
+                scheduledClose.identity.processIdentifier
+        ) else { return }
+        guard projectionAcceptance.startTargetObservation() else {
+            return XCTFail(
+                "Could not arm closed-window projection target for \(traceLabel)."
+            )
         }
 
         let closedFixtureWindow = fixtureApp.windows[
@@ -218,60 +364,165 @@ extension FlowTabUITests {
         )
         XCTAssertEqual(
             appliedClose.snapshot.remainingWindowPlanIndices,
-            [1]
+            [1, 3]
         )
         XCTAssertFalse(appliedClose.snapshot.targetWindowIsVisible)
         XCTAssertFalse(appliedClose.snapshot.targetCGWindowIsOnScreen)
+        XCTAssertEqual(
+            appliedClose.snapshot.remainingWindowTitlesByPlanIndex,
+            [
+                1: "Closed While Hidden 1",
+                3: "Closed While Hidden 3"
+            ]
+        )
+        let retiredCGWindowID =
+            scheduledClose.snapshot.targetWindowNumber
+        XCTAssertFalse(
+            appliedClose.snapshot.remainingCGWindowIDsByPlanIndex
+                .values.contains(retiredCGWindowID)
+        )
+        XCTAssertNotEqual(
+            scheduledClose.snapshot.remainingCGWindowIDsByPlanIndex[3],
+            appliedClose.snapshot.remainingCGWindowIDsByPlanIndex[3]
+        )
 
-        assertNextPhysicalControlTabSession(
+        assertPhysicalControlTabSession(
             in: app,
-            fixtureApp: fixtureApp,
             identity: identity,
-            expectedTitles: ["Closed While Hidden 1"],
-            traceLabel: "window-closed"
+            expectedTitles: [
+                "Closed While Hidden 1",
+                "Closed While Hidden 3"
+            ],
+            traceLabel: traceLabel,
+            projectionAcceptance: projectionAcceptance,
+            expectedPID:
+                scheduledClose.identity.processIdentifier,
+            retiredTitle: "Closed While Hidden 2",
+            retiredCGWindowID: retiredCGWindowID
         )
     }
 
     private func launchWindowMutationFlowTab(
-        identity: SpaceFixtureAppIdentity,
-        initialWindowCount: Int,
-        fixtureApp: XCUIApplication,
-        traceLabel: String
+        traceLabel: String,
+        projectionRoute:
+            SpaceFixtureCurrentAppProjectionAcceptanceRoute
     ) -> XCUIApplication {
         let app = makeRealRuntimeFlowTabApp(
-            additionalArguments: [
-                "--flowtab-ui-open-switcher",
-                "--flowtab-ui-listen-switcher-trigger",
-                "--flowtab-ui-frontmost-bundle-id",
-                identity.bundleIdentifier,
-                "--flowtab-ui-enable-shortcut-event-injection",
-                "--flowtab-ui-runtime-log-level", "DEBUG",
-                "--flowtab-ui-enable-verbose-logs",
-                "-windowLayerAutoEnterDelay", "30.0"
-            ] + FlowTabUITestSwitcherCommandPayload.launchArguments
+            additionalArguments:
+                runtimeTruthSwitcherLaunchArguments(
+                    additionalArguments: [
+                        "--flowtab-ui-enable-shortcut-event-injection"
+                    ] + projectionRoute.flowTabLaunchArguments,
+                    suppressesPanelActivation: false
+                )
         )
         launchFlowTabUITestApplication(app)
         assertRealSpaceFixtureFlowTabIsForegroundReady(
             app,
             traceLabel: traceLabel,
             targetDescription:
-                "next-Control-Tab-\(traceLabel)-initial-projection"
-        )
-        _ = assertCurrentSwitcherAppProjection(
-            in: app,
-            exactEntry:
-                "\(identity.bundleIdentifier):\(initialWindowCount)",
-            timeout:
-                FlowTabUITestSwitcherAppProjectionPolicy
-                    .openWindowMutationInitialProjectionWatchdog
+                "Control-Tab-\(traceLabel)-before-fixture-launch"
         )
 
         let diagnosticsSummary = element(
             in: app,
             identifier: Identifier.switcherSummary
         )
-        app.activate()
-        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertFalse(
+            diagnosticsSummary.exists,
+            "FlowTab must start with no Switcher session before \(traceLabel)."
+        )
+        return app
+    }
+
+    private func prepareWindowMutationFixture(
+        in app: XCUIApplication,
+        fixtureApp: XCUIApplication,
+        identity: SpaceFixtureAppIdentity,
+        initialWindowCount: Int,
+        priorSession: FlowTabUITestWindowMutationPriorSession,
+        traceLabel: String,
+        projectionAcceptance:
+            SpaceFixtureCurrentAppProjectionAcceptanceOwner,
+        expectedPID: pid_t
+    ) -> Bool {
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        XCTAssertFalse(
+            diagnosticsSummary.exists,
+            "Window mutation must start from a closed panel for \(traceLabel)."
+        )
+        fixtureApp.activate()
+        guard fixtureApp.wait(
+                for: .runningForeground,
+                timeout:
+                    FlowTabUITestSupportWatchdogPolicy
+                        .spaceFixtureForegroundActivation
+            )
+        else {
+            XCTFail(
+                "Fixture did not become foreground before \(traceLabel) mutation."
+            )
+            return false
+        }
+        guard let baseline = projectionAcceptance.waitForBaseline() else {
+            XCTFail(
+                "Missing exact complete projection baseline for \(traceLabel). "
+                    + projectionAcceptance.diagnosticSummary
+            )
+            return false
+        }
+        XCTAssertEqual(baseline.bundleIdentifier, identity.bundleIdentifier)
+        XCTAssertEqual(baseline.appID, identity.bundleIdentifier)
+        XCTAssertEqual(baseline.processIdentifier, expectedPID)
+        XCTAssertTrue(baseline.isCompleteForScope)
+        XCTAssertEqual(baseline.windowIDs.count, initialWindowCount)
+        XCTAssertEqual(Set(baseline.windowIDs).count, initialWindowCount)
+
+        guard priorSession == .completedOptionTab else {
+            return true
+        }
+
+        guard let flowTabProcessID = runningFlowTabProcessIdentifier(
+            applicationState: app.state,
+            traceLabel: traceLabel
+        ) else {
+            return false
+        }
+        let projectionResolved: Bool
+        do {
+            defer {
+                injectRuntimeKeySet(
+                    targetProcessID: flowTabProcessID,
+                    keyCodes: [CGKeyCode(kVK_Tab)],
+                    modifierFlags: .option,
+                    phase: "release"
+                )
+            }
+            projectionResolved = performAndWaitForSwitcherAppProjection(
+                diagnosticsSummary,
+                expectation:
+                    .exactEntry(
+                        "\(identity.bundleIdentifier):\(initialWindowCount)"
+                    ),
+                timeout:
+                    SpaceFixtureWindowOpenMutationUITestPolicy
+                        .completedOptionTabSessionWatchdog,
+                trigger: {
+                    injectRuntimeKeySet(
+                        targetProcessID: flowTabProcessID,
+                        keyCodes: [CGKeyCode(kVK_Tab)],
+                        modifierFlags: .option,
+                        phase: "press"
+                    )
+                }
+            )
+        }
+        guard projectionResolved else {
+            return false
+        }
         XCTAssertTrue(
             waitForNonExistence(
                 diagnosticsSummary,
@@ -279,27 +530,36 @@ extension FlowTabUITests {
                     SpaceFixtureWindowOpenMutationUITestPolicy
                         .panelDismissalWatchdog
             ),
-            "Initial Switcher session did not close before \(traceLabel) mutation."
+            "Physical Option+Tab session did not close before \(traceLabel) mutation."
         )
+
         fixtureApp.activate()
-        XCTAssertTrue(
-            fixtureApp.wait(
+        guard fixtureApp.wait(
                 for: .runningForeground,
                 timeout:
                     FlowTabUITestSupportWatchdogPolicy
                         .spaceFixtureForegroundActivation
-            ),
-            "Fixture did not become foreground before \(traceLabel) mutation."
-        )
-        return app
+            )
+        else {
+            XCTFail(
+                "Fixture did not return to the foreground after the "
+                    + "Option+Tab session for \(traceLabel)."
+            )
+            return false
+        }
+        return true
     }
 
-    private func assertNextPhysicalControlTabSession(
+    private func assertPhysicalControlTabSession(
         in app: XCUIApplication,
-        fixtureApp: XCUIApplication,
         identity: SpaceFixtureAppIdentity,
         expectedTitles: [String],
-        traceLabel: String
+        traceLabel: String,
+        projectionAcceptance:
+            SpaceFixtureCurrentAppProjectionAcceptanceOwner,
+        expectedPID: pid_t,
+        retiredTitle: String? = nil,
+        retiredCGWindowID: CGWindowID? = nil
     ) {
         let diagnosticsSummary = element(
             in: app,
@@ -318,7 +578,13 @@ extension FlowTabUITests {
                     let stateBefore = app.state
                     let diagnostics = self.switcherDiagnosticsSnapshot(
                         diagnosticsSummary,
-                        keys: ["apps", "selected", "mode", "preview"]
+                        keys: [
+                            "apps",
+                            "selected",
+                            "mode",
+                            "preview",
+                            "previewImages"
+                        ]
                     )
                     return FlowTabUITestInAppSwitcherPanelProjectionSnapshot(
                         applicationStateBefore: stateBefore,
@@ -388,7 +654,7 @@ extension FlowTabUITests {
 
         XCTAssertNotNil(
             projectionEvidence,
-            "Next physical Control+Tab projection failed for \(traceLabel). "
+            "Physical Control+Tab projection failed for \(traceLabel). "
                 + panelProjection.diagnosticSummary
         )
         let cards = cardEvidence?.value
@@ -399,6 +665,50 @@ extension FlowTabUITests {
                 uniqueKeysWithValues:
                     expectedTitles.map { ($0, 1) }
             )
+        )
+        let acceptedProjection =
+            projectionAcceptance.waitForAcceptedProjection()
+        XCTAssertEqual(
+            acceptedProjection?.bundleIdentifier,
+            identity.bundleIdentifier
+        )
+        XCTAssertEqual(acceptedProjection?.appID, identity.bundleIdentifier)
+        XCTAssertEqual(acceptedProjection?.processIdentifier, expectedPID)
+        XCTAssertEqual(
+            acceptedProjection?.windowIDs.count,
+            expectedTitles.count
+        )
+        XCTAssertTrue(acceptedProjection?.isCompleteForScope == true)
+        if let retiredCGWindowID {
+            XCTAssertFalse(
+                acceptedProjection?.windowIDs.contains(
+                    "cg:\(expectedPID):\(retiredCGWindowID)"
+                ) ?? true
+            )
+        }
+        if let retiredTitle {
+            XCTAssertEqual(
+                switcherWindowCardObservations(in: app)
+                    .filter { $0.title == retiredTitle }
+                    .count,
+                0
+            )
+        }
+        guard waitForSwitcherDiagnostics(
+            diagnosticsSummary,
+            key: "previewImages",
+            equals: String(expectedTitles.count),
+            timeout:
+                SpaceFixtureWindowOpenMutationUITestPolicy
+                    .switcherProjectionWatchdog
+        ) else {
+            return
+        }
+        let renderedCards = switcherWindowCardObservations(in: app)
+        XCTAssertEqual(renderedCards.count, expectedTitles.count)
+        XCTAssertEqual(
+            renderedCards.filter(\.hasImage).count,
+            expectedTitles.count
         )
     }
 
@@ -423,7 +733,7 @@ extension FlowTabUITests {
         else {
             XCTFail(
                 "Expected one fixed-path FlowTab process before \(traceLabel) "
-                    + "Control+Tab injection; applicationState="
+                    + "physical shortcut injection; applicationState="
                     + "\(String(describing: applicationState)) "
                     + "matchingProcesses=\(matchingApplications.count)."
             )

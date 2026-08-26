@@ -7,34 +7,13 @@ import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
     @MainActor
-    func testRuntimeAXWindowChangeMonitorRoutesKnownDestroyedAXWindowThroughTypedCallback() {
-        let pid: pid_t = 18_405
-        let knownWindow = AXUIElementCreateApplication(pid)
-        let knownWindowID = AXWindowInspectorForTesting.makeWindowID(pid: pid, index: 0)
-        AXLiveWindowRegistry.shared.replaceWindows(forPID: pid, with: [knownWindow])
-        defer { AXLiveWindowRegistry.shared.remove(pid: pid) }
-
-        let monitor = RuntimeAXWindowChangeMonitor()
-        var destroyedEvents: [(String, pid_t, String)] = []
-        var changedEvents: [RuntimeAXWindowChangeEvidence] = []
-        monitor.onAXWindowDestroyed = { appID, pid, axWindowID in
-            destroyedEvents.append((appID, pid, axWindowID))
-        }
-        monitor.onAppWindowChanged = { changedEvents.append($0) }
-
-        monitor.handleAXNotification(
-            appID: "com.example.editor",
-            pid: pid,
-            notification: kAXUIElementDestroyedNotification as CFString,
-            element: knownWindow,
-            bindingGeneration: 0
+    func testRuntimeAXWindowChangeMonitorClassifiesDestroyedAsTopologyChange() {
+        XCTAssertEqual(
+            RuntimeAXWindowChangeMonitor.changeKind(
+                for: kAXUIElementDestroyedNotification as CFString
+            ),
+            .destroyed
         )
-
-        XCTAssertEqual(destroyedEvents.count, 1)
-        XCTAssertEqual(destroyedEvents.first?.0, "com.example.editor")
-        XCTAssertEqual(destroyedEvents.first?.1, pid)
-        XCTAssertEqual(destroyedEvents.first?.2, knownWindowID)
-        XCTAssertTrue(changedEvents.isEmpty)
     }
 
     func testOptionTabHotkeyMonitorRoutesForwardAndBackwardPressReleaseCallbacks() {

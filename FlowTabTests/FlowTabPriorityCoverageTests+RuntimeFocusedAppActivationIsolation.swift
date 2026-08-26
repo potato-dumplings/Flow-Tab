@@ -4,6 +4,46 @@ import XCTest
 import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
+    func testUITestFrontmostProjectionOverrideForwardsAXWindowEvidenceWithoutSemanticLoss() {
+        let appID = "com.example.fixture.chrome"
+        let pid: pid_t = 18_407
+        let baseService = RecordingRuntimeProjectionService()
+        let service = RuntimeUITestFrontmostProjectionService(
+            baseService: baseService,
+            targetProvider: { nil }
+        )
+        let observedTransition = RuntimeAXWindowChangeEvidence(
+            appID: appID,
+            pid: pid,
+            generation: 41,
+            source: .observedTransition,
+            observedTransitionCount: 1,
+            changeKinds: [.created, .visibility],
+            initialReadback: nil
+        )
+        let trailingDestroyedReadback = RuntimeAXWindowChangeEvidence(
+            appID: appID,
+            pid: pid,
+            generation: 42,
+            source: .trailingReadback,
+            observedTransitionCount: 3,
+            changeKinds: [.destroyed, .focus],
+            initialReadback: nil
+        )
+
+        service.markAppWindowsDirty(observedTransition)
+        service.signalAppWindowsChanged(trailingDestroyedReadback)
+
+        XCTAssertEqual(
+            baseService.appWindowDirtyEvidenceRecorded(),
+            [observedTransition]
+        )
+        XCTAssertEqual(
+            baseService.appWindowChangeEvidenceRecorded(),
+            [trailingDestroyedReadback]
+        )
+    }
+
     func testUITestFrontmostProjectionOverrideRoutesFocusedReadsAndRefreshesToTarget() throws {
         let runningApp = NSRunningApplication.current
         let appID = "com.example.fixture.chrome"

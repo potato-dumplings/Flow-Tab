@@ -12,6 +12,12 @@ extension SwitcherPanelController {
     }
 
     func cancelSelection(trigger: String) {
+        if pendingFocusedWindowSessionPresentation != nil {
+            cancelPendingFocusedWindowSessionPresentation(
+                reason: trigger
+            )
+            return
+        }
         guard isPanelPresented || hasActivePresentationSession else { return }
         let sessionKind = activeHotkeySessionKind
         beginSelectionEndReplaySuppression(

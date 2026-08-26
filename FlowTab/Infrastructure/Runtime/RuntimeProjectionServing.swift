@@ -145,10 +145,11 @@ protocol RuntimeProjectionServing: Sendable {
         pid: pid_t,
         appDirectoryEntry: RuntimeAppDirectoryEntry
     )
+    func markAppWindowsDirty(_ evidence: RuntimeAXWindowChangeEvidence)
+    func signalAppWindowsChanged(_ evidence: RuntimeAXWindowChangeEvidence)
     func signalAppWindowsChanged(appID: String, pid: pid_t)
     func signalSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t)
     func signalFocusedCurrentAppWindowsChanged()
-    func signalAXWindowDestroyed(appID: String, pid: pid_t, axWindowID: String)
     func signalAppTerminated(appID: String, pid: pid_t)
     func scheduleWorkspaceAppTerminated(appID: String, pid: pid_t)
     func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification)

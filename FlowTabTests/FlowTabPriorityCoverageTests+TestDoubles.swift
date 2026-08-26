@@ -148,7 +148,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private var homeSummaryProjection: RuntimeHomeSummaryProjection?
     private var homeDetailProjectionsByAppID: [String: RuntimeHomeAppDetailProjection]
     private var currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
-    private let focusedCurrentAppWindowProjectionRead: RuntimeFocusedCurrentAppWindowProjectionRead?
+    private var focusedCurrentAppWindowProjectionRead: RuntimeFocusedCurrentAppWindowProjectionRead?
     private let activationTargetProjection: RuntimeActivationTargetProjection?
     private var spaceTopologyProjection: RuntimeSpaceTopologyProjection?
     private var committedSearchIndexRead: RuntimeSearchIndexRead?
@@ -175,6 +175,8 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private var appActivationSignals: [
         (appID: String, pid: pid_t, appDirectoryEntry: RuntimeAppDirectoryEntry)
     ] = []
+    private var appWindowDirtyEvidence: [RuntimeAXWindowChangeEvidence] = []
+    private var appWindowChangeEvidence: [RuntimeAXWindowChangeEvidence] = []
     private var appWindowChangeSignals: [(appID: String, pid: pid_t)] = []
     private var selectedCurrentAppWindowChangeSignals: [(appID: String, pid: pid_t)] = []
     private var selectedCurrentAppWindowChangeSignalHandler:
@@ -310,6 +312,14 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.unlock()
     }
 
+    func setFocusedCurrentAppWindowProjectionRead(
+        _ read: RuntimeFocusedCurrentAppWindowProjectionRead?
+    ) {
+        lock.lock()
+        focusedCurrentAppWindowProjectionRead = read
+        lock.unlock()
+    }
+
     func focusedCurrentAppWindowProjectionReadCount() -> Int {
         lock.lock()
         defer { lock.unlock() }
@@ -423,6 +433,18 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.lock()
         defer { lock.unlock() }
         return appWindowChangeSignals
+    }
+
+    func appWindowDirtyEvidenceRecorded() -> [RuntimeAXWindowChangeEvidence] {
+        lock.lock()
+        defer { lock.unlock() }
+        return appWindowDirtyEvidence
+    }
+
+    func appWindowChangeEvidenceRecorded() -> [RuntimeAXWindowChangeEvidence] {
+        lock.lock()
+        defer { lock.unlock() }
+        return appWindowChangeEvidence
     }
 
     func selectedCurrentAppWindowChangeSignalsRecorded() -> [(appID: String, pid: pid_t)] {
@@ -649,6 +671,20 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         signalSelectedCurrentAppWindowsChanged(appID: appID, pid: pid)
     }
 
+    func markAppWindowsDirty(_ evidence: RuntimeAXWindowChangeEvidence) {
+        lock.lock()
+        appWindowDirtyEvidence.append(evidence)
+        lock.unlock()
+        signalAppWindowsChanged(appID: evidence.appID, pid: evidence.pid)
+    }
+
+    func signalAppWindowsChanged(_ evidence: RuntimeAXWindowChangeEvidence) {
+        lock.lock()
+        appWindowChangeEvidence.append(evidence)
+        lock.unlock()
+        signalAppWindowsChanged(appID: evidence.appID, pid: evidence.pid)
+    }
+
     func signalAppWindowsChanged(appID: String, pid: pid_t) {
         lock.lock()
         appWindowChangeSignals.append((appID, pid))
@@ -672,10 +708,6 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
             ))
         }
         lock.unlock()
-    }
-
-    func signalAXWindowDestroyed(appID: String, pid: pid_t, axWindowID: String) {
-        signalAppWindowsChanged(appID: appID, pid: pid)
     }
 
     func signalAppTerminated(appID: String, pid: pid_t) {

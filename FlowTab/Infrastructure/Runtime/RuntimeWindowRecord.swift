@@ -243,47 +243,6 @@ struct RuntimeWindowMappingState {
         return affectedCGWindowIDsByPID
     }
 
-    @discardableResult
-    mutating func clearDestroyedAXAttachment(
-        axWindowID: String,
-        observedAt: TimeInterval
-    ) -> CGWindowID? {
-        let historicalCGWindowIDs =
-            windowRecordsByCGWindowID.compactMap {
-                cgWindowID,
-                record -> CGWindowID? in
-                record.currentAXWindowID == axWindowID
-                    || record.lastExactAXWindowID == axWindowID
-                    ? cgWindowID
-                    : nil
-            }
-        let cgWindowID = derivedIndexes.currentAXToCG[axWindowID]
-            ?? (historicalCGWindowIDs.count == 1
-                ? historicalCGWindowIDs[0]
-                : nil)
-        guard let cgWindowID,
-              var record = windowRecordsByCGWindowID[cgWindowID] else {
-            return nil
-        }
-
-        record.clearDestroyedAXAttachment(
-            axWindowID: axWindowID,
-            observedAt: observedAt
-        )
-        windowRecordsByCGWindowID[cgWindowID] = record
-
-        var currentAXToCG = derivedIndexes.currentAXToCG
-        currentAXToCG.removeValue(forKey: axWindowID)
-        var lastAXWindowIDs = derivedIndexes.lastAXWindowIDs
-        lastAXWindowIDs.remove(axWindowID)
-        derivedIndexes = RuntimeWindowRecordDerivedIndexes(
-            currentAXToCG: currentAXToCG,
-            validCGWindowIDs: derivedIndexes.validCGWindowIDs,
-            lastAXWindowIDs: lastAXWindowIDs
-        )
-        return cgWindowID
-    }
-
     func affectedWindowEvidence(
         for affectedCGWindowIDs: Set<CGWindowID>
     ) -> RuntimeWindowRecordAffectedEvidence {
@@ -293,16 +252,9 @@ struct RuntimeWindowMappingState {
         let exactAffectedCGWindowIDs = knownAffectedCGWindowIDs.filter { cgWindowID in
             windowRecordsByCGWindowID[cgWindowID]?.bindingConfidence == .exact
         }
-        let pendingDestroyedCGWindowIDs = knownAffectedCGWindowIDs.filter {
-            cgWindowID in
-            windowRecordsByCGWindowID[cgWindowID]?
-                .hasPendingDestroyedAXEvidence == true
-        }
         return RuntimeWindowRecordAffectedEvidence(
             knownAffectedCGWindowIDs: knownAffectedCGWindowIDs,
-            exactAffectedCGWindowIDs: exactAffectedCGWindowIDs,
-            pendingDestroyedCGWindowIDs:
-                pendingDestroyedCGWindowIDs
+            exactAffectedCGWindowIDs: exactAffectedCGWindowIDs
         )
     }
 }
@@ -315,7 +267,6 @@ struct RuntimeWindowRecord {
     var lastKnownCGIsOnscreen: Bool?
     var lastKnownDisplayTitle: String?
     var currentAXAttachment: RuntimeCurrentAXAttachment?
-    var pendingDestroyedAXWindowID: String?
     var lastExactAXWindowID: String?
     var lastExactAXWindow: AXUIElement?
     var lastConfirmationSource: WindowBindingConfirmationSource?
@@ -340,7 +291,6 @@ struct RuntimeWindowRecord {
         lastKnownCGIsOnscreen = nil
         lastKnownDisplayTitle = nil
         currentAXAttachment = nil
-        pendingDestroyedAXWindowID = nil
         lastExactAXWindowID = nil
         lastExactAXWindow = nil
         lastConfirmationSource = nil
@@ -387,10 +337,6 @@ struct RuntimeWindowRecord {
 
     var hasCurrentActivationHandle: Bool {
         currentAXAttachment != nil
-    }
-
-    var hasPendingDestroyedAXEvidence: Bool {
-        pendingDestroyedAXWindowID != nil
     }
 
     var currentAXWindowID: String? {
@@ -471,11 +417,6 @@ struct RuntimeWindowRecord {
             return .keep
         }
 
-        if hasPendingDestroyedAXEvidence {
-            clearReconciliationNeed()
-            return .delete
-        }
-
         guard hasStickyBinding || spaceRecovery?.hasConfirmedActivationRoute == true else {
             clearReconciliationNeed()
             return .delete
@@ -497,16 +438,6 @@ struct RuntimeWindowRecord {
 
     mutating func clearCurrentAXAttachment() {
         currentAXAttachment = nil
-    }
-
-    mutating func clearDestroyedAXAttachment(
-        axWindowID: String,
-        observedAt: TimeInterval
-    ) {
-        currentAXAttachment = nil
-        pendingDestroyedAXWindowID = axWindowID
-        lastConfirmationSource = nil
-        markNeedsReconciliation(observedAt: observedAt)
     }
 
     mutating func recordActivationRouteFailure(
@@ -552,8 +483,6 @@ struct RuntimeWindowRecord {
     ) {
         let previousSource = lastConfirmationSource
         let previousConfidence = bindingConfidence
-        let clearsPendingDestroyedEvidence =
-            exactMatchClearsPendingDestroyedEvidence(axWindow)
         if let matchedCGWindow {
             refreshCGState(from: matchedCGWindow, observedAt: observedAt)
         } else {
@@ -568,9 +497,6 @@ struct RuntimeWindowRecord {
             frame: axWindow.frame,
             state: axWindow.state
         )
-        if clearsPendingDestroyedEvidence {
-            pendingDestroyedAXWindowID = nil
-        }
         activationRouteFailure = nil
         lastKnownDisplayTitle = currentAXAttachment?.title ?? lastKnownDisplayTitle
         lastConfirmationSource = confirmationSource

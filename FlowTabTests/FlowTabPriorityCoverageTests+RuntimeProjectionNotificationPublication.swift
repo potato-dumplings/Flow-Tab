@@ -357,7 +357,12 @@ extension FlowTabPriorityCoverageTests {
             ),
             readModelStore: readModelStore,
             reconciliationExecutor: { _, _ in
-                windowRecordStore.setState(RuntimeWindowMappingState(), for: pid)
+                windowRecordStore.setState(
+                    RuntimeWindowMappingState(
+                        hasRecordedWindowCollection: true
+                    ),
+                    for: pid
+                )
                 return .completedWithCurrentAppRepairEvidence([
                     RuntimeCurrentAppRepairEvidence(
                         appID: appID,
@@ -408,7 +413,17 @@ extension FlowTabPriorityCoverageTests {
             )
         }
 
-        service.signalAXWindowDestroyed(appID: appID, pid: pid, axWindowID: axWindowID)
+        service.signalAppWindowsChanged(
+            RuntimeAXWindowChangeEvidence(
+                appID: appID,
+                pid: pid,
+                generation: 1,
+                source: .trailingReadback,
+                observedTransitionCount: 1,
+                changeKinds: [.destroyed],
+                initialReadback: nil
+            )
+        )
         service.waitForMaintenanceQueueForTesting()
         wait(
             for: [projected],

@@ -98,7 +98,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(state.lastAXWindowIDs, Set(["ax:18405:0", "ax:18405:1"]))
     }
 
-    func testRuntimeWindowRecordStoreClearsDestroyedAXAttachmentWithoutDeletingWindowRecord() {
+    func testRuntimeWindowRecordStoreCoalescesApplicationTopologyInvalidation() {
         let pid = pid_t(18_405)
         let axWindowID = "ax:18405:0"
         let cgWindowID = CGWindowID(240_001)
@@ -127,24 +127,26 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
 
-        let affectedCGWindowID = store.clearDestroyedAXAttachment(
-            processIdentifier: pid,
-            axWindowID: axWindowID,
-            now: 11
+        let firstGeneration = store.invalidateWindowTopology(
+            processIdentifier: pid
+        )
+        let repeatedGeneration = store.invalidateWindowTopology(
+            processIdentifier: pid
         )
         let state = store.state(for: pid)
-        let downgradedRecord = state?.windowRecordsByCGWindowID[cgWindowID]
+        let retainedRecord = state?.windowRecordsByCGWindowID[cgWindowID]
 
-        XCTAssertEqual(affectedCGWindowID, cgWindowID)
-        XCTAssertNil(downgradedRecord?.currentAXAttachment)
-        XCTAssertEqual(downgradedRecord?.lastExactAXWindowID, axWindowID)
-        XCTAssertNil(downgradedRecord?.lastConfirmationSource)
-        XCTAssertEqual(downgradedRecord?.bindingConfidence, .sticky)
-        XCTAssertTrue(downgradedRecord?.needsReconciliation == true)
-        XCTAssertEqual(downgradedRecord?.lastReconciliationMarkedAt, 11)
-        XCTAssertNil(state?.currentAXToCG[axWindowID])
-        XCTAssertNil(state?.currentCGToAX[cgWindowID])
-        XCTAssertFalse(state?.lastAXWindowIDs.contains(axWindowID) == true)
+        XCTAssertEqual(repeatedGeneration, firstGeneration)
+        XCTAssertEqual(
+            store.pendingWindowTopologyInvalidationGeneration(
+                processIdentifier: pid
+            ),
+            firstGeneration
+        )
+        XCTAssertNotNil(retainedRecord?.currentAXAttachment)
+        XCTAssertEqual(retainedRecord?.lastExactAXWindowID, axWindowID)
+        XCTAssertEqual(retainedRecord?.lastConfirmationSource, .publicExactMatch)
+        XCTAssertEqual(state?.currentAXToCG[axWindowID], cgWindowID)
     }
 
     func testRuntimeProjectionRepairFactSourceBuildsCurrentAppWindowFactsFromWindowRecordStore() {
@@ -1087,7 +1089,8 @@ private final class RuntimeWindowRecordProjectionFakeFactProvider: RuntimeProjec
     func collectAXWindowData(
         for runningApps: [NSRunningApplication],
         cgWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
-        allCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
+        allCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
+        allCGCollectionIsComplete: Bool
     ) -> [pid_t: [RuntimeWindowListEntry]] {
         collectAXWindowDataCallCount += 1
         return sampledWindowsByPID
@@ -1099,7 +1102,8 @@ private final class RuntimeWindowRecordProjectionFakeFactProvider: RuntimeProjec
     ) -> RuntimeCGWindowCollection {
         RuntimeCGWindowCollection(
             windowsByPID: [:],
-            spaceTopologyDiff: nil
+            spaceTopologyDiff: nil,
+            isComplete: true
         )
     }
 }

@@ -364,118 +364,6 @@ final class LiveSwitcherModel: ObservableObject {
         return true
     }
 
-    func startFocusedAppWindowSession(triggerDirection: CycleDirection) -> Bool {
-        let startMs = Self.monotonicMilliseconds()
-        invalidateSelectedAppWindowProjection(reason: .startFocusedWindowSession)
-        clearTerminateSelectedAppAnimation()
-        overlayStyle = .windowOnly
-        titleBarStyleInferenceEnabled = true
-        guard let focusedRead = runtimeProjectionService.readFocusedCurrentAppWindowProjection() else {
-            runtimeProjectionService.signalFocusedCurrentAppWindowsChanged()
-            logStartFocusedWindowSessionNoFrontmost(startMs: startMs)
-            resetSessionState()
-            return false
-        }
-        let frontmostReadyMs = Self.monotonicMilliseconds()
-
-        let frontmostAppID = focusedRead.appID
-        let projectionReadMs: Double
-        let recencyAppliedMs: Double
-        var resolvedAppCandidate: AppSwitchCandidate?
-        var resolvedContext: RuntimeAppContext?
-        var readyResult = "ready"
-
-        if let projection = focusedRead.projection {
-            projectionReadMs = Self.monotonicMilliseconds()
-            if projection.freshness.isCompleteForScope {
-                let payload = currentAppWindowPayloadWithWindowRecencyApplied(
-                    projection.currentAppWindowPayload
-                )
-                recencyAppliedMs = Self.monotonicMilliseconds()
-                resolvedAppCandidate = payload.candidate
-                resolvedContext = payload.context
-            } else if !projection.currentAppWindowPayload.candidate.windows.isEmpty {
-                runtimeProjectionService.signalFocusedCurrentAppWindowsChanged()
-                let payload = currentAppWindowPayloadWithWindowRecencyApplied(
-                    projection.currentAppWindowPayload
-                )
-                recencyAppliedMs = Self.monotonicMilliseconds()
-                resolvedAppCandidate = payload.candidate
-                resolvedContext = payload.context
-                readyResult = "degradedStaleCommitted"
-            } else {
-                runtimeProjectionService.signalFocusedCurrentAppWindowsChanged()
-                recencyAppliedMs = Self.monotonicMilliseconds()
-            }
-        } else {
-            projectionReadMs = Self.monotonicMilliseconds()
-            runtimeProjectionService.signalFocusedCurrentAppWindowsChanged()
-            recencyAppliedMs = Self.monotonicMilliseconds()
-        }
-
-        guard let appCandidate = resolvedAppCandidate, let context = resolvedContext else {
-            let failedMs = Self.monotonicMilliseconds()
-            logStartFocusedWindowSession(
-                result: "missingFrontmostApp",
-                frontmostAppID: frontmostAppID,
-                frontmostReadyMs: frontmostReadyMs,
-                projectionReadMs: projectionReadMs,
-                recencyAppliedMs: recencyAppliedMs,
-                completeMs: failedMs,
-                startMs: startMs
-            )
-            resetSessionState()
-            return false
-        }
-        let sessionAppID = appCandidate.id
-        guard !appCandidate.windows.isEmpty else {
-            let failedMs = Self.monotonicMilliseconds()
-            logStartFocusedWindowSession(
-                result: "noWindows",
-                frontmostAppID: frontmostAppID,
-                frontmostReadyMs: frontmostReadyMs,
-                projectionReadMs: projectionReadMs,
-                recencyAppliedMs: recencyAppliedMs,
-                completeMs: failedMs,
-                startMs: startMs
-            )
-            resetSessionState()
-            return false
-        }
-
-        runtimeContextsByID = [sessionAppID: context]
-        clearPreviewSnapshotState()
-        autoEnterSuppressedAppID = nil
-        let preferences = SwitcherBehaviorPreferencesStore.loadSwitcherPreferences()
-        var rebuiltSession = SwitcherSession(
-            apps: [appCandidate],
-            preferences: preferences,
-            triggerDirection: triggerDirection,
-            rememberedWindowIDByAppID: rememberedWindowIDByAppID
-        )
-
-        guard rebuiltSession.enterWindowCycle(allowSingleWindow: true) else {
-            resetSessionState()
-            return false
-        }
-
-        session = rebuiltSession
-        _ = searchCoordinator.exit()
-        publishSearchStateIfNeeded()
-        let completeMs = Self.monotonicMilliseconds()
-        logStartFocusedWindowSession(
-            result: readyResult,
-            frontmostAppID: frontmostAppID,
-            frontmostReadyMs: frontmostReadyMs,
-            projectionReadMs: projectionReadMs,
-            recencyAppliedMs: recencyAppliedMs,
-            completeMs: completeMs,
-            startMs: startMs,
-            windows: appCandidate.windows.count
-        )
-        return true
-    }
-
     func terminateSelectedApp() -> TerminateSelectedAppResult {
         guard let currentSession = session else { return .notHandled }
 
@@ -560,10 +448,10 @@ final class LiveSwitcherModel: ObservableObject {
     func handleCurrentAppWindowProjectionDidUpdate(appID: String?) -> Bool {
         guard let currentSession = session else { return false }
         guard !searchViewState.isActive else { return false }
-        guard !isPresentingWindowLayerSnapshot(currentSession) else { return false }
         let targetAppID = appID ?? currentSession.selectedApp.id
         guard currentSession.apps.contains(where: { $0.id == targetAppID }) else { return false }
         guard targetAppID == currentSession.selectedApp.id else { return false }
+        guard !isPresentingWindowLayerSnapshot(currentSession) else { return false }
         return applyCurrentAppWindowProjectionIfReady(appID: targetAppID)
     }
 

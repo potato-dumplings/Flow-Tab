@@ -32,6 +32,17 @@ struct RuntimeCGWindowEntry {
 struct RuntimeCGWindowCollection {
     let windowsByPID: [pid_t: [RuntimeCGWindowEntry]]
     let spaceTopologyDiff: RuntimeSpaceTopologyDiff?
+    let isComplete: Bool
+
+    init(
+        windowsByPID: [pid_t: [RuntimeCGWindowEntry]],
+        spaceTopologyDiff: RuntimeSpaceTopologyDiff?,
+        isComplete: Bool
+    ) {
+        self.windowsByPID = windowsByPID
+        self.spaceTopologyDiff = spaceTopologyDiff
+        self.isComplete = isComplete
+    }
 }
 
 enum RuntimeCGWindowFacts {
