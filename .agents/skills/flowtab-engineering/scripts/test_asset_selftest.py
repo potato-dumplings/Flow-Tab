@@ -110,10 +110,6 @@ final class VisibleTests: XCTestCase {
             "#!/bin/bash\nexit 0\n",
         )
         self._write(
-            "scripts/release/test-uninstall-flowtab-cleanup.js",
-            "const assert = require('node:assert/strict');\nassert.ok(true);\n",
-        )
-        self._write(
             "FlowTab.xcodeproj/xcshareddata/xcschemes/FlowTab.xcscheme",
             """<Scheme>
 <BuildAction>
@@ -193,7 +189,7 @@ final class VisibleTests: XCTestCase {
         self.assertIn("FlowTabUITests", intents)
         self.assertIn("scripts/testing", intents)
         self.assertIn("scripts/audit", intents)
-        self.assertIn("scripts/release/test-uninstall-flowtab-cleanup.js", intents)
+        self.assertIn("scripts/release/test-release-distribution-contract.sh", intents)
         self.assertEqual(
             manifest["transient_reconstruction_root"],
             ".build-local/test-audit/rebuild",
@@ -434,7 +430,7 @@ DDDDDDDDDDDDDDDDDDDDDDDD /* FlowTabTests */ = {{
 
     def test_file_scoped_runner_boundary_is_indexed(self) -> None:
         records = discover_assets(self.root)
-        intent = "scripts/release/test-uninstall-flowtab-cleanup.js"
+        intent = "scripts/release/test-release-distribution-contract.sh"
         release_test = next(
             row
             for row in records

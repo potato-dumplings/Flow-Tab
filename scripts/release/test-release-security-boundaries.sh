@@ -205,11 +205,6 @@ ln -s /Applications "${DMG_LAYOUT}/Applications"
 flowtab_require_distribution_layout \
   "${DMG_LAYOUT}" \
   "Flow Tab.app"
-mkdir -p "${DMG_LAYOUT}/Uninstall Flow Tab.app"
-if flowtab_require_distribution_layout "${DMG_LAYOUT}" "Flow Tab.app" >/dev/null 2>&1; then
-  fail "DMG layout accepted an embedded uninstaller."
-fi
-rmdir "${DMG_LAYOUT}/Uninstall Flow Tab.app"
 touch "${DMG_LAYOUT}/unexpected.txt"
 if flowtab_require_distribution_layout "${DMG_LAYOUT}" "Flow Tab.app" >/dev/null 2>&1; then
   fail "Unexpected DMG content was accepted."

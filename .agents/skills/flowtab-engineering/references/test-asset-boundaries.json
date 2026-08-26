@@ -165,18 +165,6 @@
       "target": null
     },
     {
-      "asset_type": "runner",
-      "layer_capabilities": [
-        "behavior",
-        "process_tooling"
-      ],
-      "owner": "RepositoryRelease",
-      "project_identity": null,
-      "relative_path_intent": "scripts/release/test-uninstall-flowtab-cleanup.js",
-      "role": "uninstall_cleanup_test",
-      "target": null
-    },
-    {
       "asset_type": "scheme",
       "layer_capabilities": [
         "process_tooling"

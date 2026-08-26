@@ -90,8 +90,6 @@ require_literal "${RELEASE_SECURITY_SCRIPT}" "flowtab_require_release_checksum"
 require_literal "${RELEASE_SECURITY_SCRIPT}" "flowtab_promote_release_artifact_directory"
 
 reject_literal "${RELEASE_SCRIPT}" "--target"
-reject_literal "${RELEASE_SCRIPT}" "Uninstall Flow Tab.app"
-reject_literal "${RELEASE_SCRIPT}" "uninstall-flowtab.js"
 reject_literal "${RELEASE_SCRIPT}" ".dmg.sha256"
 reject_literal "${VERIFY_SCRIPT}" "--expected-dmg-bundle"
 

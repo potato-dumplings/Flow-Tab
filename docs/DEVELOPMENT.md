@@ -394,7 +394,6 @@ swift test
 - `scripts/release/release-install.sh`：Release 构建并安装到 `/Applications/Flow Tab.app`。
 - `scripts/release/release-dmg.sh`：构建并打包 DMG 到 `release/FlowTab-v<version>/`。
 - `scripts/release/publish-sparkle-update.sh`：完成 Community DMG、GitHub Release 与签名 appcast 的单入口发布。
-- `scripts/release/uninstall-flowtab.js`：独立卸载工具源码，不进入发布 DMG；删除应用前通过 Workspace 终止通知、精确 bundle ID 读回和提权命令内的最终进程读回确认 FlowTab 已退出。
 - `scripts/perf/tab-switch-stress.sh`：tab 高频切换性能压测；采样与切换时长属于显式压力协议，子进程清理由精确 PID/启动身份读回和退出状态驱动。
 
 ## 本地签名配置
