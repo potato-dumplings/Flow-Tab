@@ -584,6 +584,8 @@ gh release create "${TAG}" \
 
 `--install-path` 会在构建和替换前解析到明确的 Applications 资源边界，只接受用户目录或系统目录下的 `Flow Tab UITest.app` 与 `Flow Tab.app` 固定名称。
 
+安装到专用的 `Flow Tab UITest.app` 路径成功后，脚本还会在仓库忽略的 `.build-local/` 边界签发一次性生命周期凭据。每个执行 UI 用例的动作都需要一份新凭据，因此每次 UI 自动化前都先重新运行安装脚本。
+
 然后在下面两处把这份 app 加进去并授权：
 
 - `系统设置 -> 隐私与安全性 -> 辅助功能`
@@ -595,7 +597,9 @@ gh release create "${TAG}" \
 ./scripts/testing/run-ui-tests-local.sh
 ```
 
-该脚本会自动优先使用 `~/Applications/Flow Tab UITest.app`；如果该路径不存在，才回退到 `DerivedData` 构建产物。
+默认测试动作会消费这份一次性凭据，并在成功、失败或收到可处理的终止信号后，结束专用测试 app 的精确进程身份、确认进程消失，再删除 `~/Applications/Flow Tab UITest.app` 及对应生命周期状态。测试结束后该路径消失即表示清理完成，下一次运行从重新安装开始。
+
+`build-for-testing` 只校验并保留凭据，随后配对的 `test-without-building` 负责消费和清理。需要明确验证 `DerivedData` 构建产物时使用 `--no-ui-test-app`。显式传入正式 `Flow Tab.app` 的路径会保留该应用。
 
 ### 2) 窗口预览没有真实画面
 

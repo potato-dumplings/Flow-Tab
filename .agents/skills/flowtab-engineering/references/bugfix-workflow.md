@@ -84,8 +84,8 @@ When a required layer cannot run, report the implementation as made and the clos
 ## Sandboxed Test Blockers
 
 - Before calling UI automation blocked, first satisfy the repository prerequisites from `ui-automation-prerequisites.md`.
-- When a fixed-path UI test app has not been prepared yet, first run `./scripts/testing/install-ui-test-app.sh`.
-- Then run `./scripts/testing/run-ui-tests-local.sh`, because it redirects `DerivedData`, `TMPDIR`, module caches, and source packages into `./.build-local/ui-tests` and prefers the fixed-path UI test app when present.
+- Immediately before each UI test action, run `./scripts/testing/install-ui-test-app.sh` so the dedicated app has a fresh one-use receipt.
+- Then run `./scripts/testing/run-ui-tests-local.sh`, which redirects `DerivedData`, `TMPDIR`, module caches, and source packages into `./.build-local/ui-tests`, consumes the receipt for the test action, and removes the dedicated app at the terminal boundary.
 - If the run still looks like a permission loss or missing live-runtime signal, check fixed-path app usage, Accessibility permission, Screen & System Audio Recording permission, and code-identity matching before reporting a blocker.
 - If those checks are satisfied and the fallback script still fails for sandbox or external-environment reasons, classify whether the missing UI evidence blocks the modification gate or only the completion gate. Request the needed elevated or external Terminal run and report the affected gate.
 

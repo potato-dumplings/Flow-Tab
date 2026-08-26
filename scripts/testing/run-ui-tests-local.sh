@@ -13,6 +13,11 @@ ORIGINAL_CFFIXED_USER_HOME="${CFFIXED_USER_HOME:-${HOME}}"
 DEFAULT_UI_TEST_APP_PATH="${USER_HOME}/Applications/Flow Tab UITest.app"
 LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
 CODE_SIGNING_IDENTITY_PATH="${ROOT_DIR}/scripts/lib/code-signing-identity.sh"
+PATH_BOUNDARIES_PATH="${ROOT_DIR}/scripts/lib/path-boundaries.sh"
+UI_TEST_APP_LIFECYCLE_PATH="${ROOT_DIR}/scripts/testing/lib/ui-test-app-lifecycle.sh"
+UI_TEST_APP_RUNNER_LIFECYCLE_PATH="${ROOT_DIR}/scripts/testing/lib/ui-test-app-runner-lifecycle.sh"
+APPLICATION_LIFECYCLE_TOOL="${ROOT_DIR}/scripts/perf/lib/runtime-topology-application-lifecycle.js"
+APPLICATION_PROCESS_CLEANUP_TOOL="${ROOT_DIR}/scripts/perf/lib/runtime-topology-application-process-cleanup.js"
 SPACE_FIXTURE_BUILD_SCRIPT="${ROOT_DIR}/scripts/testing/build-space-fixture-workflow.sh"
 SPACE_FIXTURE_BASELINE_WORKFLOW="${ROOT_DIR}/docs/fixtures/space-fixture-home-multi-app-workflow.json"
 SYSTEM_APP_MRU_FIXTURE_WORKFLOW="${ROOT_DIR}/docs/fixtures/space-fixture-system-app-mru-workflow.json"
@@ -32,6 +37,10 @@ BUILD_FOR_TESTING_STATUS="null"
 BUILD_FOR_TESTING_LOG_STATUS="null"
 TEST_WITHOUT_BUILDING_STATUS="null"
 TEST_WITHOUT_BUILDING_LOG_STATUS="null"
+UI_TEST_APP_LIFECYCLE_STATUS="unmanaged"
+UI_TEST_APP_CLEANUP_EXIT_CODE="null"
+UI_TEST_APP_REMOVED="null"
+UI_TEST_APP_CLEANUP_REQUIRED=false
 USE_STABLE_UI_TEST_APP=true
 PREPARE_SPACE_FIXTURES=true
 PREPARE_SYSTEM_APP_MRU_FIXTURES=false
@@ -43,6 +52,12 @@ declare -a EXTRA_ARGS=()
 
 # shellcheck source=/dev/null
 source "${CODE_SIGNING_IDENTITY_PATH}"
+# shellcheck source=/dev/null
+source "${PATH_BOUNDARIES_PATH}"
+# shellcheck source=/dev/null
+source "${UI_TEST_APP_LIFECYCLE_PATH}"
+# shellcheck source=/dev/null
+source "${UI_TEST_APP_RUNNER_LIFECYCLE_PATH}"
 
 expand_path() {
   local path="$1"
@@ -67,8 +82,10 @@ print_help() {
 Usage: ./scripts/testing/run-ui-tests-local.sh [test|build-for-testing|test-without-building] [--build-root <dir>] [--output-root <dir>] [script args...] [xcodebuild args...]
 
 Runs FlowTab UI automation with build caches and temp files redirected into ./.build-local/ui-tests.
-When ~/Applications/Flow Tab UITest.app exists, the script also points UI tests at
-that fixed app path so macOS permissions can stay attached to a stable bundle.
+The default fixed-path app requires a fresh one-use lifecycle receipt from
+install-ui-test-app.sh. Test actions consume it and remove Flow Tab UITest.app
+after success, failure, or interruption. A build-for-testing action validates
+the receipt and leaves it ready for the following test-without-building action.
 
 Script options:
   --build-root <dir>   Resolve DerivedData, temp, HOME, module cache, package
@@ -78,8 +95,10 @@ Script options:
                        exist, which prevents a later attempt from overwriting it.
                        Without this option, the legacy fixed output paths remain.
   --ui-test-app-path <path>
-                       Use a specific fixed-path UI test app.
-  --no-ui-test-app     Use the DerivedData app build product.
+                       Use a specific fixed-path UI test app. Dedicated
+                       Flow Tab UITest.app paths use the managed lifecycle;
+                       other explicit app paths are retained.
+  --no-ui-test-app     Explicitly use the unmanaged DerivedData app product.
   --skip-space-fixtures
                        Skip shared Space fixture preparation.
 
@@ -88,7 +107,9 @@ Outputs below the selected root:
   logs/xcodebuild-<action>.log         Per-action xcodebuild output
   logs/space-fixture-preparation.log   Fixture preparation output
   logs/sign-ui-test-runner.log         Runner signing output
-  status.json                          Stage and child-process exit status
+  logs/ui-test-app-cleanup.log         Exact app/process cleanup output
+  ui-test-app-lifecycle-cleanup.json   Exact cleanup identity evidence
+  status.json                          Stage, child-process, and cleanup status
 
 Examples:
   ./scripts/testing/run-ui-tests-local.sh
@@ -409,7 +430,10 @@ write_status() {
     printf '  "build_for_testing_log_exit_code": %s,\n' "${BUILD_FOR_TESTING_LOG_STATUS}"
     printf '  "test_without_building_exit_code": %s,\n' "${TEST_WITHOUT_BUILDING_STATUS}"
     printf '  "test_without_building_log_exit_code": %s,\n' "${TEST_WITHOUT_BUILDING_LOG_STATUS}"
-    printf '  "result_bundle_present": %s\n' "${result_bundle_present}"
+    printf '  "result_bundle_present": %s,\n' "${result_bundle_present}"
+    printf '  "ui_test_app_lifecycle_status": "%s",\n' "${UI_TEST_APP_LIFECYCLE_STATUS}"
+    printf '  "ui_test_app_cleanup_exit_code": %s,\n' "${UI_TEST_APP_CLEANUP_EXIT_CODE}"
+    printf '  "ui_test_app_removed": %s\n' "${UI_TEST_APP_REMOVED}"
     printf '}\n'
   } >"${status_temp}" || return 1
   mv "${status_temp}" "${STATUS_FILE}"
@@ -417,7 +441,24 @@ write_status() {
 
 finalize_status() {
   local script_exit_code="$1"
-  trap - EXIT
+  local cleanup_exit_code=0
+
+  trap - EXIT HUP INT TERM
+  set +e
+  if [[ "${UI_TEST_APP_CLEANUP_REQUIRED}" == true ]]; then
+    flowtab_cleanup_managed_ui_test_app
+    cleanup_exit_code=$?
+    UI_TEST_APP_CLEANUP_EXIT_CODE="${cleanup_exit_code}"
+    if [[ "${cleanup_exit_code}" -ne 0 ]]; then
+      UI_TEST_APP_REMOVED=false
+      echo "Managed UI-test app cleanup failed. Log: ${LOG_ROOT}/ui-test-app-cleanup.log" >&2
+      tail -n 80 "${LOG_ROOT}/ui-test-app-cleanup.log" >&2 || true
+      if [[ "${script_exit_code}" -eq 0 ]]; then
+        script_exit_code=1
+        CURRENT_STAGE="ui_test_app_cleanup_failed"
+      fi
+    fi
+  fi
   if ! write_status "${script_exit_code}"; then
     echo "Failed to preserve run status: ${STATUS_FILE}" >&2
     if [[ "${script_exit_code}" -eq 0 ]]; then
@@ -428,6 +469,9 @@ finalize_status() {
 }
 
 trap 'finalize_status "$?"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 export TMPDIR="${TMP_ROOT}/"
 export HOME="${HOME_ROOT}"
@@ -438,11 +482,7 @@ export SWIFTPM_PACKAGECACHE="${PACKAGE_CACHE_PATH}"
 export FLOWTAB_SPACE_FIXTURE_WORKFLOW_PATH="${SPACE_FIXTURE_BASELINE_ACCESSIBLE_PATH}"
 export FLOWTAB_SYSTEM_APP_MRU_FIXTURE_WORKFLOW_PATH="${SYSTEM_APP_MRU_FIXTURE_ACCESSIBLE_PATH}"
 
-if [[ "${USE_STABLE_UI_TEST_APP}" == true && -d "${UI_TEST_APP_PATH}" ]]; then
-  export FLOWTAB_UI_TEST_APP_PATH="${UI_TEST_APP_PATH}"
-else
-  unset FLOWTAB_UI_TEST_APP_PATH || true
-fi
+flowtab_configure_ui_test_app_lifecycle
 
 if [[ "${ACTION}" != "build-for-testing" && "${HAS_CUSTOM_TEST_FILTER}" == false ]]; then
   if ((${#EXTRA_ARGS[@]} > 0)); then

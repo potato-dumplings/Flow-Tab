@@ -18,7 +18,7 @@ FlowTab UI failures often come from repository-specific setup. Complete these ch
 
 ## Required Outcome
 
-- Prepare a fixed-path UI test app before relying on UI automation for local validation.
+- Prepare a fresh fixed-path UI test app immediately before each local UI test action.
 - Verify the permissions and designated requirements that macOS actually uses for privacy decisions.
 - Use the repository scripts in the recommended order before escalating to an environment blocker.
 - For audit runs, give the UI wrapper a fresh attempt-specific output root so prior result bundles and xcodebuild logs remain intact.
@@ -41,6 +41,8 @@ Default install path:
 
 The script uses `FLOWTAB_DEVELOPMENT_TEAM`. When the current shell does not export that variable, the script reads the same setting from `xcconfigs/LocalSigning.xcconfig`. When a matching local `Apple Development` identity exists, the script signs the fixed-path app. When none exists, it keeps the default ad hoc installation so the fixed path can still be refreshed.
 
+For the dedicated `Flow Tab UITest.app` path, a successful installation also writes a one-use lifecycle receipt under the repository's ignored `.build-local/` boundary. A test action must claim that receipt before it can launch the app. Reinstall before every later test action.
+
 2. Grant these permissions to that fixed-path app in macOS:
 
 - `System Settings -> Privacy & Security -> Accessibility`
@@ -54,7 +56,9 @@ Before running real-workflow tests, open the same fixed-path app once. The first
 ./scripts/testing/run-ui-tests-local.sh
 ```
 
-The script prefers `~/Applications/Flow Tab UITest.app` when it exists. When the fixed-path app is absent, it falls back to the DerivedData build product.
+The default path requires the fresh receipt created in step 1. A `test` or `test-without-building` action consumes it, then terminates the exact test-app identity and removes the bundle after success, failure, `HUP`, `INT`, or `TERM`. A `build-for-testing` action validates the receipt and leaves it ready for the following `test-without-building` action. After any completed test action, the absence of `~/Applications/Flow Tab UITest.app` is the expected terminal state. Use `--no-ui-test-app` only for an explicit unmanaged DerivedData run.
+
+`SIGKILL` cannot execute shell traps. Its claimed receipt remains unavailable, so a later test action cannot silently reuse the residue; rerun the installer to reset the stale lifecycle and create a fresh app receipt.
 
 ## Audit Evidence Run
 
@@ -66,9 +70,9 @@ Allocate attempt-specific build and output leaf paths under the current project'
   --output-root ./.build-local/test-audit/rebuild/attempts/<attempt-id>
 ```
 
-The wrapper creates the attempt directory and rejects an existing path. Resolve stored path intents against the current repository root immediately before invocation. A test action preserves `results/FlowTabUITests.xcresult`; build and test stages preserve `logs/xcodebuild-<action>.log`; fixture preparation and runner signing preserve their own stage logs; and `status.json` preserves every child-process and log-writer exit code. Evidence validation fails when a test action does not produce a result bundle. Inventory these files before starting the next attempt. Normal non-audit runs that use the fixed local paths omit the audit overrides.
+The wrapper creates the attempt directory and rejects an existing path. Resolve stored path intents against the current repository root immediately before invocation. A test action preserves `results/FlowTabUITests.xcresult`; build and test stages preserve `logs/xcodebuild-<action>.log`; fixture preparation, runner signing, and app cleanup preserve their own stage logs; `ui-test-app-lifecycle-cleanup.json` preserves exact application/process absence evidence; and `status.json` records the lifecycle, cleanup exit code, removal verdict, and every child-process and log-writer exit code. Evidence validation fails when a test action does not produce a result bundle. Inventory these files before starting the next attempt. Normal non-audit runs that use the fixed local paths omit the audit overrides.
 
-For a runtime-topology pressure audit, first run `create-ui-app-identity-manifest.sh --app-path <fixed-app> --output-file <new-project-local-private-manifest>`. Pass that manifest and a fresh `--output-dir` leaf to `runtime-topology-pressure.sh`. The pressure wrapper passes `attempts/ui-tests/run/` to this UI wrapper as the child `--output-root`; the pressure root retains the launch receipt, per-sample PID bindings, FlowTab samples, aggregate UI logs and summary, and the top-level `status.json`.
+For each runtime-topology pressure audit, reinstall the fixed app, then run `create-ui-app-identity-manifest.sh --app-path <fixed-app> --output-file <new-project-local-private-manifest>`. Pass that manifest and a fresh `--output-dir` leaf to `runtime-topology-pressure.sh`. The pressure wrapper passes `attempts/ui-tests/run/` to this UI wrapper as the child `--output-root`; the pressure root retains the launch receipt, per-sample PID bindings, FlowTab samples, aggregate UI logs and summary, and the top-level `status.json`. The inner UI wrapper consumes the install receipt and removes the test app at its terminal boundary.
 
 ## Why The Fixed Path Matters
 
@@ -118,6 +122,8 @@ open "$HOME/Applications/Flow Tab UITest.app"
 ./scripts/testing/run-ui-tests-local.sh
 ```
 
+The runner removes the dedicated UI-test app when the test action ends. Start the next test action by running `install-ui-test-app.sh` again; a stale or missing receipt is rejected.
+
 For an auditable run, add fresh project-local `--build-root` and `--output-root <not-yet-existing-attempt-directory>` paths as described in [Audit Evidence Run](#audit-evidence-run).
 
 ## Proven Permission-Reuse Flow
@@ -138,6 +144,7 @@ Treat permission acquisition or reuse as successful when:
 - `install-ui-test-app.sh` signs the fixed-path app with `Apple Development`.
 - Both apps report the signing identifier `io.github.potato-dumplings.flowtab`, and `codesign -dr -` shows compatible Apple Development designated requirements.
 - The UI wrapper prints a resolved path matching the intent `{user-home}/Applications/Flow Tab UITest.app`.
+- The final child `status.json` reports `ui_test_app_cleanup_exit_code: 0` and `ui_test_app_removed: true`; the dedicated app path is absent.
 - The UI log reaches the real-fixture markers, opens FlowTab, clears `flowtab.home.permission.open-settings`, and continues to `flowtab.switcher.search.input` or `flowtab.switcher.search.window.*`.
 
 Permission acquisition is proven by those signals. If the test later fails in switcher, search-result, activation, or XCUI snapshot assertions, continue diagnosing that layer and classify its actual result.
@@ -148,10 +155,10 @@ When running from Codex or another restricted sandbox, the install script can mi
 
 Check these in order:
 
-1. Was `./scripts/testing/install-ui-test-app.sh` run?
-2. Does `~/Applications/Flow Tab UITest.app` exist?
+1. Was `./scripts/testing/install-ui-test-app.sh` run immediately before this test action?
+2. Before the run, did the installer report `UI test lifecycle: ready for one test action`?
 3. Was `./scripts/testing/run-ui-tests-local.sh` used?
-4. For an audit run, did the wrapper receive fresh project-local `--build-root` and `--output-root` paths, and did the output retain the result bundle, fixture/signing/xcodebuild logs, and `status.json`?
+4. For an audit run, did the wrapper receive fresh project-local `--build-root` and `--output-root` paths, and did the output retain the result bundle, fixture/signing/xcodebuild/cleanup logs, lifecycle cleanup evidence, and `status.json`?
 5. Does the fixed-path UI test app have `Accessibility` permission?
 6. Does the fixed-path UI test app have `Screen & System Audio Recording` permission?
 7. For real-environment or multi-app workflows, do `Flow Tab.app` and `Flow Tab UITest.app` have mutually compatible designated requirements?
@@ -162,4 +169,5 @@ Check these in order:
 - `windows=0` commonly indicates a permission or authorized-path mismatch.
 - Preview content without real frames commonly indicates missing screen-recording permission.
 - UI automation that repeatedly loses permission commonly launches a DerivedData app with a different privacy identity.
+- A missing `Flow Tab UITest.app` after a completed test action is the successful managed-cleanup state; reinstall it before the next action.
 - A real multi-app workflow that still shows permission reminders commonly launches an unauthorized app path or uses incompatible designated requirements between `Flow Tab.app` and `Flow Tab UITest.app`.

@@ -346,11 +346,13 @@ fixture app 变体只是用于本地 UI 测试和手工回归的测试拓扑，�
 ./scripts/testing/install-ui-test-app.sh --development-team <TEAM_ID>
 ```
 
+专用 `Flow Tab UITest.app` 安装成功后会签发一次性生命周期凭据。每次执行真实 workflow UI 用例前都重新安装；测试动作消费凭据，并在终态清理专用测试 app。
+
 如果脚本输出的 codesign summary 显示 `Signature=adhoc` 或 `TeamIdentifier=not set`，不要继续把真实 workflow UI test 当成稳定权限验证。先安装带 Apple Development 签名的固定路径 app，或者明确接受每次重建后都需要重新授权这份 `adhoc` app。
 
 2. 确认后续测试会启动哪个 app，并只给那一个身份授权。
 
-默认情况下，`run-ui-tests-local.sh` 会优先启动：
+默认情况下，`run-ui-tests-local.sh` 会校验本次安装凭据并启动：
 
 - `~/Applications/Flow Tab UITest.app`
 
@@ -391,8 +393,11 @@ open "$HOME/Applications/Flow Tab UITest.app"
 
 该脚本当前会：
 
-- 优先启动固定路径 `~/Applications/Flow Tab UITest.app`
+- 消费固定路径 `~/Applications/Flow Tab UITest.app` 的本次安装凭据
 - 对本地 UI test 构建产物默认关闭代码签名，避免测试执行再次受 Xcode 当前签名配置影响
+- 在成功、失败或可处理的中断终态结束专用测试 app 的精确进程身份并删除 bundle
+
+测试结束后，`~/Applications/Flow Tab UITest.app` 应当已经消失。下一条 UI 测试命令从重新运行 `install-ui-test-app.sh` 开始。显式选择 `/Applications/Flow Tab.app` 时，正式应用会保留。
 
 本机已验证过的成功路径：
 
@@ -407,9 +412,10 @@ open -n "$HOME/Applications/Flow Tab UITest.app"
 
 成功获取或复用权限的判定信号不是整条 UI 用例必须通过，而是：
 
-- `install-ui-test-app.sh` 输出 `Signing FlowTab UI automation app with Apple Development: ...`，而不是 `Signature=adhoc`。
+- `install-ui-test-app.sh` 输出本地 Apple Development 签名指纹，codesign summary 显示对应 TeamIdentifier。
 - 两份 app 的 `codesign -dr -` 输出使用同一个 `identifier "io.github.potato-dumplings.flowtab"` 和同一条 Apple Development requirement；`CDHash` 可以不同。
 - `run-ui-tests-local.sh` 输出的解析路径符合 `{user-home}/Applications/Flow Tab UITest.app` 路径意图。
+- 子运行的 `status.json` 记录 `ui_test_app_cleanup_exit_code: 0` 与 `ui_test_app_removed: true`。
 - 测试日志中 fixture app 已经启动并出现 `flowtab.spacefixture.workflow.ready` / `flowtab.spacefixture.window.mode.*`。
 - FlowTab 打开后，`flowtab.home.permission.open-settings` 没有出现，测试继续进入 `flowtab.switcher.search.input` 或 `flowtab.switcher.search.window.*`。
 
@@ -437,6 +443,8 @@ open -n "$HOME/Applications/Flow Tab UITest.app"
 即使用 `/Applications/Flow Tab.app` 跑，UI 前置权限仍失败，也仍然表示这台环境当前没有给被测 FlowTab 实例可用的 `Accessibility` / `Screen Recording` 权限；这不是“已经授权所以测试应该继续”的反证。
 
 出现该情况时，先核对实际被测 app 路径和签名身份：
+
+先重新运行 `install-ui-test-app.sh`，并在启动测试前执行以下检查；测试终态会自动删除专用测试 app。
 
 ```bash
 codesign -dv --verbose=4 "$HOME/Applications/Flow Tab UITest.app"

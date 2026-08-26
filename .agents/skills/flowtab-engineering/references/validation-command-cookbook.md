@@ -184,6 +184,8 @@ Prepare a stable fixed-path app before relying on UI automation:
 ./scripts/testing/install-ui-test-app.sh
 ```
 
+The dedicated `Flow Tab UITest.app` install issues a one-use lifecycle receipt. Run this installer immediately before every `test` or `test-without-building` action. A standalone `build-for-testing` validates and retains the receipt for its paired `test-without-building` action.
+
 Then run UI tests through the wrapper so temporary directories and caches stay under `./.build-local/ui-tests`:
 
 ```bash
@@ -205,7 +207,7 @@ For an audit attempt, pass fresh project-local build and output leaves:
   --output-root ./.build-local/test-audit/rebuild/attempts/<attempt-id>
 ```
 
-The wrapper creates the attempt directory and rejects reuse. It writes the UI test result bundle to `results/FlowTabUITests.xcresult`, writes build/test output to `logs/xcodebuild-<action>.log`, retains fixture and signing stage logs, and records child-process/log-writer exit codes in `status.json`. A standalone `build-for-testing` action produces logs without a test result bundle.
+The wrapper creates the attempt directory and rejects reuse. It writes the UI test result bundle to `results/FlowTabUITests.xcresult`, writes build/test output to `logs/xcodebuild-<action>.log`, retains fixture, signing, and exact app-cleanup logs, preserves `ui-test-app-lifecycle-cleanup.json`, and records child-process/log-writer/lifecycle cleanup results in `status.json`. A test action terminates and removes the claimed dedicated app on success, failure, or a handled interrupt. A standalone `build-for-testing` action produces logs without a test result bundle and leaves the receipt ready. Use `--no-ui-test-app` only when the selected validation explicitly calls for an unmanaged DerivedData product.
 
 Use `ui-automation-prerequisites.md` before declaring UI automation blocked. Common blockers include missing Accessibility permission, missing Screen & System Audio Recording permission, a fixed-path app mismatch, a code-identity mismatch, and sandboxed temporary/cache access.
 
@@ -262,6 +264,8 @@ The output leaf must not exist before the run. The wrapper preserves `process-sa
 Runtime-topology pressure for the representative noisy fullscreen/off-Space fixture path:
 
 ```bash
+./scripts/testing/install-ui-test-app.sh
+
 ./scripts/testing/create-ui-app-identity-manifest.sh \
   --app-path "$HOME/Applications/Flow Tab UITest.app" \
   --output-file ./.build-local/test-audit/rebuild/private/<ui-app-identity>.json
@@ -272,7 +276,7 @@ Runtime-topology pressure for the representative noisy fullscreen/off-Space fixt
   --output-dir ./.build-local/test-audit/rebuild/attempts/<topology-attempt-id>
 ```
 
-The identity-manifest leaf and output-directory leaf must not exist before the run. The wrapper runs the four-window Noisy Option+Tab UI fixture, samples CPU/RSS for the uniquely bound `FlowTab` process, and preserves `flowtab-samples.csv`, `pid-bindings.csv`, `target-launch-receipt.json`, `summary.txt`, aggregate logs, and the top-level `status.json`. The inner UI wrapper receives the unique `attempts/ui-tests/run/` output root, which retains the result bundle, stage logs, and child status. Use this path for Space topology, fullscreen/off-Space activation, or repeated topology-aware panel-interaction pressure. A normal non-audit run can omit `--output-dir`; the script then creates a unique default result directory.
+The identity-manifest leaf and output-directory leaf must not exist before the run. Reinstall the UI-test app and create a new identity manifest for every pressure attempt. The wrapper runs the four-window Noisy Option+Tab UI fixture, samples CPU/RSS for the uniquely bound `FlowTab` process, and preserves `flowtab-samples.csv`, `pid-bindings.csv`, `target-launch-receipt.json`, `summary.txt`, aggregate logs, and the top-level `status.json`. The inner UI wrapper receives the unique `attempts/ui-tests/run/` output root, which retains the result bundle, stage logs, cleanup evidence, and child status, then removes the dedicated test app. Use this path for Space topology, fullscreen/off-Space activation, or repeated topology-aware panel-interaction pressure. A normal non-audit run can omit `--output-dir`; the script then creates a unique default result directory.
 
 ## Validation Report Shape
 

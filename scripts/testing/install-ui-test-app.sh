@@ -9,6 +9,7 @@ ORIGINAL_CFFIXED_USER_HOME="${CFFIXED_USER_HOME:-${HOME}}"
 LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
 PATH_BOUNDARIES_PATH="${ROOT_DIR}/scripts/lib/path-boundaries.sh"
 CODE_SIGNING_IDENTITY_PATH="${ROOT_DIR}/scripts/lib/code-signing-identity.sh"
+UI_TEST_APP_LIFECYCLE_PATH="${ROOT_DIR}/scripts/testing/lib/ui-test-app-lifecycle.sh"
 
 CONFIGURATION="Testing"
 INSTALL_PATH="${USER_HOME}/Applications/Flow Tab UITest.app"
@@ -18,11 +19,14 @@ RESOLVED_CODE_SIGN_IDENTITY=""
 MANUAL_CODESIGN_ENABLED=0
 DEVELOPMENT_TEAM_SOURCE=""
 HAS_CUSTOM_BUILD_ROOT=false
+MANAGES_UI_TEST_APP_LIFECYCLE=false
 
 # shellcheck source=/dev/null
 source "${PATH_BOUNDARIES_PATH}"
 # shellcheck source=/dev/null
 source "${CODE_SIGNING_IDENTITY_PATH}"
+# shellcheck source=/dev/null
+source "${UI_TEST_APP_LIFECYCLE_PATH}"
 
 if [[ -n "${DEVELOPMENT_TEAM}" ]]; then
   DEVELOPMENT_TEAM_SOURCE="FLOWTAB_DEVELOPMENT_TEAM"
@@ -63,6 +67,10 @@ Usage:
 
 Builds FlowTab into a fixed app bundle path for UI automation so macOS permissions
 can be granted to a stable bundle instead of a DerivedData product.
+
+The dedicated Flow Tab UITest.app path receives a one-use lifecycle receipt.
+A test action through run-ui-tests-local.sh consumes the receipt and removes the
+app after the run reaches success, failure, or an interrupt.
 
 Defaults:
   configuration: Testing
@@ -124,6 +132,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 INSTALL_PATH="$(flowtab_resolve_ui_test_install_path "${USER_HOME}" "${INSTALL_PATH}")"
+if flowtab_ui_test_app_is_dedicated_path "${USER_HOME}" "${INSTALL_PATH}"; then
+  MANAGES_UI_TEST_APP_LIFECYCLE=true
+fi
 DERIVED_DATA_PATH="${BUILD_ROOT}/DerivedData"
 TMP_ROOT="${BUILD_ROOT}/tmp"
 HOME_ROOT="${BUILD_ROOT}/home"
@@ -181,6 +192,12 @@ else
   INSTALL_BOUNDARY="$(flowtab_prepare_direct_child_directory "/" "Applications")"
 fi
 INSTALL_PATH="$(flowtab_resolve_direct_child_path "${INSTALL_BOUNDARY}" "$(/usr/bin/basename "${INSTALL_PATH}")")"
+if [[ "${MANAGES_UI_TEST_APP_LIFECYCLE}" == true ]]; then
+  flowtab_ui_test_app_reset_lifecycle \
+    "${ROOT_DIR}" \
+    "${ORIGINAL_HOME}" \
+    "${INSTALL_PATH}"
+fi
 
 mkdir -p \
   "${DERIVED_DATA_PATH}" \
@@ -213,8 +230,8 @@ XCODEBUILD_CMD=(
   -clonedSourcePackagesDirPath "${PACKAGE_CACHE_PATH}"
 )
 
-# Build unsigned first. The default install intentionally leaves an adhoc app,
-# while the manual path signs the copied bundle with the resolved local identity.
+# Build unsigned first, then sign the copied fixed-path bundle with either the
+# resolved local identity or an explicit ad-hoc identity.
 XCODEBUILD_CMD+=("CODE_SIGNING_ALLOWED=NO")
 
 XCODEBUILD_CMD+=(build)
@@ -234,8 +251,11 @@ rm -rf "${INSTALL_PATH}"
 if [[ "${MANUAL_CODESIGN_ENABLED}" -eq 1 ]]; then
   echo "Signing FlowTab UI automation app with fingerprint ${RESOLVED_CODE_SIGN_IDENTITY}..."
   /usr/bin/codesign --force --deep --sign "${RESOLVED_CODE_SIGN_IDENTITY}" "${INSTALL_PATH}"
-  /usr/bin/codesign --verify --deep --strict --verbose=2 "${INSTALL_PATH}"
+else
+  echo "Signing FlowTab UI automation app with an ad-hoc identity..."
+  /usr/bin/codesign --force --deep --sign - "${INSTALL_PATH}"
 fi
+/usr/bin/codesign --verify --deep --strict --verbose=2 "${INSTALL_PATH}"
 
 echo
 echo "Installed UI test app:"
@@ -243,6 +263,16 @@ echo "  ${INSTALL_PATH}"
 echo
 echo "codesign summary:"
 /usr/bin/codesign -dv --verbose=2 "${INSTALL_PATH}" 2>&1 || true
+
+if [[ "${MANAGES_UI_TEST_APP_LIFECYCLE}" == true ]]; then
+  flowtab_ui_test_app_issue_receipt \
+    "${ROOT_DIR}" \
+    "${ORIGINAL_HOME}" \
+    "${INSTALL_PATH}"
+  echo
+  echo "UI test lifecycle: ready for one test action"
+  echo "The UI test runner will remove this app after success, failure, or interruption."
+fi
 
 echo
 echo "Next steps:"

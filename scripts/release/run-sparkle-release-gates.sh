@@ -25,6 +25,7 @@ echo "[gate 2/6] Run release-script and identity contracts"
 "${ROOT_DIR}/scripts/release/test-release-security-boundaries.sh"
 "${ROOT_DIR}/scripts/release/test-dmg-mount-lifecycle.sh"
 "${ROOT_DIR}/scripts/release/test-sparkle-release-contract.sh"
+"${ROOT_DIR}/scripts/testing/test-ui-test-app-lifecycle.sh"
 /usr/bin/python3 \
   "${ROOT_DIR}/.agents/skills/flowtab-engineering/scripts/release_identity_audit_tests.py"
 
