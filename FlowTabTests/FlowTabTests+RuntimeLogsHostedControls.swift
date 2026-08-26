@@ -14,6 +14,7 @@ extension FlowTabTests {
                     get: { runtimeLogLevelRaw },
                     set: { runtimeLogLevelRaw = $0 }
                 ),
+                isActive: true,
                 hotkeyShortcutText: "Option + Tab",
                 appLanguage: .english,
                 targetAppearance: appearance

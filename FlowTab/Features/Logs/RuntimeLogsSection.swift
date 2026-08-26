@@ -23,6 +23,8 @@ final class RuntimeLogLinesViewModel: ObservableObject {
     private var reloadTask: Task<Void, Never>?
     private var refreshGeneration: UInt64 = 0
     private var latestRequestedChangeGeneration: UInt64?
+    private var isActive = false
+    private var activeMinimumLevel: RuntimeLogLevel?
 
     init(
         diagnostics: any RuntimeLogLinesProviding = RuntimeDiagnostics.shared,
@@ -32,11 +34,32 @@ final class RuntimeLogLinesViewModel: ObservableObject {
         self.refreshPolicy = refreshPolicy
     }
 
-    func start(minimumLevel: RuntimeLogLevel) {
-        stop()
-        refreshGeneration &+= 1
+    func updateActivity(
+        isActive: Bool,
+        minimumLevel: RuntimeLogLevel
+    ) {
+        guard isActive else {
+            guard self.isActive
+                    || changeObservation != nil
+                    || reloadTask != nil
+            else { return }
+            deactivate()
+            return
+        }
+
+        guard !self.isActive || activeMinimumLevel != minimumLevel else {
+            return
+        }
+        activate(minimumLevel: minimumLevel)
+    }
+
+    private func activate(minimumLevel: RuntimeLogLevel) {
+        invalidateCurrentRefresh()
+        isActive = true
+        activeMinimumLevel = minimumLevel
         let generation = refreshGeneration
         let observation = diagnostics.observeChanges { [weak self] change in
+            guard change.kind != .appended else { return }
             Task { @MainActor [weak self] in
                 self?.requestReload(
                     changeGeneration: change.generation,
@@ -54,14 +77,14 @@ final class RuntimeLogLinesViewModel: ObservableObject {
     }
 
     func clearStoredLogs(minimumLevel: RuntimeLogLevel) async {
-        guard !isClearing else { return }
+        guard isActive, !isClearing else { return }
         isClearing = true
         defer { isClearing = false }
 
         let generation = refreshGeneration
         do {
             let change = try await diagnostics.clearAndWait()
-            guard generation == refreshGeneration else { return }
+            guard isActive, generation == refreshGeneration else { return }
             lines = []
             requestReload(
                 changeGeneration: change.generation,
@@ -69,12 +92,18 @@ final class RuntimeLogLinesViewModel: ObservableObject {
                 refreshGeneration: generation
             )
         } catch {
-            guard generation == refreshGeneration else { return }
-            start(minimumLevel: minimumLevel)
+            guard isActive, generation == refreshGeneration else { return }
+            activate(minimumLevel: minimumLevel)
         }
     }
 
-    func stop() {
+    private func deactivate() {
+        isActive = false
+        activeMinimumLevel = nil
+        invalidateCurrentRefresh()
+    }
+
+    private func invalidateCurrentRefresh() {
         changeObservation?.cancel()
         changeObservation = nil
         reloadTask?.cancel()
@@ -93,7 +122,10 @@ final class RuntimeLogLinesViewModel: ObservableObject {
         minimumLevel: RuntimeLogLevel,
         refreshGeneration: UInt64
     ) {
-        guard refreshGeneration == self.refreshGeneration else { return }
+        guard isActive,
+              activeMinimumLevel == minimumLevel,
+              refreshGeneration == self.refreshGeneration
+        else { return }
         if let latestRequestedChangeGeneration,
            changeGeneration <= latestRequestedChangeGeneration {
             return
@@ -113,6 +145,8 @@ final class RuntimeLogLinesViewModel: ObservableObject {
         refreshGeneration: UInt64
     ) async {
         while !Task.isCancelled,
+              isActive,
+              activeMinimumLevel == minimumLevel,
               refreshGeneration == self.refreshGeneration,
               let requestedChangeGeneration =
                   latestRequestedChangeGeneration {
@@ -122,7 +156,10 @@ final class RuntimeLogLinesViewModel: ObservableObject {
                 since: nil
             )
             guard !Task.isCancelled else { return }
-            guard refreshGeneration == self.refreshGeneration else { return }
+            guard isActive,
+                  activeMinimumLevel == minimumLevel,
+                  refreshGeneration == self.refreshGeneration
+            else { return }
             guard requestedChangeGeneration
                     == latestRequestedChangeGeneration
             else {
@@ -137,6 +174,7 @@ final class RuntimeLogLinesViewModel: ObservableObject {
 
 struct RuntimeLogsSection: View {
     @Binding var runtimeLogLevelRaw: String
+    let isActive: Bool
     let hotkeyShortcutText: String
     let appLanguage: AppLanguage
     let targetAppearance: NSAppearance
@@ -302,7 +340,16 @@ struct RuntimeLogsSection: View {
         }
         .onAppear {
             synchronizeLogLevelIfNeeded()
-            logsViewModel.start(minimumLevel: selectedLogLevel)
+            logsViewModel.updateActivity(
+                isActive: isActive,
+                minimumLevel: selectedLogLevel
+            )
+        }
+        .onChange(of: isActive) { newValue in
+            logsViewModel.updateActivity(
+                isActive: newValue,
+                minimumLevel: selectedLogLevel
+            )
         }
         .onChange(of: runtimeLogLevelRaw) { newValue in
             let resolved = RuntimeLogPreferencesStore.resolve(rawValue: newValue)
@@ -310,10 +357,16 @@ struct RuntimeLogsSection: View {
                 runtimeLogLevelRaw = resolved.rawValue
                 return
             }
-            logsViewModel.start(minimumLevel: resolved)
+            logsViewModel.updateActivity(
+                isActive: isActive,
+                minimumLevel: resolved
+            )
         }
         .onDisappear {
-            logsViewModel.stop()
+            logsViewModel.updateActivity(
+                isActive: false,
+                minimumLevel: selectedLogLevel
+            )
         }
     }
 }

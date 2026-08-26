@@ -44,6 +44,7 @@ struct AppLogsView: View {
 
                     RuntimeLogsSection(
                         runtimeLogLevelRaw: $runtimeLogLevelRaw,
+                        isActive: isActive,
                         hotkeyShortcutText: hotkeyConfiguration.mainShortcutText,
                         appLanguage: appLanguage,
                         targetAppearance: targetAppearance

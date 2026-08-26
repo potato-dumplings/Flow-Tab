@@ -12,6 +12,7 @@
 		A8A001033F10000100B0D737 /* FlowTabUITestUpdateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8A000033F10000100B0D737 /* FlowTabUITestUpdateCoordinator.swift */; };
 		A8A001043F10000100B0D737 /* FlowTabTests+SparkleUpdates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8A000043F10000100B0D737 /* FlowTabTests+SparkleUpdates.swift */; };
 		A8A001053F10000100B0D737 /* FlowTabUITests+SparkleUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8A000053F10000100B0D737 /* FlowTabUITests+SparkleUpdate.swift */; };
+		A8B001013F11000100B0D737 /* FlowTabUITests+LogsActivityLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8B000013F11000100B0D737 /* FlowTabUITests+LogsActivityLifecycle.swift */; };
 		A8A001063F10000100B0D737 /* SparkleLicense.txt in Resources */ = {isa = PBXBuildFile; fileRef = A8A000063F10000100B0D737 /* SparkleLicense.txt */; };
 		A8A001073F10000100B0D737 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A8A003013F10000100B0D737 /* Sparkle */; };
 		4A6DAE6E2F727AF500B0D737 /* FlowTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */; };
@@ -976,6 +977,7 @@
 		B35001012FF900100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSnapshotPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeSnapshotPressure.swift"; sourceTree = "<group>"; };
 		F7B8C9D335B8000100B0D737 /* FlowTabTests+LaunchAtLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+LaunchAtLogin.swift"; sourceTree = "<group>"; };
 		B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeAndLogs.swift"; sourceTree = "<group>"; };
+		A8B000013F11000100B0D737 /* FlowTabUITests+LogsActivityLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+LogsActivityLifecycle.swift"; sourceTree = "<group>"; };
 		A49300013D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeAndLogsWatchdogPolicy.swift"; sourceTree = "<group>"; };
 		A49400013DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeHiddenAppRowProjection.swift"; sourceTree = "<group>"; };
 		A49500013DA1000100B0D737 /* FlowTabUITests+HomeNestedTopologyTopLevelProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeNestedTopologyTopLevelProjection.swift"; sourceTree = "<group>"; };
@@ -1679,6 +1681,7 @@
 				4A6DAE892F727AF600B0D737 /* FlowTabUITests.swift */,
 				A8A000053F10000100B0D737 /* FlowTabUITests+SparkleUpdate.swift */,
 				B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */,
+				A8B000013F11000100B0D737 /* FlowTabUITests+LogsActivityLifecycle.swift */,
 				A49300013D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift */,
 				A49400013DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift */,
 				A49500013DA1000100B0D737 /* FlowTabUITests+HomeNestedTopologyTopLevelProjection.swift */,
@@ -2945,6 +2948,7 @@
 				4A6DAE8A2F727AF600B0D737 /* FlowTabUITests.swift in Sources */,
 				A8A001053F10000100B0D737 /* FlowTabUITests+SparkleUpdate.swift in Sources */,
 				B10012012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift in Sources */,
+				A8B001013F11000100B0D737 /* FlowTabUITests+LogsActivityLifecycle.swift in Sources */,
 				A49300023D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift in Sources */,
 				A49400023DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift in Sources */,
 				A49500023DA1000100B0D737 /* FlowTabUITests+HomeNestedTopologyTopLevelProjection.swift in Sources */,

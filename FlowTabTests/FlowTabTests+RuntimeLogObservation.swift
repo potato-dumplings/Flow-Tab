@@ -72,6 +72,321 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testRuntimeLogViewModelRunsOnlyWhileActiveAndReadsEveryActivation()
+        async
+    {
+        let source = ControlledRuntimeLogLinesSource()
+        let viewModel = RuntimeLogLinesViewModel(diagnostics: source)
+        var cancellables: Set<AnyCancellable> = []
+
+        viewModel.updateActivity(
+            isActive: false,
+            minimumLevel: .warning
+        )
+        await Task.yield()
+
+        XCTAssertFalse(source.hasObserver)
+        XCTAssertTrue(source.readRequests.isEmpty)
+
+        let firstReadRequested = expectation(
+            description: "unmetCondition=firstActiveRuntimeLogReadRequested"
+        )
+        let secondReadRequested = expectation(
+            description: "unmetCondition=secondActiveRuntimeLogReadRequested"
+        )
+        source.onReadRequested = { requestCount in
+            if requestCount == 1 {
+                firstReadRequested.fulfill()
+            } else if requestCount == 2 {
+                secondReadRequested.fulfill()
+            }
+        }
+
+        viewModel.updateActivity(
+            isActive: true,
+            minimumLevel: .warning
+        )
+        await fulfillment(
+            of: [firstReadRequested],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
+
+        XCTAssertTrue(source.hasObserver)
+        XCTAssertEqual(
+            source.readRequests,
+            [
+                RuntimeLogReadRequest(
+                    limit: DiagnosticsRefreshPolicy.runtimeLogs.lineLimit,
+                    minimumLevel: .warning,
+                    usesSnapshot: false
+                )
+            ]
+        )
+
+        viewModel.updateActivity(
+            isActive: true,
+            minimumLevel: .warning
+        )
+        await Task.yield()
+        XCTAssertEqual(source.readRequestCount, 1)
+
+        let firstActiveLinesApplied = expectation(
+            description: "unmetCondition=firstActiveRuntimeLogLinesApplied"
+        )
+        viewModel.$lines
+            .filter { $0 == ["first-active"] }
+            .prefix(1)
+            .sink { _ in firstActiveLinesApplied.fulfill() }
+            .store(in: &cancellables)
+        source.completeNextRead(with: ["first-active"])
+        await fulfillment(
+            of: [firstActiveLinesApplied],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
+        XCTAssertEqual(viewModel.lines, ["first-active"])
+
+        viewModel.updateActivity(
+            isActive: false,
+            minimumLevel: .warning
+        )
+        XCTAssertFalse(source.hasObserver)
+
+        source.emit(RuntimeLogChange(generation: 1, kind: .flushed))
+        await Task.yield()
+        XCTAssertEqual(source.readRequestCount, 1)
+
+        viewModel.updateActivity(
+            isActive: true,
+            minimumLevel: .warning
+        )
+        await fulfillment(
+            of: [secondReadRequested],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
+
+        XCTAssertEqual(
+            source.readRequests,
+            [
+                RuntimeLogReadRequest(
+                    limit: DiagnosticsRefreshPolicy.runtimeLogs.lineLimit,
+                    minimumLevel: .warning,
+                    usesSnapshot: false
+                ),
+                RuntimeLogReadRequest(
+                    limit: DiagnosticsRefreshPolicy.runtimeLogs.lineLimit,
+                    minimumLevel: .warning,
+                    usesSnapshot: false
+                )
+            ]
+        )
+
+        let secondActiveLinesApplied = expectation(
+            description: "unmetCondition=secondActiveRuntimeLogLinesApplied"
+        )
+        viewModel.$lines
+            .filter { $0 == ["second-active"] }
+            .prefix(1)
+            .sink { _ in secondActiveLinesApplied.fulfill() }
+            .store(in: &cancellables)
+        source.completeNextRead(with: ["second-active"])
+        await fulfillment(
+            of: [secondActiveLinesApplied],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
+        XCTAssertEqual(viewModel.lines, ["second-active"])
+
+        viewModel.updateActivity(
+            isActive: false,
+            minimumLevel: .warning
+        )
+    }
+
+    @MainActor
+    func testRuntimeLogViewModelInvalidatesInflightReadAfterDeactivation()
+        async
+    {
+        let source = ControlledRuntimeLogLinesSource()
+        let viewModel = RuntimeLogLinesViewModel(diagnostics: source)
+        let firstReadRequested = expectation(
+            description: "unmetCondition=runtimeLogReadRequestedBeforeDeactivation"
+        )
+        let secondReadRequested = expectation(
+            description: "unmetCondition=runtimeLogReadRequestedAfterReactivation"
+        )
+        source.onReadRequested = { requestCount in
+            if requestCount == 1 {
+                firstReadRequested.fulfill()
+            } else if requestCount == 2 {
+                secondReadRequested.fulfill()
+            }
+        }
+
+        var publishedLines: [[String]] = []
+        var cancellables: Set<AnyCancellable> = []
+        let freshLinesApplied = expectation(
+            description: "unmetCondition=reactivatedRuntimeLogLinesApplied"
+        )
+        viewModel.$lines
+            .dropFirst()
+            .sink { lines in
+                publishedLines.append(lines)
+                if lines == ["fresh-after-reactivation"] {
+                    freshLinesApplied.fulfill()
+                }
+            }
+            .store(in: &cancellables)
+
+        viewModel.updateActivity(isActive: true, minimumLevel: .error)
+        await fulfillment(
+            of: [firstReadRequested],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
+
+        viewModel.updateActivity(isActive: false, minimumLevel: .error)
+        source.completeNextRead(with: ["cancelled-while-hidden"])
+        viewModel.updateActivity(isActive: true, minimumLevel: .error)
+        await fulfillment(
+            of: [secondReadRequested],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
+
+        source.completeNextRead(with: ["fresh-after-reactivation"])
+        await fulfillment(
+            of: [freshLinesApplied],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
+
+        XCTAssertFalse(publishedLines.contains(["cancelled-while-hidden"]))
+        XCTAssertEqual(viewModel.lines, ["fresh-after-reactivation"])
+        viewModel.updateActivity(isActive: false, minimumLevel: .error)
+    }
+
+    @MainActor
+    func testRuntimeLogViewModelReloadsLevelOnlyWhileActive()
+        async
+    {
+        let source = ControlledRuntimeLogLinesSource()
+        let viewModel = RuntimeLogLinesViewModel(diagnostics: source)
+        let errorReadRequested = expectation(
+            description: "unmetCondition=activeErrorRuntimeLogReadRequested"
+        )
+        let debugReadRequested = expectation(
+            description: "unmetCondition=activeDebugRuntimeLogReadRequested"
+        )
+        source.onReadRequested = { requestCount in
+            if requestCount == 1 {
+                errorReadRequested.fulfill()
+            } else if requestCount == 2 {
+                debugReadRequested.fulfill()
+            }
+        }
+
+        viewModel.updateActivity(isActive: false, minimumLevel: .warning)
+        viewModel.updateActivity(isActive: false, minimumLevel: .error)
+        await Task.yield()
+        XCTAssertTrue(source.readRequests.isEmpty)
+
+        viewModel.updateActivity(isActive: true, minimumLevel: .error)
+        await fulfillment(
+            of: [errorReadRequested],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
+        XCTAssertEqual(source.readRequests.last?.minimumLevel, .error)
+        source.completeNextRead(with: ["error"])
+        await Task.yield()
+
+        viewModel.updateActivity(isActive: true, minimumLevel: .debug)
+        await fulfillment(
+            of: [debugReadRequested],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
+        XCTAssertEqual(source.readRequests.last?.minimumLevel, .debug)
+        source.completeNextRead(with: ["debug"])
+
+        viewModel.updateActivity(isActive: false, minimumLevel: .debug)
+        viewModel.updateActivity(isActive: false, minimumLevel: .info)
+        await Task.yield()
+        XCTAssertEqual(source.readRequestCount, 2)
+    }
+
+    @MainActor
+    func testRuntimeLogViewModelReadsLatestConfiguredLineLimitOnEveryActivation()
+        async throws
+    {
+        let fileManager = FileManager.default
+        let temporaryRoot = fileManager.temporaryDirectory
+            .appendingPathComponent(
+                "FlowTabLogLatestProjection-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        let logsDirectory = temporaryRoot
+            .appendingPathComponent("FlowTab/logs", isDirectory: true)
+        defer { try? fileManager.removeItem(at: temporaryRoot) }
+
+        let store = RuntimeLogFileStore(logsDirectoryURL: logsDirectory)
+        let diagnostics = RuntimeDiagnostics(fileStore: store)
+        let lineLimit = DiagnosticsRefreshPolicy.runtimeLogs.lineLimit
+
+        for index in 1...(lineLimit + 5) {
+            store.append(
+                "[00:00:00.000] [DEBUG] [UnitTest] filtered-"
+                    + String(format: "%03d", index)
+            )
+            store.append(
+                "[00:00:00.000] [INFO] [UnitTest] marker-"
+                    + String(format: "%03d", index)
+            )
+        }
+        _ = await store.readRecentLines(limit: 1, minimumLevel: .debug)
+
+        let viewModel = RuntimeLogLinesViewModel(diagnostics: diagnostics)
+        var cancellables: Set<AnyCancellable> = []
+        let firstProjectionApplied = expectation(
+            description: "unmetCondition=firstLatestRuntimeLogProjectionApplied"
+        )
+        viewModel.$lines
+            .filter {
+                $0.count == lineLimit
+                    && $0.first?.contains("marker-006") == true
+                    && $0.last?.contains("marker-305") == true
+            }
+            .prefix(1)
+            .sink { _ in firstProjectionApplied.fulfill() }
+            .store(in: &cancellables)
+        viewModel.updateActivity(isActive: true, minimumLevel: .info)
+        await fulfillment(
+            of: [firstProjectionApplied],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
+        XCTAssertEqual(viewModel.lines.count, lineLimit)
+
+        viewModel.updateActivity(isActive: false, minimumLevel: .info)
+        store.append("[00:00:00.001] [DEBUG] [UnitTest] filtered-306")
+        store.append("[00:00:00.001] [INFO] [UnitTest] marker-306")
+        _ = await store.readRecentLines(limit: 1, minimumLevel: .debug)
+        let secondProjectionApplied = expectation(
+            description: "unmetCondition=secondLatestRuntimeLogProjectionApplied"
+        )
+        viewModel.$lines
+            .filter {
+                $0.count == lineLimit
+                    && $0.first?.contains("marker-007") == true
+                    && $0.last?.contains("marker-306") == true
+            }
+            .prefix(1)
+            .sink { _ in secondProjectionApplied.fulfill() }
+            .store(in: &cancellables)
+        viewModel.updateActivity(isActive: true, minimumLevel: .info)
+        await fulfillment(
+            of: [secondProjectionApplied],
+            timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
+        )
+        XCTAssertEqual(viewModel.lines.count, lineLimit)
+
+        viewModel.updateActivity(isActive: false, minimumLevel: .info)
+    }
+
+    @MainActor
     func testRuntimeLogViewModelAppliesInitialAppendAndClearEvidence()
         async throws
     {
@@ -104,7 +419,7 @@ extension FlowTabTests {
             .sink { _ in initialApplied.fulfill() }
             .store(in: &cancellables)
 
-        viewModel.start(minimumLevel: .debug)
+        viewModel.updateActivity(isActive: true, minimumLevel: .debug)
         await fulfillment(
             of: [initialApplied],
             timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
@@ -157,7 +472,7 @@ extension FlowTabTests {
                 + "marker=\(postClearMarker) finalLines=\(viewModel.lines)"
         )
 
-        viewModel.stop()
+        viewModel.updateActivity(isActive: false, minimumLevel: .debug)
     }
 
     @MainActor
@@ -198,7 +513,7 @@ extension FlowTabTests {
             }
             .store(in: &cancellables)
 
-        viewModel.start(minimumLevel: .debug)
+        viewModel.updateActivity(isActive: true, minimumLevel: .debug)
         await fulfillment(
             of: [firstReadRequested],
             timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
@@ -212,6 +527,10 @@ extension FlowTabTests {
         )
 
         source.emit(RuntimeLogChange(generation: 1, kind: .appended))
+        await Task.yield()
+        XCTAssertEqual(source.readRequestCount, 1)
+
+        source.emit(RuntimeLogChange(generation: 2, kind: .flushed))
         source.completeNextRead(with: ["stale"])
         await fulfillment(
             of: [laterReadRequested],
@@ -243,14 +562,14 @@ extension FlowTabTests {
         )
         XCTAssertEqual(source.readRequestCount, 2)
 
-        source.emit(RuntimeLogChange(generation: 1, kind: .flushed))
-        source.emit(RuntimeLogChange(generation: 0, kind: .appended))
+        source.emit(RuntimeLogChange(generation: 2, kind: .flushed))
+        source.emit(RuntimeLogChange(generation: 3, kind: .appended))
         await Task.yield()
         XCTAssertEqual(source.readRequestCount, 2)
 
-        viewModel.stop()
+        viewModel.updateActivity(isActive: false, minimumLevel: .debug)
         XCTAssertFalse(source.hasObserver)
-        source.emit(RuntimeLogChange(generation: 2, kind: .appended))
+        source.emit(RuntimeLogChange(generation: 4, kind: .flushed))
         await Task.yield()
         XCTAssertEqual(source.readRequestCount, 2)
     }
@@ -277,7 +596,11 @@ private final class ControlledRuntimeLogLinesSource:
     RuntimeLogLinesProviding
 {
     var onReadRequested: ((Int) -> Void)?
-    private(set) var readRequestCount = 0
+    private(set) var readRequests: [RuntimeLogReadRequest] = []
+
+    var readRequestCount: Int {
+        readRequests.count
+    }
 
     private let observerBox = RuntimeLogObserverBox()
     private var pendingReads: [
@@ -301,11 +624,17 @@ private final class ControlledRuntimeLogLinesSource:
     }
 
     func readRecentLines(
-        limit _: Int,
-        minimumLevel _: RuntimeLogLevel,
-        since _: RuntimeLogFileStore.ReadSnapshot?
+        limit: Int,
+        minimumLevel: RuntimeLogLevel,
+        since snapshot: RuntimeLogFileStore.ReadSnapshot?
     ) async -> [String] {
-        readRequestCount += 1
+        readRequests.append(
+            RuntimeLogReadRequest(
+                limit: limit,
+                minimumLevel: minimumLevel,
+                usesSnapshot: snapshot != nil
+            )
+        )
         onReadRequested?(readRequestCount)
         return await withCheckedContinuation { continuation in
             pendingReads.append(continuation)
@@ -333,6 +662,12 @@ private final class ControlledRuntimeLogLinesSource:
         }
         pendingReads.removeFirst().resume(returning: lines)
     }
+}
+
+private struct RuntimeLogReadRequest: Equatable {
+    let limit: Int
+    let minimumLevel: RuntimeLogLevel
+    let usesSnapshot: Bool
 }
 
 private final class RuntimeLogObserverBox {

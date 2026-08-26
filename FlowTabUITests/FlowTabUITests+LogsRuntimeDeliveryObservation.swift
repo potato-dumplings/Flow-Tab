@@ -183,6 +183,93 @@ private struct FlowTabUITestLogsRuntimeDeliveryElements {
 }
 
 extension FlowTabUITests {
+    func assertLogsRuntimeSnapshotAfterNavigation(
+        in app: XCUIApplication,
+        targetDescription: String,
+        selectedLevel: String,
+        marker: String,
+        trigger: () -> Bool
+    ) {
+        let targetExpectation =
+            FlowTabUITestLogsRuntimeDeliveryExpectation
+                .delivered(
+                    selectedLevel: selectedLevel,
+                    marker: marker
+                )
+        let elements = logsRuntimeDeliveryElements(
+            in: app,
+            marker: marker
+        )
+        let readback = logsRuntimeDeliveryReadback(
+            in: app,
+            elements: elements
+        )
+        let deferredReadbacks =
+            FlowTabUITestDeferredConditionReadbackRegistration(
+                downstreamRegistration:
+                    FlowTabUITestConditionReadbackScheduler
+                        .mainRunLoopRegistration(
+                            cadence:
+                                FlowTabUITestConditionObservationPolicy
+                                    .xcuiReadbackCadence
+                        )
+            )
+        var triggerDidComplete = false
+        let owner =
+            FlowTabUITestLogsRuntimeDeliveryObservationOwner(
+                expectation: targetExpectation,
+                observationRegistration: { callback in
+                    deferredReadbacks.register(callback)
+                },
+                acceptsResolution: { triggerDidComplete },
+                readback: readback
+            )
+        owner.start()
+        defer {
+            owner.cancel()
+            deferredReadbacks.cancel()
+        }
+
+        guard let initialEvidence = owner.latestEvidence,
+              initialEvidence.source == .initialReadback
+        else {
+            XCTFail(
+                "Runtime Logs current-snapshot initial readback was unavailable. "
+                    + "target=\(targetDescription) "
+                    + owner.diagnosticSummary
+            )
+            return
+        }
+        XCTAssertTrue(initialEvidence.value.matchingRowContents.isEmpty)
+        XCTAssertNil(owner.resolvedEvidence)
+
+        let triggerSucceeded = trigger()
+        triggerDidComplete = true
+        owner.requestReadback(source: .triggerReadback)
+        if owner.resolvedEvidence == nil {
+            deferredReadbacks.activate()
+        }
+        guard triggerSucceeded else {
+            XCTFail(
+                "Runtime Logs current-snapshot navigation failed. "
+                    + "target=\(targetDescription) "
+                    + owner.diagnosticSummary
+            )
+            return
+        }
+
+        XCTAssertNotNil(
+            owner.waitForResolution(
+                timeout:
+                    FlowTabUITestLogsRuntimeDeliveryObservationPolicy
+                        .projectionWatchdog
+            ),
+            "Runtime Logs current-snapshot projection watchdog expired. "
+                + "target=\(targetDescription) "
+                + owner.diagnosticSummary
+        )
+    }
+
     func assertLogsRuntimeDelivery(
         in app: XCUIApplication,
         targetDescription: String,
