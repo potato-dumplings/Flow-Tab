@@ -251,6 +251,38 @@ extension FlowTabTests {
         }
     }
 
+    func testFlowTabTestLaunchOptionsScopesRuntimeLogLevelToTabStress() {
+        withLaunchArgumentsForTesting(
+            [
+                "FlowTab",
+                "--flowtab-tab-stress",
+                "--flowtab-tab-stress-runtime-log-level", "DEBUG"
+            ],
+            environment: [:]
+        ) {
+            XCTAssertTrue(FlowTabTestLaunchOptions.runsTabSwitchStressTest)
+            XCTAssertEqual(
+                FlowTabTestLaunchOptions
+                    .tabSwitchStressRuntimeLogLevelRawValue,
+                "DEBUG"
+            )
+        }
+
+        withLaunchArgumentsForTesting(
+            [
+                "FlowTab",
+                "--flowtab-tab-stress-runtime-log-level", "DEBUG"
+            ],
+            environment: [:]
+        ) {
+            XCTAssertFalse(FlowTabTestLaunchOptions.runsTabSwitchStressTest)
+            XCTAssertNil(
+                FlowTabTestLaunchOptions
+                    .tabSwitchStressRuntimeLogLevelRawValue
+            )
+        }
+    }
+
     func testFlowTabTestLaunchOptionsIgnoreUITestArgumentsWithoutEnvironmentSentinel() {
         withLaunchArgumentsForTesting(
             [

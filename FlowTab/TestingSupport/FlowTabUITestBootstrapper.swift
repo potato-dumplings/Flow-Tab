@@ -112,11 +112,19 @@ enum FlowTabUITestBootstrapper {
             FlowTabUITestMockRuntimeEffects.reset()
         }
 
-        let runtimeLogLevelRaw =
-            FlowTabTestLaunchOptions.runtimeLogLevelOverrideRawValue
-            ?? (FlowTabTestLaunchOptions.enablesVerboseRuntimeLogs
-                ? RuntimeLogLevel.debug.rawValue
-                : nil)
+        let runtimeLogLevelRaw: String?
+        if FlowTabTestLaunchOptions.runsTabSwitchStressTest {
+            runtimeLogLevelRaw =
+                FlowTabTestLaunchOptions
+                    .tabSwitchStressRuntimeLogLevelRawValue
+                ?? RuntimeLogPreferencesStore.defaultLevel.rawValue
+        } else {
+            runtimeLogLevelRaw =
+                FlowTabTestLaunchOptions.runtimeLogLevelOverrideRawValue
+                ?? (FlowTabTestLaunchOptions.enablesVerboseRuntimeLogs
+                    ? RuntimeLogLevel.debug.rawValue
+                    : nil)
+        }
         if let runtimeLogLevelRaw {
             let resolved = RuntimeLogPreferencesStore.resolve(rawValue: runtimeLogLevelRaw)
             userDefaults.set(resolved.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)

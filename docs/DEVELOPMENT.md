@@ -306,17 +306,23 @@ swift test
 - 页面生命周期相关状态管理（如 `onAppear` / `onDisappear` / `@StateObject` 保活策略）
 - 日志页展示、诊断会话或持久化日志清理逻辑
 
-压测命令（参数分别为：持续秒数、切换间隔毫秒、采样间隔秒）：
+压测命令（参数分别为：持续秒数、切换间隔毫秒、采样间隔秒）。每个组合运行三次，以中位数比较；脚本默认使用 `ERROR`，并把运行时日志等级、计划/完成切换数、实际耗时和吞吐写入 `summary.txt` 与 schema v2 `status.json`。
 
 ```bash
-./scripts/perf/tab-switch-stress.sh 20 20 0.5
+./scripts/perf/tab-switch-stress.sh 20 20 0.5 --runtime-log-level ERROR
+./scripts/perf/tab-switch-stress.sh 20 50 0.5 --runtime-log-level ERROR
 ```
 
-建议同时补一组较低频切换对照数据：
+DEBUG 配对命令：
 
 ```bash
-./scripts/perf/tab-switch-stress.sh 20 50 0.5
+./scripts/perf/tab-switch-stress.sh 20 20 0.5 --runtime-log-level DEBUG
+./scripts/perf/tab-switch-stress.sh 20 50 0.5 --runtime-log-level DEBUG
 ```
+
+每次运行必须出现唯一且自洽的 `phase=completed` 完成证据，计划数与完成数须分别精确达到 `1000`（20ms）和 `400`（50ms），应用退出码须为 `0`。脚本把压测 App 的 HOME 隔离在当次输出目录；完整证据统一保存在 `.build-local/runtime-log-debug-fix/`。
+
+Logs 页同等级重新进入时先显示缓存，并在页面连续可见 `100 ms` 后增量补齐；压力测试中的瞬时往返会取消尚未开始的读取，页面稳定后仍呈现最新 `300` 条匹配日志。
 
 ### 压测定位结论（2026-03-30）
 

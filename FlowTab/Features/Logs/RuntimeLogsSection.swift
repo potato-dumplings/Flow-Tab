@@ -3,9 +3,11 @@ import AppKit
 
 struct DiagnosticsRefreshPolicy: Equatable {
     var lineLimit: Int
+    var cachedReadDelayNanoseconds: UInt64
 
     static let runtimeLogs = DiagnosticsRefreshPolicy(
-        lineLimit: 300
+        lineLimit: 300,
+        cachedReadDelayNanoseconds: 100_000_000
     )
 }
 
@@ -21,8 +23,15 @@ final class RuntimeLogLinesViewModel: ObservableObject {
     }
     private var changeObservation: RuntimeLogChangeObservation?
     private var reloadTask: Task<Void, Never>?
+    private var reloadOwnerID: UUID?
+    private var reloadOwnerGeneration: UInt64?
+    private var restartsReloadAfterCancellation = false
     private var refreshGeneration: UInt64 = 0
     private var latestRequestedChangeGeneration: UInt64?
+    private var requiresReload = false
+    private var readSnapshot: RuntimeLogFileStore.ReadSnapshot?
+    private var coveredChangeGeneration: UInt64 = 0
+    private var cachedMinimumLevel: RuntimeLogLevel?
     private var isActive = false
     private var activeMinimumLevel: RuntimeLogLevel?
 
@@ -55,24 +64,33 @@ final class RuntimeLogLinesViewModel: ObservableObject {
 
     private func activate(minimumLevel: RuntimeLogLevel) {
         invalidateCurrentRefresh()
+        if cachedMinimumLevel != minimumLevel {
+            cachedMinimumLevel = minimumLevel
+            lines = []
+            readSnapshot = nil
+            coveredChangeGeneration = 0
+        }
         isActive = true
         activeMinimumLevel = minimumLevel
         let generation = refreshGeneration
-        let observation = diagnostics.observeChanges { [weak self] change in
-            guard change.kind != .appended else { return }
+        let observation = diagnostics.observeChanges(
+            kinds: [.flushed, .cleared]
+        ) { [weak self] change in
             Task { @MainActor [weak self] in
-                self?.requestReload(
-                    changeGeneration: change.generation,
+                self?.handleObservedChange(
+                    change,
                     minimumLevel: minimumLevel,
                     refreshGeneration: generation
                 )
             }
         }
         changeObservation = observation
+        let requiresInitialRead = readSnapshot == nil
         requestReload(
             changeGeneration: observation.baselineGeneration,
             minimumLevel: minimumLevel,
-            refreshGeneration: generation
+            refreshGeneration: generation,
+            force: requiresInitialRead
         )
     }
 
@@ -86,14 +104,22 @@ final class RuntimeLogLinesViewModel: ObservableObject {
             let change = try await diagnostics.clearAndWait()
             guard isActive, generation == refreshGeneration else { return }
             lines = []
+            readSnapshot = nil
+            coveredChangeGeneration = change.generation
             requestReload(
                 changeGeneration: change.generation,
                 minimumLevel: minimumLevel,
-                refreshGeneration: generation
+                refreshGeneration: generation,
+                force: true
             )
         } catch {
             guard isActive, generation == refreshGeneration else { return }
-            activate(minimumLevel: minimumLevel)
+            requestReload(
+                changeGeneration: coveredChangeGeneration,
+                minimumLevel: minimumLevel,
+                refreshGeneration: generation,
+                force: true
+            )
         }
     }
 
@@ -107,8 +133,8 @@ final class RuntimeLogLinesViewModel: ObservableObject {
         changeObservation?.cancel()
         changeObservation = nil
         reloadTask?.cancel()
-        reloadTask = nil
         latestRequestedChangeGeneration = nil
+        requiresReload = false
         refreshGeneration &+= 1
     }
 
@@ -120,23 +146,61 @@ final class RuntimeLogLinesViewModel: ObservableObject {
     private func requestReload(
         changeGeneration: UInt64,
         minimumLevel: RuntimeLogLevel,
-        refreshGeneration: UInt64
+        refreshGeneration: UInt64,
+        force: Bool = false
     ) {
         guard isActive,
               activeMinimumLevel == minimumLevel,
               refreshGeneration == self.refreshGeneration
         else { return }
-        if let latestRequestedChangeGeneration,
-           changeGeneration <= latestRequestedChangeGeneration {
+        if let latestRequestedChangeGeneration {
+            self.latestRequestedChangeGeneration = max(
+                latestRequestedChangeGeneration,
+                changeGeneration
+            )
+        } else {
+            latestRequestedChangeGeneration = changeGeneration
+        }
+        requiresReload = requiresReload || force
+        guard reloadTask == nil else {
+            if reloadOwnerGeneration != refreshGeneration {
+                restartsReloadAfterCancellation = true
+            }
             return
         }
-        latestRequestedChangeGeneration = changeGeneration
-        guard reloadTask == nil else { return }
+        startReload(
+            minimumLevel: minimumLevel,
+            refreshGeneration: refreshGeneration,
+            delaysCachedRead: readSnapshot != nil && !force
+        )
+    }
+
+    private func startReload(
+        minimumLevel: RuntimeLogLevel,
+        refreshGeneration: UInt64,
+        delaysCachedRead: Bool
+    ) {
+        let ownerID = UUID()
+        reloadOwnerID = ownerID
+        reloadOwnerGeneration = refreshGeneration
         reloadTask = Task { [weak self] in
-            await self?.runReloadLoop(
+            guard let self else { return }
+            if delaysCachedRead {
+                do {
+                    try await Task.sleep(
+                        nanoseconds:
+                            refreshPolicy.cachedReadDelayNanoseconds
+                    )
+                } catch {
+                    finishReload(ownerID: ownerID)
+                    return
+                }
+            }
+            await self.runReloadLoop(
                 minimumLevel: minimumLevel,
                 refreshGeneration: refreshGeneration
             )
+            self.finishReload(ownerID: ownerID)
         }
     }
 
@@ -144,30 +208,128 @@ final class RuntimeLogLinesViewModel: ObservableObject {
         minimumLevel: RuntimeLogLevel,
         refreshGeneration: UInt64
     ) async {
+        var candidateLines = lines
+        var candidateSnapshot = readSnapshot
+        var candidateCoveredGeneration = coveredChangeGeneration
+        var forceNextRead = requiresReload
+
         while !Task.isCancelled,
               isActive,
               activeMinimumLevel == minimumLevel,
               refreshGeneration == self.refreshGeneration,
               let requestedChangeGeneration =
                   latestRequestedChangeGeneration {
-            let nextLines = await diagnostics.readRecentLines(
-                limit: lineLimit,
-                minimumLevel: minimumLevel,
-                since: nil
-            )
+            let needsRead = forceNextRead
+                || candidateSnapshot == nil
+                || requestedChangeGeneration > candidateCoveredGeneration
+            guard needsRead else {
+                commitReload(
+                    lines: candidateLines,
+                    snapshot: candidateSnapshot,
+                    coveredChangeGeneration: candidateCoveredGeneration
+                )
+                return
+            }
+            forceNextRead = false
+            requiresReload = false
+
+            let batch: RuntimeLogReadBatch
+            do {
+                batch = try await diagnostics.readRecentBatch(
+                    limit: lineLimit,
+                    minimumLevel: minimumLevel,
+                    since: candidateSnapshot
+                )
+            } catch {
+                guard !Task.isCancelled else { return }
+                return
+            }
+
             guard !Task.isCancelled else { return }
             guard isActive,
                   activeMinimumLevel == minimumLevel,
                   refreshGeneration == self.refreshGeneration
             else { return }
-            guard requestedChangeGeneration
-                    == latestRequestedChangeGeneration
-            else {
+
+            switch batch.mode {
+            case .full:
+                candidateLines = batch.lines
+            case .incremental:
+                candidateLines.append(contentsOf: batch.lines)
+                if candidateLines.count > lineLimit {
+                    candidateLines.removeFirst(
+                        candidateLines.count - lineLimit
+                    )
+                }
+            }
+            candidateSnapshot = batch.snapshot
+            candidateCoveredGeneration = max(
+                candidateCoveredGeneration,
+                batch.coveredChangeGeneration
+            )
+
+            if let latestRequestedChangeGeneration,
+               latestRequestedChangeGeneration > candidateCoveredGeneration {
                 continue
             }
-            lines = nextLines
-            reloadTask = nil
+            commitReload(
+                lines: candidateLines,
+                snapshot: candidateSnapshot,
+                coveredChangeGeneration: candidateCoveredGeneration
+            )
             return
+        }
+    }
+
+    private func handleObservedChange(
+        _ change: RuntimeLogChange,
+        minimumLevel: RuntimeLogLevel,
+        refreshGeneration: UInt64
+    ) {
+        guard isActive,
+              activeMinimumLevel == minimumLevel,
+              refreshGeneration == self.refreshGeneration
+        else { return }
+        if change.kind == .cleared {
+            lines = []
+            readSnapshot = nil
+        }
+        requestReload(
+            changeGeneration: change.generation,
+            minimumLevel: minimumLevel,
+            refreshGeneration: refreshGeneration,
+            force: change.kind == .cleared
+        )
+    }
+
+    private func commitReload(
+        lines: [String],
+        snapshot: RuntimeLogFileStore.ReadSnapshot?,
+        coveredChangeGeneration: UInt64
+    ) {
+        self.lines = Array(lines.suffix(lineLimit))
+        readSnapshot = snapshot
+        self.coveredChangeGeneration = coveredChangeGeneration
+        latestRequestedChangeGeneration = nil
+        requiresReload = false
+    }
+
+    private func finishReload(ownerID: UUID) {
+        guard reloadOwnerID == ownerID else { return }
+        reloadTask = nil
+        reloadOwnerID = nil
+        reloadOwnerGeneration = nil
+
+        let shouldRestart = restartsReloadAfterCancellation
+            && isActive
+            && latestRequestedChangeGeneration != nil
+        restartsReloadAfterCancellation = false
+        if shouldRestart, let activeMinimumLevel {
+            startReload(
+                minimumLevel: activeMinimumLevel,
+                refreshGeneration: refreshGeneration,
+                delaysCachedRead: readSnapshot != nil
+            )
         }
     }
 }

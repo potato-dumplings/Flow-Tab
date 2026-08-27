@@ -62,9 +62,12 @@ extension TabSwitchStressRunner {
         else {
             return
         }
+        let runtimeLogLevel =
+            RuntimeLogPreferencesStore.loadMinimumLevel().rawValue
         let line =
             "FlowTabTabSwitchStressEvidence "
             + evidence.logFields
+            + " runtimeLogLevel=\(runtimeLogLevel)"
         TabSwitchStressEvidenceTransport.publish(
             evidence
         )

@@ -1,6 +1,59 @@
 import XCTest
 
 extension FlowTabUITests {
+    func testDebugLogsRemainCurrentAcrossRepeatedHomeLogsNavigation() {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-seed-logs",
+                "4",
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        defer {
+            if app.state == .runningForeground
+                || app.state == .runningBackground
+            {
+                app.terminate()
+            }
+        }
+
+        for iteration in 1...6 {
+            guard assertSidebarTabProjectionAfterNavigation(
+                in: app,
+                target: .home
+            ) else { return }
+            let didResolveLogs =
+                assertLogsPopulatedProjectionAfterNavigation(
+                    in: app,
+                    targetDescription:
+                        "debug-home-logs-iteration-\(iteration)",
+                    selectedLevel: "DEBUG",
+                    visibleIdentifiers: [
+                        Identifier.logsSeededDebugLine,
+                        Identifier.logsSeededInfoLine,
+                        Identifier.logsSeededWarnLine,
+                        Identifier.logsSeededErrorLine
+                    ]
+                ) {
+                    tapFirstHittable(
+                        in: app.buttons.matching(
+                            identifier: Identifier.logsTabButton
+                        ),
+                        timeout:
+                            FlowTabUITestLogsProjectionPolicy
+                                .tabNavigationWatchdog
+                    )
+                }
+            guard didResolveLogs else { return }
+        }
+    }
+
     func testLogsPageReadsCurrentSnapshotAfterReturningFromHome() {
         let app = makeApp(
             additionalArguments: [

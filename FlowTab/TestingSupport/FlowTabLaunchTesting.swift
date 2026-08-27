@@ -43,6 +43,8 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-ax-suppression-readback-route"
     static let tabSwitchStressEvidenceNotificationArgument =
         "--flowtab-tab-stress-evidence-notification-name"
+    static let tabSwitchStressRuntimeLogLevelArgument =
+        "--flowtab-tab-stress-runtime-log-level"
     static let shortcutEventInjectionArgument =
         "--flowtab-ui-enable-shortcut-event-injection"
     static let includeCurrentAppInMockInventoryArgument =
@@ -54,6 +56,12 @@ enum FlowTabTestLaunchOptions {
 
     static var argumentsOverrideForTesting: [String]?
     static var environmentOverrideForTesting: [String: String]?
+
+    private static let processArguments = ProcessInfo.processInfo.arguments
+    private static let processEnvironment = ProcessInfo.processInfo.environment
+    private static let processIsRunningUITests =
+        processEnvironment[uiTestingEnvironmentKey] == uiTestingEnvironmentValue
+        && processArguments.contains { uiTestArguments.contains($0) }
 
     private static let uiTestArguments: Set<String> = [
         "--flowtab-ui-ax-trusted",
@@ -96,11 +104,11 @@ enum FlowTabTestLaunchOptions {
     ]
 
     private static var arguments: [String] {
-        argumentsOverrideForTesting ?? ProcessInfo.processInfo.arguments
+        argumentsOverrideForTesting ?? processArguments
     }
 
     private static var environment: [String: String] {
-        environmentOverrideForTesting ?? ProcessInfo.processInfo.environment
+        environmentOverrideForTesting ?? processEnvironment
     }
 
     static var usesMockRuntimeProjection: Bool {
@@ -495,8 +503,17 @@ enum FlowTabTestLaunchOptions {
         arguments.contains("--flowtab-tab-stress")
     }
 
+    static var tabSwitchStressRuntimeLogLevelRawValue: String? {
+        guard runsTabSwitchStressTest else { return nil }
+        return value(after: tabSwitchStressRuntimeLogLevelArgument)
+    }
+
     static var isRunningUITests: Bool {
-        environment[uiTestingEnvironmentKey] == uiTestingEnvironmentValue
+        if argumentsOverrideForTesting == nil,
+           environmentOverrideForTesting == nil {
+            return processIsRunningUITests
+        }
+        return environment[uiTestingEnvironmentKey] == uiTestingEnvironmentValue
             && arguments.contains(where: { uiTestArguments.contains($0) })
     }
 

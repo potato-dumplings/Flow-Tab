@@ -5,15 +5,18 @@ ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 BUILD_ROOT="$ROOT_DIR/.build-local"
 HOST_ARCH="$(uname -m)"
 PROCESS_EXIT_OBSERVATION_PATH="${ROOT_DIR}/scripts/perf/lib/process-exit-observation.sh"
+TAB_SWITCH_EVIDENCE_PATH="${ROOT_DIR}/scripts/perf/lib/tab-switch-stress-evidence.sh"
 APP_TERMINATION_GRACE_MILLISECONDS=2000
 APP_TERMINATION_POLL_INTERVAL_SECONDS=0.1
 
 # shellcheck source=scripts/perf/lib/process-exit-observation.sh
 source "${PROCESS_EXIT_OBSERVATION_PATH}"
+# shellcheck source=scripts/perf/lib/tab-switch-stress-evidence.sh
+source "${TAB_SWITCH_EVIDENCE_PATH}"
 
 usage() {
   cat <<'EOF'
-Usage: ./scripts/perf/tab-switch-stress.sh [duration_seconds] [switch_interval_ms] [sample_interval_seconds] [--build-root <dir>] [--output-dir <dir>]
+Usage: ./scripts/perf/tab-switch-stress.sh [duration_seconds] [switch_interval_ms] [sample_interval_seconds] [--runtime-log-level <DEBUG|INFO|WARN|ERROR>] [--build-root <dir>] [--output-dir <dir>]
 
 Runs the tab-switch stress scenario and preserves its evidence.
 
@@ -26,6 +29,8 @@ Options:
   --build-root <dir>       Resolve DerivedData below this directory.
   --output-dir <dir>       New evidence directory. The leaf must not already exist.
                            Defaults to a unique directory under .build-local/tab-switch-stress/.
+  --runtime-log-level <DEBUG|INFO|WARN|ERROR>
+                           Runtime log level injected through TestingSupport (default: ERROR).
   -h, --help               Show this help.
 
 Outputs:
@@ -40,6 +45,8 @@ EOF
 OUTPUT_DIR=""
 HAS_CUSTOM_OUTPUT_DIR=false
 HAS_CUSTOM_BUILD_ROOT=false
+HAS_RUNTIME_LOG_LEVEL=false
+RUNTIME_LOG_LEVEL="ERROR"
 POSITIONAL_ARGS=()
 APP_PID=""
 APP_START_IDENTITY=""
@@ -53,12 +60,17 @@ SUMMARY_STATUS="null"
 SUMMARY_TEE_STATUS="null"
 SAMPLE_INDEX=0
 SAMPLING_FAILED=false
+EVIDENCE_PARSE_STATUS="null"
 
 write_status() {
   local final_exit_code="$1"
   local status_temp
   local app_exit_code_json="null"
   local sampling_failed_json="false"
+  local planned_switch_count_json="null"
+  local completed_switch_count_json="null"
+  local actual_elapsed_seconds_json="null"
+  local throughput_json="null"
 
   if [[ -z "$STATUS_FILE" ]]; then
     return 0
@@ -70,19 +82,38 @@ write_status() {
   if [[ "$SAMPLING_FAILED" == true ]]; then
     sampling_failed_json="true"
   fi
+  if [[ "$FLOWTAB_TAB_SWITCH_PLANNED_SWITCH_COUNT" =~ ^[0-9]+$ ]]; then
+    planned_switch_count_json="$FLOWTAB_TAB_SWITCH_PLANNED_SWITCH_COUNT"
+  fi
+  if [[ "$FLOWTAB_TAB_SWITCH_COMPLETED_SWITCH_COUNT" =~ ^[0-9]+$ ]]; then
+    completed_switch_count_json="$FLOWTAB_TAB_SWITCH_COMPLETED_SWITCH_COUNT"
+  fi
+  if [[ "$FLOWTAB_TAB_SWITCH_ACTUAL_ELAPSED_SECONDS" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+    actual_elapsed_seconds_json="$FLOWTAB_TAB_SWITCH_ACTUAL_ELAPSED_SECONDS"
+  fi
+  if [[ "$FLOWTAB_TAB_SWITCH_THROUGHPUT" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+    throughput_json="$FLOWTAB_TAB_SWITCH_THROUGHPUT"
+  fi
 
   status_temp="${STATUS_FILE}.tmp"
   {
     printf '{\n'
-    printf '  "schema_version": 1,\n'
+    printf '  "schema_version": 2,\n'
     printf '  "runner_kind": "tab_switch_stress",\n'
     printf '  "stage": "%s",\n' "$CURRENT_STAGE"
+    printf '  "runtime_log_level": "%s",\n' "$RUNTIME_LOG_LEVEL"
+    printf '  "completion_evidence": "%s",\n' "$FLOWTAB_TAB_SWITCH_EVIDENCE_CONDITION"
+    printf '  "planned_switch_count": %s,\n' "$planned_switch_count_json"
+    printf '  "completed_switch_count": %s,\n' "$completed_switch_count_json"
+    printf '  "actual_elapsed_seconds": %s,\n' "$actual_elapsed_seconds_json"
+    printf '  "throughput_switches_per_second": %s,\n' "$throughput_json"
     printf '  "final_exit_code": %s,\n' "$final_exit_code"
     printf '  "xcodebuild_exit_code": %s,\n' "$XCODEBUILD_STATUS"
     printf '  "build_log_exit_code": %s,\n' "$BUILD_TEE_STATUS"
     printf '  "app_exit_code": %s,\n' "$app_exit_code_json"
     printf '  "sampling_failed": %s,\n' "$sampling_failed_json"
     printf '  "sample_count": %s,\n' "$SAMPLE_INDEX"
+    printf '  "evidence_parse_exit_code": %s,\n' "$EVIDENCE_PARSE_STATUS"
     printf '  "summary_exit_code": %s,\n' "$SUMMARY_STATUS"
     printf '  "summary_log_exit_code": %s\n' "$SUMMARY_TEE_STATUS"
     printf '}\n'
@@ -210,6 +241,28 @@ while [[ $# -gt 0 ]]; do
       HAS_CUSTOM_OUTPUT_DIR=true
       shift
       ;;
+    --runtime-log-level)
+      if [[ "$HAS_RUNTIME_LOG_LEVEL" == true || $# -lt 2 || -z "$2" ]]; then
+        echo "--runtime-log-level requires one value and may only be specified once." >&2
+        exit 2
+      fi
+      RUNTIME_LOG_LEVEL="$(printf '%s' "$2" | LC_ALL=C tr '[:lower:]' '[:upper:]')"
+      HAS_RUNTIME_LOG_LEVEL=true
+      shift 2
+      ;;
+    --runtime-log-level=*)
+      if [[ "$HAS_RUNTIME_LOG_LEVEL" == true ]]; then
+        echo "--runtime-log-level may only be specified once." >&2
+        exit 2
+      fi
+      RUNTIME_LOG_LEVEL="$(printf '%s' "${1#*=}" | LC_ALL=C tr '[:lower:]' '[:upper:]')"
+      if [[ -z "$RUNTIME_LOG_LEVEL" ]]; then
+        echo "Missing value for --runtime-log-level." >&2
+        exit 2
+      fi
+      HAS_RUNTIME_LOG_LEVEL=true
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -232,6 +285,14 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+case "$RUNTIME_LOG_LEVEL" in
+  DEBUG|INFO|WARN|ERROR) ;;
+  *)
+    echo "Invalid --runtime-log-level value: $RUNTIME_LOG_LEVEL" >&2
+    exit 2
+    ;;
+esac
 
 if [[ ${#POSITIONAL_ARGS[@]} -gt 3 ]]; then
   echo "Expected at most three positional arguments." >&2
@@ -282,6 +343,12 @@ SUMMARY_FILE="$OUTPUT_DIR/summary.txt"
 BUILD_LOG="$OUTPUT_DIR/build.log"
 APP_LOG="$OUTPUT_DIR/app.log"
 STATUS_FILE="$OUTPUT_DIR/status.json"
+APP_HOME="$OUTPUT_DIR/home"
+
+if ! mkdir -p "$APP_HOME"; then
+  echo "Could not create isolated stress App home: $APP_HOME" >&2
+  exit 1
+fi
 
 printf 'sample_index,captured_at_utc,cpu_percent,rss_kb,mem_percent\n' >"$SAMPLES_FILE"
 
@@ -324,10 +391,13 @@ fi
 
 CURRENT_STAGE="sampling"
 echo "[2/3] Launching stress mode for ${DURATION_SECONDS}s (switch interval ${SWITCH_INTERVAL_MS}ms)..."
+HOME="$APP_HOME" \
+CFFIXED_USER_HOME="$APP_HOME" \
 "$APP_BIN" \
   --flowtab-tab-stress \
   --flowtab-tab-stress-duration "$DURATION_SECONDS" \
   --flowtab-tab-stress-interval-ms "$SWITCH_INTERVAL_MS" \
+  --flowtab-tab-stress-runtime-log-level "$RUNTIME_LOG_LEVEL" \
   >"$APP_LOG" 2>&1 &
 APP_PID=$!
 APP_REAPED=false
@@ -362,6 +432,13 @@ done
 
 reap_app
 
+set +e
+flowtab_tab_switch_parse_completion_evidence \
+  "$APP_LOG" \
+  "$RUNTIME_LOG_LEVEL"
+EVIDENCE_PARSE_STATUS=$?
+set -e
+
 echo "[3/3] Aggregating CPU / memory stats..."
 CURRENT_STAGE="aggregating"
 set +e
@@ -369,8 +446,14 @@ set +e
   printf 'Duration: %ss\n' "$DURATION_SECONDS"
   printf 'Switch interval: %sms\n' "$SWITCH_INTERVAL_MS"
   printf 'Sample interval: %ss\n' "$SAMPLE_INTERVAL_SECONDS"
+  printf 'Runtime log level: %s\n' "$RUNTIME_LOG_LEVEL"
   printf 'App exit status: %s\n' "$APP_EXIT_STATUS"
   printf 'Sampling status: %s\n' "$([[ "$SAMPLING_FAILED" == true ]] && printf failed || printf completed)"
+  printf 'Completion evidence: %s\n' "$FLOWTAB_TAB_SWITCH_EVIDENCE_CONDITION"
+  printf 'Planned switches: %s\n' "${FLOWTAB_TAB_SWITCH_PLANNED_SWITCH_COUNT:-unavailable}"
+  printf 'Completed switches: %s\n' "${FLOWTAB_TAB_SWITCH_COMPLETED_SWITCH_COUNT:-unavailable}"
+  printf 'Actual elapsed: %ss\n' "${FLOWTAB_TAB_SWITCH_ACTUAL_ELAPSED_SECONDS:-unavailable}"
+  printf 'Throughput: %s switches/s\n' "${FLOWTAB_TAB_SWITCH_THROUGHPUT:-unavailable}"
   printf 'Samples file: %s\n\n' "$SAMPLES_FILE"
 
   LC_ALL=C awk -F, '
@@ -480,6 +563,12 @@ fi
 if [[ "$SUMMARY_STATUS" -ne 0 ]]; then
   CURRENT_STAGE="summary_failed"
   exit "$SUMMARY_STATUS"
+fi
+
+if [[ "$EVIDENCE_PARSE_STATUS" -ne 0 ]]; then
+  CURRENT_STAGE="completion_evidence_${FLOWTAB_TAB_SWITCH_EVIDENCE_CONDITION}"
+  echo "Stress completion evidence is ${FLOWTAB_TAB_SWITCH_EVIDENCE_CONDITION}: $APP_LOG" >&2
+  exit 1
 fi
 
 CURRENT_STAGE="completed"

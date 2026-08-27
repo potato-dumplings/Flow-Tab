@@ -72,7 +72,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testRuntimeLogViewModelRunsOnlyWhileActiveAndReadsEveryActivation()
+    func testRuntimeLogViewModelUsesFullThenIncrementalReadsAcrossActivations()
         async
     {
         let source = ControlledRuntimeLogLinesSource()
@@ -175,7 +175,7 @@ extension FlowTabTests {
                 RuntimeLogReadRequest(
                     limit: DiagnosticsRefreshPolicy.runtimeLogs.lineLimit,
                     minimumLevel: .warning,
-                    usesSnapshot: false
+                    usesSnapshot: true
                 )
             ]
         )
@@ -184,7 +184,7 @@ extension FlowTabTests {
             description: "unmetCondition=secondActiveRuntimeLogLinesApplied"
         )
         viewModel.$lines
-            .filter { $0 == ["second-active"] }
+            .filter { $0 == ["first-active", "second-active"] }
             .prefix(1)
             .sink { _ in secondActiveLinesApplied.fulfill() }
             .store(in: &cancellables)
@@ -193,7 +193,10 @@ extension FlowTabTests {
             of: [secondActiveLinesApplied],
             timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
         )
-        XCTAssertEqual(viewModel.lines, ["second-active"])
+        XCTAssertEqual(
+            viewModel.lines,
+            ["first-active", "second-active"]
+        )
 
         viewModel.updateActivity(
             isActive: false,
@@ -310,7 +313,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testRuntimeLogViewModelReadsLatestConfiguredLineLimitOnEveryActivation()
+    func testRuntimeLogViewModelPresentsLatestConfiguredLineLimitAfterReentry()
         async throws
     {
         let fileManager = FileManager.default
@@ -543,7 +546,7 @@ extension FlowTabTests {
                 + "finalReadRequestCount=\(source.readRequestCount) "
                 + "hasObserver=\(source.hasObserver)"
         )
-        source.completeNextRead(with: ["fresh"])
+        source.completeNextRead(with: ["fresh"], mode: .full)
         await fulfillment(
             of: [freshLinesApplied],
             timeout: RuntimeLogObservationWatchdogPolicy.eventDelivery
@@ -572,6 +575,130 @@ extension FlowTabTests {
         source.emit(RuntimeLogChange(generation: 4, kind: .flushed))
         await Task.yield()
         XCTAssertEqual(source.readRequestCount, 2)
+    }
+
+    @MainActor
+    func testRuntimeLogViewModelKeepsOneReadAcrossOneHundredActivityCycles()
+        async
+    {
+        let source = ControlledRuntimeLogLinesSource()
+        let viewModel = RuntimeLogLinesViewModel(diagnostics: source)
+        let firstReadRequested = expectation(
+            description: "unmetCondition=firstLifecycleReadRequested"
+        )
+        let replacementReadRequested = expectation(
+            description: "unmetCondition=replacementLifecycleReadRequested"
+        )
+        source.onReadRequested = { requestCount in
+            if requestCount == 1 {
+                firstReadRequested.fulfill()
+            } else if requestCount == 2 {
+                replacementReadRequested.fulfill()
+            }
+        }
+
+        viewModel.updateActivity(isActive: true, minimumLevel: .debug)
+        await fulfillment(of: [firstReadRequested], timeout: 1)
+
+        for _ in 0..<100 {
+            viewModel.updateActivity(isActive: false, minimumLevel: .debug)
+            viewModel.updateActivity(isActive: true, minimumLevel: .debug)
+        }
+        await Task.yield()
+        XCTAssertEqual(source.readRequestCount, 1)
+        XCTAssertEqual(source.pendingReadCount, 1)
+
+        source.completeNextRead(with: ["cancelled-owner"])
+        await fulfillment(of: [replacementReadRequested], timeout: 1)
+        XCTAssertEqual(source.pendingReadCount, 1)
+        source.completeNextRead(with: ["current-owner"])
+        await Task.yield()
+        XCTAssertEqual(viewModel.lines, ["current-owner"])
+
+        viewModel.updateActivity(isActive: false, minimumLevel: .debug)
+    }
+
+    @MainActor
+    func testRuntimeLogViewModelDefersCachedCatchUpUntilReentrySettles()
+        async
+    {
+        let source = ControlledRuntimeLogLinesSource()
+        let viewModel = RuntimeLogLinesViewModel(
+            diagnostics: source,
+            refreshPolicy: DiagnosticsRefreshPolicy(
+                lineLimit: 300,
+                cachedReadDelayNanoseconds: 50_000_000
+            )
+        )
+        let initialReadRequested = expectation(
+            description: "unmetCondition=initialCachedRuntimeLogReadRequested"
+        )
+        let settledReadRequested = expectation(
+            description: "unmetCondition=settledRuntimeLogReadRequested"
+        )
+        source.onReadRequested = { requestCount in
+            if requestCount == 1 {
+                initialReadRequested.fulfill()
+            } else if requestCount == 2 {
+                settledReadRequested.fulfill()
+            }
+        }
+
+        viewModel.updateActivity(isActive: true, minimumLevel: .debug)
+        await fulfillment(of: [initialReadRequested], timeout: 1)
+        source.completeNextRead(with: ["cached"])
+        await Task.yield()
+        viewModel.updateActivity(isActive: false, minimumLevel: .debug)
+        source.emit(RuntimeLogChange(generation: 1, kind: .flushed))
+
+        for _ in 0..<100 {
+            viewModel.updateActivity(isActive: true, minimumLevel: .debug)
+            viewModel.updateActivity(isActive: false, minimumLevel: .debug)
+        }
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(source.readRequestCount, 1)
+
+        viewModel.updateActivity(isActive: true, minimumLevel: .debug)
+        await fulfillment(of: [settledReadRequested], timeout: 1)
+        source.completeNextRead(with: ["fresh"])
+        await Task.yield()
+        XCTAssertEqual(viewModel.lines, ["cached", "fresh"])
+        viewModel.updateActivity(isActive: false, minimumLevel: .debug)
+    }
+
+    @MainActor
+    func testRuntimeLogViewModelRetainsLastValidLinesAfterReadFailure()
+        async
+    {
+        let source = ControlledRuntimeLogLinesSource()
+        let viewModel = RuntimeLogLinesViewModel(diagnostics: source)
+        let firstReadRequested = expectation(
+            description: "unmetCondition=initialValidReadRequested"
+        )
+        let failingReadRequested = expectation(
+            description: "unmetCondition=failingIncrementalReadRequested"
+        )
+        source.onReadRequested = { requestCount in
+            if requestCount == 1 {
+                firstReadRequested.fulfill()
+            } else if requestCount == 2 {
+                failingReadRequested.fulfill()
+            }
+        }
+
+        viewModel.updateActivity(isActive: true, minimumLevel: .info)
+        await fulfillment(of: [firstReadRequested], timeout: 1)
+        source.completeNextRead(with: ["last-valid"])
+        await Task.yield()
+        XCTAssertEqual(viewModel.lines, ["last-valid"])
+
+        source.emit(RuntimeLogChange(generation: 1, kind: .flushed))
+        await fulfillment(of: [failingReadRequested], timeout: 1)
+        source.failNextRead()
+        await Task.yield()
+        XCTAssertEqual(viewModel.lines, ["last-valid"])
+
+        viewModel.updateActivity(isActive: false, minimumLevel: .info)
     }
 }
 
@@ -602,20 +729,32 @@ private final class ControlledRuntimeLogLinesSource:
         readRequests.count
     }
 
+    var pendingReadCount: Int {
+        pendingReads.count
+    }
+
     private let observerBox = RuntimeLogObserverBox()
-    private var pendingReads: [
-        CheckedContinuation<[String], Never>
-    ] = []
+    private struct PendingRead {
+        let continuation:
+            CheckedContinuation<RuntimeLogReadBatch, Error>
+        let requestGeneration: UInt64
+        let requestedSnapshot:
+            RuntimeLogFileStore.ReadSnapshot?
+    }
+
+    private var pendingReads: [PendingRead] = []
     private var generation: UInt64 = 0
+    private var snapshotOffset = 0
 
     var hasObserver: Bool {
         observerBox.hasObserver
     }
 
     func observeChanges(
+        kinds: Set<RuntimeLogChangeKind>,
         _ observer: @escaping (RuntimeLogChange) -> Void
     ) -> RuntimeLogChangeObservation {
-        observerBox.install(observer)
+        observerBox.install(kinds: kinds, observer)
         return RuntimeLogChangeObservation(
             baselineGeneration: generation
         ) { [observerBox] in
@@ -623,11 +762,11 @@ private final class ControlledRuntimeLogLinesSource:
         }
     }
 
-    func readRecentLines(
+    func readRecentBatch(
         limit: Int,
         minimumLevel: RuntimeLogLevel,
         since snapshot: RuntimeLogFileStore.ReadSnapshot?
-    ) async -> [String] {
+    ) async throws -> RuntimeLogReadBatch {
         readRequests.append(
             RuntimeLogReadRequest(
                 limit: limit,
@@ -636,8 +775,14 @@ private final class ControlledRuntimeLogLinesSource:
             )
         )
         onReadRequested?(readRequestCount)
-        return await withCheckedContinuation { continuation in
-            pendingReads.append(continuation)
+        return try await withCheckedThrowingContinuation { continuation in
+            pendingReads.append(
+                PendingRead(
+                    continuation: continuation,
+                    requestGeneration: generation,
+                    requestedSnapshot: snapshot
+                )
+            )
         }
     }
 
@@ -656,12 +801,44 @@ private final class ControlledRuntimeLogLinesSource:
         observerBox.emit(change)
     }
 
-    func completeNextRead(with lines: [String]) {
+    func completeNextRead(
+        with lines: [String],
+        mode: RuntimeLogReadMode? = nil
+    ) {
         guard !pendingReads.isEmpty else {
             return XCTFail("Missing pending runtime-log read")
         }
-        pendingReads.removeFirst().resume(returning: lines)
+        let pendingRead = pendingReads.removeFirst()
+        snapshotOffset += 1
+        pendingRead.continuation.resume(
+            returning: RuntimeLogReadBatch(
+                lines: lines,
+                snapshot: RuntimeLogFileStore.ReadSnapshot(
+                    fileOffsetsByPath: ["controlled.log": snapshotOffset],
+                    storageEpoch: 0
+                ),
+                coveredChangeGeneration:
+                    pendingRead.requestGeneration,
+                mode: mode
+                    ?? (pendingRead.requestedSnapshot == nil
+                        ? .full
+                        : .incremental)
+            )
+        )
     }
+
+    func failNextRead() {
+        guard !pendingReads.isEmpty else {
+            return XCTFail("Missing pending runtime-log read")
+        }
+        pendingReads.removeFirst().continuation.resume(
+            throwing: ControlledRuntimeLogReadError.failed
+        )
+    }
+}
+
+private enum ControlledRuntimeLogReadError: Error {
+    case failed
 }
 
 private struct RuntimeLogReadRequest: Equatable {
@@ -673,6 +850,7 @@ private struct RuntimeLogReadRequest: Equatable {
 private final class RuntimeLogObserverBox {
     private let lock = NSLock()
     private var observer: ((RuntimeLogChange) -> Void)?
+    private var observedKinds: Set<RuntimeLogChangeKind> = []
 
     var hasObserver: Bool {
         lock.lock()
@@ -680,8 +858,12 @@ private final class RuntimeLogObserverBox {
         return observer != nil
     }
 
-    func install(_ observer: @escaping (RuntimeLogChange) -> Void) {
+    func install(
+        kinds: Set<RuntimeLogChangeKind>,
+        _ observer: @escaping (RuntimeLogChange) -> Void
+    ) {
         lock.lock()
+        observedKinds = kinds
         self.observer = observer
         lock.unlock()
     }
@@ -689,12 +871,15 @@ private final class RuntimeLogObserverBox {
     func cancel() {
         lock.lock()
         observer = nil
+        observedKinds = []
         lock.unlock()
     }
 
     func emit(_ change: RuntimeLogChange) {
         lock.lock()
-        let callback = observer
+        let callback = observedKinds.contains(change.kind)
+            ? observer
+            : nil
         lock.unlock()
         callback?(change)
     }

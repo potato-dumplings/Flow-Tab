@@ -375,6 +375,8 @@
 		E6D100063D14000100B0D737 /* RuntimeFocusRecoveryPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D100053D14000100B0D737 /* RuntimeFocusRecoveryPolicy.swift */; };
 		E6D1000E3D14000100B0D737 /* RuntimeFocusRecoveryDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D1000D3D14000100B0D737 /* RuntimeFocusRecoveryDiagnostics.swift */; };
 		E7D100043D15000100B0D737 /* RuntimeLogChangeObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D100033D15000100B0D737 /* RuntimeLogChangeObservation.swift */; };
+		E8D100023D16000100B0D737 /* RuntimeLogFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D100013D16000100B0D737 /* RuntimeLogFileStore.swift */; };
+		E8D100043D16000100B0D737 /* RuntimeLogTailReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D100033D16000100B0D737 /* RuntimeLogTailReader.swift */; };
 		E9D100023D17000100B0D737 /* RuntimePermissionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D100013D17000100B0D737 /* RuntimePermissionObservation.swift */; };
 		E9D100043D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D100033D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift */; };
 		E9D100063D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D100053D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift */; };
@@ -513,6 +515,7 @@
 		E6D1000C3D14000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusRecoveryIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D1000B3D14000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusRecoveryIntegration.swift */; };
 		A5A100023DC0000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusVerificationPriority.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5A100013DC0000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusVerificationPriority.swift */; };
 		E7D100023D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D100013D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift */; };
+		E8D100063D16000100B0D737 /* FlowTabTests+RuntimeLogBatchReading.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D100053D16000100B0D737 /* FlowTabTests+RuntimeLogBatchReading.swift */; };
 		B10011102F76000100B0D737 /* FlowTabTests+HotkeyCoverageGaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001102F76000100B0D737 /* FlowTabTests+HotkeyCoverageGaps.swift */; };
 		B10011112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift */; };
 		B10011122F76000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001122F76000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerEntry.swift */; };
@@ -814,6 +817,8 @@
 		E6D100053D14000100B0D737 /* RuntimeFocusRecoveryPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeFocusRecoveryPolicy.swift; sourceTree = "<group>"; };
 		E6D1000D3D14000100B0D737 /* RuntimeFocusRecoveryDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeFocusRecoveryDiagnostics.swift; sourceTree = "<group>"; };
 		E7D100033D15000100B0D737 /* RuntimeLogChangeObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogChangeObservation.swift; sourceTree = "<group>"; };
+		E8D100013D16000100B0D737 /* RuntimeLogFileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogFileStore.swift; sourceTree = "<group>"; };
+		E8D100033D16000100B0D737 /* RuntimeLogTailReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogTailReader.swift; sourceTree = "<group>"; };
 		E9D100013D17000100B0D737 /* RuntimePermissionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimePermissionObservation.swift; sourceTree = "<group>"; };
 		E9D100033D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimePermissionObservationCoordinator.swift; sourceTree = "<group>"; };
 		E9D100053D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimePermissionObservation.swift"; sourceTree = "<group>"; };
@@ -954,6 +959,7 @@
 		E6D1000B3D14000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusRecoveryIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeFocusRecoveryIntegration.swift"; sourceTree = "<group>"; };
 		A5A100013DC0000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusVerificationPriority.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeFocusVerificationPriority.swift"; sourceTree = "<group>"; };
 		E7D100013D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimeLogObservation.swift"; sourceTree = "<group>"; };
+		E8D100053D16000100B0D737 /* FlowTabTests+RuntimeLogBatchReading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimeLogBatchReading.swift"; sourceTree = "<group>"; };
 		B10001102F76000100B0D737 /* FlowTabTests+HotkeyCoverageGaps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HotkeyCoverageGaps.swift"; sourceTree = "<group>"; };
 		B10001112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+CoverageGaps.swift"; sourceTree = "<group>"; };
 		B10001122F76000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+ManualWindowLayerEntry.swift"; sourceTree = "<group>"; };
@@ -1641,6 +1647,7 @@
 				E6D1000B3D14000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusRecoveryIntegration.swift */,
 				A5A100013DC0000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusVerificationPriority.swift */,
 				E7D100013D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift */,
+				E8D100053D16000100B0D737 /* FlowTabTests+RuntimeLogBatchReading.swift */,
 				E9D100053D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift */,
 				EAD100033D18000100B0D737 /* FlowTabTests+HomePermissionObservation.swift */,
 				EBD100033D19000100B0D737 /* FlowTabTests+HomeInitialProjectionObservation.swift */,
@@ -2082,6 +2089,8 @@
 				E6D100053D14000100B0D737 /* RuntimeFocusRecoveryPolicy.swift */,
 				E6D1000D3D14000100B0D737 /* RuntimeFocusRecoveryDiagnostics.swift */,
 				E7D100033D15000100B0D737 /* RuntimeLogChangeObservation.swift */,
+				E8D100013D16000100B0D737 /* RuntimeLogFileStore.swift */,
+				E8D100033D16000100B0D737 /* RuntimeLogTailReader.swift */,
 				E9D100013D17000100B0D737 /* RuntimePermissionObservation.swift */,
 				E9D100033D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift */,
 				D10000022FF500100B0D737 /* RuntimeProjectionService.swift */,
@@ -2629,6 +2638,8 @@
 				E6D100063D14000100B0D737 /* RuntimeFocusRecoveryPolicy.swift in Sources */,
 				E6D1000E3D14000100B0D737 /* RuntimeFocusRecoveryDiagnostics.swift in Sources */,
 				E7D100043D15000100B0D737 /* RuntimeLogChangeObservation.swift in Sources */,
+				E8D100023D16000100B0D737 /* RuntimeLogFileStore.swift in Sources */,
+				E8D100043D16000100B0D737 /* RuntimeLogTailReader.swift in Sources */,
 				D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */,
 				A0361F043E01000100B0D737 /* RuntimeProjectionService+ProjectionReads.swift in Sources */,
 				D10000032FF500200B0D737 /* RuntimeProjectionServing.swift in Sources */,
@@ -2879,6 +2890,7 @@
 				E6D1000C3D14000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusRecoveryIntegration.swift in Sources */,
 				A5A100023DC0000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusVerificationPriority.swift in Sources */,
 				E7D100023D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift in Sources */,
+				E8D100063D16000100B0D737 /* FlowTabTests+RuntimeLogBatchReading.swift in Sources */,
 				E9D100063D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift in Sources */,
 				EED100043D1C000100B0D737 /* FlowTabTests+TemporaryRegularActivationRestoration.swift in Sources */,
 				EAD100043D18000100B0D737 /* FlowTabTests+HomePermissionObservation.swift in Sources */,
