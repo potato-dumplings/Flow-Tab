@@ -22,24 +22,40 @@ extension RuntimeLogFileStore {
     }
 
     private func migrateLegacyLogsIfNeededLocked() throws {
-        let markerURL = logsDirectoryURL.appendingPathComponent(
+        let v1MarkerURL = logsDirectoryURL.appendingPathComponent(
             Self.privacyFormatMarkerFileName,
             isDirectory: false
         )
-        if fileManager.fileExists(atPath: markerURL.path) {
-            try secureFilePermissionsLocked(at: markerURL)
-            return
+        let v2MarkerURL = logsDirectoryURL.appendingPathComponent(
+            Self.privacyV2FormatMarkerFileName,
+            isDirectory: false
+        )
+
+        if fileManager.fileExists(atPath: v1MarkerURL.path) {
+            try secureFilePermissionsLocked(at: v1MarkerURL)
+        } else {
+            let existingURLs = try fileManager.contentsOfDirectory(
+                at: logsDirectoryURL,
+                includingPropertiesForKeys: nil
+            )
+            for url in existingURLs where url.pathExtension.lowercased() == "log" {
+                try fileManager.removeItem(at: url)
+            }
+            try createSecureFileLocked(
+                at: v1MarkerURL,
+                contents: Data("1\n".utf8)
+            )
+            activeLogURL = nil
         }
 
-        let existingURLs = try fileManager.contentsOfDirectory(
-            at: logsDirectoryURL,
-            includingPropertiesForKeys: nil
-        )
-        for url in existingURLs where url.pathExtension.lowercased() == "log" {
-            try fileManager.removeItem(at: url)
+        if fileManager.fileExists(atPath: v2MarkerURL.path) {
+            try secureFilePermissionsLocked(at: v2MarkerURL)
+        } else {
+            try createSecureFileLocked(
+                at: v2MarkerURL,
+                contents: Data("2\n".utf8)
+            )
         }
-        try createSecureFileLocked(at: markerURL, contents: Data("1\n".utf8))
-        activeLogURL = nil
     }
 
     private func enforcePrivateFilePermissionsLocked() throws {
@@ -53,6 +69,12 @@ extension RuntimeLogFileStore {
         privateURLs.append(
             logsDirectoryURL.appendingPathComponent(
                 Self.privacyFormatMarkerFileName,
+                isDirectory: false
+            )
+        )
+        privateURLs.append(
+            logsDirectoryURL.appendingPathComponent(
+                Self.privacyV2FormatMarkerFileName,
                 isDirectory: false
             )
         )

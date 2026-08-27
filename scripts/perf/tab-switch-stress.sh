@@ -6,6 +6,7 @@ BUILD_ROOT="$ROOT_DIR/.build-local"
 HOST_ARCH="$(uname -m)"
 PROCESS_EXIT_OBSERVATION_PATH="${ROOT_DIR}/scripts/perf/lib/process-exit-observation.sh"
 TAB_SWITCH_EVIDENCE_PATH="${ROOT_DIR}/scripts/perf/lib/tab-switch-stress-evidence.sh"
+RUNTIME_LOG_VOLUME_EVIDENCE_PATH="${ROOT_DIR}/scripts/perf/lib/runtime-log-volume-evidence.sh"
 APP_TERMINATION_GRACE_MILLISECONDS=2000
 APP_TERMINATION_POLL_INTERVAL_SECONDS=0.1
 
@@ -13,10 +14,12 @@ APP_TERMINATION_POLL_INTERVAL_SECONDS=0.1
 source "${PROCESS_EXIT_OBSERVATION_PATH}"
 # shellcheck source=scripts/perf/lib/tab-switch-stress-evidence.sh
 source "${TAB_SWITCH_EVIDENCE_PATH}"
+# shellcheck source=scripts/perf/lib/runtime-log-volume-evidence.sh
+source "${RUNTIME_LOG_VOLUME_EVIDENCE_PATH}"
 
 usage() {
   cat <<'EOF'
-Usage: ./scripts/perf/tab-switch-stress.sh [duration_seconds] [switch_interval_ms] [sample_interval_seconds] [--runtime-log-level <DEBUG|INFO|WARN|ERROR>] [--build-root <dir>] [--output-dir <dir>]
+Usage: ./scripts/perf/tab-switch-stress.sh [duration_seconds] [switch_interval_ms] [sample_interval_seconds] [--runtime-log-level <DEBUG|INFO|WARN|ERROR>] [--max-runtime-log-mb-per-minute <positive-decimal>] [--build-root <dir>] [--output-dir <dir>]
 
 Runs the tab-switch stress scenario and preserves its evidence.
 
@@ -31,6 +34,9 @@ Options:
                            Defaults to a unique directory under .build-local/tab-switch-stress/.
   --runtime-log-level <DEBUG|INFO|WARN|ERROR>
                            Runtime log level injected through TestingSupport (default: ERROR).
+  --max-runtime-log-mb-per-minute <positive-decimal>
+                           Fail when measured logical log writes exceed this budget.
+                           The budget gate is disabled by default.
   -h, --help               Show this help.
 
 Outputs:
@@ -46,7 +52,9 @@ OUTPUT_DIR=""
 HAS_CUSTOM_OUTPUT_DIR=false
 HAS_CUSTOM_BUILD_ROOT=false
 HAS_RUNTIME_LOG_LEVEL=false
+HAS_RUNTIME_LOG_BUDGET=false
 RUNTIME_LOG_LEVEL="ERROR"
+MAX_RUNTIME_LOG_MB_PER_MINUTE=""
 POSITIONAL_ARGS=()
 APP_PID=""
 APP_START_IDENTITY=""
@@ -61,6 +69,7 @@ SUMMARY_TEE_STATUS="null"
 SAMPLE_INDEX=0
 SAMPLING_FAILED=false
 EVIDENCE_PARSE_STATUS="null"
+RUNTIME_LOG_VOLUME_STATUS="null"
 
 write_status() {
   local final_exit_code="$1"
@@ -71,6 +80,15 @@ write_status() {
   local completed_switch_count_json="null"
   local actual_elapsed_seconds_json="null"
   local throughput_json="null"
+  local runtime_log_file_count_json="null"
+  local runtime_log_line_count_json="null"
+  local runtime_log_retained_bytes_json="null"
+  local runtime_log_bytes_per_second_json="null"
+  local runtime_log_megabytes_per_minute_json="null"
+  local runtime_log_bytes_per_switch_json="null"
+  local runtime_log_retention_minutes_json="null"
+  local runtime_log_budget_json="null"
+  local runtime_log_budget_satisfied_json="null"
 
   if [[ -z "$STATUS_FILE" ]]; then
     return 0
@@ -94,11 +112,39 @@ write_status() {
   if [[ "$FLOWTAB_TAB_SWITCH_THROUGHPUT" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
     throughput_json="$FLOWTAB_TAB_SWITCH_THROUGHPUT"
   fi
+  if [[ "$FLOWTAB_RUNTIME_LOG_FILE_COUNT" =~ ^[0-9]+$ ]]; then
+    runtime_log_file_count_json="$FLOWTAB_RUNTIME_LOG_FILE_COUNT"
+  fi
+  if [[ "$FLOWTAB_RUNTIME_LOG_LINE_COUNT" =~ ^[0-9]+$ ]]; then
+    runtime_log_line_count_json="$FLOWTAB_RUNTIME_LOG_LINE_COUNT"
+  fi
+  if [[ "$FLOWTAB_RUNTIME_LOG_RETAINED_BYTES" =~ ^[0-9]+$ ]]; then
+    runtime_log_retained_bytes_json="$FLOWTAB_RUNTIME_LOG_RETAINED_BYTES"
+  fi
+  if [[ "$FLOWTAB_RUNTIME_LOG_BYTES_PER_SECOND" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+    runtime_log_bytes_per_second_json="$FLOWTAB_RUNTIME_LOG_BYTES_PER_SECOND"
+  fi
+  if [[ "$FLOWTAB_RUNTIME_LOG_MEGABYTES_PER_MINUTE" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+    runtime_log_megabytes_per_minute_json="$FLOWTAB_RUNTIME_LOG_MEGABYTES_PER_MINUTE"
+  fi
+  if [[ "$FLOWTAB_RUNTIME_LOG_BYTES_PER_COMPLETED_SWITCH" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+    runtime_log_bytes_per_switch_json="$FLOWTAB_RUNTIME_LOG_BYTES_PER_COMPLETED_SWITCH"
+  fi
+  if [[ "$FLOWTAB_RUNTIME_LOG_ESTIMATED_20MB_RETENTION_MINUTES" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+    runtime_log_retention_minutes_json="$FLOWTAB_RUNTIME_LOG_ESTIMATED_20MB_RETENTION_MINUTES"
+  fi
+  if [[ "$MAX_RUNTIME_LOG_MB_PER_MINUTE" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+    runtime_log_budget_json="$MAX_RUNTIME_LOG_MB_PER_MINUTE"
+  fi
+  if [[ "$FLOWTAB_RUNTIME_LOG_BUDGET_SATISFIED" == true \
+    || "$FLOWTAB_RUNTIME_LOG_BUDGET_SATISFIED" == false ]]; then
+    runtime_log_budget_satisfied_json="$FLOWTAB_RUNTIME_LOG_BUDGET_SATISFIED"
+  fi
 
   status_temp="${STATUS_FILE}.tmp"
   {
     printf '{\n'
-    printf '  "schema_version": 2,\n'
+    printf '  "schema_version": 3,\n'
     printf '  "runner_kind": "tab_switch_stress",\n'
     printf '  "stage": "%s",\n' "$CURRENT_STAGE"
     printf '  "runtime_log_level": "%s",\n' "$RUNTIME_LOG_LEVEL"
@@ -107,6 +153,17 @@ write_status() {
     printf '  "completed_switch_count": %s,\n' "$completed_switch_count_json"
     printf '  "actual_elapsed_seconds": %s,\n' "$actual_elapsed_seconds_json"
     printf '  "throughput_switches_per_second": %s,\n' "$throughput_json"
+    printf '  "runtime_log_measurement": "%s",\n' "$FLOWTAB_RUNTIME_LOG_VOLUME_CONDITION"
+    printf '  "runtime_log_measurement_exit_code": %s,\n' "$RUNTIME_LOG_VOLUME_STATUS"
+    printf '  "runtime_log_file_count": %s,\n' "$runtime_log_file_count_json"
+    printf '  "runtime_log_line_count": %s,\n' "$runtime_log_line_count_json"
+    printf '  "runtime_log_retained_bytes": %s,\n' "$runtime_log_retained_bytes_json"
+    printf '  "runtime_log_bytes_per_second": %s,\n' "$runtime_log_bytes_per_second_json"
+    printf '  "runtime_log_megabytes_per_minute": %s,\n' "$runtime_log_megabytes_per_minute_json"
+    printf '  "runtime_log_bytes_per_completed_switch": %s,\n' "$runtime_log_bytes_per_switch_json"
+    printf '  "runtime_log_estimated_20mb_retention_minutes": %s,\n' "$runtime_log_retention_minutes_json"
+    printf '  "max_runtime_log_mb_per_minute": %s,\n' "$runtime_log_budget_json"
+    printf '  "runtime_log_budget_satisfied": %s,\n' "$runtime_log_budget_satisfied_json"
     printf '  "final_exit_code": %s,\n' "$final_exit_code"
     printf '  "xcodebuild_exit_code": %s,\n' "$XCODEBUILD_STATUS"
     printf '  "build_log_exit_code": %s,\n' "$BUILD_TEE_STATUS"
@@ -263,6 +320,28 @@ while [[ $# -gt 0 ]]; do
       HAS_RUNTIME_LOG_LEVEL=true
       shift
       ;;
+    --max-runtime-log-mb-per-minute)
+      if [[ "$HAS_RUNTIME_LOG_BUDGET" == true || $# -lt 2 || -z "$2" ]]; then
+        echo "--max-runtime-log-mb-per-minute requires one value and may only be specified once." >&2
+        exit 2
+      fi
+      MAX_RUNTIME_LOG_MB_PER_MINUTE="$2"
+      HAS_RUNTIME_LOG_BUDGET=true
+      shift 2
+      ;;
+    --max-runtime-log-mb-per-minute=*)
+      if [[ "$HAS_RUNTIME_LOG_BUDGET" == true ]]; then
+        echo "--max-runtime-log-mb-per-minute may only be specified once." >&2
+        exit 2
+      fi
+      MAX_RUNTIME_LOG_MB_PER_MINUTE="${1#*=}"
+      if [[ -z "$MAX_RUNTIME_LOG_MB_PER_MINUTE" ]]; then
+        echo "Missing value for --max-runtime-log-mb-per-minute." >&2
+        exit 2
+      fi
+      HAS_RUNTIME_LOG_BUDGET=true
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -294,6 +373,17 @@ case "$RUNTIME_LOG_LEVEL" in
     ;;
 esac
 
+if [[ -n "$MAX_RUNTIME_LOG_MB_PER_MINUTE" ]] \
+  && ! flowtab_runtime_log_is_positive_decimal "$MAX_RUNTIME_LOG_MB_PER_MINUTE"; then
+  echo "Invalid --max-runtime-log-mb-per-minute value: $MAX_RUNTIME_LOG_MB_PER_MINUTE" >&2
+  exit 2
+fi
+if [[ -n "$MAX_RUNTIME_LOG_MB_PER_MINUTE" ]]; then
+  MAX_RUNTIME_LOG_MB_PER_MINUTE="$({
+    flowtab_runtime_log_normalize_decimal "$MAX_RUNTIME_LOG_MB_PER_MINUTE"
+  })"
+fi
+
 if [[ ${#POSITIONAL_ARGS[@]} -gt 3 ]]; then
   echo "Expected at most three positional arguments." >&2
   usage >&2
@@ -304,6 +394,7 @@ DURATION_SECONDS="${POSITIONAL_ARGS[0]:-30}"
 SWITCH_INTERVAL_MS="${POSITIONAL_ARGS[1]:-20}"
 SAMPLE_INTERVAL_SECONDS="${POSITIONAL_ARGS[2]:-0.5}"
 DERIVED_DATA_DIR="${BUILD_ROOT}/DerivedData"
+SOURCE_PACKAGES_DIR="${BUILD_ROOT}/source-packages"
 APP_BIN="$DERIVED_DATA_DIR/Build/Products/Testing/Flow Tab.app/Contents/MacOS/FlowTab"
 
 if [[ "$HAS_CUSTOM_OUTPUT_DIR" == true ]]; then
@@ -364,6 +455,7 @@ xcodebuild \
   -destination "platform=macOS,arch=${HOST_ARCH}" \
   -sdk macosx \
   -derivedDataPath "$DERIVED_DATA_DIR" \
+  -clonedSourcePackagesDirPath "$SOURCE_PACKAGES_DIR" \
   CODE_SIGNING_ALLOWED=NO \
   build 2>&1 | tee "$BUILD_LOG"
 build_pipeline_status=("${PIPESTATUS[@]}")
@@ -439,6 +531,24 @@ flowtab_tab_switch_parse_completion_evidence \
 EVIDENCE_PARSE_STATUS=$?
 set -e
 
+RUNTIME_LOGS_DIRECTORY="${APP_HOME}/Library/Application Support/FlowTab/logs"
+if [[ "$EVIDENCE_PARSE_STATUS" -eq 0 ]]; then
+  set +e
+  flowtab_runtime_log_measure_volume \
+    "$RUNTIME_LOGS_DIRECTORY" \
+    "$FLOWTAB_TAB_SWITCH_ACTUAL_ELAPSED_SECONDS" \
+    "$FLOWTAB_TAB_SWITCH_COMPLETED_SWITCH_COUNT" \
+    20 \
+    "$MAX_RUNTIME_LOG_MB_PER_MINUTE"
+  RUNTIME_LOG_VOLUME_STATUS=$?
+  set -e
+else
+  flowtab_runtime_log_reset_volume_evidence
+  FLOWTAB_RUNTIME_LOG_VOLUME_CONDITION="completion_evidence_unavailable"
+  FLOWTAB_RUNTIME_LOG_BUDGET_MB_PER_MINUTE="$MAX_RUNTIME_LOG_MB_PER_MINUTE"
+  RUNTIME_LOG_VOLUME_STATUS=1
+fi
+
 echo "[3/3] Aggregating CPU / memory stats..."
 CURRENT_STAGE="aggregating"
 set +e
@@ -454,6 +564,17 @@ set +e
   printf 'Completed switches: %s\n' "${FLOWTAB_TAB_SWITCH_COMPLETED_SWITCH_COUNT:-unavailable}"
   printf 'Actual elapsed: %ss\n' "${FLOWTAB_TAB_SWITCH_ACTUAL_ELAPSED_SECONDS:-unavailable}"
   printf 'Throughput: %s switches/s\n' "${FLOWTAB_TAB_SWITCH_THROUGHPUT:-unavailable}"
+  printf 'Runtime log measurement: %s\n' "$FLOWTAB_RUNTIME_LOG_VOLUME_CONDITION"
+  printf 'Runtime log measurement exit status: %s\n' "$RUNTIME_LOG_VOLUME_STATUS"
+  printf 'Runtime log files: %s\n' "${FLOWTAB_RUNTIME_LOG_FILE_COUNT:-unavailable}"
+  printf 'Runtime log lines: %s\n' "${FLOWTAB_RUNTIME_LOG_LINE_COUNT:-unavailable}"
+  printf 'Runtime log retained bytes: %s\n' "${FLOWTAB_RUNTIME_LOG_RETAINED_BYTES:-unavailable}"
+  printf 'Runtime log write rate: %s bytes/s\n' "${FLOWTAB_RUNTIME_LOG_BYTES_PER_SECOND:-unavailable}"
+  printf 'Runtime log write volume: %s MB/min\n' "${FLOWTAB_RUNTIME_LOG_MEGABYTES_PER_MINUTE:-unavailable}"
+  printf 'Runtime log bytes/completed switch: %s\n' "${FLOWTAB_RUNTIME_LOG_BYTES_PER_COMPLETED_SWITCH:-unavailable}"
+  printf 'Estimated 20 MB retention: %s minutes\n' "${FLOWTAB_RUNTIME_LOG_ESTIMATED_20MB_RETENTION_MINUTES:-unbounded}"
+  printf 'Runtime log budget: %s MB/min\n' "${FLOWTAB_RUNTIME_LOG_BUDGET_MB_PER_MINUTE:-disabled}"
+  printf 'Runtime log budget satisfied: %s\n' "${FLOWTAB_RUNTIME_LOG_BUDGET_SATISFIED:-not-enabled}"
   printf 'Samples file: %s\n\n' "$SAMPLES_FILE"
 
   LC_ALL=C awk -F, '
@@ -568,6 +689,20 @@ fi
 if [[ "$EVIDENCE_PARSE_STATUS" -ne 0 ]]; then
   CURRENT_STAGE="completion_evidence_${FLOWTAB_TAB_SWITCH_EVIDENCE_CONDITION}"
   echo "Stress completion evidence is ${FLOWTAB_TAB_SWITCH_EVIDENCE_CONDITION}: $APP_LOG" >&2
+  exit 1
+fi
+
+if [[ "$RUNTIME_LOG_VOLUME_STATUS" -ne 0 ]]; then
+  if [[ "$FLOWTAB_RUNTIME_LOG_VOLUME_CONDITION" == capacity_saturated ]]; then
+    CURRENT_STAGE="runtime_log_capacity_saturated"
+    echo "Runtime-log volume reached the 20-file retention boundary; cumulative writes cannot be proven." >&2
+  elif [[ "$FLOWTAB_RUNTIME_LOG_VOLUME_CONDITION" == measurement_failed ]]; then
+    CURRENT_STAGE="runtime_log_measurement_failed"
+    echo "Runtime-log volume measurement failed: $RUNTIME_LOGS_DIRECTORY" >&2
+  else
+    CURRENT_STAGE="runtime_log_budget_exceeded"
+    echo "Runtime-log write volume exceeded ${MAX_RUNTIME_LOG_MB_PER_MINUTE} MB/min." >&2
+  fi
   exit 1
 fi
 

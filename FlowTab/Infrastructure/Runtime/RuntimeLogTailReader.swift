@@ -14,11 +14,19 @@ protocol RuntimeLogTailReading: AnyObject {
 
 final class RuntimeLogTailReader: RuntimeLogTailReading {
     static let defaultChunkSizeBytes = 64 * 1_024
+    private static let expandedLineCacheCapacity = 512
 
     private let chunkSizeBytes: Int
+    private let privacyCodec: RuntimeLogPrivacyCodec
+    private var expandedLinesByStoredLine: [String: String] = [:]
+    private var expandedLineInsertionOrder: [String] = []
 
-    init(chunkSizeBytes: Int = defaultChunkSizeBytes) {
+    init(
+        chunkSizeBytes: Int = defaultChunkSizeBytes,
+        privacyCodec: RuntimeLogPrivacyCodec = RuntimeLogPrivacyCodec()
+    ) {
         self.chunkSizeBytes = max(1, chunkSizeBytes)
+        self.privacyCodec = privacyCodec
     }
 
     func readLines(
@@ -33,9 +41,10 @@ final class RuntimeLogTailReader: RuntimeLogTailReading {
         guard limit > 0 else { return [] }
         try cancellation.checkCancellation()
 
+        let selectedLines: [String]
         switch mode {
         case .full:
-            return try readLatestLines(
+            selectedLines = try readLatestLines(
                 from: fileURLsNewestFirst,
                 limit: limit,
                 minimumLevel: minimumLevel,
@@ -44,7 +53,7 @@ final class RuntimeLogTailReader: RuntimeLogTailReading {
             )
         case .incremental:
             guard let previousSnapshot else { return [] }
-            return try readIncrementalLines(
+            selectedLines = try readIncrementalLines(
                 from: fileURLsNewestFirst,
                 limit: limit,
                 minimumLevel: minimumLevel,
@@ -53,6 +62,46 @@ final class RuntimeLogTailReader: RuntimeLogTailReading {
                 cancellation: cancellation
             )
         }
+        try cancellation.checkCancellation()
+        return try expandForDisplay(
+            selectedLines,
+            cancellation: cancellation
+        )
+    }
+
+    private func expandForDisplay(
+        _ storedLines: [String],
+        cancellation: RuntimeLogReadCancellation
+    ) throws -> [String] {
+        var expandedLines: [String] = []
+        expandedLines.reserveCapacity(storedLines.count)
+
+        for storedLine in storedLines {
+            try cancellation.checkCancellation()
+            if let cachedLine = expandedLinesByStoredLine[storedLine] {
+                expandedLines.append(cachedLine)
+                continue
+            }
+
+            let expandedLine = privacyCodec.expandLineForDisplay(storedLine)
+            expandedLinesByStoredLine[storedLine] = expandedLine
+            expandedLineInsertionOrder.append(storedLine)
+            expandedLines.append(expandedLine)
+            trimExpandedLineCacheIfNeeded()
+        }
+        try cancellation.checkCancellation()
+        return expandedLines
+    }
+
+    private func trimExpandedLineCacheIfNeeded() {
+        let overflow = expandedLineInsertionOrder.count
+            - Self.expandedLineCacheCapacity
+        guard overflow > 0 else { return }
+
+        for storedLine in expandedLineInsertionOrder.prefix(overflow) {
+            expandedLinesByStoredLine.removeValue(forKey: storedLine)
+        }
+        expandedLineInsertionOrder.removeFirst(overflow)
     }
 
     private func readLatestLines(
@@ -380,6 +429,15 @@ final class RuntimeLogTailReader: RuntimeLogTailReading {
         guard levelEnd < bytes.count else { return .info }
 
         let levelLength = levelEnd - levelStart
+        if levelLength == 1 {
+            switch bytes[levelStart] {
+            case 0x44: return .debug
+            case 0x49: return .info
+            case 0x57: return .warning
+            case 0x45: return .error
+            default: return .info
+            }
+        }
         if levelLength == 5,
            bytes[levelStart] == 0x44,
            bytes[levelStart + 1] == 0x45,

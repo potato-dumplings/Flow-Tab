@@ -306,7 +306,7 @@ swift test
 - 页面生命周期相关状态管理（如 `onAppear` / `onDisappear` / `@StateObject` 保活策略）
 - 日志页展示、诊断会话或持久化日志清理逻辑
 
-压测命令（参数分别为：持续秒数、切换间隔毫秒、采样间隔秒）。每个组合运行三次，以中位数比较；脚本默认使用 `ERROR`，并把运行时日志等级、计划/完成切换数、实际耗时和吞吐写入 `summary.txt` 与 schema v2 `status.json`。
+压测命令（参数分别为：持续秒数、切换间隔毫秒、采样间隔秒）。每个组合运行三次，以中位数比较；脚本默认使用 `ERROR`。`summary.txt` 与 schema v3 `status.json` 记录运行时日志等级、计划/完成切换数、实际耗时、吞吐、日志文件数、行数、保留字节数、bytes/s、MB/min、bytes/完成切换，以及估算的 20 MB 保留时长。
 
 ```bash
 ./scripts/perf/tab-switch-stress.sh 20 20 0.5 --runtime-log-level ERROR
@@ -316,11 +316,25 @@ swift test
 DEBUG 配对命令：
 
 ```bash
-./scripts/perf/tab-switch-stress.sh 20 20 0.5 --runtime-log-level DEBUG
-./scripts/perf/tab-switch-stress.sh 20 50 0.5 --runtime-log-level DEBUG
+./scripts/perf/tab-switch-stress.sh 20 20 0.5 \
+  --runtime-log-level DEBUG \
+  --max-runtime-log-mb-per-minute 2.0
+./scripts/perf/tab-switch-stress.sh 20 50 0.5 \
+  --runtime-log-level DEBUG \
+  --max-runtime-log-mb-per-minute 2.0
 ```
 
-每次运行必须出现唯一且自洽的 `phase=completed` 完成证据，计划数与完成数须分别精确达到 `1000`（20ms）和 `400`（50ms），应用退出码须为 `0`。脚本把压测 App 的 HOME 隔离在当次输出目录；完整证据统一保存在 `.build-local/runtime-log-debug-fix/`。
+低交互强度 DEBUG 补充门：
+
+```bash
+./scripts/perf/tab-switch-stress.sh 60 1000 0.5 \
+  --runtime-log-level DEBUG \
+  --max-runtime-log-mb-per-minute 0.25
+```
+
+每次运行必须出现唯一且自洽的 `phase=completed` 完成证据，计划数与完成数须分别精确达到 `1000`（20ms）和 `400`（50ms），应用退出码须为 `0`。`--max-runtime-log-mb-per-minute` 接受正十进制值，缺省时只测量而不启用预算门。
+
+逻辑写入量以当次隔离 HOME 内所有 `.log` 文件的保留字节数除以完成证据中的实际耗时计算，覆盖 FlowTab 可控制的应用写入。日志目录缺失计为零；统计失败、达到 `20` 个保留文件或超过显式预算都会使运行失败。SSD 控制器写放大和系统其他进程写入属于设备侧独立指标。完整证据统一保存在 `.build-local/runtime-log-write-volume-fix/`。
 
 Logs 页同等级重新进入时先显示缓存，并在页面连续可见 `100 ms` 后增量补齐；压力测试中的瞬时往返会取消尚未开始的读取，页面稳定后仍呈现最新 `300` 条匹配日志。
 
@@ -619,7 +633,7 @@ gh release create "${TAG}" \
 
 持久化日志遵循以下隐私边界：
 
-- 消息正文和字段值统一转换为类型、长度、计数及安装本地稳定指纹；窗口标题、搜索词、浏览器标签标题和应用路径不会原样落盘。
+- 消息正文、事件文本、字段名和字段值统一转换为类型、长度、计数及安装本地稳定指纹；窗口标题、搜索词、浏览器标签标题和应用路径不会原样落盘。
 - 日志等级直接决定写入的最低事件等级；选择 `DEBUG` 或 `INFO` 时会持续写入对应的高频脱敏事件。
 - `FlowTab/logs` 目录权限固定为 `0700`，日志、隐私格式标记和指纹密钥权限固定为 `0600`。
 - “清空日志”会等待存储队列删除全部日志文件；之后的读取与应用重启都不会恢复已清除内容。

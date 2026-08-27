@@ -531,8 +531,15 @@ extension FlowTabUITests {
                 "flowtab.logs.diagnostic-session"
             ].exists
         )
+        let persistedDiskFingerprints = try persistedFingerprints.map {
+            try XCTUnwrap(runtimeLogDiskFingerprint(fromHex: $0))
+        }
         let diskContentsBeforeClear = runtimeLogContents()
-        XCTAssertTrue(persistedFingerprints.allSatisfy { diskContentsBeforeClear.contains($0) })
+        XCTAssertTrue(
+            persistedDiskFingerprints.allSatisfy {
+                diskContentsBeforeClear.contains($0)
+            }
+        )
 
         assertLogVisibilityTransition(
             in: app,
@@ -567,7 +574,11 @@ extension FlowTabUITests {
         )
 
         let clearedDiskContents = runtimeLogContents()
-        XCTAssertTrue(persistedFingerprints.allSatisfy { !clearedDiskContents.contains($0) })
+        XCTAssertTrue(
+            persistedDiskFingerprints.allSatisfy {
+                !clearedDiskContents.contains($0)
+            }
+        )
 
         let sourceTermination = terminateFlowTabUITestApplication(
             app,
@@ -591,7 +602,11 @@ extension FlowTabUITests {
             openLogsTab(in: relaunchedApp)
         }
         let relaunchedDiskContents = runtimeLogContents()
-        XCTAssertTrue(persistedFingerprints.allSatisfy { !relaunchedDiskContents.contains($0) })
+        XCTAssertTrue(
+            persistedDiskFingerprints.allSatisfy {
+                !relaunchedDiskContents.contains($0)
+            }
+        )
     }
 
     func testLogsPageRespectsRuntimeLogLevelVisibility() throws {
@@ -779,6 +794,25 @@ extension FlowTabUITests {
             "YES"
         ]
         return arguments
+    }
+
+    private func runtimeLogDiskFingerprint(fromHex fingerprint: String) -> String? {
+        guard fingerprint.count == 24 else { return nil }
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(12)
+        var cursor = fingerprint.startIndex
+        while cursor < fingerprint.endIndex {
+            let next = fingerprint.index(cursor, offsetBy: 2)
+            guard let byte = UInt8(fingerprint[cursor..<next], radix: 16) else {
+                return nil
+            }
+            bytes.append(byte)
+            cursor = next
+        }
+        return Data(bytes).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
     }
 
 }

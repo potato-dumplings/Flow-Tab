@@ -104,6 +104,7 @@ final class RuntimeDiagnostics: RuntimeLogLinesProviding {
 
     private let fileStore: RuntimeLogFileStore
     private let privacyFormatter: RuntimeLogPrivacyFormatter
+    private let privacyCodec = RuntimeLogPrivacyCodec()
 #if FLOWTAB_TESTING
     private let usesUnredactedMessages: Bool
 #endif
@@ -129,17 +130,28 @@ final class RuntimeDiagnostics: RuntimeLogLinesProviding {
 
     func log(level: RuntimeLogLevel, category: String, message: String) {
         let timestamp = Date()
-        let persistedMessage: String
 #if FLOWTAB_TESTING
-        persistedMessage = usesUnredactedMessages
-            ? message
-            : privacyFormatter.redact(message)
+        if usesUnredactedMessages {
+            let displayLine = "[\(Self.formattedTimestamp(timestamp))] "
+                + "[\(level.rawValue)] [\(category)] \(message)"
+            fileStore.append(displayLine)
+            return
+        }
+        let persistedLine = privacyCodec.encodeLine(
+            timestamp: Self.formattedTimestamp(timestamp),
+            level: level,
+            category: category,
+            envelope: privacyFormatter.makeEnvelope(for: message)
+        )
 #else
-        persistedMessage = privacyFormatter.redact(message)
+        let persistedLine = privacyCodec.encodeLine(
+            timestamp: Self.formattedTimestamp(timestamp),
+            level: level,
+            category: category,
+            envelope: privacyFormatter.makeEnvelope(for: message)
+        )
 #endif
-        let displayLine = "[\(Self.formattedTimestamp(timestamp))] "
-            + "[\(level.rawValue)] [\(category)] \(persistedMessage)"
-        fileStore.append(displayLine)
+        fileStore.append(persistedLine)
     }
 
     func makeReadSnapshot() async -> RuntimeLogFileStore.ReadSnapshot {

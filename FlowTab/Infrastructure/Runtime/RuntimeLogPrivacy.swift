@@ -1,6 +1,66 @@
 import CryptoKit
 import Foundation
 
+struct RuntimeLogPrivacyEnvelope: Equatable {
+    struct ValueMetadata: Equatable {
+        let length: Int
+        let count: Int
+        let fingerprint: Data
+    }
+
+    struct Field: Equatable {
+        let name: ValueMetadata
+        let valueType: ValueType
+        let value: ValueMetadata
+    }
+
+    enum ValueType: String, CaseIterable {
+        case text
+        case searchText = "search-text"
+        case browserTabTitle = "browser-tab-title"
+        case windowTitle = "window-title"
+        case filePath = "file-path"
+        case url
+        case applicationIdentifier = "application-identifier"
+        case errorText = "error-text"
+        case identifier
+
+        var code: Character {
+            switch self {
+            case .text: return "t"
+            case .searchText: return "s"
+            case .browserTabTitle: return "b"
+            case .windowTitle: return "w"
+            case .filePath: return "p"
+            case .url: return "u"
+            case .applicationIdentifier: return "a"
+            case .errorText: return "e"
+            case .identifier: return "i"
+            }
+        }
+
+        init?(code: Substring) {
+            guard code.count == 1, let character = code.first else { return nil }
+            switch character {
+            case "t": self = .text
+            case "s": self = .searchText
+            case "b": self = .browserTabTitle
+            case "w": self = .windowTitle
+            case "p": self = .filePath
+            case "u": self = .url
+            case "a": self = .applicationIdentifier
+            case "e": self = .errorText
+            case "i": self = .identifier
+            default: return nil
+            }
+        }
+    }
+
+    let message: ValueMetadata
+    let event: ValueMetadata?
+    let fields: [Field]
+}
+
 struct RuntimeLogPrivacyFormatter {
     private struct Field {
         let key: String
@@ -17,42 +77,42 @@ struct RuntimeLogPrivacyFormatter {
         key = SymmetricKey(data: keyData)
     }
 
-    func redact(_ message: String) -> String {
+    func makeEnvelope(for message: String) -> RuntimeLogPrivacyEnvelope {
         let parsedMessage = parseMessage(message)
         let fields = parsedMessage.fields
-        var tokens = [
-            "message.type=structured",
-            "message.length=\(message.count)",
-            "message.fieldCount=\(fields.count)",
-            "message.fingerprint=\(stableFingerprint(for: message))"
-        ]
-
+        let event: RuntimeLogPrivacyEnvelope.ValueMetadata?
         if let firstFieldRange = parsedMessage.firstFieldRange {
             let eventText = String(message[..<firstFieldRange.lowerBound])
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if !eventText.isEmpty {
-                tokens.append(contentsOf: metadataTokens(prefix: "event", value: eventText, type: "event"))
+                event = metadata(for: eventText)
+            } else {
+                event = nil
             }
         } else if !message.isEmpty {
-            tokens.append(contentsOf: metadataTokens(prefix: "event", value: message, type: "event"))
+            event = metadata(for: message)
+        } else {
+            event = nil
         }
 
-        for (index, field) in fields.enumerated() {
+        let protectedFields = fields.map { field in
             let value = normalizedValue(field.value)
-            let prefix = "field\(index)"
-            tokens.append(contentsOf: metadataTokens(
-                prefix: "\(prefix).name",
-                value: field.key,
-                type: "field-name"
-            ))
-            tokens.append(contentsOf: metadataTokens(
-                prefix: "\(prefix).value",
-                value: value,
-                type: privacyType(for: field.key)
-            ))
+            return RuntimeLogPrivacyEnvelope.Field(
+                name: metadata(for: field.key),
+                valueType: privacyType(for: field.key),
+                value: metadata(for: value)
+            )
         }
 
-        return tokens.joined(separator: " ")
+        return RuntimeLogPrivacyEnvelope(
+            message: RuntimeLogPrivacyEnvelope.ValueMetadata(
+                length: message.count,
+                count: protectedFields.count,
+                fingerprint: stableFingerprintData(for: message)
+            ),
+            event: event,
+            fields: protectedFields
+        )
     }
 
     private func parseMessage(
@@ -89,34 +149,36 @@ struct RuntimeLogPrivacyFormatter {
         return trimmed
     }
 
-    private func privacyType(for key: String) -> String {
+    private func privacyType(
+        for key: String
+    ) -> RuntimeLogPrivacyEnvelope.ValueType {
         let normalized = key.lowercased()
         if normalized.contains("query")
             || normalized.contains("search")
             || normalized.contains("term")
             || normalized.contains("compact") {
-            return "search-text"
+            return .searchText
         }
         if normalized.contains("tab") && normalized.contains("title") {
-            return "browser-tab-title"
+            return .browserTabTitle
         }
         if normalized.contains("title") {
-            return "window-title"
+            return .windowTitle
         }
         if normalized.contains("path") || normalized.contains("executable") {
-            return "file-path"
+            return .filePath
         }
         if normalized.contains("url") {
-            return "url"
+            return .url
         }
         if normalized.contains("bundle") || normalized.hasSuffix("appid") {
-            return "application-identifier"
+            return .applicationIdentifier
         }
         if normalized.contains("tab") {
-            return "browser-tab-title"
+            return .browserTabTitle
         }
         if normalized.contains("error") || normalized.contains("description") {
-            return "error-text"
+            return .errorText
         }
         if normalized.contains("identifier")
             || normalized.contains("identity")
@@ -124,18 +186,19 @@ struct RuntimeLogPrivacyFormatter {
             || key == "id"
             || key.hasSuffix("ID")
             || key.hasSuffix("IDs") {
-            return "identifier"
+            return .identifier
         }
-        return "text"
+        return .text
     }
 
-    private func metadataTokens(prefix: String, value: String, type: String) -> [String] {
-        [
-            "\(prefix).type=\(type)",
-            "\(prefix).length=\(value.count)",
-            "\(prefix).count=\(itemCount(in: value))",
-            "\(prefix).fingerprint=\(stableFingerprint(for: value))"
-        ]
+    private func metadata(
+        for value: String
+    ) -> RuntimeLogPrivacyEnvelope.ValueMetadata {
+        RuntimeLogPrivacyEnvelope.ValueMetadata(
+            length: value.count,
+            count: itemCount(in: value),
+            fingerprint: stableFingerprintData(for: value)
+        )
     }
 
     private func itemCount(in value: String) -> Int {
@@ -144,10 +207,16 @@ struct RuntimeLogPrivacyFormatter {
     }
 
     func stableFingerprint(for value: String) -> String {
+        stableFingerprintData(for: value).map {
+            String(format: "%02x", $0)
+        }.joined()
+    }
+
+    private func stableFingerprintData(for value: String) -> Data {
         let authenticationCode = HMAC<SHA256>.authenticationCode(
             for: Data(value.utf8),
             using: key
         )
-        return authenticationCode.prefix(12).map { String(format: "%02x", $0) }.joined()
+        return Data(authenticationCode.prefix(12))
     }
 }

@@ -516,6 +516,7 @@
 		A5A100023DC0000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusVerificationPriority.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5A100013DC0000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusVerificationPriority.swift */; };
 		E7D100023D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D100013D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift */; };
 		E8D100063D16000100B0D737 /* FlowTabTests+RuntimeLogBatchReading.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D100053D16000100B0D737 /* FlowTabTests+RuntimeLogBatchReading.swift */; };
+		A5B200023DC1000100B0D737 /* FlowTabTests+RuntimeLogPrivacyV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5B200013DC1000100B0D737 /* FlowTabTests+RuntimeLogPrivacyV2.swift */; };
 		B10011102F76000100B0D737 /* FlowTabTests+HotkeyCoverageGaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001102F76000100B0D737 /* FlowTabTests+HotkeyCoverageGaps.swift */; };
 		B10011112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift */; };
 		B10011122F76000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001122F76000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerEntry.swift */; };
@@ -651,6 +652,8 @@
 		E1F100012B00000100B0D737 /* RuntimeLogging.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100112B00000100B0D737 /* RuntimeLogging.swift */; };
 		E1F100042B00000100B0D737 /* RuntimeLogPrivacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100142B00000100B0D737 /* RuntimeLogPrivacy.swift */; };
 		E1F100052B00000100B0D737 /* RuntimeLogStoragePrivacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100152B00000100B0D737 /* RuntimeLogStoragePrivacy.swift */; };
+		A5B200043DC1000100B0D737 /* RuntimeLogPrivacyCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5B200033DC1000100B0D737 /* RuntimeLogPrivacyCodec.swift */; };
+		A5B200063DC1000100B0D737 /* RuntimeLogPrivacyLineHeaderCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5B200053DC1000100B0D737 /* RuntimeLogPrivacyLineHeaderCodec.swift */; };
 		E1F100022B00000100B0D737 /* RuntimeLogsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */; };
 		E1F100032B00000100B0D737 /* AppDelegate+Testing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */; };
 		F7B8C9D235B8000100B0D737 /* LaunchAtLoginController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7B8C9D135B8000100B0D737 /* LaunchAtLoginController.swift */; };
@@ -960,6 +963,7 @@
 		A5A100013DC0000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusVerificationPriority.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeFocusVerificationPriority.swift"; sourceTree = "<group>"; };
 		E7D100013D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimeLogObservation.swift"; sourceTree = "<group>"; };
 		E8D100053D16000100B0D737 /* FlowTabTests+RuntimeLogBatchReading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimeLogBatchReading.swift"; sourceTree = "<group>"; };
+		A5B200013DC1000100B0D737 /* FlowTabTests+RuntimeLogPrivacyV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimeLogPrivacyV2.swift"; sourceTree = "<group>"; };
 		B10001102F76000100B0D737 /* FlowTabTests+HotkeyCoverageGaps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HotkeyCoverageGaps.swift"; sourceTree = "<group>"; };
 		B10001112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+CoverageGaps.swift"; sourceTree = "<group>"; };
 		B10001122F76000100B0D737 /* FlowTabPriorityCoverageTests+ManualWindowLayerEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+ManualWindowLayerEntry.swift"; sourceTree = "<group>"; };
@@ -1116,6 +1120,8 @@
 		E1F100112B00000100B0D737 /* RuntimeLogging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogging.swift; sourceTree = "<group>"; };
 		E1F100142B00000100B0D737 /* RuntimeLogPrivacy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogPrivacy.swift; sourceTree = "<group>"; };
 		E1F100152B00000100B0D737 /* RuntimeLogStoragePrivacy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogStoragePrivacy.swift; sourceTree = "<group>"; };
+		A5B200033DC1000100B0D737 /* RuntimeLogPrivacyCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogPrivacyCodec.swift; sourceTree = "<group>"; };
+		A5B200053DC1000100B0D737 /* RuntimeLogPrivacyLineHeaderCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogPrivacyLineHeaderCodec.swift; sourceTree = "<group>"; };
 		E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogsSection.swift; sourceTree = "<group>"; };
 		E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+Testing.swift"; sourceTree = "<group>"; };
 		F7B8C9D135B8000100B0D737 /* LaunchAtLoginController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginController.swift; sourceTree = "<group>"; };
@@ -1648,6 +1654,7 @@
 				A5A100013DC0000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusVerificationPriority.swift */,
 				E7D100013D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift */,
 				E8D100053D16000100B0D737 /* FlowTabTests+RuntimeLogBatchReading.swift */,
+				A5B200013DC1000100B0D737 /* FlowTabTests+RuntimeLogPrivacyV2.swift */,
 				E9D100053D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift */,
 				EAD100033D18000100B0D737 /* FlowTabTests+HomePermissionObservation.swift */,
 				EBD100033D19000100B0D737 /* FlowTabTests+HomeInitialProjectionObservation.swift */,
@@ -2149,6 +2156,8 @@
 				F7B8C9D135B8000100B0D737 /* LaunchAtLoginController.swift */,
 				E1F100112B00000100B0D737 /* RuntimeLogging.swift */,
 				E1F100142B00000100B0D737 /* RuntimeLogPrivacy.swift */,
+				A5B200033DC1000100B0D737 /* RuntimeLogPrivacyCodec.swift */,
+				A5B200053DC1000100B0D737 /* RuntimeLogPrivacyLineHeaderCodec.swift */,
 				E1F100152B00000100B0D737 /* RuntimeLogStoragePrivacy.swift */,
 			);
 			path = Runtime;
@@ -2600,6 +2609,8 @@
 				B1C2D3E42F74000100B0D737 /* AppLocalization.swift in Sources */,
 				E1F100012B00000100B0D737 /* RuntimeLogging.swift in Sources */,
 				E1F100042B00000100B0D737 /* RuntimeLogPrivacy.swift in Sources */,
+				A5B200043DC1000100B0D737 /* RuntimeLogPrivacyCodec.swift in Sources */,
+				A5B200063DC1000100B0D737 /* RuntimeLogPrivacyLineHeaderCodec.swift in Sources */,
 				E1F100052B00000100B0D737 /* RuntimeLogStoragePrivacy.swift in Sources */,
 				E9D100023D17000100B0D737 /* RuntimePermissionObservation.swift in Sources */,
 				E9D100043D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift in Sources */,
@@ -2891,6 +2902,7 @@
 				A5A100023DC0000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusVerificationPriority.swift in Sources */,
 				E7D100023D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift in Sources */,
 				E8D100063D16000100B0D737 /* FlowTabTests+RuntimeLogBatchReading.swift in Sources */,
+				A5B200023DC1000100B0D737 /* FlowTabTests+RuntimeLogPrivacyV2.swift in Sources */,
 				E9D100063D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift in Sources */,
 				EED100043D1C000100B0D737 /* FlowTabTests+TemporaryRegularActivationRestoration.swift in Sources */,
 				EAD100043D18000100B0D737 /* FlowTabTests+HomePermissionObservation.swift in Sources */,

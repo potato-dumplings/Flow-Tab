@@ -20,6 +20,7 @@ final class RuntimeLogFileStore {
     static let shared = RuntimeLogFileStore()
     static let privacyFingerprintKeyFileName = ".runtime-log-fingerprint-key"
     static let privacyFormatMarkerFileName = ".runtime-log-privacy-v1"
+    static let privacyV2FormatMarkerFileName = ".runtime-log-privacy-v2"
     static let directoryPermissions = 0o700
     static let filePermissions = 0o600
     static let fingerprintKeyByteCount = 32

@@ -80,11 +80,13 @@ fi
 
 /usr/bin/grep -F -q -- '--runtime-log-level <DEBUG|INFO|WARN|ERROR>' "$RUNNER_PATH" \
   || fail "runner help omits the runtime log level contract"
+/usr/bin/grep -F -q -- '--max-runtime-log-mb-per-minute <positive-decimal>' "$RUNNER_PATH" \
+  || fail "runner help omits the runtime log volume budget"
 /usr/bin/grep -F -q -- '--flowtab-tab-stress-runtime-log-level "$RUNTIME_LOG_LEVEL"' "$RUNNER_PATH" \
   || fail "runner omits the TestingSupport runtime log level argument"
 /usr/bin/grep -F -q -- 'CFFIXED_USER_HOME="$APP_HOME"' "$RUNNER_PATH" \
   || fail "runner does not isolate the stress App home inside evidence"
-/usr/bin/grep -F -q -- '"schema_version": 2' "$RUNNER_PATH" \
-  || fail "runner status schema is not version 2"
+/usr/bin/grep -F -q -- '"schema_version": 3' "$RUNNER_PATH" \
+  || fail "runner status schema is not version 3"
 
 echo "Tab-switch stress evidence validates exact completion, elapsed time, throughput, and runtime log level wiring."
