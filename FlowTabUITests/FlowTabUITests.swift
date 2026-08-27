@@ -44,6 +44,7 @@ final class FlowTabUITests: XCTestCase {
         static let homeStatsTotalWindows = "flowtab.home.stats.total-windows"
         static let logsTabContent = "flowtab.tab.logs.content"
         static let settingsTabContent = "flowtab.tab.settings.content"
+        static let settingsPageSubtitle = "flowtab.settings.page.subtitle"
         static let sidebarPermissionStatus = "flowtab.sidebar.permission-status"
         static let sidebarPermissionAccessibility = "flowtab.sidebar.permission.accessibility"
         static let sidebarPermissionScreenCapture = "flowtab.sidebar.permission.screen-capture"

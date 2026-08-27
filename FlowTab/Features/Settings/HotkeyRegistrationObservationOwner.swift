@@ -68,14 +68,22 @@ final class HotkeyRegistrationObservationOwner: ObservableObject {
         readback()
     }
 
-    func stop() {
+    func suspend() {
         observationGeneration &+= 1
         if let observer {
             notificationCenter.removeObserver(observer)
             self.observer = nil
         }
-        pendingRequest = nil
-        latestEvidence = nil
+        if pendingRequest != nil {
+            pendingRequest = nil
+        }
+    }
+
+    func stop() {
+        suspend()
+        if latestEvidence != nil {
+            latestEvidence = nil
+        }
         latestObservedEvidenceGeneration = 0
     }
 

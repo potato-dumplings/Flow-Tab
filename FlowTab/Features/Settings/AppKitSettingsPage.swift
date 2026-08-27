@@ -2,48 +2,6 @@ import SwiftUI
 import AppKit
 import FlowTabCore
 
-struct AppKitSettingsPageState: Equatable {
-    let showInCommandTab: Bool
-    let themeModeRaw: String
-    let appLanguageRaw: String
-    let windowLayerAutoEnterDelayText: String
-    let autoRestoreMinimizedWindowOnSwitch: Bool
-    let hideMinimizedAppsFromAppLayer: Bool
-    let showPermissionReminder: Bool
-    let allowLaunchAtLogin: Bool
-    let searchEnabled: Bool
-    let searchDefaultScopeRaw: String
-    let hiddenAppCount: Int
-    let hotkeyPrimaryModifierRaw: String
-    var hotkeyReverseModifiersRaw =
-        SwitcherHotkeyPreferencesStore.defaultReverseKeys.rawValue
-    let hotkeyMainKeyRaw: String
-    let hotkeyQuitKeyRaw: String
-    let inAppWindowHotkeyBaseKeysRaw: String
-    var inAppWindowHotkeyReverseKeysRaw =
-        InAppWindowHotkeyPreferencesStore.defaultReverseKeys.rawValue
-    let inAppWindowHotkeyMainKeysRaw: String
-    let commandTabTakeoverRegistrationState: CommandTabTakeoverRegistrationState
-    let accessibilityTrusted: Bool
-    let screenCaptureTrusted: Bool
-    let targetNSAppearanceName: NSAppearance.Name
-    var hotkeyConflict: HotkeySettingsConflictPresentation? = nil
-    var hotkeyPermissionRequirement:
-        HotkeySettingsPermissionPresentation? = nil
-}
-
-struct AppKitSettingsHotkeyRawValues: Equatable {
-    let hotkeyPrimaryModifierRaw: String
-    var hotkeyReverseModifiersRaw =
-        SwitcherHotkeyPreferencesStore.defaultReverseKeys.rawValue
-    let hotkeyMainKeyRaw: String
-    let hotkeyQuitKeyRaw: String
-    let inAppWindowHotkeyBaseKeysRaw: String
-    var inAppWindowHotkeyReverseKeysRaw =
-        InAppWindowHotkeyPreferencesStore.defaultReverseKeys.rawValue
-    let inAppWindowHotkeyMainKeysRaw: String
-}
-
 final class AppKitFlippedDocumentView: NSView {
     override var isFlipped: Bool { true }
 }
@@ -57,6 +15,7 @@ final class AppKitSettingsPageContainerView: NSView {
     private let verticalContentInset = FlowPageLayout.alignedTopInset
     private var wasActive = false
     private var pendingInitialFocusClear = false
+    private var contentRefreshGate = AppKitSettingsPageContentRefreshGate()
     private var pageLeadingConstraint: NSLayoutConstraint?
     private var pageTopConstraint: NSLayoutConstraint?
     private var pageWidthConstraint: NSLayoutConstraint?
@@ -75,6 +34,14 @@ final class AppKitSettingsPageContainerView: NSView {
     }
 
     func update(with state: AppKitSettingsPageState, isActive: Bool) {
+        let becameActive = isActive && !wasActive
+        wasActive = isActive
+        if becameActive {
+            clearInitialFirstResponderIfNeeded()
+        }
+
+        guard contentRefreshGate.consume(state) else { return }
+
         let targetAppearance = FlowSettingsStyleResolver.targetAppearance(
             named: state.targetNSAppearanceName,
             fallback: inheritedAppearanceFallback
@@ -85,10 +52,6 @@ final class AppKitSettingsPageContainerView: NSView {
         pageView.appearance = targetAppearance
         pageView.applySettingsAppearance(targetAppearance)
         pageView.update(with: state)
-        if isActive && !wasActive {
-            clearInitialFirstResponderIfNeeded()
-        }
-        wasActive = isActive
         refreshLayoutAfterSettingsUpdate()
     }
 
@@ -210,7 +173,7 @@ final class AppKitSettingsPageContainerView: NSView {
     }
 
     private func refreshLayoutAfterSettingsUpdate() {
-        pageView.invalidateIntrinsicContentSize()
+        pageView.invalidateMeasuredContentHeight()
         pageView.needsLayout = true
         documentView.needsLayout = true
         needsLayout = true
@@ -225,7 +188,7 @@ final class AppKitSettingsPageContainerView: NSView {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.hasDeferredLayoutRefresh = false
-            self.pageView.invalidateIntrinsicContentSize()
+            self.pageView.invalidateMeasuredContentHeight()
             self.pageView.needsLayout = true
             self.documentView.needsLayout = true
             self.needsLayout = true
@@ -317,6 +280,8 @@ final class AppKitSettingsPageView: NSView {
     )
 
     private var currentState: AppKitSettingsPageState?
+    private var intrinsicHeightCache =
+        AppKitSettingsPageIntrinsicHeightCache()
     private var targetSettingsAppearance = FlowSettingsStyleResolver.defaultAppearance
 
     override init(frame frameRect: NSRect) {
@@ -332,7 +297,19 @@ final class AppKitSettingsPageView: NSView {
     }
 
     override var intrinsicContentSize: NSSize {
-        return NSSize(width: NSView.noIntrinsicMetric, height: contentStack.fittingSize.height)
+        let width = bounds.width
+        if let height = intrinsicHeightCache.height(forWidth: width) {
+            return NSSize(width: NSView.noIntrinsicMetric, height: height)
+        }
+
+        let height = contentStack.fittingSize.height
+        intrinsicHeightCache.store(height: height, forWidth: width)
+        return NSSize(width: NSView.noIntrinsicMetric, height: height)
+    }
+
+    func invalidateMeasuredContentHeight() {
+        intrinsicHeightCache.invalidate()
+        invalidateIntrinsicContentSize()
     }
 
     override func layout() {
@@ -356,7 +333,7 @@ final class AppKitSettingsPageView: NSView {
         columnsStack.alignment = useSingleColumn ? .leading : .top
         columnsStack.distribution = useSingleColumn ? .fill : .fillEqually
         columnWidthConstraints.forEach { $0.isActive = useSingleColumn }
-        invalidateIntrinsicContentSize()
+        invalidateMeasuredContentHeight()
     }
 
     func preferredFittingSize(forWidth width: CGFloat) -> CGSize {
@@ -374,10 +351,12 @@ final class AppKitSettingsPageView: NSView {
             columnsHeight = max(leftColumnHeight, rightColumnHeight)
         }
 
-        return CGSize(
+        let fittedSize = CGSize(
             width: width,
             height: ceil(headerHeight + contentStack.spacing + columnsHeight)
         )
+        intrinsicHeightCache.store(height: fittedSize.height, forWidth: width)
+        return fittedSize
     }
 
     func update(with state: AppKitSettingsPageState) {
@@ -444,7 +423,7 @@ final class AppKitSettingsPageView: NSView {
         searchCard.invalidateIntrinsicContentSize()
         appVisibilityCard.invalidateIntrinsicContentSize()
         hotkeyCard.invalidateIntrinsicContentSize()
-        invalidateIntrinsicContentSize()
+        invalidateMeasuredContentHeight()
     }
 
     func updateHotkeyContent(with values: AppKitSettingsHotkeyRawValues) {
@@ -452,6 +431,8 @@ final class AppKitSettingsPageView: NSView {
         hotkeyContent.update(
             with: hotkeyCardState(from: currentState, overridingRawValuesWith: values)
         )
+        hotkeyCard.invalidateIntrinsicContentSize()
+        invalidateMeasuredContentHeight()
     }
 
     override func viewDidChangeEffectiveAppearance() {

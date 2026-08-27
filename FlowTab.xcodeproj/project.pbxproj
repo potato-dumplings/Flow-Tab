@@ -540,6 +540,7 @@
 		B35011012FF900100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSnapshotPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = B35001012FF900100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSnapshotPressure.swift */; };
 		F7B8C9D435B8000100B0D737 /* FlowTabTests+LaunchAtLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7B8C9D335B8000100B0D737 /* FlowTabTests+LaunchAtLogin.swift */; };
 		B10012012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */; };
+		A1D700023F27000100B0D737 /* FlowTabUITests+SettingsNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D700013F27000100B0D737 /* FlowTabUITests+SettingsNavigation.swift */; };
 		C8A100023A24000100B0D737 /* FlowTabUITests+HomePermissionBoundary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A100013A24000100B0D737 /* FlowTabUITests+HomePermissionBoundary.swift */; };
 		B10012022F76000100B0D737 /* FlowTabUITests+Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */; };
 		FA14000431A1000100C0D001 /* FlowTabUITests+AppLanguageDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA14000331A1000100C0D001 /* FlowTabUITests+AppLanguageDefaults.swift */; };
@@ -618,6 +619,9 @@
 		E50000053601000100B0D737 /* FlowSettingsSegmentedControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = E50000153601000100B0D737 /* FlowSettingsSegmentedControl.swift */; };
 		E50000063601000100B0D737 /* FlowSettingsCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E50000163601000100B0D737 /* FlowSettingsCardView.swift */; };
 		C10000092F75000100B0D737 /* AppKitSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000192F75000100B0D737 /* AppKitSettingsPage.swift */; };
+		A1D600023F26000100B0D737 /* AppKitSettingsPageContentRefreshGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D600013F26000100B0D737 /* AppKitSettingsPageContentRefreshGate.swift */; };
+		A1D600043F26000100B0D737 /* AppKitSettingsPageIntrinsicHeightCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D600033F26000100B0D737 /* AppKitSettingsPageIntrinsicHeightCache.swift */; };
+		A1D600063F26000100B0D737 /* AppKitSettingsPageState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D600053F26000100B0D737 /* AppKitSettingsPageState.swift */; };
 		E1F200052B00000100B0D737 /* AppKitSettingsPageBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F200152B00000100B0D737 /* AppKitSettingsPageBridge.swift */; };
 		C100000A2F75000100B0D737 /* AppearanceSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */; };
 		C100000B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift */; };
@@ -977,6 +981,7 @@
 		B35001012FF900100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSnapshotPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeSnapshotPressure.swift"; sourceTree = "<group>"; };
 		F7B8C9D335B8000100B0D737 /* FlowTabTests+LaunchAtLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+LaunchAtLogin.swift"; sourceTree = "<group>"; };
 		B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeAndLogs.swift"; sourceTree = "<group>"; };
+		A1D700013F27000100B0D737 /* FlowTabUITests+SettingsNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SettingsNavigation.swift"; sourceTree = "<group>"; };
 		A8B000013F11000100B0D737 /* FlowTabUITests+LogsActivityLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+LogsActivityLifecycle.swift"; sourceTree = "<group>"; };
 		A49300013D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeAndLogsWatchdogPolicy.swift"; sourceTree = "<group>"; };
 		A49400013DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeHiddenAppRowProjection.swift"; sourceTree = "<group>"; };
@@ -1076,6 +1081,9 @@
 		E50000153601000100B0D737 /* FlowSettingsSegmentedControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowSettingsSegmentedControl.swift; sourceTree = "<group>"; };
 		E50000163601000100B0D737 /* FlowSettingsCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowSettingsCardView.swift; sourceTree = "<group>"; };
 		C10000192F75000100B0D737 /* AppKitSettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsPage.swift; sourceTree = "<group>"; };
+		A1D600013F26000100B0D737 /* AppKitSettingsPageContentRefreshGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsPageContentRefreshGate.swift; sourceTree = "<group>"; };
+		A1D600033F26000100B0D737 /* AppKitSettingsPageIntrinsicHeightCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsPageIntrinsicHeightCache.swift; sourceTree = "<group>"; };
+		A1D600053F26000100B0D737 /* AppKitSettingsPageState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsPageState.swift; sourceTree = "<group>"; };
 		E1F200152B00000100B0D737 /* AppKitSettingsPageBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsPageBridge.swift; sourceTree = "<group>"; };
 		C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsCard.swift; sourceTree = "<group>"; };
 		C100001B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowBehaviorSettingsCard.swift; sourceTree = "<group>"; };
@@ -1681,6 +1689,7 @@
 				4A6DAE892F727AF600B0D737 /* FlowTabUITests.swift */,
 				A8A000053F10000100B0D737 /* FlowTabUITests+SparkleUpdate.swift */,
 				B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */,
+				A1D700013F27000100B0D737 /* FlowTabUITests+SettingsNavigation.swift */,
 				A8B000013F11000100B0D737 /* FlowTabUITests+LogsActivityLifecycle.swift */,
 				A49300013D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift */,
 				A49400013DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift */,
@@ -2235,6 +2244,9 @@
 				F0D100033D1E000100B0D737 /* HotkeyRegistrationObservationOwner.swift */,
 				A6F100013E11000100B0D737 /* HotkeySettingsChangeTransaction.swift */,
 				C10000192F75000100B0D737 /* AppKitSettingsPage.swift */,
+				A1D600013F26000100B0D737 /* AppKitSettingsPageContentRefreshGate.swift */,
+				A1D600033F26000100B0D737 /* AppKitSettingsPageIntrinsicHeightCache.swift */,
+				A1D600053F26000100B0D737 /* AppKitSettingsPageState.swift */,
 				E1F200152B00000100B0D737 /* AppKitSettingsPageBridge.swift */,
 				C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */,
 				C100001B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift */,
@@ -2529,6 +2541,9 @@
 				C100000B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift in Sources */,
 				C100000A2F75000100B0D737 /* AppearanceSettingsCard.swift in Sources */,
 				C10000092F75000100B0D737 /* AppKitSettingsPage.swift in Sources */,
+				A1D600023F26000100B0D737 /* AppKitSettingsPageContentRefreshGate.swift in Sources */,
+				A1D600043F26000100B0D737 /* AppKitSettingsPageIntrinsicHeightCache.swift in Sources */,
+				A1D600063F26000100B0D737 /* AppKitSettingsPageState.swift in Sources */,
 				E1F200052B00000100B0D737 /* AppKitSettingsPageBridge.swift in Sources */,
 				C10000082F75000100B0D737 /* AppKitSettingsCardChrome.swift in Sources */,
 				E50000013601000100B0D737 /* FlowSettingsStylePrimitives.swift in Sources */,
@@ -2948,6 +2963,7 @@
 				4A6DAE8A2F727AF600B0D737 /* FlowTabUITests.swift in Sources */,
 				A8A001053F10000100B0D737 /* FlowTabUITests+SparkleUpdate.swift in Sources */,
 				B10012012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift in Sources */,
+				A1D700023F27000100B0D737 /* FlowTabUITests+SettingsNavigation.swift in Sources */,
 				A8B001013F11000100B0D737 /* FlowTabUITests+LogsActivityLifecycle.swift in Sources */,
 				A49300023D9F000100B0D737 /* FlowTabUITests+HomeAndLogsWatchdogPolicy.swift in Sources */,
 				A49400023DA0000100B0D737 /* FlowTabUITests+HomeHiddenAppRowProjection.swift in Sources */,

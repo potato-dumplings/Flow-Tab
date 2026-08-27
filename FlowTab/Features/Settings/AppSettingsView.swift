@@ -313,7 +313,7 @@ struct AppSettingsView: View {
         guard active else {
             dismissHotkeyValidation()
             cancelPermissionObservation()
-            hotkeyRegistrationObservationOwner.stop()
+            hotkeyRegistrationObservationOwner.suspend()
             return
         }
         hotkeyRegistrationObservationOwner.start()

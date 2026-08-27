@@ -232,6 +232,49 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testHotkeyRegistrationObservationSuspendRetainsLatestStateUntilReadback() {
+        let notificationCenter = NotificationCenter()
+        let request = makeHotkeyRegistrationRequest(
+            mainModifier: .command,
+            mainKey: .tab
+        )
+        let initialEvidence = HotkeyRegistrationEvidence(
+            generation: 1,
+            request: request,
+            commandTabTakeoverActive: true
+        )
+        let resumedEvidence = HotkeyRegistrationEvidence(
+            generation: 2,
+            request: request,
+            commandTabTakeoverActive: false
+        )
+        var readbackEvidence: HotkeyRegistrationEvidence? = initialEvidence
+        let owner = HotkeyRegistrationObservationOwner(
+            notificationCenter: notificationCenter,
+            evidenceProvider: { readbackEvidence }
+        )
+
+        owner.start()
+        owner.suspend()
+
+        XCTAssertEqual(owner.latestEvidence, initialEvidence)
+        XCTAssertEqual(owner.takeoverState(matching: request), .active)
+
+        notificationCenter.post(
+            name: .flowTabHotkeyRegistrationEvidenceDidChange,
+            object: nil,
+            userInfo: resumedEvidence.notificationUserInfo
+        )
+        XCTAssertEqual(owner.latestEvidence, initialEvidence)
+
+        readbackEvidence = resumedEvidence
+        owner.start()
+
+        XCTAssertEqual(owner.latestEvidence, resumedEvidence)
+        XCTAssertEqual(owner.takeoverState(matching: request), .inactive)
+    }
+
+    @MainActor
     func testHotkeyRegistrationObservationSchedulingLatencyDoesNotChangeResult() async {
         let request = makeHotkeyRegistrationRequest(
             mainModifier: .command,
