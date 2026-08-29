@@ -67,6 +67,8 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-tab-stress-evidence-notification-name"
     static let tabSwitchStressRuntimeLogLevelArgument =
         "--flowtab-tab-stress-runtime-log-level"
+    static let tabSwitchStressStartNotificationArgument =
+        "--flowtab-tab-stress-start-notification-name"
     static let appPanelPressureEvidenceNotificationArgument =
         "--flowtab-app-panel-pressure-evidence-notification-name"
     static let appPanelPressureEvidenceAcknowledgementNotificationArgument =
@@ -121,6 +123,7 @@ enum FlowTabTestLaunchOptions {
         appPanelPressureCommandAcknowledgementNotificationArgument,
         appPanelPressureCommandNotificationArgument,
         appPanelPressureEvidenceNotificationArgument,
+        tabSwitchStressStartNotificationArgument,
         projectionAcknowledgementRouteArgument,
         "--flowtab-ui-record-hotkey-reload-diagnostics",
         "--flowtab-ui-redacted-runtime-logs",
@@ -617,6 +620,12 @@ enum FlowTabTestLaunchOptions {
             after:
                 tabSwitchStressEvidenceNotificationArgument
         )
+    }
+
+    static var tabSwitchStressStartNotificationName: String? {
+        uiTestValue(
+            after: tabSwitchStressStartNotificationArgument
+        )?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func value(after flag: String) -> String? {

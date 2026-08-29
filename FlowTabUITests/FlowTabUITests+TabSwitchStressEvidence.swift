@@ -34,6 +34,10 @@ struct TabSwitchStressUITestEvidence:
     let requiredSwitches: UInt64
     let attempts: UInt64
     let switches: UInt64
+    let homeSwitches: UInt64
+    let logsSwitches: UInt64
+    let settingsSwitches: UInt64
+    let runtimeLogLevel: String
     let requested: String
     let observed: String
     let elapsedNanoseconds: UInt64
@@ -53,6 +57,10 @@ struct TabSwitchStressUITestEvidence:
             + "\(requiredSwitches) "
             + "attempts=\(attempts) "
             + "switches=\(switches) "
+            + "homeSwitches=\(homeSwitches) "
+            + "logsSwitches=\(logsSwitches) "
+            + "settingsSwitches=\(settingsSwitches) "
+            + "runtimeLogLevel=\(runtimeLogLevel) "
             + "requested=\(requested) "
             + "observed=\(observed) "
             + "elapsedNanoseconds="
@@ -79,6 +87,10 @@ final class TabSwitchStressUITestObservationOwner {
             "requiredSwitches"
         static let attempts = "attempts"
         static let switches = "switches"
+        static let homeSwitches = "homeSwitches"
+        static let logsSwitches = "logsSwitches"
+        static let settingsSwitches = "settingsSwitches"
+        static let runtimeLogLevel = "runtimeLogLevel"
         static let requested = "requested"
         static let observed = "observed"
         static let elapsedNanoseconds =
@@ -224,6 +236,24 @@ final class TabSwitchStressUITestObservationOwner {
                     UserInfoKey.switches,
                     in: userInfo
                 )?.uint64Value,
+              let homeSwitches =
+                number(
+                    UserInfoKey.homeSwitches,
+                    in: userInfo
+                )?.uint64Value,
+              let logsSwitches =
+                number(
+                    UserInfoKey.logsSwitches,
+                    in: userInfo
+                )?.uint64Value,
+              let settingsSwitches =
+                number(
+                    UserInfoKey.settingsSwitches,
+                    in: userInfo
+                )?.uint64Value,
+              let runtimeLogLevel =
+                userInfo[UserInfoKey.runtimeLogLevel]
+                    as? String,
               let requested =
                 userInfo[UserInfoKey.requested]
                     as? String,
@@ -261,6 +291,10 @@ final class TabSwitchStressUITestObservationOwner {
                 requiredSwitches,
             attempts: attempts,
             switches: switches,
+            homeSwitches: homeSwitches,
+            logsSwitches: logsSwitches,
+            settingsSwitches: settingsSwitches,
+            runtimeLogLevel: runtimeLogLevel,
             requested: requested,
             observed: observed,
             elapsedNanoseconds:
@@ -292,7 +326,7 @@ extension FlowTabUITests {
                 XCTMemoryMetric()
             ],
             options: options
-        ) {
+        ) { [self] in
             let route =
                 TabSwitchStressUITestRoute()
             let observation =
@@ -359,6 +393,19 @@ extension FlowTabUITests {
             XCTAssertEqual(
                 completed?.switches,
                 TabSwitchStressUITestPolicy.requiredSwitches
+            )
+            XCTAssertGreaterThan(completed?.homeSwitches ?? 0, 0)
+            XCTAssertGreaterThan(completed?.logsSwitches ?? 0, 0)
+            XCTAssertGreaterThan(completed?.settingsSwitches ?? 0, 0)
+            XCTAssertEqual(
+                completed?.runtimeLogLevel,
+                "ERROR"
+            )
+            XCTAssertEqual(
+                (completed?.homeSwitches ?? 0)
+                    + (completed?.logsSwitches ?? 0)
+                    + (completed?.settingsSwitches ?? 0),
+                completed?.switches
             )
             XCTAssertEqual(
                 completed?.requested,

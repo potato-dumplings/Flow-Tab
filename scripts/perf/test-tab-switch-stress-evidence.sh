@@ -29,7 +29,7 @@ write_fixture() {
 
 VALID_LOG="${FIXTURE_ROOT}/valid.log"
 write_fixture "$VALID_LOG" \
-  "FlowTabTabSwitchStressEvidence phase=completed requiredSwitches=1000 switches=1000 elapsedNanoseconds=62500000000 durationSatisfied=true workloadSatisfied=true runtimeLogLevel=DEBUG"
+  "FlowTabTabSwitchStressEvidence phase=completed requiredSwitches=1000 switches=1000 homeSwitches=334 logsSwitches=333 settingsSwitches=333 elapsedNanoseconds=62500000000 durationSatisfied=true workloadSatisfied=true runtimeLogLevel=DEBUG"
 flowtab_tab_switch_parse_completion_evidence "$VALID_LOG" DEBUG \
   || fail "valid completion evidence was rejected"
 [[ "$FLOWTAB_TAB_SWITCH_EVIDENCE_CONDITION" == valid ]] \
@@ -38,6 +38,10 @@ flowtab_tab_switch_parse_completion_evidence "$VALID_LOG" DEBUG \
   || fail "planned switch count was not parsed"
 [[ "$FLOWTAB_TAB_SWITCH_COMPLETED_SWITCH_COUNT" == 1000 ]] \
   || fail "completed switch count was not parsed"
+[[ "$FLOWTAB_TAB_SWITCH_HOME_SWITCH_COUNT" == 334 \
+  && "$FLOWTAB_TAB_SWITCH_LOGS_SWITCH_COUNT" == 333 \
+  && "$FLOWTAB_TAB_SWITCH_SETTINGS_SWITCH_COUNT" == 333 ]] \
+  || fail "per-tab switch counts were not parsed"
 [[ "$FLOWTAB_TAB_SWITCH_ACTUAL_ELAPSED_SECONDS" == 62.500000 ]] \
   || fail "actual elapsed time was not derived"
 [[ "$FLOWTAB_TAB_SWITCH_THROUGHPUT" == 16.000000 ]] \
@@ -47,7 +51,7 @@ flowtab_tab_switch_parse_completion_evidence "$VALID_LOG" DEBUG \
 
 MISSING_LOG="${FIXTURE_ROOT}/missing.log"
 write_fixture "$MISSING_LOG" \
-  "FlowTabTabSwitchStressEvidence phase=started requiredSwitches=1000 switches=0 elapsedNanoseconds=0 durationSatisfied=false workloadSatisfied=false runtimeLogLevel=DEBUG"
+  "FlowTabTabSwitchStressEvidence phase=started requiredSwitches=1000 switches=0 homeSwitches=0 logsSwitches=0 settingsSwitches=0 elapsedNanoseconds=0 durationSatisfied=false workloadSatisfied=false runtimeLogLevel=DEBUG"
 if flowtab_tab_switch_parse_completion_evidence "$MISSING_LOG" DEBUG; then
   fail "missing completion evidence was accepted"
 fi
@@ -56,7 +60,7 @@ fi
 
 CONFLICT_LOG="${FIXTURE_ROOT}/conflict.log"
 write_fixture "$CONFLICT_LOG" \
-  "FlowTabTabSwitchStressEvidence phase=completed requiredSwitches=1000 switches=999 elapsedNanoseconds=62500000000 durationSatisfied=true workloadSatisfied=false runtimeLogLevel=DEBUG"
+  "FlowTabTabSwitchStressEvidence phase=completed requiredSwitches=1000 switches=999 homeSwitches=333 logsSwitches=333 settingsSwitches=333 elapsedNanoseconds=62500000000 durationSatisfied=true workloadSatisfied=false runtimeLogLevel=DEBUG"
 if flowtab_tab_switch_parse_completion_evidence "$CONFLICT_LOG" DEBUG; then
   fail "conflicting completion evidence was accepted"
 fi
@@ -65,14 +69,14 @@ fi
 
 DUPLICATE_LOG="${FIXTURE_ROOT}/duplicate.log"
 write_fixture "$DUPLICATE_LOG" \
-  $'FlowTabTabSwitchStressEvidence phase=completed requiredSwitches=10 switches=10 elapsedNanoseconds=1000000000 durationSatisfied=true workloadSatisfied=true runtimeLogLevel=ERROR\nFlowTabTabSwitchStressEvidence phase=completed requiredSwitches=10 switches=10 elapsedNanoseconds=1000000000 durationSatisfied=true workloadSatisfied=true runtimeLogLevel=ERROR'
+  $'FlowTabTabSwitchStressEvidence phase=completed requiredSwitches=10 switches=10 homeSwitches=4 logsSwitches=3 settingsSwitches=3 elapsedNanoseconds=1000000000 durationSatisfied=true workloadSatisfied=true runtimeLogLevel=ERROR\nFlowTabTabSwitchStressEvidence phase=completed requiredSwitches=10 switches=10 homeSwitches=4 logsSwitches=3 settingsSwitches=3 elapsedNanoseconds=1000000000 durationSatisfied=true workloadSatisfied=true runtimeLogLevel=ERROR'
 if flowtab_tab_switch_parse_completion_evidence "$DUPLICATE_LOG" ERROR; then
   fail "duplicate completion evidence was accepted"
 fi
 
 LEVEL_CONFLICT_LOG="${FIXTURE_ROOT}/level-conflict.log"
 write_fixture "$LEVEL_CONFLICT_LOG" \
-  "FlowTabTabSwitchStressEvidence phase=completed requiredSwitches=10 switches=10 elapsedNanoseconds=1000000000 durationSatisfied=true workloadSatisfied=true runtimeLogLevel=INFO"
+  "FlowTabTabSwitchStressEvidence phase=completed requiredSwitches=10 switches=10 homeSwitches=4 logsSwitches=3 settingsSwitches=3 elapsedNanoseconds=1000000000 durationSatisfied=true workloadSatisfied=true runtimeLogLevel=INFO"
 if flowtab_tab_switch_parse_completion_evidence \
   "$LEVEL_CONFLICT_LOG" DEBUG; then
   fail "conflicting runtime log level evidence was accepted"
@@ -86,7 +90,9 @@ fi
   || fail "runner omits the TestingSupport runtime log level argument"
 /usr/bin/grep -F -q -- 'CFFIXED_USER_HOME="$APP_HOME"' "$RUNNER_PATH" \
   || fail "runner does not isolate the stress App home inside evidence"
-/usr/bin/grep -F -q -- '"schema_version": 3' "$RUNNER_PATH" \
-  || fail "runner status schema is not version 3"
+/usr/bin/grep -F -q -- '"schema_version": 4' "$RUNNER_PATH" \
+  || fail "runner status schema is not version 4"
+/usr/bin/grep -F -q -- '"lane": "isolated_state_log"' "$RUNNER_PATH" \
+  || fail "runner status omits the isolated attribution lane"
 
-echo "Tab-switch stress evidence validates exact completion, elapsed time, throughput, and runtime log level wiring."
+echo "Tab-switch stress evidence validates exact completion, per-tab counts, elapsed time, throughput, and runtime log level wiring."

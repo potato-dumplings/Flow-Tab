@@ -301,21 +301,29 @@ swift test
 
 ### 性能压测（必跑）
 
-涉及以下范围的修改时，提交前必须执行一次 tab 切换压测并记录结果（至少包含 `CPU avg/peak`、`RSS avg/peak`）：
+涉及以下范围的修改时，提交前必须执行 tab 切换压测并记录 `CPU/RSS avg/p95/max`：
 - 左侧 tab 切换相关逻辑或 UI 结构（home / logs / settings）
 - 页面生命周期相关状态管理（如 `onAppear` / `onDisappear` / `@StateObject` 保活策略）
 - 日志页展示、诊断会话或持久化日志清理逻辑
 
-压测命令（参数分别为：持续秒数、切换间隔毫秒、采样间隔秒）。每个组合运行三次，以中位数比较；脚本默认使用 `ERROR`。`summary.txt` 与 schema v3 `status.json` 记录运行时日志等级、计划/完成切换数、实际耗时、吞吐、日志文件数、行数、保留字节数、bytes/s、MB/min、bytes/完成切换，以及估算的 20 MB 保留时长。
+正式验收使用真实权限链路。入口安装固定路径签名 App，确认 Accessibility 与 Screen Recording 授权，启动固定 Fixture 并确认其应用/窗口进入 Home 投影，依次预热 Home、Logs、Settings，随后通过 TestingSupport 延迟启动高频切换：
+
+```bash
+./scripts/perf/tab-switch-real-pressure.sh \
+  --duration-seconds 20 --switch-interval-ms 20 \
+  --sample-interval 0.5 --runtime-log-level ERROR
+./scripts/perf/tab-switch-real-pressure.sh \
+  --duration-seconds 20 --switch-interval-ms 50 \
+  --sample-interval 0.5 --runtime-log-level ERROR
+```
+
+`DEBUG` 使用相同的 `20ms`、`50ms` 组合，可按本轮日志预算增加 `--max-runtime-log-mb-per-minute`。四个组合各运行三次，以同机三轮中位数比较。正式 `status.json` 保存权限、Home 应用/窗口数、Fixture 命中、三页预热、计划/完成切换数、Home/Logs/Settings 完成次数、CPU/RSS 与日志门禁；三个 Tab 的计数都必须大于零，且总和等于完成切换数。
+
+隔离状态/日志链路提供配对归因数据。参数依次为持续秒数、切换间隔毫秒和采样间隔秒：
 
 ```bash
 ./scripts/perf/tab-switch-stress.sh 20 20 0.5 --runtime-log-level ERROR
 ./scripts/perf/tab-switch-stress.sh 20 50 0.5 --runtime-log-level ERROR
-```
-
-DEBUG 配对命令：
-
-```bash
 ./scripts/perf/tab-switch-stress.sh 20 20 0.5 \
   --runtime-log-level DEBUG \
   --max-runtime-log-mb-per-minute 2.0
@@ -323,6 +331,8 @@ DEBUG 配对命令：
   --runtime-log-level DEBUG \
   --max-runtime-log-mb-per-minute 2.0
 ```
+
+这四个隔离组合也各运行三次。`summary.txt` 与 schema-v4 `status.json` 标记 `isolated_state_log`，记录运行时日志等级、计划/完成切换数、三个 Tab 的完成次数、实际耗时、吞吐、日志文件数、行数、保留字节数、bytes/s、MB/min、bytes/完成切换，以及估算的 20 MB 保留时长。
 
 低交互强度 DEBUG 补充门：
 
@@ -332,7 +342,7 @@ DEBUG 配对命令：
   --max-runtime-log-mb-per-minute 0.25
 ```
 
-每次运行必须出现唯一且自洽的 `phase=completed` 完成证据，计划数与完成数须分别精确达到 `1000`（20ms）和 `400`（50ms），应用退出码须为 `0`。`--max-runtime-log-mb-per-minute` 接受正十进制值，缺省时只测量而不启用预算门。
+每次隔离运行必须出现唯一且自洽的 `phase=completed` 完成证据，三个 Tab 的完成次数都大于零且总和等于完成数，应用退出码须为 `0`。`--max-runtime-log-mb-per-minute` 接受正十进制值，缺省时只测量日志量。
 
 逻辑写入量以当次隔离 HOME 内所有 `.log` 文件的保留字节数除以完成证据中的实际耗时计算，覆盖 FlowTab 可控制的应用写入。日志目录缺失计为零；统计失败、达到 `20` 个保留文件或超过显式预算都会使运行失败。SSD 控制器写放大和系统其他进程写入属于设备侧独立指标。完整证据统一保存在 `.build-local/runtime-log-write-volume-fix/`。
 
@@ -708,13 +718,16 @@ gh release create "${TAG}" \
 门禁要求：
 
 - 每个循环都读回正确应用面板可见、正确高亮应用和精确关闭状态。
+- 应用态与搜索态使用当前活动显示器的宽度边界 `min(应用条期望宽度, max(440pt, visibleFrame.width - 80pt))`；证据中的 `panelWidth`、`visibleFrameWidth` 必须满足该边界，`visibleHomeWindowCount` 必须为 `0`。
+- 每个 flow/scenario 在首个预热循环保留一个 `keepAlways` XCTest 屏幕附件：application 对应 `appContentDraw`，app-to-window 对应 `windowContentDraw`，search 对应已提交结果发布后的 `searchFirstRowDraw`。附件完成后才发送关闭命令。
+- 每个附件从 `.xcresult` 导出并校验准确名称、PNG 尺寸、payload 大小和 SHA-256；导出的 PNG 与附件 manifest 随场景证据保留。
 - warm 打开到正确应用面板可见 p95 小于等于 `50ms`。
 - 应用高亮切换 p95 小于等于 `33.334ms`。
 - 窗口命令到窗口面板真正可见 p95 小于等于 `35ms`。
 - 关闭后冷却窗口最后半段 CPU p95 小于等于 `max(5%, active CPU avg x 25%)`。
 - active 末段相对中段的 RSS p95 增长小于等于 `max(16MiB, 中段 RSS p95 x 10%)`。
 
-脚本在每次 UI 动作前重新安装测试应用，用不可变 identity manifest 把采样绑定到本次启动的精确 PID，并保留 UI 指标 CSV、CPU/RSS CSV、XCTest 结果、文本与 JSON 门禁摘要。摘要输出打开、流程交互和关闭的 p50/p95；打开耗时同时按 session、几何与辅助功能、窗口呈现、观察器调度、呈现后可见性五组拆分，并输出每个子阶段的 p50、p95、平均占比及总耗时对账误差。默认证据根位于 `.build-local/app-panel-pressure/`。
+脚本在每次 UI 动作前重新安装测试应用，用不可变 identity manifest 把采样绑定到本次启动的精确 PID，并保留 UI 指标 CSV、CPU/RSS CSV、XCTest 结果、导出的屏幕附件、附件 manifest、文本与 JSON 门禁摘要。摘要输出打开、流程交互和关闭的 p50/p95；打开耗时同时按 session、几何与辅助功能、窗口呈现、观察器调度、呈现后可见性五组拆分，并输出每个子阶段的 p50、p95、平均占比及总耗时对账误差。默认证据根位于 `.build-local/app-panel-pressure/`。
 
 ## 搜索压测要求（必须）
 

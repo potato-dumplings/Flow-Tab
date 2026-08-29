@@ -16,6 +16,9 @@ private enum AppPanelPressureEvidenceUserInfoKey {
     static let selectedAppID = "selectedAppID"
     static let appCount = "appCount"
     static let selectedWindowCount = "selectedWindowCount"
+    static let panelWidth = "panelWidth"
+    static let visibleFrameWidth = "visibleFrameWidth"
+    static let visibleHomeWindowCount = "visibleHomeWindowCount"
     static let satisfied = "satisfied"
     static let stageMetrics = "stageMetrics"
 }
@@ -178,6 +181,12 @@ extension AppPanelPressureEvidenceTransport {
                     value:
                         evidence.selectedWindowCount
                 ),
+            AppPanelPressureEvidenceUserInfoKey.panelWidth:
+                NSNumber(value: evidence.panelWidth),
+            AppPanelPressureEvidenceUserInfoKey.visibleFrameWidth:
+                NSNumber(value: evidence.visibleFrameWidth),
+            AppPanelPressureEvidenceUserInfoKey.visibleHomeWindowCount:
+                NSNumber(value: evidence.visibleHomeWindowCount),
             AppPanelPressureEvidenceUserInfoKey.satisfied:
                 NSNumber(value: evidence.isSatisfied),
             AppPanelPressureEvidenceUserInfoKey.stageMetrics:

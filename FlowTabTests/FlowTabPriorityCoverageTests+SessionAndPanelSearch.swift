@@ -613,6 +613,102 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelControllerApplicationAndSearchWidthsUseVisibleFrameReservation() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
+            let visibleFrames = [
+                CGRect(x: 0, y: 0, width: 1024, height: 768),
+                CGRect(x: 0, y: 0, width: 1440, height: 900),
+                CGRect(x: 0, y: 0, width: 1728, height: 1117),
+                CGRect(x: 0, y: 0, width: 2560, height: 1440),
+                CGRect(x: 72, y: 0, width: 1368, height: 900)
+            ]
+
+            for appCount in [1, 10, 24, 120] {
+                for visibleFrame in visibleFrames {
+                    let controller = SwitcherPanelController(
+                        model: LiveSwitcherModel(
+                            runtimeProjectionService: RecordingRuntimeProjectionService(
+                                appSwitcherApps: self.layoutScenarioApps(count: appCount)
+                            )
+                        )
+                    )
+                    XCTAssertTrue(
+                        controller.modelForTesting.startSession(
+                            triggerDirection: .forward
+                        )
+                    )
+                    controller.updatePanelSizeForTesting(
+                        visibleFrame: visibleFrame
+                    )
+                    let applicationWidth =
+                        controller.panelContentSizeForTesting.width
+                    let preferredWidth = controller.preferredAppStripWidth(
+                        appCount: appCount,
+                        maxTileSize: controller.appLayerMaxAdaptiveTileSize
+                    )
+                    let expectedWidth = min(
+                        preferredWidth,
+                        max(
+                            controller.appLayerMinimumWidth,
+                            visibleFrame.width - controller.panelScreenMargin
+                        )
+                    )
+
+                    XCTAssertEqual(
+                        applicationWidth,
+                        expectedWidth,
+                        accuracy: 0.001,
+                        "Unexpected application width for \(appCount) apps in \(visibleFrame)"
+                    )
+                    XCTAssertTrue(controller.modelForTesting.enterSearchMode())
+                    controller.updatePanelSizeForTesting(
+                        visibleFrame: visibleFrame
+                    )
+                    XCTAssertEqual(
+                        controller.panelContentSizeForTesting.width,
+                        applicationWidth,
+                        accuracy: 0.001,
+                        "Search width diverged for \(appCount) apps in \(visibleFrame)"
+                    )
+                    controller.cancelSelectionForTesting()
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerSearchEntryReplacesAppAccessibilityAnchors() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
+            let apps = self.layoutScenarioApps(count: 10)
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(
+                    runtimeProjectionService: RecordingRuntimeProjectionService(
+                        appSwitcherApps: apps
+                    )
+                )
+            )
+
+            XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
+            controller.syncPanelAccessibilityAnchors()
+            let firstAppIdentifier = SwitcherAccessibilityIdentifiers.app(
+                id: apps[0].id
+            )
+            XCTAssertEqual(
+                controller.panel.registeredSwitcherAccessibilityAppIDs.first,
+                apps[0].id
+            )
+
+            XCTAssertTrue(controller.enterSearchModeIfPossible())
+
+            XCTAssertTrue(
+                controller.panel.registeredSwitcherAccessibilityAppIDs.isEmpty,
+                "Expected search input/results to replace the \(firstAppIdentifier) app anchor"
+            )
+            controller.cancelSelectionForTesting()
+        }
+    }
+
+    @MainActor
     func testSwitcherPanelControllerEntersSearchAfterCommittedIndexUpdateNotification() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .window) {
             let apps = self.searchScenarioApps()

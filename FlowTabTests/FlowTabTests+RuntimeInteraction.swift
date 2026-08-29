@@ -232,6 +232,49 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testSearchSystemTextInputBridgeSuspendsReadinessWhenOverlayDeactivates()
+        async
+    {
+        let harness = SearchSystemTextInputBridgeTestHarness()
+        let window = harness.installInKeyWindow()
+        defer { harness.closeHostingWindow() }
+
+        harness.synchronize(
+            query: "",
+            cursorPosition: 0,
+            isSearchActive: true
+        )
+        await waitForSearchInputMainQueueTurn()
+        XCTAssertTrue(window.firstResponder === harness.textView)
+
+        harness.updatePresentationSessionActivity(false)
+        harness.postHostingWindowDidBecomeKey()
+        await waitForSearchInputMainQueueTurn()
+
+        XCTAssertFalse(window.firstResponder === harness.textView)
+        XCTAssertEqual(harness.keyboardReadinessChanges, [true, false])
+
+        harness.updatePresentationSessionActivity(true)
+        await waitForSearchInputMainQueueTurn()
+
+        XCTAssertFalse(window.firstResponder === harness.textView)
+        XCTAssertEqual(harness.keyboardReadinessChanges, [true, false])
+
+        harness.synchronize(
+            query: "",
+            cursorPosition: 0,
+            isSearchActive: true
+        )
+        await waitForSearchInputMainQueueTurn()
+
+        XCTAssertTrue(window.firstResponder === harness.textView)
+        XCTAssertEqual(
+            harness.keyboardReadinessChanges,
+            [true, false, true]
+        )
+    }
+
+    @MainActor
     func testSearchSystemTextInputBridgeSynchronizeClampsQueryAndCursor() {
         let harness = SearchSystemTextInputBridgeTestHarness()
 

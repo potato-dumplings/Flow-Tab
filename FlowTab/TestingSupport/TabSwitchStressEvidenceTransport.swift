@@ -16,6 +16,10 @@ enum TabSwitchStressEvidenceTransport {
             "requiredSwitches"
         static let attempts = "attempts"
         static let switches = "switches"
+        static let homeSwitches = "homeSwitches"
+        static let logsSwitches = "logsSwitches"
+        static let settingsSwitches = "settingsSwitches"
+        static let runtimeLogLevel = "runtimeLogLevel"
         static let requested = "requested"
         static let observed = "observed"
         static let elapsedNanoseconds =
@@ -82,6 +86,22 @@ enum TabSwitchStressEvidenceTransport {
                             value:
                                 evidence.switchCount
                         ),
+                    UserInfoKey.homeSwitches:
+                        NSNumber(
+                            value: evidence.homeSwitchCount
+                        ),
+                    UserInfoKey.logsSwitches:
+                        NSNumber(
+                            value: evidence.logsSwitchCount
+                        ),
+                    UserInfoKey.settingsSwitches:
+                        NSNumber(
+                            value: evidence.settingsSwitchCount
+                        ),
+                    UserInfoKey.runtimeLogLevel:
+                        RuntimeLogPreferencesStore
+                            .loadMinimumLevel()
+                            .rawValue,
                     UserInfoKey.requested:
                         evidence.requestedTarget?
                             .rawValue

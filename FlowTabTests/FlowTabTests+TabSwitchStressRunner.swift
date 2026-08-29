@@ -134,6 +134,9 @@ extension FlowTabTests {
             evidence.last?.switchCount,
             policy.requiredSwitchCount
         )
+        XCTAssertEqual(evidence.last?.homeSwitchCount, 1)
+        XCTAssertEqual(evidence.last?.logsSwitchCount, 1)
+        XCTAssertEqual(evidence.last?.settingsSwitchCount, 1)
         XCTAssertEqual(
             evidence.last?.elapsedNanoseconds,
             1_000_000_000
@@ -396,5 +399,46 @@ extension FlowTabTests {
         XCTAssertTrue(
             scheduler.tokens[0].isCancelled
         )
+    }
+
+    @MainActor
+    func testTabSwitchStressStartCommandStartsRunnerExactlyOnce() {
+        let runner = SpyStressRunner()
+        let owner = TabSwitchStressStartCommandOwner(
+            notificationName: Notification.Name(
+                "flowtab.test.tab-stress.start"
+            ),
+            runner: runner
+        )
+
+        owner.receiveStartCommand()
+        owner.receiveStartCommand()
+
+        XCTAssertTrue(owner.didReceiveStartCommand)
+        XCTAssertEqual(runner.startCallCount, 1)
+    }
+
+    func testTabSwitchStressLaunchOptionsExposeDeferredStartRoute() {
+        withLaunchArgumentsForTesting(
+            [
+                "FlowTab",
+                "--flowtab-tab-stress",
+                FlowTabTestLaunchOptions
+                    .tabSwitchStressStartNotificationArgument,
+                "flowtab.test.tab-stress.start"
+            ],
+            environment: [
+                FlowTabTestLaunchOptions
+                    .uiTestingEnvironmentKey:
+                        FlowTabTestLaunchOptions
+                            .uiTestingEnvironmentValue
+            ]
+        ) {
+            XCTAssertEqual(
+                FlowTabTestLaunchOptions
+                    .tabSwitchStressStartNotificationName,
+                "flowtab.test.tab-stress.start"
+            )
+        }
     }
 }

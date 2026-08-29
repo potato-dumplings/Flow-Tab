@@ -448,6 +448,7 @@ final class SwitcherPanelController {
                 self.clearDelayedWindowLayerEntryState()
                 self.cancelManualWindowLayerEntryObservation()
             }
+            self.syncPanelAccessibilityAnchors()
             guard self.isPanelPresented else { return }
             self.updatePanelSize()
         }
@@ -721,12 +722,24 @@ final class SwitcherPanelController {
     }
 
     func syncPanelAccessibilityAnchors() {
+        if model.isSearchActive {
+            guard !panel.registeredSwitcherAccessibilityAppIDs.isEmpty else {
+                return
+            }
+            panel.updateSwitcherAccessibilityApps(
+                [],
+                tileSize: 1,
+                spacing: 0,
+                appStripHeaderOffset: 0
+            )
+            return
+        }
         let appStripHeaderOffset =
-            searchFeatureEnabled && !model.isPreviewLayerMode && !model.isSearchActive
+            searchFeatureEnabled && !model.isPreviewLayerMode
             ? appLayerSearchHeaderExtraHeight
             : 0
         panel.updateSwitcherAccessibilityApps(
-            model.isSearchActive ? [] : model.session?.apps ?? [],
+            model.session?.apps ?? [],
             tileSize: model.appGridTileSize,
             spacing: model.appGridSpacing,
             appStripHeaderOffset: appStripHeaderOffset

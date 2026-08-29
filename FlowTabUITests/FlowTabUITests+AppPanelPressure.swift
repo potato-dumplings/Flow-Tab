@@ -10,6 +10,9 @@ struct AppPanelPressureUITestEvidence {
     let selectedAppID: String
     let appCount: Int
     let selectedWindowCount: Int
+    let panelWidth: Double
+    let visibleFrameWidth: Double
+    let visibleHomeWindowCount: Int
     let satisfied: Bool
     let stageMetrics: [String: Double]
 
@@ -38,6 +41,15 @@ struct AppPanelPressureUITestEvidence {
               let selectedWindowCount =
                 (info["selectedWindowCount"] as? NSNumber)?
                     .intValue,
+              let panelWidth =
+                (info["panelWidth"] as? NSNumber)?
+                    .doubleValue,
+              let visibleFrameWidth =
+                (info["visibleFrameWidth"] as? NSNumber)?
+                    .doubleValue,
+              let visibleHomeWindowCount =
+                (info["visibleHomeWindowCount"] as? NSNumber)?
+                    .intValue,
               let satisfied =
                 (info["satisfied"] as? NSNumber)?
                     .boolValue
@@ -56,6 +68,9 @@ struct AppPanelPressureUITestEvidence {
             selectedAppID: selectedAppID,
             appCount: appCount,
             selectedWindowCount: selectedWindowCount,
+            panelWidth: panelWidth,
+            visibleFrameWidth: visibleFrameWidth,
+            visibleHomeWindowCount: visibleHomeWindowCount,
             satisfied: satisfied,
             stageMetrics: stageMetrics
         )
@@ -374,9 +389,11 @@ extension FlowTabUITests {
         {
             guard let result = runAppPanelPressureCycle(
                 observer: observer,
+                application: app,
                 flow: flow,
                 scenario: scenario,
                 cycle: -cycle,
+                capturesVisualCheckpoint: cycle == 1,
                 lastSequence: &lastSequence,
                 metrics: &metrics
             ) else {
@@ -396,9 +413,11 @@ extension FlowTabUITests {
             measuredCycle += 1
             guard let result = runAppPanelPressureCycle(
                 observer: observer,
+                application: app,
                 flow: flow,
                 scenario: scenario,
                 cycle: measuredCycle,
+                capturesVisualCheckpoint: false,
                 lastSequence: &lastSequence,
                 metrics: &metrics
             ) else {
@@ -457,9 +476,11 @@ extension FlowTabUITests {
 
     private func runAppPanelPressureCycle(
         observer: AppPanelPressureUITestObserver,
+        application: XCUIApplication,
         flow: AppPanelPressureUITestFlow,
         scenario: AppPanelPressureUITestScenario,
         cycle: Int,
+        capturesVisualCheckpoint: Bool,
         lastSequence: inout UInt64,
         metrics: inout AppPanelPressureMetrics
     ) -> (
@@ -497,6 +518,14 @@ extension FlowTabUITests {
             excludingAppID: nil
         ) else {
             return nil
+        }
+        if capturesVisualCheckpoint, flow == .application {
+            captureAppPanelVisualCheckpoint(
+                application: application,
+                flow: flow,
+                scenario: scenario,
+                evidence: opened
+            )
         }
         guard let highlighted =
             runAppPanelPressureInteraction(
@@ -555,6 +584,14 @@ extension FlowTabUITests {
             )
             return nil
         }
+        if capturesVisualCheckpoint, flow != .application {
+            captureAppPanelVisualCheckpoint(
+                application: application,
+                flow: flow,
+                scenario: scenario,
+                evidence: highlighted
+            )
+        }
         guard observer.post(
             command: .cancel,
             traceLabel: "app-panel-pressure.\(cycle).close"
@@ -603,9 +640,16 @@ extension FlowTabUITests {
         let excludedAppIsAbsent = excludingAppID.map {
             evidence.selectedAppID != $0
         } ?? true
+        let widthLimit = max(
+            440,
+            evidence.visibleFrameWidth - 80
+        )
         guard evidence.satisfied,
               evidence.panelPresented,
               evidence.userVisible,
+              evidence.panelWidth >= 440,
+              evidence.panelWidth <= widthLimit + 0.5,
+              evidence.visibleHomeWindowCount == 0,
               appIDMatches,
               appCountMatches,
               windowCountMatches,
@@ -635,6 +679,10 @@ extension FlowTabUITests {
                     + "\(evidence.panelPresented ? 1 : 0) "
                     + "userVisible="
                     + "\(evidence.userVisible ? 1 : 0) "
+                    + "panelWidth="
+                    + "\(evidence.panelWidth) visibleFrameWidth="
+                    + "\(evidence.visibleFrameWidth) visibleHomeWindows="
+                    + "\(evidence.visibleHomeWindowCount) "
                     + "satisfied="
                     + "\(evidence.satisfied ? 1 : 0) "
                     + "elapsedMs="
@@ -648,6 +696,7 @@ extension FlowTabUITests {
         }
         return true
     }
+
 }
 
 private enum FlowTabTestRouteArgument {

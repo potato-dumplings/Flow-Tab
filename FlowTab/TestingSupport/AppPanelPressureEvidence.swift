@@ -23,23 +23,30 @@ struct AppPanelPressureEvidence:
     let selectedAppID: String?
     let appCount: Int
     let selectedWindowCount: Int
+    var panelWidth: Double = 0
+    var visibleFrameWidth: Double = 0
+    var visibleHomeWindowCount: Int = 0
     var completionRequirementSatisfied: Bool? = nil
     let stageMetrics: [String: Double]
 
     var isSatisfied: Bool {
-        if let completionRequirementSatisfied {
-            return completionRequirementSatisfied
-        }
+        guard completionRequirementSatisfied != false else { return false }
         switch phase {
         case .opened, .highlighted:
             return panelPresented
                 && userVisible
                 && selectedAppID != nil
                 && appCount > 1
+                && panelWidth >= 440
+                && visibleFrameWidth > 0
+                && panelWidth
+                    <= max(440, visibleFrameWidth - 80) + 0.5
+                && visibleHomeWindowCount == 0
         case .closed:
             return !panelPresented
                 && !userVisible
                 && selectedAppID == nil
+                && visibleHomeWindowCount == 0
         }
     }
 }

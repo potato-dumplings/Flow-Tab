@@ -205,7 +205,8 @@ struct AppPanelPressureMetrics {
     private(set) var rows: [String] = [
         "kind,cycle,epoch_seconds,elapsed_ms,sequence,"
             + "panel_presented,user_visible,selected_app_id,"
-            + "app_count,selected_window_count,"
+            + "app_count,selected_window_count,panel_width,"
+            + "visible_frame_width,visible_home_window_count,"
             + AppPanelPressureStageMetricColumn.all
                 .joined(separator: ",")
     ]
@@ -220,6 +221,9 @@ struct AppPanelPressureMetrics {
             "0",
             "0",
             "none",
+            "0",
+            "0",
+            "0",
             "0",
             "0"
         ]
@@ -252,7 +256,13 @@ struct AppPanelPressureMetrics {
                 evidence.userVisible ? "1" : "0",
                 evidence.selectedAppID,
                 String(evidence.appCount),
-                String(evidence.selectedWindowCount)
+                String(evidence.selectedWindowCount),
+                String(format: "%.6f", evidence.panelWidth),
+                String(
+                    format: "%.6f",
+                    evidence.visibleFrameWidth
+                ),
+                String(evidence.visibleHomeWindowCount)
             ]
         let stageValues =
             AppPanelPressureStageMetricColumn.all.map {

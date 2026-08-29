@@ -451,7 +451,6 @@ extension SwitcherPanelController {
         removeEventMonitors()
         cancelInitialWindowOnlyPanelReveal()
         panelPresentationActive = false
-        _ = panel.makeFirstResponder(nil)
         panel.orderOut(nil)
         panel.alphaValue = 0
         panel.ignoresMouseEvents = true
@@ -529,6 +528,10 @@ extension SwitcherPanelController {
 
         let maxWidth = max(appLayerMinimumWidth, visibleFrame.width - panelScreenMargin)
         let maxHeight = max(minimumPanelHeight, visibleFrame.height - panelScreenMargin)
+        let appStripPreferredWidth = preferredAppStripWidth(
+            appCount: model.appCount,
+            maxTileSize: appLayerMaxAdaptiveTileSize
+        )
         let preferredWidth: CGFloat
         if model.isPreviewLayerMode {
             preferredWidth = preferredPreviewLayerWidth(
@@ -537,12 +540,12 @@ extension SwitcherPanelController {
                 maxPanelWidth: maxWidth
             )
         } else {
-            preferredWidth = preferredAppStripWidth(
-                appCount: model.appCount,
-                maxTileSize: appLayerMaxAdaptiveTileSize
-            )
+            preferredWidth = appStripPreferredWidth
         }
-        let width = min(maxWidth, preferredWidth)
+        let width = resolvedAppLayerPanelWidth(
+            preferredWidth: preferredWidth,
+            visibleFrameWidth: visibleFrame.width
+        )
         let height: CGFloat
 
         if model.isSearchActive {
@@ -565,7 +568,10 @@ extension SwitcherPanelController {
                 listHeight: listHeight,
                 neededPanelHeight: desiredHeight,
                 finalPanelHeight: height,
-                maxHeight: maxHeight
+                maxHeight: maxHeight,
+                visibleFrameWidth: visibleFrame.width,
+                preferredAppStripWidth: appStripPreferredWidth,
+                finalPanelWidth: width
             )
             let targetSize = NSSize(width: width, height: height)
             setPanelContentSize(targetSize, recenterScreen: recenterScreen)
@@ -662,6 +668,16 @@ extension SwitcherPanelController {
         return max(appLayerMinimumWidth, stripWidth + SwitcherPanelLayoutMetrics.horizontalInset)
     }
 
+    func resolvedAppLayerPanelWidth(
+        preferredWidth: CGFloat,
+        visibleFrameWidth: CGFloat
+    ) -> CGFloat {
+        min(
+            preferredWidth,
+            max(appLayerMinimumWidth, visibleFrameWidth - panelScreenMargin)
+        )
+    }
+
     func preferredPreviewLayerWidth(
         appCount: Int,
         windowCount: Int,
@@ -693,11 +709,17 @@ extension SwitcherPanelController {
         listHeight: CGFloat,
         neededPanelHeight: CGFloat,
         finalPanelHeight: CGFloat,
-        maxHeight: CGFloat
+        maxHeight: CGFloat,
+        visibleFrameWidth: CGFloat,
+        preferredAppStripWidth: CGFloat,
+        finalPanelWidth: CGFloat
     ) {
         let summary = [
             "resultCount=\(resultCount)",
             "visibleRows=\(visibleRows)",
+            "visibleFrameWidth=\(formatLayoutPoint(visibleFrameWidth))",
+            "preferredAppStripWidth=\(formatLayoutPoint(preferredAppStripWidth))",
+            "finalPanelWidth=\(formatLayoutPoint(finalPanelWidth))",
             "header=\(formatLayoutPoint(measurements.presentationHeaderHeight))",
             "row=\(formatLayoutPoint(measurements.resultRowHeight))",
             "listHeight=\(formatLayoutPoint(listHeight))",

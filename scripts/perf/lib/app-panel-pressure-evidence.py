@@ -364,6 +364,32 @@ def evaluate(
         and row["selected_app_id"] == "none"
         for row in closed
     )
+    active_rows = opened + highlighted
+    panel_geometry_valid = all(
+        float(row["visible_frame_width"]) > 0
+        and float(row["panel_width"]) >= 440
+        and float(row["panel_width"])
+        <= max(440, float(row["visible_frame_width"]) - 80) + 0.5
+        for row in active_rows
+    )
+    home_lifecycle_valid = all(
+        int(row["visible_home_window_count"]) == 0
+        for row in measured_rows
+    )
+    opened_width_by_cycle = {
+        int(row["cycle"]): float(row["panel_width"])
+        for row in opened
+    }
+    shared_width_valid = flow_name == "app-to-window" or all(
+        abs(
+            float(row["panel_width"])
+            - opened_width_by_cycle.get(
+                int(row["cycle"]),
+                math.inf,
+            )
+        ) <= 0.5
+        for row in highlighted
+    )
 
     active = timed_samples(samples, measurement_start, cooldown_start)
     cooldown_settle = cooldown_start + measured_cooldown * 0.5
@@ -432,6 +458,24 @@ def evaluate(
         ),
         gate("closed_state", closed_state_valid, len(closed), "all"),
         gate(
+            "panel_geometry",
+            panel_geometry_valid,
+            len(active_rows),
+            "all",
+        ),
+        gate(
+            "shared_application_search_width",
+            shared_width_valid,
+            len(highlighted),
+            "all",
+        ),
+        gate(
+            "suppressed_home_window_count",
+            home_lifecycle_valid,
+            len(measured_rows),
+            "all-zero",
+        ),
+        gate(
             "open_p95_ms",
             open_p95 <= OPEN_P95_LIMIT_MS,
             open_p95,
@@ -486,7 +530,7 @@ def evaluate(
     )
 
     return {
-        "schema_version": 5,
+        "schema_version": 6,
         "flow": flow_name,
         "scenario": scenario_name,
         "verdict": "passed" if all(item["passed"] for item in gates) else "failed",
@@ -510,6 +554,35 @@ def evaluate(
             else None
         ),
         "observed_selected_app_count": len(selected_app_ids),
+        "panel_width_min": min(
+            (float(row["panel_width"]) for row in active_rows),
+            default=None,
+        ),
+        "panel_width_max": max(
+            (float(row["panel_width"]) for row in active_rows),
+            default=None,
+        ),
+        "visible_frame_width_min": min(
+            (
+                float(row["visible_frame_width"])
+                for row in active_rows
+            ),
+            default=None,
+        ),
+        "visible_frame_width_max": max(
+            (
+                float(row["visible_frame_width"])
+                for row in active_rows
+            ),
+            default=None,
+        ),
+        "visible_home_window_count_max": max(
+            (
+                int(row["visible_home_window_count"])
+                for row in measured_rows
+            ),
+            default=None,
+        ),
         "measured_duration_seconds": measured_duration,
         "measured_cooldown_seconds": measured_cooldown,
         "open_p50_ms": open_p50,

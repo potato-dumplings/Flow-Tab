@@ -131,6 +131,9 @@ struct TabSwitchStressEvidence:
     let policy: TabSwitchStressPolicy
     let attemptCount: UInt64
     let switchCount: UInt64
+    let homeSwitchCount: UInt64
+    let logsSwitchCount: UInt64
+    let settingsSwitchCount: UInt64
     let requestedTarget: TabSwitchStressTarget?
     let observedTarget: TabSwitchStressTarget?
     let elapsedNanoseconds: UInt64
@@ -149,6 +152,9 @@ struct TabSwitchStressEvidence:
             + "\(policy.requiredSwitchCount) "
             + "attempts=\(attemptCount) "
             + "switches=\(switchCount) "
+            + "homeSwitches=\(homeSwitchCount) "
+            + "logsSwitches=\(logsSwitchCount) "
+            + "settingsSwitches=\(settingsSwitchCount) "
             + "requested="
             + "\(requestedTarget?.rawValue ?? "none") "
             + "observed="

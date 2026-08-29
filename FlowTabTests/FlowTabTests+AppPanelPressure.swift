@@ -153,6 +153,9 @@ extension FlowTabTests {
             selectedWindowCount:
                 FlowTabUITestAppPanelPressureFixture
                     .realisticWindowCount,
+            panelWidth: 944,
+            visibleFrameWidth: 1_024,
+            visibleHomeWindowCount: 0,
             stageMetrics: [:]
         )
         XCTAssertTrue(visible.isSatisfied)
@@ -172,6 +175,9 @@ extension FlowTabTests {
             selectedWindowCount:
                 FlowTabUITestAppPanelPressureFixture
                     .realisticWindowCount,
+            panelWidth: 944,
+            visibleFrameWidth: 1_024,
+            visibleHomeWindowCount: 0,
             stageMetrics: [:]
         )
         XCTAssertFalse(occluded.isSatisfied)
@@ -185,9 +191,20 @@ extension FlowTabTests {
             selectedAppID: nil,
             appCount: 0,
             selectedWindowCount: 0,
+            panelWidth: 0,
+            visibleFrameWidth: 1_024,
+            visibleHomeWindowCount: 0,
             stageMetrics: [:]
         )
         XCTAssertTrue(closed.isSatisfied)
+
+        var oversized = visible
+        oversized.panelWidth = 945
+        XCTAssertFalse(oversized.isSatisfied)
+
+        var homeVisible = visible
+        homeVisible.visibleHomeWindowCount = 1
+        XCTAssertFalse(homeVisible.isSatisfied)
     }
 
     func testAppPanelPressureStaticDatasetBuildsOncePerVariant() {

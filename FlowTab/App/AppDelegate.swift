@@ -33,6 +33,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         (any RuntimeAppLaunchWindowEvidenceCoordinating)?
     private var appVisibilityReconciliationTask: Task<Void, Never>?
     private var requestedAccessibilityPermissionThisLaunch = false
+#if FLOWTAB_TESTING
+    private var tabSwitchStressStartCommandOwner:
+        TabSwitchStressStartCommandOwner?
+#endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
@@ -81,7 +85,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !FlowTabTestLaunchOptions.suppressesHomeWindowOnLaunch {
             AppWindowCoordinator.openHomeInCurrentProcess()
         }
-        resolvedStressRunner.startIfNeeded()
+        if let rawStartNotificationName =
+                FlowTabTestLaunchOptions
+                    .tabSwitchStressStartNotificationName,
+           !rawStartNotificationName.isEmpty
+        {
+            let owner = TabSwitchStressStartCommandOwner(
+                notificationName: Notification.Name(
+                    rawStartNotificationName
+                ),
+                runner: resolvedStressRunner
+            )
+            tabSwitchStressStartCommandOwner = owner
+            owner.start()
+        } else {
+            resolvedStressRunner.startIfNeeded()
+        }
         FlowTabUITestBootstrapper.presentInitialUIIfNeeded(panelController: panelController)
 #else
         AppWindowCoordinator.openHomeInCurrentProcess()
@@ -180,6 +199,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyMonitor?.stop()
         inAppWindowHotkeyMonitor?.stop()
 #if FLOWTAB_TESTING
+        tabSwitchStressStartCommandOwner?.cancel()
+        tabSwitchStressStartCommandOwner = nil
         resolvedStressRunner.stop()
         FlowTabUITestBootstrapper
             .stopInitialPanelOcclusionStalenessInjection()

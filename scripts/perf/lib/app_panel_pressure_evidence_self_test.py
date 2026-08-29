@@ -27,6 +27,9 @@ def synthetic_inputs(
             "selected_app_id": "none",
             "app_count": "0",
             "selected_window_count": "0",
+            "panel_width": "0",
+            "visible_frame_width": "0",
+            "visible_home_window_count": "0",
         }
         marker.update({column: "0" for column in open_stage_columns})
         marker.update({column: "0" for column in event_stage_columns})
@@ -100,6 +103,9 @@ def synthetic_inputs(
                 ),
                 "app_count": "24" if visible == "1" else "0",
                 "selected_window_count": str(windows),
+                "panel_width": "1120" if visible == "1" else "0",
+                "visible_frame_width": "1440",
+                "visible_home_window_count": "0",
             }
             metric.update({column: "0" for column in open_stage_columns})
             metric.update({column: "0" for column in event_stage_columns})
@@ -196,6 +202,32 @@ def run_self_test(evaluate, open_stage_columns, event_stage_columns):
             120,
             15,
         )["verdict"] == "failed"
+    invalid_panel_metrics, invalid_panel_samples = synthetic_inputs(
+        open_stage_columns,
+        event_stage_columns,
+    )
+    invalid_panel_metrics[3]["panel_width"] = "1400"
+    assert evaluate(
+        invalid_panel_metrics,
+        invalid_panel_samples,
+        "application",
+        "realistic",
+        120,
+        15,
+    )["verdict"] == "failed"
+    visible_home_metrics, visible_home_samples = synthetic_inputs(
+        open_stage_columns,
+        event_stage_columns,
+    )
+    visible_home_metrics[3]["visible_home_window_count"] = "1"
+    assert evaluate(
+        visible_home_metrics,
+        visible_home_samples,
+        "application",
+        "realistic",
+        120,
+        15,
+    )["verdict"] == "failed"
     flow_metrics, flow_samples = synthetic_inputs(
         open_stage_columns,
         event_stage_columns,

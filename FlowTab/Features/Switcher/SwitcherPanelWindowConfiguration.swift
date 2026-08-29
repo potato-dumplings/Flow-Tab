@@ -19,6 +19,10 @@ final class SwitcherOverlayPanel: NSPanel {
         false
     }
 
+    var registeredSwitcherAccessibilityAppIDs: [String] {
+        orderedSwitcherAppIDs
+    }
+
     func updateSwitcherAccessibilityApps(
         _ apps: [AppSwitchCandidate],
         tileSize: CGFloat,

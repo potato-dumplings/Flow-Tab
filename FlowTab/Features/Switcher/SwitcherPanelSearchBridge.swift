@@ -29,6 +29,15 @@ struct SearchSystemTextInputBridge: NSViewRepresentable {
                 to: window
             )
         }
+        view.onPresentationSessionActivityChanged = {
+            [weak coordinator = context.coordinator,
+             weak textView = view.textView] isActive in
+            guard let coordinator, let textView else { return }
+            coordinator.updatePresentationSessionActivity(
+                isActive,
+                for: textView
+            )
+        }
         return view
     }
 
@@ -51,6 +60,7 @@ struct SearchSystemTextInputBridge: NSViewRepresentable {
         coordinator: Coordinator
     ) {
         nsView.onWindowChanged = nil
+        nsView.onPresentationSessionActivityChanged = nil
         coordinator.detach(textView: nsView.textView)
     }
 
@@ -139,6 +149,27 @@ struct SearchSystemTextInputBridge: NSViewRepresentable {
         ) {
             self.onInputChanged = onInputChanged
             self.onMarkedTextChanged = onMarkedTextChanged
+        }
+
+        func updatePresentationSessionActivity(
+            _ isActive: Bool,
+            for textView: NSTextView
+        ) {
+            guard trackedTextView === textView else { return }
+            // The active root update owns responder restoration. Restoring here
+            // would enqueue responder work once for the cached tree and again
+            // when SwiftUI synchronizes the current search state.
+            guard !isActive else { return }
+
+            firstResponderSynchronizationGeneration &+= 1
+            isKeyboardReadinessActive = false
+            cancelKeyboardReadinessObservation()
+            if let window = textView.window,
+               window.firstResponder === textView
+            {
+                _ = window.makeFirstResponder(nil)
+            }
+            publishKeyboardReadiness(false)
         }
 
         func synchronize(
@@ -472,10 +503,38 @@ struct SearchSystemTextInputBridge: NSViewRepresentable {
     }
 }
 
-final class SearchSystemTextInputContainerView: NSView {
+@MainActor
+protocol SwitcherOverlayPresentationSessionLifecycleHandling: AnyObject {
+    func switcherOverlayPresentationSessionActivityDidChange(
+        _ isActive: Bool
+    )
+}
+
+extension NSView {
+    func updateSwitcherOverlayPresentationSessionActivity(
+        _ isActive: Bool
+    ) {
+        if let handler = self as?
+            SwitcherOverlayPresentationSessionLifecycleHandling
+        {
+            handler.switcherOverlayPresentationSessionActivityDidChange(
+                isActive
+            )
+        }
+        subviews.forEach {
+            $0.updateSwitcherOverlayPresentationSessionActivity(isActive)
+        }
+    }
+}
+
+final class SearchSystemTextInputContainerView:
+    NSView,
+    SwitcherOverlayPresentationSessionLifecycleHandling
+{
     let textView: SearchSystemTextView
     let scrollView: NSScrollView
     var onWindowChanged: ((NSWindow?) -> Void)?
+    var onPresentationSessionActivityChanged: ((Bool) -> Void)?
 
     override init(frame frameRect: NSRect) {
         let textStorage = NSTextStorage()
@@ -562,6 +621,12 @@ final class SearchSystemTextInputContainerView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         onWindowChanged?(window)
+    }
+
+    func switcherOverlayPresentationSessionActivityDidChange(
+        _ isActive: Bool
+    ) {
+        onPresentationSessionActivityChanged?(isActive)
     }
 }
 
@@ -735,6 +800,13 @@ final class SearchSystemTextInputBridgeTestHarness {
             cursorPosition: cursorPosition,
             isSearchActive: isSearchActive,
             showsInsertionPoint: showsInsertionPoint
+        )
+    }
+
+    func updatePresentationSessionActivity(_ isActive: Bool) {
+        coordinator.updatePresentationSessionActivity(
+            isActive,
+            for: containerView.textView
         )
     }
 

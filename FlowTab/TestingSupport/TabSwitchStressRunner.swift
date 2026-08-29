@@ -32,6 +32,9 @@ final class TabSwitchStressRunner:
         let deadlineNanoseconds: UInt64
         var attemptCount: UInt64
         var switchCount: UInt64
+        var homeSwitchCount: UInt64
+        var logsSwitchCount: UInt64
+        var settingsSwitchCount: UInt64
         var requestedTarget:
             TabSwitchStressTarget?
         var observedTarget:
@@ -106,6 +109,9 @@ final class TabSwitchStressRunner:
                 ),
             attemptCount: 0,
             switchCount: 0,
+            homeSwitchCount: 0,
+            logsSwitchCount: 0,
+            settingsSwitchCount: 0,
             requestedTarget: nil,
             observedTarget: nil,
             wakeGeneration: 0,
@@ -198,6 +204,14 @@ final class TabSwitchStressRunner:
         observed.observedTarget = observedTarget
         if observedTarget == requestedTarget {
             observed.switchCount &+= 1
+            switch requestedTarget {
+            case .home:
+                observed.homeSwitchCount &+= 1
+            case .logs:
+                observed.logsSwitchCount &+= 1
+            case .settings:
+                observed.settingsSwitchCount &+= 1
+            }
         }
         active = observed
         publish(
@@ -362,6 +376,9 @@ final class TabSwitchStressRunner:
             policy: run.policy,
             attemptCount: run.attemptCount,
             switchCount: run.switchCount,
+            homeSwitchCount: run.homeSwitchCount,
+            logsSwitchCount: run.logsSwitchCount,
+            settingsSwitchCount: run.settingsSwitchCount,
             requestedTarget:
                 run.requestedTarget,
             observedTarget:

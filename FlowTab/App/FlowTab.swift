@@ -23,6 +23,13 @@ struct FlowTabApp: App {
     }
 
     var body: some Scene {
+#if !FLOWTAB_TESTING
+        homeWindowScene
+#endif
+        settingsScene
+    }
+
+    private var homeWindowScene: some Scene {
         WindowGroup("FlowTab") {
             HomeRootView(
                 runtimeProjectionService: Self.runtimeProjectionService
@@ -31,7 +38,9 @@ struct FlowTabApp: App {
         }
         .defaultSize(width: AppWindowLayout.width, height: AppWindowLayout.height)
         .windowStyle(.hiddenTitleBar)
+    }
 
+    private var settingsScene: some Scene {
         Settings {
             HomeRootView(
                 runtimeProjectionService: Self.runtimeProjectionService

@@ -70,11 +70,25 @@ Use this for:
 
 Minimum validation:
 
-- Run `./scripts/perf/tab-switch-stress.sh 20 20 0.5 --build-root <project-local-build-root-20ms> --output-dir <attempt-20ms-directory>`.
-- Prefer adding the lower-frequency comparison run `./scripts/perf/tab-switch-stress.sh 20 50 0.5 --build-root <project-local-build-root-50ms> --output-dir <attempt-50ms-directory>`.
-- Use a distinct, not-yet-existing attempt directory for every run. The script atomically creates the leaf and preserves `samples.csv`, `summary.txt`, `build.log`, `app.log`, and `status.json`.
-- Continue to support non-audit calls that use positional arguments only; they receive a unique output directory under `./.build-local/tab-switch-stress/`.
-- Record CPU and RSS `avg/p95/max`. Keep the pressure result non-green when the pressure process exits nonzero, sampling fails, samples are missing, or evidence cannot be written.
+- Use `./scripts/perf/tab-switch-real-pressure.sh` for the formal acceptance lane. It runs the fixed-path signed App with its real Accessibility and Screen Recording grants, launches the resolved multi-window fixture, verifies the fixture in Home, warms Home, Logs, and Settings, then sends the deferred TestingSupport start command.
+- Run `ERROR` and `DEBUG` at both `20ms` and `50ms`. Run every combination three times in fresh evidence directories and compare the median with the nearest same-machine baseline.
+- The formal `status.json` must report both permission decisions, Home application/window counts, the fixture hit, all three page warm-ups, total completion count, and the Home/Logs/Settings completion counts. Each tab count must be positive and their sum must equal the completed count.
+- Use `./scripts/perf/tab-switch-stress.sh` as the `isolated_state_log` attribution lane with the same `ERROR`/`DEBUG`, `20ms`/`50ms`, three-run matrix. Its isolated HOME, exact completion line, per-tab counters, and log-volume fields provide paired state-transition and logging evidence.
+- Run the existing low-frequency `DEBUG` gate at `60s / 1000ms / 0.5s` as the supplemental retained-log check.
+- Use a distinct, not-yet-existing attempt directory for every run. The real lane preserves fixed-identity runtime evidence, UI status, samples, `.xcresult`, summary, and top-level status. The attribution lane preserves `samples.csv`, `summary.txt`, `build.log`, `app.log`, and `status.json`.
+- Record CPU and RSS `avg/p95/max`, RSS warm-state platform behavior, throughput, and retained-log volume. Keep the pressure result non-green when permissions or fixture projection are missing, a page is not warmed, completion evidence is incomplete, the pressure process exits nonzero, sampling fails, samples are missing, or evidence cannot be written.
+
+### App-Panel Pressure
+
+Use this for application-strip, application-to-window, search-panel layout, panel lifecycle, or panel TestingSupport changes.
+
+Minimum validation:
+
+- Run `./scripts/perf/app-panel-pressure.sh` for `application`, `app-to-window`, and `search`, covering both `realistic` and `extreme` scenarios. Each scenario runs for `120s`, samples every `0.5s`, and uses a `15s` closed-panel cooldown.
+- Require `panelWidth`, `visibleFrameWidth`, and `visibleHomeWindowCount` on every panel evidence record. The visible panel must satisfy the current-display width reservation and `visibleHomeWindowCount == 0`.
+- Require one `keepAlways` XCTest screen attachment from the first warm-up cycle of every flow/scenario. Capture after `appContentDraw`, `windowContentDraw`, or committed results plus `searchFirstRowDraw`, before sending the close command.
+- Export the attachment from the scenario `.xcresult`; validate its exact name, PNG dimensions, payload size, and SHA-256. Preserve the exported PNG and attachment manifest with the scenario evidence.
+- Record open/interaction/close latency, active CPU `avg/p95/max`, cooldown CPU recovery, RSS `avg/p95/max`, and the warm-state RSS plateau comparison.
 
 ### Search Pressure
 

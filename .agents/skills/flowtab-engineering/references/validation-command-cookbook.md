@@ -228,7 +228,21 @@ Then run the relevant `FlowTabUITests` case through `run-ui-tests-local.sh`.
 
 ## Pressure Checks
 
-Tab-switch pressure:
+Formal real-permission Tab-switch pressure:
+
+```bash
+./scripts/perf/tab-switch-real-pressure.sh \
+  --duration-seconds 20 \
+  --switch-interval-ms 20 \
+  --sample-interval 0.5 \
+  --runtime-log-level ERROR \
+  --build-root ./.build-local/test-audit/rebuild/build/<real-tab-command-id> \
+  --evidence-dir ./.build-local/test-audit/rebuild/attempts/<real-tab-attempt-id>
+```
+
+Run `ERROR` and `DEBUG` at both `20ms` and `50ms`, with three fresh attempts per combination. The entry installs the fixed-path signed App, reuses the canonical runtime-topology sampler, verifies real Accessibility and Screen Recording grants, projects the resolved fixture into Home, warms Home/Logs/Settings, and then starts the switching workload. Its status preserves permission, fixture, page-warmup, per-tab completion, CPU/RSS, retained-log, identity, and `.xcresult` gates.
+
+Isolated state/log attribution:
 
 ```bash
 ./scripts/perf/tab-switch-stress.sh 20 20 0.5 \
@@ -239,7 +253,20 @@ Tab-switch pressure:
   --output-dir ./.build-local/test-audit/rebuild/attempts/<attempt-50ms>
 ```
 
-Each output directory preserves `samples.csv`, `summary.txt`, `build.log`, `app.log`, and `status.json`. Every run uses a fresh attempt directory; the script atomically creates the leaf and rejects reuse. The summary reports CPU/RSS `avg/p95/max`, and `status.json` preserves build, app, sampling, summary, and log-writer results. Positional-only non-audit calls remain supported and receive a unique default directory under `./.build-local/tab-switch-stress/`.
+Run this lane with the same four log-level/cadence combinations and three attempts per combination. Each output directory preserves `samples.csv`, `summary.txt`, `build.log`, `app.log`, and schema-v4 `status.json`, including the `isolated_state_log` lane and Home/Logs/Settings counts. Every run uses a fresh attempt directory; the script atomically creates the leaf and rejects reuse. Positional-only non-audit calls remain supported and receive a unique default directory under `./.build-local/tab-switch-stress/`.
+
+App-panel pressure:
+
+```bash
+./scripts/perf/app-panel-pressure.sh --flow application \
+  --duration-seconds 120 --sample-interval 0.5 --cooldown-seconds 15
+./scripts/perf/app-panel-pressure.sh --flow app-to-window \
+  --duration-seconds 120 --sample-interval 0.5 --cooldown-seconds 15
+./scripts/perf/app-panel-pressure.sh --flow search \
+  --duration-seconds 120 --sample-interval 0.5 --cooldown-seconds 15
+```
+
+The default scenario set covers `realistic` and `extreme`. Every flow/scenario must publish panel width, current visible-frame width, and zero visible Home windows, then retain one first-warm-up XCTest screen attachment at its exact draw milestone. The wrapper exports the `keepAlways` PNG from `.xcresult`, verifies its exact name, dimensions, payload size, and SHA-256, and preserves the PNG plus attachment manifest with the latency and CPU/RSS evidence.
 
 Full search pressure still requires process-level `%CPU` and `RSS` sampling for at least `30s` per scenario. Use `performance-pressure-workflow.md` for the required dataset, cadence, and reporting fields.
 

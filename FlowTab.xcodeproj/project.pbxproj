@@ -13,6 +13,8 @@
 		A8A001043F10000100B0D737 /* FlowTabTests+SparkleUpdates.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8A000043F10000100B0D737 /* FlowTabTests+SparkleUpdates.swift */; };
 		A8A001053F10000100B0D737 /* FlowTabUITests+SparkleUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8A000053F10000100B0D737 /* FlowTabUITests+SparkleUpdate.swift */; };
 		A8B001013F11000100B0D737 /* FlowTabUITests+LogsActivityLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8B000013F11000100B0D737 /* FlowTabUITests+LogsActivityLifecycle.swift */; };
+		D2A100023F20000100B0D737 /* FlowTabUITests+AppPanelPressureVisualEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A100013F20000100B0D737 /* FlowTabUITests+AppPanelPressureVisualEvidence.swift */; };
+		D2A200023F20000100B0D737 /* FlowTabUITests+TabSwitchRealPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A200013F20000100B0D737 /* FlowTabUITests+TabSwitchRealPressure.swift */; };
 		A8A001063F10000100B0D737 /* SparkleLicense.txt in Resources */ = {isa = PBXBuildFile; fileRef = A8A000063F10000100B0D737 /* SparkleLicense.txt */; };
 		A8A001073F10000100B0D737 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A8A003013F10000100B0D737 /* Sparkle */; };
 		4A6DAE6E2F727AF500B0D737 /* FlowTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */; };
@@ -1412,6 +1414,8 @@
 		FFFB00063D3A000100B0D737 /* TabSwitchStressTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSwitchStressTestSupport.swift; sourceTree = "<group>"; };
 		FFFB00073D3A000100B0D737 /* TabSwitchStressEvidenceTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSwitchStressEvidenceTransport.swift; sourceTree = "<group>"; };
 		FFFB00083D3A000100B0D737 /* FlowTabUITests+TabSwitchStressEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+TabSwitchStressEvidence.swift"; sourceTree = "<group>"; };
+		D2A100013F20000100B0D737 /* FlowTabUITests+AppPanelPressureVisualEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+AppPanelPressureVisualEvidence.swift"; sourceTree = "<group>"; };
+		D2A200013F20000100B0D737 /* FlowTabUITests+TabSwitchRealPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+TabSwitchRealPressure.swift"; sourceTree = "<group>"; };
 		FFFC00013D3B000100B0D737 /* FlowTabTests+AppVisibilityReload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+AppVisibilityReload.swift"; sourceTree = "<group>"; };
 		A5B100013DC1000100B0D737 /* FlowTabTests+AppVisibilityRuntimeIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+AppVisibilityRuntimeIdentity.swift"; sourceTree = "<group>"; };
 		A5B100033DC1000100B0D737 /* FlowTabUITests+AppVisibilityIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+AppVisibilityIdentity.swift"; sourceTree = "<group>"; };
@@ -1796,6 +1800,8 @@
 				C8A300013A25000100B0D737 /* FlowTabUITests+ApplicationMembership.swift */,
 				A47A00013D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift */,
 				FFFB00083D3A000100B0D737 /* FlowTabUITests+TabSwitchStressEvidence.swift */,
+				D2A200013F20000100B0D737 /* FlowTabUITests+TabSwitchRealPressure.swift */,
+				D2A100013F20000100B0D737 /* FlowTabUITests+AppPanelPressureVisualEvidence.swift */,
 				C1F100013A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift */,
 				C1F200013A21000100B0D737 /* FlowTabUITests+HotkeyReleaseLifecycle.swift */,
 				A4D100053B20000100B0D737 /* FlowTabUITests+SystemAppMRU.swift */,
@@ -3092,6 +3098,8 @@
 				C8A300023A25000100B0D737 /* FlowTabUITests+ApplicationMembership.swift in Sources */,
 				A47A00023D7B000100B0D737 /* FlowTabUITests+SearchSelectionWrap.swift in Sources */,
 				FFFB01083D3A000100B0D737 /* FlowTabUITests+TabSwitchStressEvidence.swift in Sources */,
+				D2A200023F20000100B0D737 /* FlowTabUITests+TabSwitchRealPressure.swift in Sources */,
+				D2A100023F20000100B0D737 /* FlowTabUITests+AppPanelPressureVisualEvidence.swift in Sources */,
 				C1F100023A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift in Sources */,
 				C1F200023A21000100B0D737 /* FlowTabUITests+HotkeyReleaseLifecycle.swift in Sources */,
 				A4D100063B20000100B0D737 /* FlowTabUITests+SystemAppMRU.swift in Sources */,

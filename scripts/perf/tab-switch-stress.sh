@@ -21,7 +21,7 @@ usage() {
   cat <<'EOF'
 Usage: ./scripts/perf/tab-switch-stress.sh [duration_seconds] [switch_interval_ms] [sample_interval_seconds] [--runtime-log-level <DEBUG|INFO|WARN|ERROR>] [--max-runtime-log-mb-per-minute <positive-decimal>] [--build-root <dir>] [--output-dir <dir>]
 
-Runs the tab-switch stress scenario and preserves its evidence.
+Runs the isolated state/log attribution lane and preserves its evidence.
 
 Positional arguments:
   duration_seconds         Stress duration in seconds (default: 30)
@@ -78,6 +78,9 @@ write_status() {
   local sampling_failed_json="false"
   local planned_switch_count_json="null"
   local completed_switch_count_json="null"
+  local home_switch_count_json="null"
+  local logs_switch_count_json="null"
+  local settings_switch_count_json="null"
   local actual_elapsed_seconds_json="null"
   local throughput_json="null"
   local runtime_log_file_count_json="null"
@@ -105,6 +108,15 @@ write_status() {
   fi
   if [[ "$FLOWTAB_TAB_SWITCH_COMPLETED_SWITCH_COUNT" =~ ^[0-9]+$ ]]; then
     completed_switch_count_json="$FLOWTAB_TAB_SWITCH_COMPLETED_SWITCH_COUNT"
+  fi
+  if [[ "$FLOWTAB_TAB_SWITCH_HOME_SWITCH_COUNT" =~ ^[0-9]+$ ]]; then
+    home_switch_count_json="$FLOWTAB_TAB_SWITCH_HOME_SWITCH_COUNT"
+  fi
+  if [[ "$FLOWTAB_TAB_SWITCH_LOGS_SWITCH_COUNT" =~ ^[0-9]+$ ]]; then
+    logs_switch_count_json="$FLOWTAB_TAB_SWITCH_LOGS_SWITCH_COUNT"
+  fi
+  if [[ "$FLOWTAB_TAB_SWITCH_SETTINGS_SWITCH_COUNT" =~ ^[0-9]+$ ]]; then
+    settings_switch_count_json="$FLOWTAB_TAB_SWITCH_SETTINGS_SWITCH_COUNT"
   fi
   if [[ "$FLOWTAB_TAB_SWITCH_ACTUAL_ELAPSED_SECONDS" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
     actual_elapsed_seconds_json="$FLOWTAB_TAB_SWITCH_ACTUAL_ELAPSED_SECONDS"
@@ -144,13 +156,17 @@ write_status() {
   status_temp="${STATUS_FILE}.tmp"
   {
     printf '{\n'
-    printf '  "schema_version": 3,\n'
+    printf '  "schema_version": 4,\n'
     printf '  "runner_kind": "tab_switch_stress",\n'
+    printf '  "lane": "isolated_state_log",\n'
     printf '  "stage": "%s",\n' "$CURRENT_STAGE"
     printf '  "runtime_log_level": "%s",\n' "$RUNTIME_LOG_LEVEL"
     printf '  "completion_evidence": "%s",\n' "$FLOWTAB_TAB_SWITCH_EVIDENCE_CONDITION"
     printf '  "planned_switch_count": %s,\n' "$planned_switch_count_json"
     printf '  "completed_switch_count": %s,\n' "$completed_switch_count_json"
+    printf '  "home_switch_count": %s,\n' "$home_switch_count_json"
+    printf '  "logs_switch_count": %s,\n' "$logs_switch_count_json"
+    printf '  "settings_switch_count": %s,\n' "$settings_switch_count_json"
     printf '  "actual_elapsed_seconds": %s,\n' "$actual_elapsed_seconds_json"
     printf '  "throughput_switches_per_second": %s,\n' "$throughput_json"
     printf '  "runtime_log_measurement": "%s",\n' "$FLOWTAB_RUNTIME_LOG_VOLUME_CONDITION"
@@ -557,11 +573,16 @@ set +e
   printf 'Switch interval: %sms\n' "$SWITCH_INTERVAL_MS"
   printf 'Sample interval: %ss\n' "$SAMPLE_INTERVAL_SECONDS"
   printf 'Runtime log level: %s\n' "$RUNTIME_LOG_LEVEL"
+  printf 'Lane: isolated_state_log\n'
   printf 'App exit status: %s\n' "$APP_EXIT_STATUS"
   printf 'Sampling status: %s\n' "$([[ "$SAMPLING_FAILED" == true ]] && printf failed || printf completed)"
   printf 'Completion evidence: %s\n' "$FLOWTAB_TAB_SWITCH_EVIDENCE_CONDITION"
   printf 'Planned switches: %s\n' "${FLOWTAB_TAB_SWITCH_PLANNED_SWITCH_COUNT:-unavailable}"
   printf 'Completed switches: %s\n' "${FLOWTAB_TAB_SWITCH_COMPLETED_SWITCH_COUNT:-unavailable}"
+  printf 'Per-tab switches: home=%s logs=%s settings=%s\n' \
+    "${FLOWTAB_TAB_SWITCH_HOME_SWITCH_COUNT:-unavailable}" \
+    "${FLOWTAB_TAB_SWITCH_LOGS_SWITCH_COUNT:-unavailable}" \
+    "${FLOWTAB_TAB_SWITCH_SETTINGS_SWITCH_COUNT:-unavailable}"
   printf 'Actual elapsed: %ss\n' "${FLOWTAB_TAB_SWITCH_ACTUAL_ELAPSED_SECONDS:-unavailable}"
   printf 'Throughput: %s switches/s\n' "${FLOWTAB_TAB_SWITCH_THROUGHPUT:-unavailable}"
   printf 'Runtime log measurement: %s\n' "$FLOWTAB_RUNTIME_LOG_VOLUME_CONDITION"

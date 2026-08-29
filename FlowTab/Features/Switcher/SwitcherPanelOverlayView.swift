@@ -26,6 +26,7 @@ struct SwitcherPanelRootView: View {
                 CommandTabOverlay(
                     appRenderSnapshot: renderSnapshot,
                     overlayStyle: model.overlayStyle,
+                    isPresentationSessionActive: session != nil,
                     isPreviewLayer: model.isPreviewLayerMode,
                     previewSectionHeight: model.previewSectionHeight,
                     windowRenderGeneration:
@@ -253,9 +254,112 @@ struct SwitcherPanelRootView: View {
 #endif
 }
 
+private enum SwitcherOverlayPresentationMode: Hashable {
+    case standard
+    case search
+    case windowOnly
+}
+
+private struct ExclusiveSwitcherOverlayHost: NSViewRepresentable {
+    let mode: SwitcherOverlayPresentationMode?
+    let contentForMode: (SwitcherOverlayPresentationMode) -> AnyView
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let container = NSView()
+        container.wantsLayer = true
+        container.layer?.backgroundColor = NSColor.clear.cgColor
+        context.coordinator.present(
+            mode: mode,
+            contentForMode: contentForMode,
+            in: container
+        )
+        return container
+    }
+
+    func updateNSView(_ container: NSView, context: Context) {
+        context.coordinator.present(
+            mode: mode,
+            contentForMode: contentForMode,
+            in: container
+        )
+    }
+
+    static func dismantleNSView(
+        _ container: NSView,
+        coordinator: Coordinator
+    ) {
+        coordinator.dismantle(from: container)
+    }
+
+    @MainActor
+    final class Coordinator {
+        private var hostingViews:
+            [SwitcherOverlayPresentationMode: NSHostingView<AnyView>] = [:]
+        private var activeMode: SwitcherOverlayPresentationMode?
+
+        func present(
+            mode: SwitcherOverlayPresentationMode?,
+            contentForMode: (SwitcherOverlayPresentationMode) -> AnyView,
+            in container: NSView
+        ) {
+            guard let mode else { return }
+            let content = contentForMode(mode)
+            let hostingView: NSHostingView<AnyView>
+            if let cachedHostingView = hostingViews[mode] {
+                hostingView = cachedHostingView
+                hostingView.rootView = content
+            } else {
+                hostingView = NSHostingView(rootView: content)
+                hostingView.translatesAutoresizingMaskIntoConstraints = false
+                hostingView.sizingOptions = []
+                hostingViews[mode] = hostingView
+            }
+
+            guard activeMode != mode || hostingView.superview !== container else {
+                hostingView
+                    .updateSwitcherOverlayPresentationSessionActivity(
+                        true
+                    )
+                return
+            }
+
+            // Detaching inactive hosts keeps their SwiftUI state reusable without
+            // allowing their intrinsic size to participate in panel layout.
+            container.subviews.forEach {
+                $0.updateSwitcherOverlayPresentationSessionActivity(false)
+                $0.removeFromSuperview()
+            }
+            container.addSubview(hostingView)
+            NSLayoutConstraint.activate([
+                hostingView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+                hostingView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+                hostingView.topAnchor.constraint(equalTo: container.topAnchor),
+                hostingView.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+            ])
+            hostingView
+                .updateSwitcherOverlayPresentationSessionActivity(true)
+            activeMode = mode
+        }
+
+        func dismantle(from container: NSView) {
+            container.subviews.forEach {
+                $0.updateSwitcherOverlayPresentationSessionActivity(false)
+                $0.removeFromSuperview()
+            }
+            hostingViews.removeAll()
+            activeMode = nil
+        }
+    }
+}
+
 private struct CommandTabOverlay: View {
     let appRenderSnapshot: SwitcherAppLayerRenderSnapshot
     let overlayStyle: SwitcherOverlayStyle
+    let isPresentationSessionActive: Bool
     let isPreviewLayer: Bool
     let previewSectionHeight: CGFloat
     let windowRenderGeneration: UInt64
@@ -802,18 +906,33 @@ private struct CommandTabOverlay: View {
     }
 
     var body: some View {
-        ZStack {
-            if isWindowOnlyMode {
-                windowOnlyOverlayBody
-            } else {
-                standardOverlayBody
-                    .opacity(isSearchMode ? 0 : 1)
-                    .allowsHitTesting(!isSearchMode)
-                    .accessibilityHidden(isSearchMode)
+        ExclusiveSwitcherOverlayHost(
+            mode: activePresentationMode,
+            contentForMode: overlayBody(for:)
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var activePresentationMode: SwitcherOverlayPresentationMode? {
+        guard isPresentationSessionActive else { return nil }
+        if isWindowOnlyMode {
+            return .windowOnly
+        }
+        if isSearchMode {
+            return .search
+        }
+        return .standard
+    }
+
+    private func overlayBody(
+        for mode: SwitcherOverlayPresentationMode
+    ) -> AnyView {
+        switch mode {
+        case .windowOnly:
+            return AnyView(windowOnlyOverlayBody)
+        case .search:
+            return AnyView(
                 searchOverlayBody
-                    .opacity(isSearchMode ? 1 : 0)
-                    .allowsHitTesting(isSearchMode)
-                    .accessibilityHidden(!isSearchMode)
                     .onPreferenceChange(
                         SearchLayoutMeasurementPreferenceKey.self
                     ) { measurement in
@@ -822,7 +941,9 @@ private struct CommandTabOverlay: View {
                         }
                         onSearchLayoutMeasured(measurements)
                     }
-            }
+            )
+        case .standard:
+            return AnyView(standardOverlayBody)
         }
     }
 }

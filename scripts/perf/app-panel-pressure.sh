@@ -8,6 +8,7 @@ UI_TEST_RUNNER="${ROOT_DIR}/scripts/testing/run-ui-tests-local.sh"
 MANIFEST_CREATOR="${ROOT_DIR}/scripts/testing/create-ui-app-identity-manifest.sh"
 PRESSURE_RUNNER="${ROOT_DIR}/scripts/perf/runtime-topology-pressure.sh"
 EVIDENCE_TOOL="${ROOT_DIR}/scripts/perf/lib/app-panel-pressure-evidence.py"
+ATTACHMENT_TOOL="${ROOT_DIR}/scripts/perf/lib/app-panel-attachment-evidence.py"
 PATH_BOUNDARIES_PATH="${ROOT_DIR}/scripts/lib/path-boundaries.sh"
 UI_TEST_APP_LIFECYCLE_PATH="${ROOT_DIR}/scripts/testing/lib/ui-test-app-lifecycle.sh"
 APP_PATH="${HOME}/Applications/Flow Tab UITest.app"
@@ -217,7 +218,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-printf 'scenario\tpressure_status\tevidence_status\n' \
+printf 'scenario\tpressure_status\tevidence_status\tattachment_status\n' \
   >"${OUTPUT_DIR}/scenario-status.tsv"
 
 echo "Preparing the signed UI-test runner before timed scenarios..."
@@ -237,6 +238,7 @@ for scenario in "${SCENARIOS[@]}"; do
   pressure_output="${scenario_dir}/runtime-pressure"
   summary_path="${scenario_dir}/gate-summary.txt"
   json_path="${scenario_dir}/gate-summary.json"
+  attachment_output="${scenario_dir}/xctest-attachment"
   mkdir -p "${scenario_dir}"
 
   echo "Installing Release-optimized UI app for ${scenario} scenario..."
@@ -287,12 +289,41 @@ for scenario in "${SCENARIOS[@]}"; do
     echo "Missing UI metrics or CPU/RSS samples for ${scenario}." >&2
   fi
 
-  printf '%s\t%s\t%s\n' \
+  case "${FLOW_SELECTION}" in
+    application)
+      attachment_milestone="appContentDraw"
+      ;;
+    app-to-window)
+      attachment_milestone="windowContentDraw"
+      ;;
+    search)
+      attachment_milestone="searchFirstRowDraw"
+      ;;
+  esac
+  expected_attachment_name="flowtab-app-panel-${FLOW_SELECTION}-${scenario}-${attachment_milestone}"
+  xcresult_path="${pressure_output}/attempts/ui-tests/run/results/FlowTabUITests.xcresult"
+  attachment_status=1
+  if [[ -d "${xcresult_path}" ]]; then
+    set +e
+    /usr/bin/python3 "${ATTACHMENT_TOOL}" export \
+      --xcresult "${xcresult_path}" \
+      --output-dir "${attachment_output}" \
+      --expected-name "${expected_attachment_name}"
+    attachment_status=$?
+    set -e
+  else
+    echo "Missing XCTest result bundle for ${scenario}." >&2
+  fi
+
+  printf '%s\t%s\t%s\t%s\n' \
     "${scenario}" \
     "${pressure_status}" \
     "${evidence_status}" \
+    "${attachment_status}" \
     >>"${OUTPUT_DIR}/scenario-status.tsv"
-  if [[ "${pressure_status}" -ne 0 || "${evidence_status}" -ne 0 ]]; then
+  if [[ "${pressure_status}" -ne 0 \
+        || "${evidence_status}" -ne 0 \
+        || "${attachment_status}" -ne 0 ]]; then
     FINAL_STATUS=1
   fi
 done

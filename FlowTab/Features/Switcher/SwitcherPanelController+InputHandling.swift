@@ -279,6 +279,7 @@ extension SwitcherPanelController {
         }
         cancelPendingModifierReleaseConfirmation()
         resetPointerSelectionGate()
+        syncPanelAccessibilityAnchors()
         updatePanelSize()
         RuntimeLog.info(.session, "enter search mode")
         logSearchTrace("enterSearchMode action=entered \(searchTraceStateSummary())")
@@ -294,6 +295,7 @@ extension SwitcherPanelController {
         }
         cancelPendingModifierReleaseConfirmation()
         resetPointerSelectionGate()
+        syncPanelAccessibilityAnchors()
         if isPanelPresented {
             updatePanelSize()
         } else {
@@ -357,6 +359,7 @@ extension SwitcherPanelController {
             }
             if model.handleSearchEscape() != .ignored {
                 resetPointerSelectionGate()
+                syncPanelAccessibilityAnchors()
                 updatePanelSize()
             }
             return true

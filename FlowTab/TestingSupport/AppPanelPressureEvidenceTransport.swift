@@ -492,6 +492,17 @@ enum AppPanelPressureEvidenceTransport {
             let appCount = session?.apps.count ?? 0
             let selectedWindowCount =
                 session?.selectedApp.windows.count ?? 0
+            let panelWidth = panelController.panel.frame.width
+            let visibleFrameWidth = (
+                panelController.activePresentationScreen
+                    ?? panelController.panel.screen
+                    ?? NSScreen.main
+            )?.visibleFrame.width ?? 0
+            let visibleHomeWindowCount = NSApp.windows.filter {
+                $0.isVisible
+                    && $0.identifier?.rawValue
+                        == AppWindowCoordinator.homeWindowIdentifier
+            }.count
             let readbackCompletedAtNanoseconds =
                 DispatchTime.now().uptimeNanoseconds
             let elapsedMilliseconds: Double
@@ -543,6 +554,9 @@ enum AppPanelPressureEvidenceTransport {
                 selectedAppID: selectedAppID,
                 appCount: appCount,
                 selectedWindowCount: selectedWindowCount,
+                panelWidth: panelWidth,
+                visibleFrameWidth: visibleFrameWidth,
+                visibleHomeWindowCount: visibleHomeWindowCount,
                 completionRequirementSatisfied:
                     watchdogExpired ? false : true,
                 stageMetrics: stageMetrics
