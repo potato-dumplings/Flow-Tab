@@ -128,7 +128,7 @@ extension FlowTabPriorityCoverageTests {
                 .currentAppWindowProjectionReadCount(
                     appID: appID
                 ),
-            1
+            2
         )
         XCTAssertEqual(
             controller.modelForTesting
@@ -160,7 +160,7 @@ extension FlowTabPriorityCoverageTests {
                 .currentAppWindowProjectionReadCount(
                     appID: appID
                 ),
-            1
+            2
         )
         runtimeProjectionService.setCurrentAppWindowProjection(
             RuntimeCurrentAppWindowProjection(
@@ -184,7 +184,7 @@ extension FlowTabPriorityCoverageTests {
                 .currentAppWindowProjectionReadCount(
                     appID: appID
                 ),
-            2
+            3
         )
         XCTAssertEqual(
             controller.modelForTesting

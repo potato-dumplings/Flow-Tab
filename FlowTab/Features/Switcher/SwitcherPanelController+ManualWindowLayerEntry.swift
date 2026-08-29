@@ -5,29 +5,56 @@ extension SwitcherPanelController {
     @discardableResult
     func beginManualWindowLayerEntryIfNeeded() -> Bool {
         guard let session = model.session,
-              case .appCycle = session.mode,
-              session.selectedApp.windows.count >= 2,
-              let targetPID = selectedAppProcessIdentifier(
-                  appID: session.selectedApp.id
-              )
+              case .appCycle = session.mode
         else {
             return false
         }
-        let targetAppID = session.selectedApp.id
+        switch model.resolveSelectedAppWindowReadiness() {
+        case .ready(let identity, let projection):
+            let result = model.enterSelectedAppWindowLayer(
+                using: .ready(
+                    identity: identity,
+                    projection: projection
+                )
+            )
+            completeResolvedWindowLayerEntry(result: result)
+            return true
+        case .unavailable:
+            return true
+        case .pending(let identity):
+            return beginPendingManualWindowLayerEntry(
+                identity: identity
+            )
+        }
+    }
+
+    private func beginPendingManualWindowLayerEntry(
+        identity: SessionAppWindowIdentity
+    ) -> Bool {
+        let targetAppID = identity.appID
+        let targetPID = identity.pid
         let presentationGeneration = presentationSessionGeneration
         let observationGeneration =
             manualWindowLayerEntryObservationOwner.start(
                 targetAppID: targetAppID,
                 targetPID: targetPID,
                 presentationGeneration: presentationGeneration,
+                baseline: manualWindowLayerEntrySnapshot(
+                    targetAppID: targetAppID,
+                    readsProjection: false
+                ),
                 readback: { [unowned self] in
                     self.manualWindowLayerEntrySnapshot(
                         targetAppID: targetAppID
                     )
                 },
-                onSettled: { [weak self] evidence in
-                    self?.completeManualWindowLayerEntry(
-                        using: evidence
+                onSettled: { [weak self] _ in
+                    guard let self else { return }
+                    let resolution = self.model
+                        .resolveSelectedAppWindowReadiness()
+                    self.completeManualWindowLayerEntry(
+                        using: resolution,
+                        trigger: "ownerSettled"
                     )
                 }
             )
@@ -35,15 +62,20 @@ extension SwitcherPanelController {
         guard manualWindowLayerEntryObservationOwner.isObserving else {
             return true
         }
-        model.runtimeProjectionService
-            .signalSelectedCurrentAppWindowsChanged(
-                appID: targetAppID,
-                pid: targetPID
-            )
-        _ = manualWindowLayerEntryObservationOwner.observe(
-            source: .projectionRequestReturnReadback,
-            observationGeneration: observationGeneration,
-            presentationGeneration: presentationGeneration
+        _ = model.requestSelectedAppWindowMaintenanceIfNeeded(
+            identity: identity
+        )
+        let requestReturnResolution =
+            model.resolveSelectedAppWindowReadiness()
+        if completePendingManualWindowLayerEntryIfReady(
+            using: requestReturnResolution,
+            trigger: "requestReturn"
+        ) {
+            return true
+        }
+        scheduleDelayedWindowLayerEntryIfNeeded(
+            prewarmsPreviews: false,
+            requestsProjection: false
         )
         RuntimeLog.debug(
             .projection,
@@ -64,13 +96,26 @@ extension SwitcherPanelController {
         guard manualWindowLayerEntryObservationOwner.isObserving else {
             return false
         }
-        return manualWindowLayerEntryObservationOwner.observe(
-            source: .currentAppWindowProjectionUpdated,
-            eventAppID: appID,
-            eventEvidence: evidence,
-            observationGeneration:
-                manualWindowLayerEntryObservationOwner.generation,
-            presentationGeneration: presentationSessionGeneration
+        guard let appID,
+              model.sessionAppWindowReadiness?
+                  .identity.appID == appID
+        else {
+            return false
+        }
+        if let evidence,
+           (evidence.appID != appID
+               || !manualWindowLayerEntryObservationOwner.matches(
+                   targetAppID: evidence.appID,
+                   targetPID: evidence.processIdentifier,
+                   presentationGeneration:
+                       presentationSessionGeneration
+               )) {
+            return false
+        }
+        let resolution = model.resolveSelectedAppWindowReadiness()
+        return completePendingManualWindowLayerEntryIfReady(
+            using: resolution,
+            trigger: "projectionUpdated"
         )
     }
 
@@ -78,32 +123,69 @@ extension SwitcherPanelController {
         manualWindowLayerEntryObservationOwner.cancel()
     }
 
-    private func completeManualWindowLayerEntry(
-        using evidence: ManualWindowLayerEntryEvidence
-    ) {
-        guard evidence.presentationGeneration
-                == presentationSessionGeneration,
-              isPanelPresented
+    private func completePendingManualWindowLayerEntryIfReady(
+        using resolution: SelectedAppWindowReadinessResolution,
+        trigger: String
+    ) -> Bool {
+        guard case .ready(let identity, _) = resolution,
+              manualWindowLayerEntryObservationOwner.matches(
+                  targetAppID: identity.appID,
+                  targetPID: identity.pid,
+                  presentationGeneration:
+                      presentationSessionGeneration
+              )
         else {
-            return
+            return false
         }
-        _ = model.applyCurrentAppWindowProjectionIfReady(
-            appID: evidence.targetAppID
+        manualWindowLayerEntryObservationOwner.cancel(
+            invalidate: false
         )
-        model.handle(.downArrow)
+        completeManualWindowLayerEntry(
+            using: resolution,
+            trigger: trigger
+        )
+        return true
+    }
+
+    private func completeManualWindowLayerEntry(
+        using resolution: SelectedAppWindowReadinessResolution,
+        trigger: String
+    ) {
+        guard isPanelPresented else { return }
+        let result = model.enterSelectedAppWindowLayer(
+            using: resolution
+        )
+        completeResolvedWindowLayerEntry(result: result)
         resetPointerSelectionGate()
         RuntimeLog.debug(
             .session,
             "advance key=downArrow "
-                + "evidenceDriven=1 \(model.debugSelectionSummary()) "
-                + "evidence{\(evidence.logFields)}"
+                + "readinessDriven=1 trigger=\(trigger) "
+                + model.debugSelectionSummary()
         )
-        updatePanelSize()
-        scheduleDelayedWindowLayerEntryIfNeeded()
+    }
+
+    private func completeResolvedWindowLayerEntry(
+        result: SelectedAppWindowLayerEntryResult
+    ) {
+        RuntimeLog.debug(
+            .projection,
+            "manualWindowLayerEntry resolution=\(String(describing: result))"
+        )
+        switch result {
+        case .entered:
+            updatePanelSize()
+            clearDelayedWindowLayerEntryState()
+        case .pending:
+            scheduleDelayedWindowLayerEntryIfNeeded()
+        case .readyWithoutEnoughWindows, .unavailable:
+            clearDelayedWindowLayerEntryState()
+        }
     }
 
     private func manualWindowLayerEntrySnapshot(
-        targetAppID: String
+        targetAppID: String,
+        readsProjection: Bool = true
     ) -> ManualWindowLayerEntrySnapshot {
         let session = model.session
         let isAppLayer: Bool
@@ -128,9 +210,11 @@ extension SwitcherPanelController {
             isPanelPresented: isPanelPresented,
             isAppLayer: isAppLayer,
             isSearchActive: model.isSearchActive,
-            projection: manualWindowLayerProjectionReadback(
-                targetAppID: targetAppID
-            )
+            projection: readsProjection
+                ? manualWindowLayerProjectionReadback(
+                    targetAppID: targetAppID
+                )
+                : nil
         )
     }
 

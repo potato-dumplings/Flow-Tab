@@ -40,7 +40,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelProjectionRefreshPlacesNewRuntimeLeaderAheadOfVisibleOrder() {
+    func testLiveSwitcherModelProjectionRefreshKeepsOpenSnapshotAndUsesNewOrderNextSession() {
         let mail = AppSwitchCandidate(
             id: "com.example.mail",
             displayName: "Mail",
@@ -67,7 +67,6 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(
             model.startSession(triggerDirection: .forward)
         )
-        let selectedAppID = model.session?.selectedApp.id
         let calendar = AppSwitchCandidate(
             id: "com.example.calendar",
             displayName: "Calendar",
@@ -81,20 +80,24 @@ extension FlowTabPriorityCoverageTests {
             generatedAt: 20
         )
 
-        XCTAssertTrue(
+        XCTAssertFalse(
             model.handleAppSwitcherProjectionDidUpdate()
+        )
+        XCTAssertEqual(
+            model.session?.apps.map(\.id),
+            [mail.id, browser.id]
+        )
+        model.cancelSelection()
+        XCTAssertTrue(
+            model.startSession(triggerDirection: .forward)
         )
         XCTAssertEqual(
             model.session?.apps.map(\.id),
             [
                 calendar.id,
-                mail.id,
                 browser.id,
+                mail.id,
             ]
-        )
-        XCTAssertEqual(
-            model.session?.selectedApp.id,
-            selectedAppID
         )
     }
 

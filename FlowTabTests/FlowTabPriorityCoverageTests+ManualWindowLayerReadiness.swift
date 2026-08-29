@@ -5,6 +5,80 @@ import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
     @MainActor
+    func testSwitcherPanelControllerManualWindowLayerEntryUsesAlreadyCompleteProjectionWithoutRepair() {
+        let fixture = makeManualWindowLayerReadinessFixture(
+            currentWindowIDs: ["fullscreen", "normal"],
+            sourceGeneration: RuntimeReadModelGeneration(
+                space: 3,
+                projection: 5
+            ),
+            isCompleteForScope: true
+        )
+
+        XCTAssertTrue(
+            fixture.controller.beginGlobalHotkeySessionForTesting()
+        )
+        fixture.controller.advance(.downArrow)
+
+        XCTAssertTrue(
+            fixture.runtimeService
+                .selectedCurrentAppWindowChangeSignalsRecorded()
+                .isEmpty
+        )
+        XCTAssertFalse(
+            fixture.controller.manualWindowLayerEntryObservationOwner
+                .isObserving
+        )
+        XCTAssertEqual(
+            fixture.controller.modelForTesting.session?.mode,
+            .windowCycle(appID: fixture.appID)
+        )
+        XCTAssertEqual(
+            fixture.controller.modelForTesting.session?
+                .selectedApp.windows.map(\.id),
+            ["fullscreen", "normal"]
+        )
+        fixture.controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerManualWindowLayerEntryAcceptsCompleteZeroWindowProjectionWithoutRepair() {
+        let fixture = makeManualWindowLayerReadinessFixture(
+            currentWindowIDs: [],
+            sourceGeneration: RuntimeReadModelGeneration(
+                space: 3,
+                projection: 5
+            ),
+            isCompleteForScope: true
+        )
+
+        XCTAssertTrue(
+            fixture.controller.beginGlobalHotkeySessionForTesting()
+        )
+        fixture.controller.advance(.downArrow)
+
+        XCTAssertTrue(
+            fixture.runtimeService
+                .selectedCurrentAppWindowChangeSignalsRecorded()
+                .isEmpty
+        )
+        XCTAssertFalse(
+            fixture.controller.manualWindowLayerEntryObservationOwner
+                .isObserving
+        )
+        XCTAssertEqual(
+            fixture.controller.modelForTesting.session?.mode,
+            .appCycle
+        )
+        XCTAssertEqual(
+            fixture.controller.modelForTesting.session?
+                .selectedApp.windows.map(\.id),
+            []
+        )
+        fixture.controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
     func testSwitcherPanelControllerManualWindowLayerEntryWaitsForLaterCompleteProjectionOrderingEvidence() {
         let fixture = makeManualWindowLayerReadinessFixture(
             currentWindowIDs: ["normal", "fullscreen"],
@@ -122,7 +196,7 @@ extension FlowTabPriorityCoverageTests {
                 space: 8,
                 projection: 13
             ),
-            isCompleteForScope: true
+            isCompleteForScope: false
         )
         let laterProjection = fixture.currentProjection(
             windowIDs: ["fullscreen", "normal"],

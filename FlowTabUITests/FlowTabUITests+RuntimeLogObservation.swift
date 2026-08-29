@@ -41,6 +41,22 @@ enum FlowTabUITestRuntimeLogRecordPattern {
             + "axWindowID=ax:\(processIdentifier):[0-9]+ "
             + "affectedCGWindowID=\(affectedCGWindowID)\\r?$"
     }
+
+    static func exactReadyCurrentAppRepair(
+        bundleIdentifier: String,
+        processIdentifier: pid_t,
+        windowCount: Int
+    ) -> String {
+        let escapedBundleIdentifier =
+            NSRegularExpression.escapedPattern(
+                for: bundleIdentifier
+            )
+        return "(?m)focusedCurrentAppRepairEvidence result=ready "
+            + "appID=\(escapedBundleIdentifier) "
+            + "pid=\(processIdentifier) "
+            + "selectedPID=\(processIdentifier) "
+            + "windows=\(windowCount)(?: |\\r?$)"
+    }
 }
 
 struct FlowTabUITestRuntimeLogSnapshot: Equatable {
@@ -130,6 +146,26 @@ extension FlowTabUITestRuntimeLogExpectation {
             pattern: pattern,
             description:
                 "exact runtime AX-destroyed bundle/PID/CG reconciliation"
+        )
+    }
+
+    static func exactReadyCurrentAppRepair(
+        bundleIdentifier: String,
+        processIdentifier: pid_t,
+        windowCount: Int
+    ) throws -> Self {
+        let pattern =
+            FlowTabUITestRuntimeLogRecordPattern
+                .exactReadyCurrentAppRepair(
+                    bundleIdentifier: bundleIdentifier,
+                    processIdentifier: processIdentifier,
+                    windowCount: windowCount
+                )
+        return .regularExpression(
+            try NSRegularExpression(pattern: pattern),
+            pattern: pattern,
+            description:
+                "exact bundle/PID ready current-App repair"
         )
     }
 }

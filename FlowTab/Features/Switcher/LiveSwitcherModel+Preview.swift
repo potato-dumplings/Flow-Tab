@@ -412,6 +412,9 @@ extension LiveSwitcherModel {
         let batchOverride = previewCaptureBatchOverride
         let batchOutcomeOverride = previewCaptureBatchOutcomeOverride
         let requests = pendingCaptures.map(\.providerRequest)
+        let batchID = UUID()
+        let cancellation = WindowPreviewCaptureCancellation()
+        previewCaptureCancellationsByID[batchID] = cancellation
         let startMs = Self.monotonicMilliseconds()
         for pendingCapture in pendingCaptures {
             RuntimeLog.debug(
@@ -421,7 +424,12 @@ extension LiveSwitcherModel {
         }
         Task.detached(priority: Self.previewTaskPriority(for: qos)) {
             let outcomes: [WindowPreviewResult]
-            if let batchOutcomeOverride {
+            if cancellation.isCancelled {
+                outcomes = Array(
+                    repeating: .failure(.transientSystemError),
+                    count: requests.count
+                )
+            } else if let batchOutcomeOverride {
                 outcomes = batchOutcomeOverride(requests.map(\.genericCaptureRequest))
                     .map(Self.windowPreviewResult)
             } else if let batchOverride {
@@ -433,7 +441,8 @@ extension LiveSwitcherModel {
             } else {
                 outcomes = await resolver.previewOutcomes(
                     for: requests,
-                    captureSemaphore: semaphore
+                    captureSemaphore: semaphore,
+                    cancellation: cancellation
                 )
             }
             let completeMs = Self.monotonicMilliseconds()
@@ -441,6 +450,8 @@ extension LiveSwitcherModel {
                 self?.completeRuntimePreviewCaptureBatch(
                     outcomes,
                     pendingCaptures: pendingCaptures,
+                    batchID: batchID,
+                    cancellation: cancellation,
                     generation: generation,
                     startMs: startMs,
                     completeMs: completeMs
@@ -452,16 +463,32 @@ extension LiveSwitcherModel {
     private func completeRuntimePreviewCaptureBatch(
         _ outcomes: [WindowPreviewResult],
         pendingCaptures: [PendingPreviewCapture],
+        batchID: UUID,
+        cancellation: WindowPreviewCaptureCancellation,
         generation: UInt64,
         startMs: Double,
         completeMs: Double
     ) {
+        previewCaptureCancellationsByID[batchID] = nil
+        guard !cancellation.isCancelled else { return }
         for pendingCapture in pendingCaptures {
-            previewCaptureInFlightKeys.remove(pendingCapture.initialCacheKey)
+            guard case .inFlight(let stateGeneration) =
+                    previewCaptureStatesByKey[
+                        pendingCapture.initialCacheKey
+                    ],
+                  stateGeneration == generation
+            else {
+                continue
+            }
+            previewCaptureInFlightKeys.remove(
+                pendingCapture.initialCacheKey
+            )
         }
         guard generation == previewCaptureGeneration else {
             for pendingCapture in pendingCaptures
-                where previewCaptureStatesByKey[pendingCapture.initialCacheKey] != nil
+                where previewCaptureStatesByKey[
+                    pendingCapture.initialCacheKey
+                ] == .inFlight(generation: generation)
             {
                 previewCaptureStatesByKey[pendingCapture.initialCacheKey] = .failed(
                     reason: .cancelledByNewerGeneration,
@@ -836,7 +863,12 @@ extension LiveSwitcherModel {
         if autoEnterSuppressedAppID == session.selectedApp.id {
             return false
         }
-        return session.selectedApp.windows.count >= 2
+        guard let readiness = sessionAppWindowReadiness,
+              readiness.identity.appID == session.selectedApp.id
+        else {
+            return false
+        }
+        return (readiness.readyWindowCount ?? 0) >= 2
     }
 
     func icon(for app: AppSwitchCandidate) -> NSImage? {

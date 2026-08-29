@@ -19,7 +19,7 @@ extension FlowTabTests {
 
         XCTAssertTrue(model.appendSearchQuery("s"))
         XCTAssertEqual(scheduler.entries.count, 1)
-        XCTAssertEqual(scheduler.entries[0].interval, 0.020)
+        XCTAssertEqual(scheduler.entries[0].interval, 0.018)
         XCTAssertEqual(scheduler.activeEntryCount, 1)
         XCTAssertEqual(model.searchViewState.query, "s")
         XCTAssertEqual(model.searchViewState.resultsQuery, "")
@@ -50,7 +50,7 @@ extension FlowTabTests {
         )
         XCTAssertEqual(model.searchViewState.resultsScope, .app)
         XCTAssertEqual(model.searchViewState.resultsQuery, "sa")
-        XCTAssertEqual(model.searchSchedulingOwner.debounceInterval, 0.014)
+        XCTAssertEqual(model.searchSchedulingOwner.debounceInterval, 0.012)
         XCTAssertEqual(resultPublicationCount, 1)
     }
 
@@ -154,7 +154,7 @@ extension FlowTabTests {
                 model.searchViewState.resultsQuery,
                 "wechat"
             )
-            XCTAssertEqual(model.searchSchedulingOwner.debounceInterval, 0.014)
+            XCTAssertEqual(model.searchSchedulingOwner.debounceInterval, 0.012)
         }
 
         XCTAssertEqual(resultIDsBySchedulerLatency.count, 2)
@@ -209,25 +209,25 @@ extension FlowTabTests {
             policy.debounceInterval(
                 afterComputationNanoseconds: 6_000_000
             ),
-            0.014
+            0.012
         )
         XCTAssertEqual(
             policy.debounceInterval(
                 afterComputationNanoseconds: 6_000_001
             ),
-            0.025
+            0.018
         )
         XCTAssertEqual(
             policy.debounceInterval(
                 afterComputationNanoseconds: 10_000_001
             ),
-            0.035
+            0.022
         )
         XCTAssertEqual(
             policy.debounceInterval(
                 afterComputationNanoseconds: 16_000_001
             ),
-            0.045
+            0.025
         )
     }
 

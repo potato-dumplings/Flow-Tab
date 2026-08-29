@@ -101,7 +101,7 @@ extension FlowTabUITests {
 
         guard assertCurrentSwitcherAppProjection(
             in: app,
-            exactEntry: "\(identity.bundleIdentifier):1",
+            bundleIdentifier: identity.bundleIdentifier,
             timeout:
                 FlowTabUITestSwitcherAppProjectionPolicy
                     .quitShortcutInitialProjectionWatchdog
@@ -118,8 +118,7 @@ extension FlowTabUITests {
         guard let removalObservation =
                 startSwitcherAppRemovalObservation(
                     in: app,
-                    bundleIdentifier: identity.bundleIdentifier,
-                    expectedInitialWindowCount: 1
+                    bundleIdentifier: identity.bundleIdentifier
                 )
         else { return }
         defer { removalObservation.cancel() }

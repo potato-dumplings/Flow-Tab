@@ -9,6 +9,8 @@ enum FlowTabUITestBootstrapper {
     private static var hotkeyReloadDiagnosticsObserver: NSObjectProtocol?
     private static var switcherTriggerObservers: [SwitcherTriggerNotificationObserver] = []
     private static var switcherCommandObservers: [SwitcherCommandNotificationObserver] = []
+    private static var appPanelPressureCommandObserver:
+        AppPanelPressureCommandObserver?
     static var initialPanelOcclusionStalenessOwner:
         FlowTabUITestInitialPanelOcclusionStalenessOwner?
     private static var mockWindowPreviewLatencyGeneration:
@@ -54,6 +56,9 @@ enum FlowTabUITestBootstrapper {
         )
         static let confirm = Notification.Name(
             "io.github.potato-dumplings.flowtab.ui-test.switcher-command.confirm"
+        )
+        static let cancel = Notification.Name(
+            "io.github.potato-dumplings.flowtab.ui-test.switcher-command.cancel"
         )
         static let runtimeLogProbe = Notification.Name(
             "io.github.potato-dumplings.flowtab.ui-test.switcher-command.runtime-log-probe"
@@ -255,6 +260,7 @@ enum FlowTabUITestBootstrapper {
 
         installSwitcherTriggerNotificationsIfNeeded(panelController: panelController)
         installSwitcherCommandNotificationsIfNeeded(panelController: panelController)
+        installAppPanelPressureCommandNotificationIfNeeded()
 
         guard FlowTabTestLaunchOptions.enablesMockHotkeyEffects else { return }
 
@@ -489,12 +495,101 @@ enum FlowTabUITestBootstrapper {
                 command: .confirm
             ),
             SwitcherCommandNotificationObserver(
+                name: SwitcherCommandNotification.cancel,
+                panelController: panelController,
+                command: .cancel
+            ),
+            SwitcherCommandNotificationObserver(
                 name: SwitcherCommandNotification.runtimeLogProbe,
                 panelController: panelController,
                 command: .runtimeLogProbe
             )
         ]
         switcherCommandObservers.forEach { $0.install(in: center) }
+    }
+
+    private static func installAppPanelPressureCommandNotificationIfNeeded() {
+        appPanelPressureCommandObserver?.uninstall()
+        appPanelPressureCommandObserver = nil
+        guard
+            let rawName = FlowTabTestLaunchOptions
+                .appPanelPressureCommandNotificationName?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ),
+            !rawName.isEmpty,
+            let acknowledgementRawName =
+                FlowTabTestLaunchOptions
+                    .appPanelPressureCommandAcknowledgementNotificationName?
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ),
+            !acknowledgementRawName.isEmpty
+        else {
+            return
+        }
+
+        let observer = AppPanelPressureCommandObserver(
+            notificationName: Notification.Name(rawName),
+            acknowledgementNotificationName:
+                Notification.Name(acknowledgementRawName)
+        ) { action, sequence, receivedAtNanoseconds in
+            switch action {
+            case .openGlobal:
+                switcherTriggerObservers
+                    .first { $0.handles(.global) }?
+                    .receiveAppPanelPressureTrigger(
+                        sequence: sequence,
+                        receivedAtNanoseconds:
+                            receivedAtNanoseconds
+                    )
+            case .openSearch:
+                switcherTriggerObservers
+                    .first { $0.handles(.search) }?
+                    .receiveAppPanelPressureTrigger(
+                        sequence: sequence,
+                        receivedAtNanoseconds:
+                            receivedAtNanoseconds
+                    )
+            case .advanceDown:
+                receiveAppPanelPressureCommand(
+                    .advanceDown,
+                    sequence: sequence
+                )
+            case .advanceRight:
+                receiveAppPanelPressureCommand(
+                    .advanceRight,
+                    sequence: sequence
+                )
+            case .searchQuery:
+                receiveAppPanelPressureCommand(
+                    .searchQuery,
+                    sequence: sequence
+                )
+            case .cancel:
+                receiveAppPanelPressureCommand(
+                    .cancel,
+                    sequence: sequence
+                )
+            }
+        }
+        observer.install()
+        appPanelPressureCommandObserver = observer
+        RuntimeLog.info(
+            "UITest",
+            "installed app-panel pressure command observer"
+        )
+    }
+
+    private static func receiveAppPanelPressureCommand(
+        _ command: SwitcherCommandNotificationObserver.Command,
+        sequence: UInt64
+    ) {
+        switcherCommandObservers
+            .first { $0.handles(command) }?
+            .receiveAppPanelPressureCommand(
+                sequence: sequence
+            )
     }
 
     private static func installHotkeyReloadDiagnosticsIfNeeded() {
@@ -527,7 +622,7 @@ enum FlowTabUITestBootstrapper {
 }
 
 private final class SwitcherCommandNotificationObserver: NSObject {
-    enum Command: String, Sendable {
+    enum Command: String, Equatable, Sendable {
         case inAppForward
         case advanceDown
         case advanceRight
@@ -536,6 +631,7 @@ private final class SwitcherCommandNotificationObserver: NSObject {
         case selectSearchResult
         case searchConfirm
         case confirm
+        case cancel
         case runtimeLogProbe
     }
 
@@ -577,6 +673,20 @@ private final class SwitcherCommandNotificationObserver: NSObject {
         )
     }
 
+    func handles(_ candidate: Command) -> Bool {
+        command == candidate
+    }
+
+    @MainActor
+    func receiveAppPanelPressureCommand(
+        sequence: UInt64
+    ) {
+        handleCommandOnMainActor(
+            notificationName:
+                "app-panel-pressure-\(sequence)"
+        )
+    }
+
     private static let handleDarwinNotification: CFNotificationCallback = { _, observer, name, _, _ in
         guard let observer else { return }
         let notificationObserver = Unmanaged<SwitcherCommandNotificationObserver>
@@ -588,19 +698,83 @@ private final class SwitcherCommandNotificationObserver: NSObject {
     private func handleDarwinNotification(name receivedName: String?) {
         guard let panelController else { return }
         let notificationName = receivedName ?? name.rawValue
-        let command = command
-        Task { @MainActor [weak self, panelController, notificationName, command] in
+        Task { @MainActor [weak self, panelController, notificationName] in
             guard let self else { return }
-            RuntimeLog.info(
-                "UITest",
-                "received switcher command notification name=\(notificationName) command=\(command.rawValue)"
-            )
-            self.perform(command, panelController: panelController)
-            RuntimeLog.info(
-                "UITest",
-                "completed switcher command notification name=\(notificationName) command=\(command.rawValue)"
+            self.handleCommandOnMainActor(
+                notificationName: notificationName,
+                panelController: panelController
             )
         }
+    }
+
+    @MainActor
+    private func handleCommandOnMainActor(
+        notificationName: String,
+        panelController resolvedPanelController:
+            SwitcherPanelController? = nil
+    ) {
+        guard let panelController =
+                resolvedPanelController ?? panelController
+        else {
+            return
+        }
+        RuntimeLog.info(
+            "UITest",
+            "received switcher command notification name=\(notificationName) command=\(command.rawValue)"
+        )
+        let pressureMeasurement:
+            AppPanelPressureMeasurementToken?
+        switch command {
+        case .advanceRight:
+            pressureMeasurement =
+                AppPanelPressureEvidenceTransport
+                    .begin(
+                        .highlighted,
+                        panelController: panelController
+                    )
+        case .advanceDown:
+            pressureMeasurement =
+                AppPanelPressureEvidenceTransport
+                    .begin(
+                        .highlighted,
+                        completionRequirement: .windowLayer,
+                        panelController: panelController
+                    )
+        case .searchQuery:
+            if let query = Self.switcherCommandPayload() {
+                pressureMeasurement =
+                    AppPanelPressureEvidenceTransport
+                        .begin(
+                            .highlighted,
+                            completionRequirement:
+                                .committedSearchResults(
+                                    query: query
+                                ),
+                            panelController: panelController
+                        )
+            } else {
+                pressureMeasurement = nil
+            }
+        case .cancel:
+            pressureMeasurement =
+                AppPanelPressureEvidenceTransport
+                    .begin(
+                        .closed,
+                        panelController: panelController
+                    )
+        default:
+            pressureMeasurement = nil
+        }
+        perform(command, panelController: panelController)
+        AppPanelPressureEvidenceTransport
+            .completeAfterCommand(
+                pressureMeasurement,
+                panelController: panelController
+            )
+        RuntimeLog.info(
+            "UITest",
+            "completed switcher command notification name=\(notificationName) command=\(command.rawValue)"
+        )
     }
 
     @MainActor
@@ -680,6 +854,8 @@ private final class SwitcherCommandNotificationObserver: NSObject {
             panelController.finishSelection()
         case .confirm:
             panelController.finishSelection()
+        case .cancel:
+            panelController.cancelSelectionForTesting()
         case .runtimeLogProbe:
             RuntimeDiagnostics.shared.log(
                 level: .info,

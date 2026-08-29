@@ -142,6 +142,18 @@ final class SwitcherPanelController {
     var panelPresentationRecoveryGeneration = 0
     var panelVisibilityRecoveryState: PanelVisibilityRecoveryState = .idle
     var lastPanelVisibilityRecoveryDiagnostic: PanelVisibilityRecoveryDiagnostic?
+    var lastPanelPresentationBreakdownDiagnostic:
+        PanelPresentationBreakdownDiagnostic?
+    var expectedInitialRenderMilestone:
+        SwitcherRenderMilestone?
+    var expectedInitialRenderGeneration: UInt64?
+    var initialRenderMilestoneEvent:
+        SwitcherRenderMilestoneEvent?
+    var initialOcclusionVisibleAtMilliseconds: Double?
+    var didCompleteInitialVisibleFrameWork = false
+    var deferredSelectedAppPreviewPrewarmTask: Task<Void, Never>?
+    var renderMilestoneObservers:
+        [UUID: (SwitcherRenderMilestoneEvent) -> Void] = [:]
     var activeSpaceApplicationActivationSuppression:
         ActiveSpaceApplicationActivationSuppression?
     var windowLayerPresentationDelay: TimeInterval {
@@ -242,6 +254,8 @@ final class SwitcherPanelController {
     let maxAppTileSpacing: CGFloat = 10
     let minAppTileSize: CGFloat = 1
     var activeHotkeySessionKind: HotkeySessionKind?
+    var panelPresentationActive = false
+    var activePresentationInitialContentSize: NSSize?
     var pendingFocusedWindowSessionPresentation:
         PendingFocusedWindowSessionPresentation?
     var activePresentationScreen: NSScreen?
@@ -271,11 +285,13 @@ final class SwitcherPanelController {
     }
 
     var isPanelPresented: Bool {
-        panelVisibilityOverride ?? panel.isVisible
+        panelVisibilityOverride
+            ?? (panelPresentationActive && panel.isVisible)
     }
 
     var isPanelVisibleToUser: Bool {
         guard isPanelPresented else { return false }
+        guard panel.alphaValue > 0 else { return false }
         if panelVisibilityOverride != nil, panelOcclusionStateOverride == nil {
             return true
         }
@@ -415,7 +431,10 @@ final class SwitcherPanelController {
                     commitSearchResult: { [weak self] resultID in
                         self?.commitSwitcherSearchResultByPointerClick(resultID: resultID)
                     }
-                )
+                ),
+                onRenderMilestone: { [weak self] event in
+                    self?.handleSwitcherRenderMilestone(event)
+                }
             )
         )
         hostingView.wantsLayer = true
@@ -736,6 +755,10 @@ final class SwitcherPanelController {
     }
 
     deinit {
+        MainActor.assumeIsolated {
+            deferredSelectedAppPreviewPrewarmTask?.cancel()
+            panel.orderOut(nil)
+        }
         if let appDidResignActiveObserver {
             NotificationCenter.default.removeObserver(appDidResignActiveObserver)
         }

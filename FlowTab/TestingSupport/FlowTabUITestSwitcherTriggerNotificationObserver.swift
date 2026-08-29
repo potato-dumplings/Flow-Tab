@@ -255,7 +255,7 @@ private final class FlowTabUITestSearchTriggerPresentationCancellation:
 }
 
 final class SwitcherTriggerNotificationObserver: NSObject {
-    enum Trigger: Sendable {
+    enum Trigger: Equatable, Sendable {
         case global
         case inApp
         case search
@@ -315,6 +315,25 @@ final class SwitcherTriggerNotificationObserver: NSObject {
         }
     }
 
+    func handles(_ candidate: Trigger) -> Bool {
+        trigger == candidate
+    }
+
+    @MainActor
+    func receiveAppPanelPressureTrigger(
+        sequence: UInt64,
+        receivedAtNanoseconds: UInt64
+    ) {
+        handleDarwinNotificationOnMainActor(
+            notificationName:
+                "app-panel-pressure-\(sequence)",
+            triggerReceivedAtNanoseconds:
+                receivedAtNanoseconds,
+            mainActorEnteredAtNanoseconds:
+                DispatchTime.now().uptimeNanoseconds
+        )
+    }
+
     deinit {
         let searchPresentationOwner = searchPresentationOwner
         Task { @MainActor in
@@ -339,16 +358,24 @@ final class SwitcherTriggerNotificationObserver: NSObject {
         name receivedName: String?
     ) {
         let notificationName = receivedName ?? name.rawValue
+        let triggerReceivedAtNanoseconds =
+            DispatchTime.now().uptimeNanoseconds
         Task { @MainActor [weak self] in
             self?.handleDarwinNotificationOnMainActor(
-                notificationName: notificationName
+                notificationName: notificationName,
+                triggerReceivedAtNanoseconds:
+                    triggerReceivedAtNanoseconds,
+                mainActorEnteredAtNanoseconds:
+                    DispatchTime.now().uptimeNanoseconds
             )
         }
     }
 
     @MainActor
     private func handleDarwinNotificationOnMainActor(
-        notificationName: String
+        notificationName: String,
+        triggerReceivedAtNanoseconds: UInt64,
+        mainActorEnteredAtNanoseconds: UInt64
     ) {
         guard let panelController else { return }
         panelController
@@ -368,15 +395,41 @@ final class SwitcherTriggerNotificationObserver: NSObject {
         if trigger == .search {
             handleSearchTrigger(
                 notificationName: notificationName,
-                panelController: panelController
+                panelController: panelController,
+                triggerReceivedAtNanoseconds:
+                    triggerReceivedAtNanoseconds,
+                mainActorEnteredAtNanoseconds:
+                    mainActorEnteredAtNanoseconds
             )
             return
         }
 
+        let pressureMeasurement:
+            AppPanelPressureMeasurementToken?
+        switch trigger {
+        case .global:
+            pressureMeasurement =
+                AppPanelPressureEvidenceTransport
+                    .begin(
+                        .opened,
+                        triggerReceivedAtNanoseconds:
+                            triggerReceivedAtNanoseconds,
+                        mainActorEnteredAtNanoseconds:
+                            mainActorEnteredAtNanoseconds,
+                        panelController: panelController
+                    )
+        case .inApp, .search:
+            pressureMeasurement = nil
+        }
         let presented = Self.presentSwitcher(
             trigger,
             panelController: panelController
         )
+        AppPanelPressureEvidenceTransport
+            .completeAfterCommand(
+                pressureMeasurement,
+                panelController: panelController
+            )
         if !presented {
             Self.releasePrimaryModifierForTesting(
                 panelController: panelController
@@ -395,8 +448,20 @@ final class SwitcherTriggerNotificationObserver: NSObject {
     @MainActor
     private func handleSearchTrigger(
         notificationName: String,
-        panelController: SwitcherPanelController
+        panelController: SwitcherPanelController,
+        triggerReceivedAtNanoseconds: UInt64,
+        mainActorEnteredAtNanoseconds: UInt64
     ) {
+        let pressureMeasurement =
+            AppPanelPressureEvidenceTransport.begin(
+                .opened,
+                triggerReceivedAtNanoseconds:
+                    triggerReceivedAtNanoseconds,
+                mainActorEnteredAtNanoseconds:
+                    mainActorEnteredAtNanoseconds,
+                completionRequirement: .searchReady,
+                panelController: panelController
+            )
         let owner = searchPresentationOwner
             ?? Self.makeSearchPresentationOwner(
                 panelController: panelController
@@ -425,6 +490,11 @@ final class SwitcherTriggerNotificationObserver: NSObject {
             .search,
             panelController: panelController
         )
+        AppPanelPressureEvidenceTransport
+            .completeAfterCommand(
+                pressureMeasurement,
+                panelController: panelController
+            )
         _ = owner.observe(
             .triggerReadback,
             generation: generation

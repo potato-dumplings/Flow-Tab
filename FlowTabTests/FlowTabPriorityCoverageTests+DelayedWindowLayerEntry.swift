@@ -115,7 +115,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(
             fixture.controller.modelForTesting.session?
                 .selectedApp.windows.map(\.id),
-            fixture.windows.map(\.id)
+            []
         )
         XCTAssertEqual(
             fixture.controller.modelForTesting.session?.mode,
@@ -125,6 +125,11 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(
             fixture.controller.modelForTesting.session?.mode,
             .windowCycle(appID: fixture.appID)
+        )
+        XCTAssertEqual(
+            fixture.controller.modelForTesting.session?
+                .selectedApp.windows.map(\.id),
+            fixture.windows.map(\.id)
         )
         XCTAssertTrue(
             fixture.service
@@ -411,7 +416,7 @@ extension FlowTabPriorityCoverageTests {
                 appSwitcherProjection:
                     RuntimeAppSwitcherProjection(
                         apps: [appOnlyCandidate],
-                        contextsByID: [:],
+                        contextsByID: [appID: context],
                         freshness: freshness
                     ),
                 currentAppWindowProjectionsByAppID: [
@@ -480,7 +485,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(
             controller.modelForTesting.session?
                 .selectedApp.windows.map(\.id),
-            ["deferred-1", "deferred-2"]
+            []
         )
         XCTAssertEqual(scheduler.scheduledIntervals, [0.01])
 
@@ -505,8 +510,8 @@ extension FlowTabPriorityCoverageTests {
         SwitcherPanelController(
             model: LiveSwitcherModel(
                 runtimeProjectionService:
-                    RecordingRuntimeProjectionService(
-                        appSwitcherApps: searchScenarioApps()
+                    makeCompleteAppSwitcherProjectionService(
+                        apps: searchScenarioApps()
                     )
             ),
             delayedWindowLayerEntryScheduler: scheduler

@@ -25,7 +25,7 @@ source "$PROCESS_EXIT_OBSERVATION_PATH"
 
 usage() {
   cat <<'EOF'
-Usage: ./scripts/perf/runtime-topology-pressure.sh [sample_interval_seconds] [test_filter] --ui-app-identity-manifest <file> [--build-root <dir>] [--output-dir <dir>]
+Usage: ./scripts/perf/runtime-topology-pressure.sh [sample_interval_seconds] [test_filter] --ui-app-identity-manifest <file> [--reuse-ui-test-build] [--skip-space-fixtures] [--build-root <dir>] [--output-dir <dir>]
 
 Runs one real-topology UI pressure scenario, samples FlowTab CPU/RSS, and
 preserves the UI wrapper result bundle and logs in a unique child attempt.
@@ -39,6 +39,9 @@ Options:
   --ui-app-identity-manifest <file>
                            Required private JSON manifest for the fixed App and
                            per-sample PID identity binding.
+  --reuse-ui-test-build    Run test-without-building against an already prepared
+                           and signed UI-test runner.
+  --skip-space-fixtures    Forward fixture preparation opt-out to the UI wrapper.
   --build-root <dir>       Resolve UI-test build products, caches, and generated
                            fixture variants below this directory.
   --output-dir <dir>       New evidence directory. The leaf must not already exist.
@@ -62,6 +65,8 @@ OUTPUT_DIR=""
 HAS_CUSTOM_OUTPUT_DIR=false
 HAS_CUSTOM_BUILD_ROOT=false
 HAS_UI_APP_IDENTITY_MANIFEST=false
+REUSE_UI_TEST_BUILD=false
+SKIP_SPACE_FIXTURES=false
 BUILD_ROOT=""
 UI_APP_IDENTITY_MANIFEST=""
 POSITIONAL_ARGS=()
@@ -94,12 +99,13 @@ TARGET_FIRST_OBSERVED_MONOTONIC_NS=""
 TARGET_QUALIFIED_MONOTONIC_NS=""
 TARGET_OBSERVATION_COUNT=0
 REJECTED_TRANSIENT_IDENTITY_COUNT=0
+TARGET_PREVIOUS_CPU_CENTISECONDS=""
+TARGET_PREVIOUS_CPU_SAMPLE_MONOTONIC_NS=""
 TARGET_TERMINAL_EXIT_OBSERVED=false
 TARGET_TERMINATION_VERDICT="not_observed"
 PREEXISTING_TARGET_IDENTITIES=""
 LAUNCH_REQUEST_MONOTONIC_NS=""
 LAUNCH_REQUEST_EPOCH_SECONDS=""
-declare -a CHILD_BUILD_ROOT_ARGS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -119,6 +125,14 @@ while [[ $# -gt 0 ]]; do
       fi
       UI_APP_IDENTITY_MANIFEST="${1#*=}"
       HAS_UI_APP_IDENTITY_MANIFEST=true
+      shift
+      ;;
+    --reuse-ui-test-build)
+      REUSE_UI_TEST_BUILD=true
+      shift
+      ;;
+    --skip-space-fixtures)
+      SKIP_SPACE_FIXTURES=true
       shift
       ;;
     --build-root)
@@ -202,6 +216,10 @@ fi
 
 SAMPLE_INTERVAL_SECONDS="${POSITIONAL_ARGS[0]:-0.5}"
 TEST_FILTER="${POSITIONAL_ARGS[1]:-${DEFAULT_TEST}}"
+UI_TEST_ACTION="test"
+if [[ "${REUSE_UI_TEST_BUILD}" == true ]]; then
+  UI_TEST_ACTION="test-without-building"
+fi
 
 if ! LC_ALL=C awk -v value="$SAMPLE_INTERVAL_SECONDS" 'BEGIN { exit !(value ~ /^[0-9]+([.][0-9]+)?$/ && value + 0 > 0) }'; then
   echo "sample_interval_seconds must be a positive number." >&2
@@ -252,7 +270,6 @@ fi
 UI_APP_IDENTITY_MANIFEST_SHA256="$(LC_ALL=C shasum -a 256 "$UI_APP_IDENTITY_MANIFEST" | awk '{print $1}')"
 if [[ "$HAS_CUSTOM_BUILD_ROOT" == true ]]; then
   CHILD_UI_BUILD_ROOT="${BUILD_ROOT}/ui-tests"
-  CHILD_BUILD_ROOT_ARGS=(--build-root "$CHILD_UI_BUILD_ROOT")
   SPACE_FIXTURE_RESOLVED_WORKFLOW="${CHILD_UI_BUILD_ROOT}/space-fixture-workflow/variants/resolved-workflow.json"
   SYSTEM_APP_MRU_RESOLVED_WORKFLOW="${CHILD_UI_BUILD_ROOT}/space-fixture-workflow/system-app-mru-variants/resolved-workflow.json"
 else
@@ -348,6 +365,7 @@ write_status() {
     printf '{\n'
     printf '  "schema_version": 1,\n'
     printf '  "runner_kind": "runtime_topology_pressure",\n'
+    printf '  "ui_test_action": "%s",\n' "$UI_TEST_ACTION"
     printf '  "stage": "%s",\n' "$CURRENT_STAGE"
     printf '  "final_exit_code": %s,\n' "$final_exit_code"
     printf '  "ui_wrapper_exit_code": %s,\n' "$UI_WRAPPER_STATUS"
@@ -662,11 +680,19 @@ run_ui_test() {
   local log_status
   local pipeline_status
   local status_temp="${UI_RUN_STATUS_FILE}.tmp"
+  local -a runner_arguments=("${UI_TEST_ACTION}")
+
+  if [[ "${HAS_CUSTOM_BUILD_ROOT}" == true ]]; then
+    runner_arguments+=(--build-root "${CHILD_UI_BUILD_ROOT}")
+  fi
+  if [[ "${SKIP_SPACE_FIXTURES}" == true ]]; then
+    runner_arguments+=(--skip-space-fixtures)
+  fi
 
   trap - EXIT INT TERM
   set +e
   "$UI_TEST_RUNNER" \
-    "${CHILD_BUILD_ROOT_ARGS[@]}" \
+    "${runner_arguments[@]}" \
     --ui-test-app-path "$EXPECTED_APP_PATH" \
     --output-root "$UI_ATTEMPT_DIR" \
     "-only-testing:${TEST_FILTER}" 2>&1 | tee "$UI_LOG_FILE"

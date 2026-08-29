@@ -542,8 +542,6 @@ extension SwitcherPanelController {
         observeDelayedWindowLayerProjectionUpdate(
             source: .appSwitcherProjectionUpdated
         )
-        resetPointerSelectionGate()
-        updatePanelSize()
         scheduleDelayedWindowLayerEntryIfNeeded(preservingDeadline: true)
         return true
     }
@@ -576,8 +574,6 @@ extension SwitcherPanelController {
             source: .currentAppWindowProjectionUpdated,
             appID: appID
         )
-        resetPointerSelectionGate()
-        updatePanelSize()
         scheduleDelayedWindowLayerEntryIfNeeded(preservingDeadline: true)
         return true
     }

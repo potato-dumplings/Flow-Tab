@@ -152,14 +152,13 @@ extension FlowTabUITests {
             let runtimeReconciliation =
                 FlowTabUITestRuntimeLogObservationOwner(
                     expectation:
-                        try .exactRuntimeAXDestroyed(
+                        try .exactReadyCurrentAppRepair(
                             bundleIdentifier:
                                 targetApp.identity.bundleIdentifier,
                             processIdentifier:
                                 targetProcessIdentifier,
-                            affectedCGWindowID:
-                                scheduledClose.snapshot
-                                    .targetWindowNumber
+                            windowCount:
+                                remainingWindowPlanIndices.count
                         ),
                     observationRegistration:
                         reconciliationLogBaseline

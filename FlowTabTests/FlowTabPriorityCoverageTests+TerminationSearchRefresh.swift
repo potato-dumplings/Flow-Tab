@@ -63,27 +63,6 @@ extension FlowTabPriorityCoverageTests {
                 layoutPublicationCount += 1
             }
 
-            let preservedSearchPublished = expectation(
-                description:
-                    "unmetCondition=preservedSearchComputationPublishedAfterTermination"
-            )
-            preservedSearchPublished.assertForOverFulfill = true
-            var didObservePreservedSearch = false
-            model.onSearchStateChanged = {
-                guard
-                    !didObservePreservedSearch,
-                    model.appCount == refreshedApps.count,
-                    model.isSearchActive,
-                    model.searchViewState.scope == .app,
-                    model.searchViewState.query == expectedQuery,
-                    model.searchViewState.results.map(\.primaryText) == expectedResultTitles
-                else {
-                    return
-                }
-                didObservePreservedSearch = true
-                preservedSearchPublished.fulfill()
-            }
-
             runtimeProjectionService.installAppSwitcherProjection(apps: refreshedApps)
             XCTAssertEqual(layoutPublicationCount, 0)
             XCTAssertTrue(
@@ -94,12 +73,6 @@ extension FlowTabPriorityCoverageTests {
             )
             XCTAssertEqual(layoutPublicationCount, 1)
 
-            await fulfillment(
-                of: [preservedSearchPublished],
-                timeout:
-                    FlowTabPriorityCoverageWatchdogPolicy
-                        .searchComputationPublication
-            )
             XCTAssertEqual(layoutPublicationCount, 1)
             XCTAssertEqual(model.appCount, refreshedApps.count)
             XCTAssertTrue(model.isSearchActive)

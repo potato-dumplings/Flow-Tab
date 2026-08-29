@@ -69,10 +69,37 @@ struct FlowTabUITestRuntimeProjectionDataset {
         bundleURL: URL?
     )
 
+    private static let appPanelPressureCacheLock = NSLock()
+    private static var appPanelPressureCache:
+        [String: FlowTabUITestRuntimeProjectionDataset] = [:]
+    private static var appPanelPressureBuildCount = 0
+
     private static func uiTestAppDefinitions(
         variant: String?
     ) -> [UITestAppDefinition] {
         switch variant {
+        case FlowTabUITestAppPanelPressureFixture.realisticVariant:
+            return appPanelPressureDefinitions(
+                appCount:
+                    FlowTabUITestAppPanelPressureFixture
+                        .realisticAppCount,
+                defaultWindowCount:
+                    FlowTabUITestAppPanelPressureFixture
+                        .realisticWindowCount,
+                selectedAppWindowCount: nil
+            )
+        case FlowTabUITestAppPanelPressureFixture.extremeVariant:
+            return appPanelPressureDefinitions(
+                appCount:
+                    FlowTabUITestAppPanelPressureFixture
+                        .extremeAppCount,
+                defaultWindowCount:
+                    FlowTabUITestAppPanelPressureFixture
+                        .extremeWindowCount,
+                selectedAppWindowCount:
+                    FlowTabUITestAppPanelPressureFixture
+                        .extremeSelectedAppWindowCount
+            )
         case FlowTabUITestApplicationMembershipFixture.variant:
             return [
                 (
@@ -428,11 +455,105 @@ struct FlowTabUITestRuntimeProjectionDataset {
         }
     }
 
+    private static func appPanelPressureDefinitions(
+        appCount: Int,
+        defaultWindowCount: Int,
+        selectedAppWindowCount: Int?
+    ) -> [UITestAppDefinition] {
+        (0..<appCount).map { appIndex in
+            let windowCount = appIndex == 1
+                ? selectedAppWindowCount
+                    ?? defaultWindowCount
+                : defaultWindowCount
+            let windows = (0..<windowCount).map { windowIndex in
+                WindowCandidate(
+                    id: String(
+                        format:
+                            "app-panel-pressure-%04d-window-%04d",
+                        appIndex,
+                        windowIndex
+                    ),
+                    title: String(
+                        format:
+                            "Pressure App %04d Window %04d",
+                        appIndex,
+                        windowIndex
+                    ),
+                    isMinimized: false,
+                    lastActiveAt:
+                        TimeInterval(
+                            1_000_000
+                                - appIndex * 10_000
+                                - windowIndex
+                        )
+                )
+            }
+            return (
+                appID:
+                    FlowTabUITestAppPanelPressureFixture
+                        .appID(index: appIndex),
+                name: String(
+                    format: "Pressure App %04d",
+                    appIndex
+                ),
+                windows: windows,
+                rank: appIndex,
+                bundleURL: nil
+            )
+        }
+    }
+
     static func current() -> FlowTabUITestRuntimeProjectionDataset? {
         guard FlowTabTestLaunchOptions.usesMockRuntimeProjection else { return nil }
 
+        let variant = FlowTabTestLaunchOptions.mockRuntimeVariant
+        if !FlowTabTestLaunchOptions.enablesMockHotkeyEffects,
+           FlowTabUITestAppPanelPressureFixture
+            .contains(variant),
+           let variant
+        {
+            return cachedAppPanelPressureDataset(
+                variant: variant
+            )
+        }
+        return buildCurrent(variant: variant)
+    }
+
+    static func resetAppPanelPressureCacheForTesting() {
+        appPanelPressureCacheLock.lock()
+        appPanelPressureCache = [:]
+        appPanelPressureBuildCount = 0
+        appPanelPressureCacheLock.unlock()
+    }
+
+    static var appPanelPressureBuildCountForTesting: Int {
+        appPanelPressureCacheLock.lock()
+        defer { appPanelPressureCacheLock.unlock() }
+        return appPanelPressureBuildCount
+    }
+
+    private static func cachedAppPanelPressureDataset(
+        variant: String
+    ) -> FlowTabUITestRuntimeProjectionDataset {
+        appPanelPressureCacheLock.lock()
+        defer { appPanelPressureCacheLock.unlock() }
+        if let cached = appPanelPressureCache[variant] {
+            return cached
+        }
+        let dataset = buildCurrent(variant: variant)
+        appPanelPressureCache[variant] = dataset
+        appPanelPressureBuildCount += 1
+        return dataset
+    }
+
+    private static func buildCurrent(
+        variant: String?
+    ) -> FlowTabUITestRuntimeProjectionDataset {
+
         let runningApp = NSRunningApplication.current
-        let availableAppDefinitions = uiTestAppDefinitions(variant: FlowTabTestLaunchOptions.mockRuntimeVariant)
+        let availableAppDefinitions = uiTestAppDefinitions(
+            variant: variant
+        )
             .filter { definition in
                 !FlowTabTestLaunchOptions.enablesMockHotkeyEffects
                     || !FlowTabUITestMockRuntimeEffects.isTerminated(appID: definition.appID)

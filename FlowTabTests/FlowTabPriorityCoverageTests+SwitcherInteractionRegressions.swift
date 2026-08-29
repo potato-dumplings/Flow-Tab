@@ -442,7 +442,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testProjectionRefreshPreservesVisibleAppOrderDuringDelayedWindowLayerEntry() {
+    func testProjectionRefreshPreservesVisibleAppSnapshotDuringDelayedWindowLayerEntry() {
         let currentApp = NSRunningApplication.current
         let appIDs = [
             "com.flowtab.tests.order.mail",
@@ -501,15 +501,17 @@ extension FlowTabPriorityCoverageTests {
             generatedAt: 20
         )
 
-        XCTAssertTrue(model.handleAppSwitcherProjectionDidUpdate())
+        XCTAssertFalse(model.handleAppSwitcherProjectionDidUpdate())
         XCTAssertEqual(model.session?.apps.map(\.id), visibleOrder)
         XCTAssertEqual(model.session?.selectedApp.id, selectedAppID)
-        XCTAssertTrue(model.session?.apps.allSatisfy { $0.displayName.hasSuffix(" Updated") } == true)
+        XCTAssertEqual(
+            model.session?.apps.map(\.displayName),
+            initialApps.map(\.displayName)
+        )
     }
 
     @MainActor
     func testDelayedWindowLayerEntryPrewarmsBoundedVisiblePage() {
-        let currentApp = NSRunningApplication.current
         let appID = "com.flowtab.tests.auto-enter-prewarm"
         let windows = (0..<20).map { index in
             WindowCandidate(
@@ -526,16 +528,11 @@ extension FlowTabPriorityCoverageTests {
             lastActiveAt: 1_000,
             windows: windows
         )
-        let context = makeRuntimeAppContext(
-            appID: appID,
-            runningApp: currentApp,
-            windows: windows
-        )
         let model = LiveSwitcherModel(
-            runtimeProjectionService: RecordingRuntimeProjectionService(
-                appSwitcherApps: [app],
-                contextsByID: [appID: context]
-            )
+            runtimeProjectionService:
+                makeCompleteAppSwitcherProjectionService(
+                    apps: [app]
+                )
         )
         var captureCallCount = 0
         model.previewCaptureOverride = { _, _, _, _ in
@@ -562,7 +559,6 @@ extension FlowTabPriorityCoverageTests {
     func testDelayedWindowLayerEntryReplacesStaleDeadlineGeneration() {
         let scheduler =
             ManualDelayedWindowLayerEntryScheduler()
-        let currentApp = NSRunningApplication.current
         let appID = "com.flowtab.tests.auto-enter-generation"
         let windows = [
             WindowCandidate(id: "generation-1", title: "One", isMinimized: false, lastActiveAt: 20),
@@ -575,16 +571,11 @@ extension FlowTabPriorityCoverageTests {
             lastActiveAt: 20,
             windows: windows
         )
-        let context = makeRuntimeAppContext(
-            appID: appID,
-            runningApp: currentApp,
-            windows: windows
-        )
         let model = LiveSwitcherModel(
-            runtimeProjectionService: RecordingRuntimeProjectionService(
-                appSwitcherApps: [app],
-                contextsByID: [appID: context]
-            )
+            runtimeProjectionService:
+                makeCompleteAppSwitcherProjectionService(
+                    apps: [app]
+                )
         )
         model.previewCaptureOverride = { _, _, _, _ in nil }
         let controller = SwitcherPanelController(
@@ -644,8 +635,13 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        let service = RecordingRuntimeProjectionService(
-            appSwitcherApps: [app],
+        let service = makeCurrentAppWindowProjectionService(
+            appID: appID,
+            candidate: app,
+            context: context
+        )
+        service.installAppSwitcherProjection(
+            apps: [app],
             contextsByID: [appID: context]
         )
         let model = LiveSwitcherModel(runtimeProjectionService: service)

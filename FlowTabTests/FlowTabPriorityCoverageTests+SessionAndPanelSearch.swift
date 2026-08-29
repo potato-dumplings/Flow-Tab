@@ -737,9 +737,10 @@ extension FlowTabPriorityCoverageTests {
                 model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
             )
 
-            XCTAssertTrue(controller.presentSearchHotkeySessionForTesting())
+            controller.showSearch(direction: .forward)
             XCTAssertTrue(controller.modelForTesting.isSearchActive)
             XCTAssertTrue(controller.modelForTesting.isSearchInputFocused)
+            XCTAssertTrue(controller.isPanelPresented)
             XCTAssertEqual(
                 controller.modelForTesting.session?.apps.map(\.id),
                 apps.map(\.id)
@@ -766,6 +767,76 @@ extension FlowTabPriorityCoverageTests {
                     "searchIndexResultState=degradedStaleCommittedResult"
                 )
             )
+            controller.cancelSelectionForTesting()
+        }
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerSearchHotkeyReopensAndRestoresInput() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(
+                    runtimeProjectionService: RecordingRuntimeProjectionService(
+                        appSwitcherApps: self.searchScenarioApps(),
+                        committedSearchReadiness: .committedGenerationValidated
+                    )
+                )
+            )
+            controller.appIsActiveOverride = false
+            var activationCount = 0
+            controller.activateApplicationIgnoringOtherAppsOverride = {
+                activationCount += 1
+            }
+
+            controller.showSearch(direction: .forward)
+
+            XCTAssertEqual(activationCount, 1)
+            XCTAssertTrue(controller.modelForTesting.isSearchActive)
+            XCTAssertTrue(controller.modelForTesting.isSearchInputFocused)
+            XCTAssertTrue(controller.isPanelPresented)
+            XCTAssertTrue(
+                controller.panel.firstResponder
+                    is SearchSystemTextView
+            )
+            let initialContentSize = controller.panelContentSizeForTesting
+            controller.panel.setContentSize(
+                NSSize(
+                    width: initialContentSize.width,
+                    height: initialContentSize.height + 80
+                )
+            )
+
+            controller.cancelSelectionForTesting()
+
+            XCTAssertFalse(controller.isPanelPresented)
+            XCTAssertFalse(controller.isPanelVisibleToUser)
+            XCTAssertFalse(controller.panel.isKeyWindow)
+            XCTAssertFalse(
+                controller.panel.firstResponder
+                    is SearchSystemTextView
+            )
+
+            let closeSettled = self.expectation(
+                description: "search panel close settled"
+            )
+            DispatchQueue.main.async {
+                closeSettled.fulfill()
+            }
+            await self.fulfillment(
+                of: [closeSettled],
+                timeout: 1
+            )
+            XCTAssertEqual(
+                controller.panelContentSizeForTesting,
+                initialContentSize
+            )
+
+            controller.showSearch(direction: .forward)
+
+            XCTAssertEqual(activationCount, 2)
+            XCTAssertTrue(controller.modelForTesting.isSearchActive)
+            XCTAssertTrue(controller.modelForTesting.isSearchInputFocused)
+            XCTAssertTrue(controller.isPanelPresented)
             controller.cancelSelectionForTesting()
         }
     }
@@ -867,13 +938,16 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelAutoEnterWindowLayerSuppressesImmediateReentryAfterManualExit() {
-        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: searchScenarioApps())
+        let runtimeProjectionService =
+            makeCompleteAppSwitcherProjectionService(
+                apps: searchScenarioApps()
+            )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         assertAppSwitcherProjectionSessionRead(from: runtimeProjectionService)
         XCTAssertEqual(model.session?.mode, .appCycle)
-        XCTAssertTrue(model.canAutoEnterWindowLayer)
+        XCTAssertFalse(model.canAutoEnterWindowLayer)
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
         XCTAssertEqual(model.session?.mode, .windowCycle(appID: model.selectedApp?.id ?? ""))
 

@@ -600,7 +600,7 @@ extension FlowTabUITests {
         )
     }
 
-    func testSwitcherInitialPresentationStaleOcclusionDoesNotHardRecover() throws {
+    func testSwitcherInitialPresentationStaleOcclusionWaitsForExactVisibilityWithoutRecovery() throws {
         let logSnapshot = makeRuntimeLogFileSnapshot()
         defer { logSnapshot.cancel() }
         let app = makeApp(
@@ -642,10 +642,18 @@ extension FlowTabUITests {
             since: logSnapshot
         )
         let logContents = runtimeLogContentsSinceSnapshot(logSnapshot)
-        XCTAssertTrue(
+        XCTAssertFalse(
             logContents.contains("presentationRecovery trigger=global_show action=softAttempt"),
             """
-            Initial stale occlusion should exercise the soft recovery path.
+            Initial stale occlusion should wait for exact visibility without immediate recovery.
+            Runtime logs:
+            \(logContents)
+            """
+        )
+        XCTAssertFalse(
+            logContents.contains("presentationRecovery trigger=global_show action=recoveryEscalated"),
+            """
+            Visibility released before the 350ms threshold should not escalate recovery.
             Runtime logs:
             \(logContents)
             """

@@ -4,9 +4,17 @@ import CoreGraphics
 import SwiftUI
 import FlowTabCore
 
+struct PreparedSearchIndexIdentity: Equatable {
+    let runtimeGeneration: RuntimeReadModelGeneration
+    let visibilityFilter: AppVisibilityFilter
+}
+
 extension LiveSwitcherModel {
     @discardableResult
-    func startSearchSession(triggerDirection: CycleDirection) -> Bool {
+    func startSearchSession(
+        triggerDirection: CycleDirection,
+        deferMaintenanceUntilFirstVisibleFrame: Bool = false
+    ) -> Bool {
         guard SearchInteractionPreferencesStore.loadIsEnabled() else { return false }
         runtimeProjectionService.refreshApplicationDirectoryMembershipForPresentation()
         invalidateSelectedAppWindowProjection(reason: .startSession)
@@ -18,8 +26,17 @@ extension LiveSwitcherModel {
             triggerDirection: triggerDirection,
             preferredSelectedAppID: nil
         ) {
-            requestRuntimeProjectionMaintenance(triggerDirection: triggerDirection)
-            return enterSearchMode()
+            let entered = enterSearchMode()
+            if entered && deferMaintenanceUntilFirstVisibleFrame {
+                deferRuntimeProjectionMaintenance(
+                    triggerDirection: triggerDirection
+                )
+            } else {
+                requestRuntimeProjectionMaintenance(
+                    triggerDirection: triggerDirection
+                )
+            }
+            return entered
         }
 
         requestRuntimeProjectionMaintenance(triggerDirection: triggerDirection)
@@ -90,6 +107,7 @@ extension LiveSwitcherModel {
             triggerDirection: triggerDirection,
             rememberedWindowIDByAppID: rememberedWindowIDByAppID
         )
+        beginSessionAppWindowReadinessTracking()
         RuntimeLog.debug(
             .searchModel,
             "startSearchSession source=committedRuntimeIndex readiness=\(read.readiness.rawValue) resultState=\(read.resultState.rawValue) apps=\(apps.count) windows=\(apps.reduce(0) { $0 + $1.windows.count })"
@@ -162,6 +180,7 @@ extension LiveSwitcherModel {
             && requestFreshnessBarrierIfNeeded
         guard let projection = read.projection else {
             committedSearchAppsByID = [:]
+            preparedSearchIndexIdentity = nil
             searchCoordinator.resetIndex()
             publishSearchStateIfNeeded()
             if requestedFreshnessBarrier {
@@ -189,11 +208,14 @@ extension LiveSwitcherModel {
         if requestedFreshnessBarrier {
             runtimeProjectionService.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
         }
-        let searchProjection = projection.filteringApps(
-            using: AppVisibilityPreferencesStore.visibilityFilter()
-        )
+        let visibilityFilter = AppVisibilityPreferencesStore.visibilityFilter()
+        let searchProjection = projection.filteringApps(using: visibilityFilter)
         committedSearchAppsByID = Self.committedSearchAppsByID(from: searchProjection)
         let indexStatus = SwitcherSearchIndexStatus(read: read)
+        let identity = PreparedSearchIndexIdentity(
+            runtimeGeneration: projection.freshness.sourceGeneration,
+            visibilityFilter: visibilityFilter
+        )
         let diagnostic = SearchIndexReadDiagnostic(
             reason: reason,
             readiness: indexStatus.readiness,
@@ -208,7 +230,19 @@ extension LiveSwitcherModel {
             requestedFreshnessBarrier: indexStatus.requestedFreshnessBarrier
         )
         lastSearchIndexReadDiagnostic = diagnostic
-        searchCoordinator.rebuildIndex(with: searchProjection, indexStatus: indexStatus)
+        if preparedSearchIndexIdentity == identity,
+           searchCoordinator.reusePreparedIndex(indexStatus: indexStatus) {
+            RuntimeLog.debug(
+                .searchModel,
+                "searchIndexReuse reason=\(reason) apps=\(diagnostic.appCount) windows=\(diagnostic.windowCount)"
+            )
+        } else {
+            searchCoordinator.rebuildIndex(
+                with: searchProjection,
+                indexStatus: indexStatus
+            )
+            preparedSearchIndexIdentity = identity
+        }
         RuntimeLog.debug(.searchModel, diagnostic.logMessage)
         return true
     }
@@ -470,6 +504,22 @@ extension LiveSwitcherModel {
             guard let self else { return }
             if self.searchCoordinator.applyComputationOutput(output) {
                 self.publishSearchStateIfNeeded()
+                if let timing = self.searchSchedulingOwner
+                    .lastCompletedDiagnostic,
+                   timing.query == output.query,
+                   timing.scope == output.scope {
+                    self.lastSearchResultPublicationDiagnostic =
+                        SearchResultPublicationDiagnostic(
+                            query: output.query,
+                            debounceMilliseconds:
+                                timing.debounceMilliseconds,
+                            computationMilliseconds:
+                                timing.computationMilliseconds,
+                            publishedAtMilliseconds:
+                                ProcessInfo.processInfo.systemUptime
+                                    * 1_000
+                        )
+                }
                 self.onSearchStateChanged?()
             }
         }

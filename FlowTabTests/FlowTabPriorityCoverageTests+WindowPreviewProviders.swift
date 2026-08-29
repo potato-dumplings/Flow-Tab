@@ -110,6 +110,33 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNotNil(results.first?.image)
     }
 
+    func testWindowPreviewResolverSkipsProvidersWhenCaptureBatchIsCancelled() async {
+        let specialProvider = FakeSpecialWindowPreviewProvider(
+            supportedAppID: "com.apple.Terminal",
+            result: .failure(.specialProviderUnavailable)
+        )
+        let genericProvider = FakeGenericWindowPreviewProvider(
+            result: .failure(.transientSystemError)
+        )
+        let resolver = WindowPreviewProviderResolver(
+            specialProviders: [specialProvider],
+            genericProvider: genericProvider
+        )
+        let cancellation = WindowPreviewCaptureCancellation()
+        cancellation.cancel()
+
+        let results = await resolver.previewOutcomes(
+            for: [makePreviewRequest(appID: "com.apple.Terminal")],
+            captureSemaphore: nil,
+            cancellation: cancellation
+        )
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.failureReason, .transientSystemError)
+        XCTAssertEqual(specialProvider.callCount, 0)
+        XCTAssertEqual(genericProvider.callCount, 0)
+    }
+
     func testTerminalPreviewRendererCreatesImageForContents() {
         let image = renderTerminalPreview(
             contents: "DONE Compiled successfully\nhttp://127.0.0.1:8080/",
@@ -615,7 +642,8 @@ final class FakeGenericWindowPreviewProvider: GenericWindowPreviewProviding {
 
     func previews(
         for requests: [WindowPreviewRequest],
-        captureSemaphore: DispatchSemaphore?
+        captureSemaphore: DispatchSemaphore?,
+        cancellation: WindowPreviewCaptureCancellation
     ) async -> [WindowPreviewResult] {
         lock.lock()
         batches.append(requests)

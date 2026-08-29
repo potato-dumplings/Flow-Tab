@@ -42,7 +42,7 @@
 要求：
 
 - 从 hotkey press 到应用层可见，p95 应小于等于 `100ms`。
-- 正常 warm 状态下目标值为 p95 小于等于 `60ms`。
+- 正常 warm 状态下，从输入触发到正确应用面板可见的 p95 小于等于 `50ms`。
 - 应用层启动不得依赖全量 AX 窗口扫描。
 - 应用层启动不得依赖窗口截图。
 - 应用顺序应稳定，优先反映系统 frontmost / MRU 顺序。
@@ -359,23 +359,50 @@ UI 自动化应优先使用 fixture 或 mock topology。真实 Chrome 可用于�
 - `600` 个 running apps，窗口延迟加载：应用层启动 p95。
 - selected app 有 `100` 个窗口：selected-app snapshot p95 和 auto-enter overshoot。
 - selected app 有 `1000` 个窗口：selected-app snapshot p95 和 preview request count。
-- 连续 Option+Tab open/close 至少 `60` 次。
+- Release 构建连续执行“打开应用面板 -> 切换高亮应用 -> 关闭”`2–5` 分钟，并在结束后保持面板关闭至少 `15s`。
 - 在 `0`、`1`、`10`、`100+` 窗口的应用之间反复移动 selection。
 - visible slots 为 `6`、`10`、`16` 时的 preview 压测。
+
+真实应用面板门禁同时覆盖两档静态 runtime 数据：
+
+- `realistic`：`24 apps x 5 windows`。
+- `extreme`：`120 apps`，初始高亮应用 `100 windows`，其余应用各 `5 windows`。
+
+标准入口：
+
+```bash
+./scripts/perf/app-panel-pressure.sh --flow application
+./scripts/perf/app-panel-pressure.sh --flow app-to-window
+./scripts/perf/app-panel-pressure.sh --flow search
+```
+
+该入口使用 Release 优化、Apple Development 签名的固定路径 UI app，驱动应用面板、应用到窗口面板和搜索三条真实 UI 流程。每个场景在 UI 动作前重新安装应用，并把 CPU/RSS 采样绑定到本次启动的精确 PID。
+
+使用 `--scenario local` 可在当前登录会话的 live runtime 上补测真实应用/窗口拓扑；摘要记录动态应用数与窗口数范围。该场景用于观察同机桌面噪声，默认 `all` 继续保留可重复的两档静态数据。
 
 报告指标：
 
 - app-layer presentation 的 p50、p95、max。
+- warm 打开路径按 session、几何与辅助功能、窗口呈现、观察器调度、呈现后可见性分组后的 p50、p95、平均占比，以及目录刷新、首次窗口前置、下一主线程轮次、可见性轮询等子阶段明细。
+- 子阶段分区总和与原始打开耗时的 p95 绝对对账误差。
+- 应用高亮切换的 p95。
 - selected-app window snapshot 的 p50、p95、max。
 - auto-enter overshoot p95。
 - preview cache hit 数、capture request 数、first-image p95、all-visible p95。
 - background full snapshot 是否和关键路径重叠。
+- active 阶段 CPU avg、关闭后冷却窗口最后半段 CPU p95。
+- active 中段与末段 RSS p95 及增长量。
 
 ## 验收标准
 
 实现满足以下条件时，才算达到合格产品状态：
 
 - app-layer presentation 在 app-scale 压测下 p95 小于等于 `100ms`。
+- warm Release 应用面板从输入触发到正确面板可见的 p95 小于等于 `50ms`。
+- 应用高亮切换 p95 小于等于 `33.334ms`。
+- 窗口命令到窗口面板真正可见 p95 小于等于 `35ms`。
+- 关闭后的 CPU p95 小于等于 `max(5%, active CPU avg x 25%)`。
+- active 末段相对中段的 RSS p95 增长小于等于 `max(16MiB, 中段 RSS p95 x 10%)`。
 - selected-app window snapshot 在 `1000` 个 selected-app windows 下 p95 小于等于 `100ms`，且不扫描无关应用 AX。
 - `autoEnterDelay = 0.1s` 时，如果 selected-app metadata 在 deadline 前可用，窗口层进入 p95 小于等于 `110ms`。
 - 首次 preview request 数量不超过 visible slots。

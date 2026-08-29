@@ -20,6 +20,7 @@ MANUAL_CODESIGN_ENABLED=0
 DEVELOPMENT_TEAM_SOURCE=""
 HAS_CUSTOM_BUILD_ROOT=false
 MANAGES_UI_TEST_APP_LIFECYCLE=false
+INCLUDE_TESTING_SUPPORT=false
 
 # shellcheck source=/dev/null
 source "${PATH_BOUNDARIES_PATH}"
@@ -62,6 +63,7 @@ Usage:
     [--configuration Debug|Testing|Release] \
     [--build-root /custom/build/root] \
     [--install-path /absolute/path/to/Flow Tab UITest.app] \
+    [--include-testing-support] \
     [--development-team TEAMID] \
     [--code-sign-identity "Apple Development"|SHA1]
 
@@ -75,6 +77,10 @@ app after the run reaches success, failure, or an interrupt.
 Defaults:
   configuration: Testing
   install path: ~/Applications/Flow Tab UITest.app
+
+Release pressure:
+  --include-testing-support compiles FLOWTAB_TESTING into an optimized Release
+  app for local UI pressure only. It is accepted only with --configuration Release.
 
 Supported install boundaries:
   ~/Applications/Flow Tab UITest.app
@@ -110,6 +116,10 @@ while [[ $# -gt 0 ]]; do
       INSTALL_PATH="${2-}"
       shift 2
       ;;
+    --include-testing-support)
+      INCLUDE_TESTING_SUPPORT=true
+      shift
+      ;;
     --development-team)
       DEVELOPMENT_TEAM="${2-}"
       DEVELOPMENT_TEAM_SOURCE="--development-team"
@@ -143,6 +153,10 @@ PACKAGE_CACHE_PATH="${BUILD_ROOT}/source-packages"
 
 if [[ "${CONFIGURATION}" != "Debug" && "${CONFIGURATION}" != "Testing" && "${CONFIGURATION}" != "Release" ]]; then
   echo "Unsupported configuration: ${CONFIGURATION}. Use Debug, Testing, or Release." >&2
+  exit 1
+fi
+if [[ "${INCLUDE_TESTING_SUPPORT}" == true && "${CONFIGURATION}" != "Release" ]]; then
+  echo "--include-testing-support requires --configuration Release." >&2
   exit 1
 fi
 
@@ -233,6 +247,9 @@ XCODEBUILD_CMD=(
 # Build unsigned first, then sign the copied fixed-path bundle with either the
 # resolved local identity or an explicit ad-hoc identity.
 XCODEBUILD_CMD+=("CODE_SIGNING_ALLOWED=NO")
+if [[ "${INCLUDE_TESTING_SUPPORT}" == true ]]; then
+  XCODEBUILD_CMD+=("SWIFT_ACTIVE_COMPILATION_CONDITIONS=FLOWTAB_TESTING")
+fi
 
 XCODEBUILD_CMD+=(build)
 

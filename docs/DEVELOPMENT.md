@@ -415,6 +415,7 @@ Logs 页同等级重新进入时先显示缓存，并在页面连续可见 `100 
 - `scripts/release/release-dmg.sh`：构建并打包 DMG 到 `release/FlowTab-v<version>/`。
 - `scripts/release/publish-sparkle-update.sh`：完成 Community DMG、GitHub Release 与签名 appcast 的单入口发布。
 - `scripts/perf/tab-switch-stress.sh`：tab 高频切换性能压测；采样与切换时长属于显式压力协议，子进程清理由精确 PID/启动身份读回和退出状态驱动。
+- `scripts/perf/app-panel-pressure.sh`：Release 应用面板真实 UI 延迟、CPU 回落与 RSS 平台化门禁。
 
 ## 本地签名配置
 
@@ -689,6 +690,31 @@ gh release create "${TAG}" \
 - 根目录 `README.md` 面向使用者，保持安装与使用说明。
 - 根目录 `AGENTS.md` 只保留项目入口级工程约束。
 - `FlowTabCore/docs/requirements.md` 与 `FlowTabCore/docs/implementation-split.md` 仅保留跳转说明。
+
+## 应用面板真实 UI 压测要求（必须）
+
+修改全局 Option+Tab 输入、应用面板 session/selection、面板展示布局、runtime app projection 或相关 TestingSupport 时，执行：
+
+```bash
+./scripts/perf/app-panel-pressure.sh --flow application
+./scripts/perf/app-panel-pressure.sh --flow app-to-window
+./scripts/perf/app-panel-pressure.sh --flow search
+```
+
+入口使用 Release 优化、Apple Development 签名的固定路径 UI app，分别运行 `realistic`（`24 apps x 5 windows`）与 `extreme`（`120 apps`，初始高亮应用 `100 windows`，其余应用各 `5 windows`）。`application` 执行“打开 -> 切换高亮应用 -> 关闭”，`app-to-window` 执行“打开应用面板 -> 进入窗口面板 -> 关闭”，`search` 执行“打开搜索 -> 提交查询并等到结果更新 -> 关闭”。每档持续 `120s`，再保持关闭 `15s`；可用 `--duration-seconds` 延长至 `300s`，也可用 `--scenario` 单独复验一档。
+
+本机补充场景使用 `./scripts/perf/app-panel-pressure.sh --scenario local`。它从当前 live runtime 读取实际应用/窗口拓扑，要求每轮高亮切换到不同应用，并在摘要中记录观测到的应用数、窗口数范围。`local` 受当前桌面噪声影响，作为同机补充基线单独运行，不并入默认的确定性 `all` 门禁。
+
+门禁要求：
+
+- 每个循环都读回正确应用面板可见、正确高亮应用和精确关闭状态。
+- warm 打开到正确应用面板可见 p95 小于等于 `50ms`。
+- 应用高亮切换 p95 小于等于 `33.334ms`。
+- 窗口命令到窗口面板真正可见 p95 小于等于 `35ms`。
+- 关闭后冷却窗口最后半段 CPU p95 小于等于 `max(5%, active CPU avg x 25%)`。
+- active 末段相对中段的 RSS p95 增长小于等于 `max(16MiB, 中段 RSS p95 x 10%)`。
+
+脚本在每次 UI 动作前重新安装测试应用，用不可变 identity manifest 把采样绑定到本次启动的精确 PID，并保留 UI 指标 CSV、CPU/RSS CSV、XCTest 结果、文本与 JSON 门禁摘要。摘要输出打开、流程交互和关闭的 p50/p95；打开耗时同时按 session、几何与辅助功能、窗口呈现、观察器调度、呈现后可见性五组拆分，并输出每个子阶段的 p50、p95、平均占比及总耗时对账误差。默认证据根位于 `.build-local/app-panel-pressure/`。
 
 ## 搜索压测要求（必须）
 

@@ -239,6 +239,17 @@ final class SwitcherSearchCoordinator {
         state = .inactive
     }
 
+    var hasPreparedIndex: Bool {
+        !appEntries.isEmpty
+    }
+
+    @discardableResult
+    func reusePreparedIndex(indexStatus: SwitcherSearchIndexStatus) -> Bool {
+        guard hasPreparedIndex else { return false }
+        state.indexStatus = indexStatus
+        return true
+    }
+
     @discardableResult
     func activate(defaultScope: SwitcherSearchScope = .app) -> Bool {
         guard !appEntries.isEmpty else { return false }

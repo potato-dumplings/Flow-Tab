@@ -23,6 +23,28 @@ enum FlowTabUITestApplicationMembershipFixture {
     static let finalAccessoryAppID = "com.flowtab.mock.membership-final-accessory"
 }
 
+enum FlowTabUITestAppPanelPressureFixture {
+    static let realisticVariant = "app-panel-pressure-realistic"
+    static let extremeVariant = "app-panel-pressure-extreme"
+    static let realisticAppCount = 24
+    static let realisticWindowCount = 5
+    static let extremeAppCount = 120
+    static let extremeWindowCount = 5
+    static let extremeSelectedAppWindowCount = 100
+
+    static func contains(_ variant: String?) -> Bool {
+        variant == realisticVariant
+            || variant == extremeVariant
+    }
+
+    static func appID(index: Int) -> String {
+        String(
+            format: "com.flowtab.pressure.app.%04d",
+            index
+        )
+    }
+}
+
 enum FlowTabTestLaunchOptions {
     static let uiTestingEnvironmentKey = "FLOWTAB_UI_TESTING"
     static let uiTestingEnvironmentValue = "1"
@@ -45,6 +67,14 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-tab-stress-evidence-notification-name"
     static let tabSwitchStressRuntimeLogLevelArgument =
         "--flowtab-tab-stress-runtime-log-level"
+    static let appPanelPressureEvidenceNotificationArgument =
+        "--flowtab-app-panel-pressure-evidence-notification-name"
+    static let appPanelPressureEvidenceAcknowledgementNotificationArgument =
+        "--flowtab-app-panel-pressure-evidence-acknowledgement-notification-name"
+    static let appPanelPressureCommandNotificationArgument =
+        "--flowtab-app-panel-pressure-command-notification-name"
+    static let appPanelPressureCommandAcknowledgementNotificationArgument =
+        "--flowtab-app-panel-pressure-command-acknowledgement-notification-name"
     static let shortcutEventInjectionArgument =
         "--flowtab-ui-enable-shortcut-event-injection"
     static let includeCurrentAppInMockInventoryArgument =
@@ -87,6 +117,10 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-open-switcher-search",
         "--flowtab-ui-permission-state-path",
         axSuppressionReadbackRouteArgument,
+        appPanelPressureEvidenceAcknowledgementNotificationArgument,
+        appPanelPressureCommandAcknowledgementNotificationArgument,
+        appPanelPressureCommandNotificationArgument,
+        appPanelPressureEvidenceNotificationArgument,
         projectionAcknowledgementRouteArgument,
         "--flowtab-ui-record-hotkey-reload-diagnostics",
         "--flowtab-ui-redacted-runtime-logs",
@@ -159,6 +193,43 @@ enum FlowTabTestLaunchOptions {
 
     static var switcherCommandPayloadPath: String? {
         uiTestValue(after: "--flowtab-ui-switcher-command-payload-path")
+    }
+
+    static var appPanelPressureEvidenceNotificationName: String? {
+        uiTestValue(
+            after:
+                appPanelPressureEvidenceNotificationArgument
+        )
+    }
+
+    static var appPanelPressureEvidenceAcknowledgementNotificationName:
+        String?
+    {
+        uiTestValue(
+            after:
+                appPanelPressureEvidenceAcknowledgementNotificationArgument
+        )
+    }
+
+    static var appPanelPressureCommandNotificationName: String? {
+        uiTestValue(
+            after:
+                appPanelPressureCommandNotificationArgument
+        )
+    }
+
+    static var appPanelPressureCommandAcknowledgementNotificationName:
+        String?
+    {
+        uiTestValue(
+            after:
+                appPanelPressureCommandAcknowledgementNotificationArgument
+        )
+    }
+
+    static var runsAppPanelPressure: Bool {
+        appPanelPressureEvidenceNotificationName != nil
+            && appPanelPressureCommandNotificationName != nil
     }
 
     static var frontmostBundleIdentifierOverride: String? {
@@ -526,7 +597,9 @@ enum FlowTabTestLaunchOptions {
     }
 
     static var showsSwitcherDiagnostics: Bool {
-        isRunningUITests && (opensSwitcherOnLaunch || listensForSwitcherTriggerNotifications)
+        isRunningUITests
+            && !runsAppPanelPressure
+            && (opensSwitcherOnLaunch || listensForSwitcherTriggerNotifications)
     }
 
     static var tabSwitchStressDurationSeconds: Double {

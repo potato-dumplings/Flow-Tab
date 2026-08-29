@@ -5,6 +5,7 @@ import FlowTabCore
 struct SwitcherPanelRootView: View {
     @ObservedObject var model: LiveSwitcherModel
     let pointerSelectionActions: SwitcherPointerSelectionActions
+    let onRenderMilestone: (SwitcherRenderMilestoneEvent) -> Void
     @ObservedObject private var presentation = FlowPresentationState.shared
     @AppStorage(AppPreferenceKeys.searchEnabled)
     private var searchEnabled = SearchInteractionPreferencesStore.defaultIsEnabled
@@ -17,15 +18,18 @@ struct SwitcherPanelRootView: View {
 
     var body: some View {
         ZStack {
-            if let session = model.session {
+            if let renderSnapshot = model.appLayerRenderSnapshot {
+                let session = model.session
                 let windowPreviewItems = model.overlayStyle == .windowOnly
                     ? model.windowPreviewItems()
                     : []
                 CommandTabOverlay(
-                    session: session,
+                    appRenderSnapshot: renderSnapshot,
                     overlayStyle: model.overlayStyle,
                     isPreviewLayer: model.isPreviewLayerMode,
                     previewSectionHeight: model.previewSectionHeight,
+                    windowRenderGeneration:
+                        model.selectedAppWindowProjectionGeneration,
                     windowPreviewItems: windowPreviewItems,
                     standardWindowPreviewSummary: model.windowPreviewPageSummary(),
                     standardWindowPreviewItemsForRange: { range in
@@ -58,34 +62,26 @@ struct SwitcherPanelRootView: View {
                         model.recordSearchResultScrollRequestForTesting(resultID)
                     },
                     pointerSelectionActions: pointerSelectionActions,
+                    onRenderMilestone: onRenderMilestone,
                     iconForApp: { app in
                         model.icon(for: app)
                     }
                 )
                 .onAppear {
-                    Self.logContentTrace(
-                        phase: "contentAppear",
-                        session: session,
-                        overlayStyle: model.overlayStyle,
-                        windowPreviewItems: windowPreviewItems,
-                        searchActive: model.searchViewState.isActive
-                    )
-                }
-                .onChange(
-                    of: Self.contentTraceSummary(
-                        session: session,
-                        overlayStyle: model.overlayStyle,
-                        windowPreviewItems: windowPreviewItems,
-                        searchActive: model.searchViewState.isActive
-                    )
-                ) { summary in
-                    Self.logContentTrace(
-                        phase: "contentUpdate",
-                        overlayStyle: model.overlayStyle,
-                        summary: summary
-                    )
+                    if let session {
+                        Self.logContentTrace(
+                            phase: "contentAppear",
+                            session: session,
+                            overlayStyle: model.overlayStyle,
+                            windowPreviewItems: windowPreviewItems,
+                            searchActive: model.searchViewState.isActive
+                        )
+                    }
                 }
                 .padding(SwitcherPanelLayoutMetrics.rootPadding)
+                .opacity(session == nil ? 0 : 1)
+                .allowsHitTesting(session != nil)
+                .accessibilityHidden(session == nil)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -258,10 +254,11 @@ struct SwitcherPanelRootView: View {
 }
 
 private struct CommandTabOverlay: View {
-    let session: SwitcherSession
+    let appRenderSnapshot: SwitcherAppLayerRenderSnapshot
     let overlayStyle: SwitcherOverlayStyle
     let isPreviewLayer: Bool
     let previewSectionHeight: CGFloat
+    let windowRenderGeneration: UInt64
     let windowPreviewItems: [WindowPreviewItem]
     let standardWindowPreviewSummary: WindowPreviewPageSummary
     let standardWindowPreviewItemsForRange: (Range<Int>) -> [WindowPreviewItem]
@@ -282,6 +279,7 @@ private struct CommandTabOverlay: View {
     let appTileSpacing: CGFloat
     let onSearchResultScrollRequested: (String) -> Void
     let pointerSelectionActions: SwitcherPointerSelectionActions
+    let onRenderMilestone: (SwitcherRenderMilestoneEvent) -> Void
     let iconForApp: (AppSwitchCandidate) -> NSImage?
     @Environment(\.colorScheme) private var colorScheme
 
@@ -362,12 +360,16 @@ private struct CommandTabOverlay: View {
         }
     }
 
-    private func switcherAppAccessibilityIdentifier(_ app: AppSwitchCandidate) -> String {
-        SwitcherAccessibilityIdentifiers.app(id: app.id)
+    private func switcherAppAccessibilityIdentifier(
+        _ item: SwitcherAppRenderItem
+    ) -> String {
+        SwitcherAccessibilityIdentifiers.app(id: item.id)
     }
 
-    private func switcherAppAccessibilityValue(_ app: AppSwitchCandidate) -> String {
-        "\(app.id), \(app.windows.count)w"
+    private func switcherAppAccessibilityValue(
+        _ item: SwitcherAppRenderItem
+    ) -> String {
+        "\(item.id), \(item.windowCount)w"
     }
 
     private func switcherWindowAccessibilityIdentifier(_ preview: WindowPreviewItem) -> String {
@@ -427,26 +429,35 @@ private struct CommandTabOverlay: View {
     }
 
     private var standardOverlayAppStrip: some View {
-        let appIDs = session.apps.map(\.id)
+        let appIDs = appRenderSnapshot.items.map(\.id)
         let removalAnimationDuration =
             SwitcherAppRemovalAnimationPolicy.default
-                .animationDuration(appCount: session.apps.count)
+                .animationDuration(
+                    appCount: appRenderSnapshot.items.count
+                )
         return HStack(alignment: .center, spacing: appTileSpacing) {
-            ForEach(Array(session.apps.enumerated()), id: \.element.id) { index, app in
+            ForEach(appRenderSnapshot.items) { item in
                 AppTileView(
-                    app: app,
-                    isSelected: index == session.selectedAppIndex,
-                    isTerminating: app.id == terminatingAppID,
+                    displayName: item.displayName,
+                    isSelected:
+                        item.id == appRenderSnapshot.selectedAppID,
+                    isTerminating: item.id == terminatingAppID,
                     size: appTileSize,
-                    icon: iconForApp(app),
-                    accessibilityIdentifier: switcherAppAccessibilityIdentifier(app),
-                    accessibilityLabel: app.displayName,
-                    accessibilityValue: switcherAppAccessibilityValue(app)
+                    icon: item.icon,
+                    accessibilityIdentifier:
+                        switcherAppAccessibilityIdentifier(item),
+                    accessibilityLabel: item.displayName,
+                    accessibilityValue:
+                        switcherAppAccessibilityValue(item)
                 )
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Text(app.displayName))
-                .accessibilityValue(Text(switcherAppAccessibilityValue(app)))
-                .accessibilityIdentifier(switcherAppAccessibilityIdentifier(app))
+                .accessibilityLabel(Text(item.displayName))
+                .accessibilityValue(
+                    Text(switcherAppAccessibilityValue(item))
+                )
+                .accessibilityIdentifier(
+                    switcherAppAccessibilityIdentifier(item)
+                )
                 .transition(.appQuitRemoval)
             }
         }
@@ -486,6 +497,13 @@ private struct CommandTabOverlay: View {
             }
         }
         .padding(.horizontal, 2)
+        .background(
+            SwitcherRenderMilestoneProbe(
+                milestone: .appContent,
+                renderGeneration: appRenderSnapshot.generation,
+                onDraw: onRenderMilestone
+            )
+        )
     }
 
     @ViewBuilder
@@ -551,6 +569,13 @@ private struct CommandTabOverlay: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
             .frame(height: previewSectionHeight)
+            .background(
+                SwitcherRenderMilestoneProbe(
+                    milestone: .windowContent,
+                    renderGeneration: windowRenderGeneration,
+                    onDraw: onRenderMilestone
+                )
+            )
         }
     }
 
@@ -592,6 +617,13 @@ private struct CommandTabOverlay: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("flowtab.switcher.search")
             .background(SearchLayoutSizeReader(target: .header))
+            .background(
+                SwitcherRenderMilestoneProbe(
+                    milestone: .searchShell,
+                    renderGeneration: searchResultScrollRevision,
+                    onDraw: onRenderMilestone
+                )
+            )
 
             if searchState.scope == .app {
                 if searchAppItems.isEmpty {
@@ -617,6 +649,16 @@ private struct CommandTabOverlay: View {
                                         pointerSelectionActions.selectSearchResult(item.id)
                                     }
                                     .background(SearchLayoutSizeReader(target: .row))
+                                    .background {
+                                        if item.id == searchAppItems.first?.id {
+                                            SwitcherRenderMilestoneProbe(
+                                                milestone: .searchFirstRow,
+                                                renderGeneration:
+                                                    searchResultScrollRevision,
+                                                onDraw: onRenderMilestone
+                                            )
+                                        }
+                                    }
                                 }
                             }
                             .padding(.horizontal, 2)
@@ -650,6 +692,16 @@ private struct CommandTabOverlay: View {
                                             pointerSelectionActions.selectSearchResult(item.id)
                                         }
                                         .background(SearchLayoutSizeReader(target: .row))
+                                        .background {
+                                            if item.id == searchWindowItems.first?.id {
+                                                SwitcherRenderMilestoneProbe(
+                                                    milestone: .searchFirstRow,
+                                                    renderGeneration:
+                                                        searchResultScrollRevision,
+                                                    onDraw: onRenderMilestone
+                                                )
+                                            }
+                                        }
                                 }
                             }
                             .padding(.horizontal, 2)
@@ -740,21 +792,37 @@ private struct CommandTabOverlay: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
+        .background(
+            SwitcherRenderMilestoneProbe(
+                milestone: .windowContent,
+                renderGeneration: windowRenderGeneration,
+                onDraw: onRenderMilestone
+            )
+        )
     }
 
     var body: some View {
-        Group {
+        ZStack {
             if isWindowOnlyMode {
                 windowOnlyOverlayBody
-            } else if isSearchMode {
-                searchOverlayBody
             } else {
                 standardOverlayBody
+                    .opacity(isSearchMode ? 0 : 1)
+                    .allowsHitTesting(!isSearchMode)
+                    .accessibilityHidden(isSearchMode)
+                searchOverlayBody
+                    .opacity(isSearchMode ? 1 : 0)
+                    .allowsHitTesting(isSearchMode)
+                    .accessibilityHidden(!isSearchMode)
+                    .onPreferenceChange(
+                        SearchLayoutMeasurementPreferenceKey.self
+                    ) { measurement in
+                        guard let measurements = measurement.measurements else {
+                            return
+                        }
+                        onSearchLayoutMeasured(measurements)
+                    }
             }
-        }
-        .onPreferenceChange(SearchLayoutMeasurementPreferenceKey.self) { measurement in
-            guard let measurements = measurement.measurements else { return }
-            onSearchLayoutMeasured(measurements)
         }
     }
 }

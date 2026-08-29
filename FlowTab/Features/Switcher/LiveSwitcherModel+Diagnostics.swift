@@ -57,16 +57,29 @@ extension LiveSwitcherModel {
         recencyAppliedMs: Double,
         startMs: Double
     ) {
+        let diagnostic = AppSwitcherSessionLoadDiagnostic(
+            result: "empty",
+            event: event,
+            trigger: triggerDirection.debugName,
+            appCount: 0,
+            windowCount: 0,
+            projectionMs: projectionReadMs - startMs,
+            recencyMs: recencyAppliedMs - projectionReadMs,
+            sessionBuildMs: 0,
+            indexMs: 0,
+            publishMs: 0
+        )
+        lastAppSwitcherSessionLoadDiagnostic = diagnostic
         RuntimeLog.debug(
             Self.projectionLogCategory,
             Self.projectionLogLine(
                 event,
                 fields: [
-                    ("result", "empty"),
-                    ("trigger", triggerDirection.debugName),
-                    ("projectionMs", Self.formatMilliseconds(projectionReadMs - startMs)),
-                    ("recencyMs", Self.formatMilliseconds(recencyAppliedMs - projectionReadMs)),
-                    ("totalMs", Self.formatMilliseconds(recencyAppliedMs - startMs))
+                    ("result", diagnostic.result),
+                    ("trigger", diagnostic.trigger),
+                    ("projectionMs", Self.formatMilliseconds(diagnostic.projectionMs)),
+                    ("recencyMs", Self.formatMilliseconds(diagnostic.recencyMs)),
+                    ("totalMs", Self.formatMilliseconds(diagnostic.totalMs))
                 ]
             )
         )
@@ -83,21 +96,34 @@ extension LiveSwitcherModel {
         completeMs: Double,
         startMs: Double
     ) {
+        let diagnostic = AppSwitcherSessionLoadDiagnostic(
+            result: "ready",
+            event: event,
+            trigger: triggerDirection.debugName,
+            appCount: payload.apps.count,
+            windowCount: payload.windowCount,
+            projectionMs: projectionReadMs - startMs,
+            recencyMs: recencyAppliedMs - projectionReadMs,
+            sessionBuildMs: sessionReadyMs - recencyAppliedMs,
+            indexMs: indexReadyMs - sessionReadyMs,
+            publishMs: completeMs - indexReadyMs
+        )
+        lastAppSwitcherSessionLoadDiagnostic = diagnostic
         RuntimeLog.debug(
             Self.projectionLogCategory,
             Self.projectionLogLine(
                 event,
                 fields: [
-                    ("result", "ready"),
-                    ("trigger", triggerDirection.debugName),
-                    ("apps", "\(payload.apps.count)"),
-                    ("windows", "\(payload.windowCount)"),
-                    ("projectionMs", Self.formatMilliseconds(projectionReadMs - startMs)),
-                    ("recencyMs", Self.formatMilliseconds(recencyAppliedMs - projectionReadMs)),
-                    ("sessionBuildMs", Self.formatMilliseconds(sessionReadyMs - recencyAppliedMs)),
-                    ("indexMs", Self.formatMilliseconds(indexReadyMs - sessionReadyMs)),
-                    ("publishMs", Self.formatMilliseconds(completeMs - indexReadyMs)),
-                    ("totalMs", Self.formatMilliseconds(completeMs - startMs))
+                    ("result", diagnostic.result),
+                    ("trigger", diagnostic.trigger),
+                    ("apps", "\(diagnostic.appCount)"),
+                    ("windows", "\(diagnostic.windowCount)"),
+                    ("projectionMs", Self.formatMilliseconds(diagnostic.projectionMs)),
+                    ("recencyMs", Self.formatMilliseconds(diagnostic.recencyMs)),
+                    ("sessionBuildMs", Self.formatMilliseconds(diagnostic.sessionBuildMs)),
+                    ("indexMs", Self.formatMilliseconds(diagnostic.indexMs)),
+                    ("publishMs", Self.formatMilliseconds(diagnostic.publishMs)),
+                    ("totalMs", Self.formatMilliseconds(diagnostic.totalMs))
                 ]
             )
         )

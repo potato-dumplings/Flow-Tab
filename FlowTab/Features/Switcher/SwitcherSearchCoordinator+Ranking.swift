@@ -44,13 +44,16 @@ extension SwitcherSearchCoordinator {
         entries: [AppEntry],
         candidateIndexes: [Int],
         topResultLimit: Int
-    ) -> (matchedIndexes: [Int], topRanked: [RankedResult]) {
+    ) -> (matchedIndexes: [Int], topRanked: [RankedResult])? {
         var matchedIndexes: [Int] = []
         matchedIndexes.reserveCapacity(candidateIndexes.count)
         var rankedResults: [RankedResult] = []
         rankedResults.reserveCapacity(candidateIndexes.count)
 
-        for index in candidateIndexes {
+        for (offset, index) in candidateIndexes.enumerated() {
+            if offset.isMultiple(of: 32), Task.isCancelled {
+                return nil
+            }
             let app = entries[index]
             guard let score = matchScore(query: query, in: app.searchIndex) else {
                 continue
@@ -58,7 +61,13 @@ extension SwitcherSearchCoordinator {
             matchedIndexes.append(index)
             rankedResults.append(RankedResult(score: score, order: index))
         }
-        return (matchedIndexes, topRankedResults(rankedResults, limit: topResultLimit))
+        guard !Task.isCancelled else { return nil }
+        let topRanked = topRankedResults(
+            rankedResults,
+            limit: topResultLimit
+        )
+        guard !Task.isCancelled else { return nil }
+        return (matchedIndexes, topRanked)
     }
 
     static func rankWindowMatches(
@@ -66,7 +75,7 @@ extension SwitcherSearchCoordinator {
         entries: [WindowEntry],
         candidateIndexes: [Int],
         topResultLimit: Int
-    ) -> (matchedIndexes: [Int], topRanked: [RankedResult]) {
+    ) -> (matchedIndexes: [Int], topRanked: [RankedResult])? {
         var matchedIndexes: [Int] = []
         matchedIndexes.reserveCapacity(candidateIndexes.count)
         var rankedResults: [RankedResult] = []
@@ -74,7 +83,10 @@ extension SwitcherSearchCoordinator {
         var appScoreCache: [String: Int] = [:]
         var appScoreMisses: Set<String> = []
 
-        for index in candidateIndexes {
+        for (offset, index) in candidateIndexes.enumerated() {
+            if offset.isMultiple(of: 32), Task.isCancelled {
+                return nil
+            }
             let window = entries[index]
             let titleScore = matchScore(query: query, in: window.windowSearchIndex)
             let appScore: Int?
@@ -96,7 +108,13 @@ extension SwitcherSearchCoordinator {
             matchedIndexes.append(index)
             rankedResults.append(RankedResult(score: score, order: index))
         }
-        return (matchedIndexes, topRankedResults(rankedResults, limit: topResultLimit))
+        guard !Task.isCancelled else { return nil }
+        let topRanked = topRankedResults(
+            rankedResults,
+            limit: topResultLimit
+        )
+        guard !Task.isCancelled else { return nil }
+        return (matchedIndexes, topRanked)
     }
 
     static func matchScore(query: SearchKey, in index: SearchIndex) -> Int? {

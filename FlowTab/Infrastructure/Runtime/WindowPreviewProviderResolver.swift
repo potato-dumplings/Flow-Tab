@@ -69,6 +69,23 @@ struct WindowPreviewResult {
     }
 }
 
+final class WindowPreviewCaptureCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancelled
+    }
+
+    func cancel() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
+    }
+}
+
 protocol SpecialWindowPreviewProviding {
     func supports(_ request: WindowPreviewRequest) -> Bool
     func previews(for requests: [WindowPreviewRequest]) async -> [WindowPreviewResult]
@@ -84,19 +101,22 @@ extension SpecialWindowPreviewProviding {
 protocol GenericWindowPreviewProviding {
     func previews(
         for requests: [WindowPreviewRequest],
-        captureSemaphore: DispatchSemaphore?
+        captureSemaphore: DispatchSemaphore?,
+        cancellation: WindowPreviewCaptureCancellation
     ) async -> [WindowPreviewResult]
 }
 
 struct GenericWindowScreenshotPreviewProvider: GenericWindowPreviewProviding {
     func previews(
         for requests: [WindowPreviewRequest],
-        captureSemaphore: DispatchSemaphore?
+        captureSemaphore: DispatchSemaphore?,
+        cancellation: WindowPreviewCaptureCancellation
     ) async -> [WindowPreviewResult] {
         RuntimeWindowPreviewProvider
             .captureWindowPreviewOutcomes(
                 requests.map(\.genericCaptureRequest),
-                captureSemaphore: captureSemaphore
+                captureSemaphore: captureSemaphore,
+                cancellation: cancellation
             )
             .map(Self.windowPreviewResult)
     }
@@ -144,7 +164,9 @@ struct WindowPreviewProviderResolver {
 
     func previewOutcomes(
         for requests: [WindowPreviewRequest],
-        captureSemaphore: DispatchSemaphore?
+        captureSemaphore: DispatchSemaphore?,
+        cancellation: WindowPreviewCaptureCancellation =
+            WindowPreviewCaptureCancellation()
     ) async -> [WindowPreviewResult] {
         guard !requests.isEmpty else { return [] }
 
@@ -152,9 +174,11 @@ struct WindowPreviewProviderResolver {
             repeating: WindowPreviewResult.failure(.transientSystemError),
             count: requests.count
         )
+        guard !cancellation.isCancelled else { return results }
         var handledIndexes = Set<Int>()
 
         for provider in specialProviders {
+            guard !cancellation.isCancelled else { return results }
             var providerRequests: [(index: Int, request: WindowPreviewRequest)] = []
             for (index, request) in requests.enumerated() {
                 guard !handledIndexes.contains(index), provider.supports(request) else {
@@ -168,12 +192,14 @@ struct WindowPreviewProviderResolver {
             let providerResults = await provider.previews(
                 for: providerRequests.map(\.request)
             )
+            guard !cancellation.isCancelled else { return results }
 
             for (offset, providerResult) in providerResults.enumerated() {
                 guard providerRequests.indices.contains(offset) else { continue }
                 results[providerRequests[offset].index] = providerResult
             }
         }
+        guard !cancellation.isCancelled else { return results }
 
         var genericRequests: [(index: Int, request: WindowPreviewRequest)] = []
         for (index, request) in requests.enumerated() where !handledIndexes.contains(index) {
@@ -182,8 +208,10 @@ struct WindowPreviewProviderResolver {
         if !genericRequests.isEmpty {
             let genericResults = await genericProvider.previews(
                 for: genericRequests.map(\.request),
-                captureSemaphore: captureSemaphore
+                captureSemaphore: captureSemaphore,
+                cancellation: cancellation
             )
+            guard !cancellation.isCancelled else { return results }
             for (offset, genericResult) in genericResults.enumerated() {
                 guard genericRequests.indices.contains(offset) else { continue }
                 results[genericRequests[offset].index] = genericResult

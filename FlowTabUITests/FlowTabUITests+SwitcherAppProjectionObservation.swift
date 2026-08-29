@@ -451,6 +451,52 @@ extension FlowTabUITests {
         return true
     }
 
+    func assertCurrentSwitcherAppProjection(
+        in app: XCUIApplication,
+        bundleIdentifier: String,
+        timeout: TimeInterval
+    ) -> Bool {
+        guard !bundleIdentifier.isEmpty else {
+            XCTFail("Switcher App projection bundle identifier was empty.")
+            return false
+        }
+
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        let rowIdentifier = switcherAppRowIdentifier(bundleIdentifier)
+        let rowRepresentations = app.descendants(matching: .any)
+            .matching(identifier: rowIdentifier)
+        let row = rowRepresentations.firstMatch
+        let owner = FlowTabUITestSwitcherAppProjectionObservationOwner(
+            expectation: .bundleIdentifier(bundleIdentifier),
+            acceptsResolution: {
+                row.exists
+            },
+            readback: {
+                self.switcherAppProjectionSnapshot(
+                    in: app,
+                    diagnosticsSummaryElement: diagnosticsSummary
+                )
+            }
+        )
+        owner.start()
+        defer { owner.cancel() }
+
+        guard owner.waitForResolution(timeout: timeout) != nil else {
+            XCTFail(
+                "Current Switcher App projection watchdog expired. "
+                    + "rowIdentifier=\(rowIdentifier) "
+                    + "finalRepresentationCount=\(rowRepresentations.count) "
+                    + "finalExists=\(row.exists) "
+                    + owner.diagnosticSummary
+            )
+            return false
+        }
+        return true
+    }
+
     func startSwitcherAppRemovalObservation(
         in app: XCUIApplication,
         bundleIdentifier: String,
@@ -499,6 +545,42 @@ extension FlowTabUITests {
             return nil
         }
         return owner
+    }
+
+    func startSwitcherAppRemovalObservation(
+        in app: XCUIApplication,
+        bundleIdentifier: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> FlowTabUITestSwitcherAppRemovalObservationOwner? {
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        let snapshot = switcherAppProjectionSnapshot(
+            in: app,
+            diagnosticsSummaryElement: diagnosticsSummary
+        )
+        guard
+            let initialWindowCount = snapshot.entries.first(where: {
+                $0.bundleIdentifier == bundleIdentifier
+            })?.windowCount
+        else {
+            XCTFail(
+                "Missing initial Switcher App removal baseline. "
+                    + snapshot.diagnosticSummary,
+                file: file,
+                line: line
+            )
+            return nil
+        }
+        return startSwitcherAppRemovalObservation(
+            in: app,
+            bundleIdentifier: bundleIdentifier,
+            expectedInitialWindowCount: initialWindowCount,
+            file: file,
+            line: line
+        )
     }
 
     func assertSwitcherAppRemoved(

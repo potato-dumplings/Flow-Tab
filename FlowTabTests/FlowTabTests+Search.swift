@@ -6,6 +6,43 @@ import FlowTabCore
 import Carbon
 
 extension FlowTabTests {
+    @MainActor
+    func testLiveSwitcherModelKeepsPreparedSearchIndexAcrossPanelSessions() {
+        let defaults = UserDefaults.standard
+        let previousSearchEnabled = defaults.object(
+            forKey: AppPreferenceKeys.searchEnabled
+        )
+        defer {
+            restoreUserDefaultsValue(
+                previousSearchEnabled,
+                forKey: AppPreferenceKeys.searchEnabled,
+                userDefaults: defaults
+            )
+        }
+        defaults.set(true, forKey: AppPreferenceKeys.searchEnabled)
+
+        let apps = searchSampleApps()
+        let model = LiveSwitcherModel(
+            runtimeProjectionService: RecordingRuntimeProjectionService(
+                appSwitcherApps: apps,
+                committedSearchApps: apps
+            )
+        )
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertTrue(model.enterSearchMode())
+        let appEntryCount = model.searchCoordinator.appEntries.count
+        let windowEntryCount = model.searchCoordinator.windowEntries.count
+        XCTAssertGreaterThan(appEntryCount, 0)
+        XCTAssertGreaterThan(windowEntryCount, 0)
+
+        model.resetSessionState()
+
+        XCTAssertEqual(model.searchCoordinator.appEntries.count, appEntryCount)
+        XCTAssertEqual(model.searchCoordinator.windowEntries.count, windowEntryCount)
+        XCTAssertFalse(model.searchCoordinator.state.isActive)
+    }
+
     func testSwitcherPointerAppStripHitTestMapsGlobalHoverToTile() {
         let appIDs = ["browser", "mail", "notes"]
         let frame = CGRect(x: 100, y: 200, width: 300, height: 72)
@@ -1664,10 +1701,12 @@ extension FlowTabTests {
             largeWindowAppIndex: 1,
             includeRuntimeContexts: true
         )
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherApps: appOnlyAppSwitcherApps(from: projectionSeed.apps),
+            contextsByID: projectionSeed.contextsByID
+        )
         let model = LiveSwitcherModel(
-            runtimeProjectionService: RecordingRuntimeProjectionService(
-                appSwitcherApps: appOnlyAppSwitcherApps(from: projectionSeed.apps)
-            )
+            runtimeProjectionService: runtimeProjectionService
         )
         model.runtimeProjectionMaintenanceEnabled = false
         var previewCaptureCalls = 0
@@ -1708,6 +1747,22 @@ extension FlowTabTests {
                 candidate: selectedApp,
                 context: selectedContext,
                 appDirectoryEntries: [RuntimeAppDirectoryEntry(app: selectedContext.runningApp)]
+            )
+            runtimeProjectionService.setCurrentAppWindowProjection(
+                RuntimeCurrentAppWindowProjection(
+                    appID: selectedAppID,
+                    currentAppWindowPayload: selectedPayload,
+                    freshness: RuntimeProjectionFreshness(
+                        generatedAt: 10,
+                        sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+                        dirtyAppIDs: [],
+                        dirtyPIDs: [],
+                        dirtyCGWindowIDs: [],
+                        pendingRepairScopes: [],
+                        isCompleteForScope: true
+                    )
+                ),
+                appID: selectedAppID
             )
 
             let applyStart = DispatchTime.now().uptimeNanoseconds

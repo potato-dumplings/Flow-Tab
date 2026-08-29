@@ -274,6 +274,7 @@ extension FlowTabPriorityCoverageTests {
                         runtimeProjectionService
                 )
             )
+            controller.panelOcclusionStateOverride = .visible
             let model = controller.modelForTesting
             let presentationResolved = expectation(
                 description:
@@ -484,7 +485,7 @@ extension FlowTabPriorityCoverageTests {
             XCTAssertEqual(
                 readback.inputReadinessBaselineSourceGeneration?
                     .projection,
-                2
+                1
             )
             XCTAssertEqual(
                 readback.inputReadinessSourceGeneration?

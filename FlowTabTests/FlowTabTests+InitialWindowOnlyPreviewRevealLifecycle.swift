@@ -122,7 +122,7 @@ extension FlowTabTests {
 
         controller.endPresentationSession()
 
-        XCTAssertEqual(controller.panel.alphaValue, 1)
+        XCTAssertEqual(controller.panel.alphaValue, 0)
         XCTAssertFalse(
             controller
                 .initialWindowOnlyPreviewRevealObservationOwner
@@ -139,7 +139,44 @@ extension FlowTabTests {
                 .initialWindowOnlyPreviewRevealObservationOwner
                 .lastWatchdogFailure
         )
+        XCTAssertEqual(controller.panel.alphaValue, 0)
+    }
+
+    @MainActor
+    func testPresentationEndParksPanelForWarmReuse() {
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                runtimeProjectionService:
+                    RecordingRuntimeProjectionService(
+                        appSwitcherApps: terminateScenarioApps()
+                    )
+            )
+        )
+        defer {
+            controller.panel.orderOut(nil)
+        }
+
+        XCTAssertTrue(
+            controller.presentGlobalHotkeySessionForTesting()
+        )
+        XCTAssertTrue(controller.panel.isVisible)
+
+        controller.cancelSelectionForTesting()
+
+        XCTAssertFalse(controller.isPanelPresented)
+        XCTAssertTrue(controller.panel.isVisible)
+        XCTAssertEqual(controller.panel.alphaValue, 0)
+        XCTAssertTrue(controller.panel.ignoresMouseEvents)
+        XCTAssertFalse(controller.panel.isKeyWindow)
+
+        XCTAssertTrue(
+            controller.presentGlobalHotkeySessionForTesting()
+        )
+        XCTAssertTrue(controller.isPanelPresented)
         XCTAssertEqual(controller.panel.alphaValue, 1)
+        XCTAssertFalse(controller.panel.ignoresMouseEvents)
+
+        controller.cancelSelectionForTesting()
     }
 
     @MainActor

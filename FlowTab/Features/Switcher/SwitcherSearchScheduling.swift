@@ -1,5 +1,36 @@
 import Foundation
 
+struct SwitcherSearchComputationDiagnostic: Equatable {
+    let query: String
+    let scope: SwitcherSearchScope
+    let revision: UInt64
+    let scheduledAtNanoseconds: UInt64
+    let startedAtNanoseconds: UInt64
+    let finishedAtNanoseconds: UInt64
+
+    var debounceMilliseconds: Double {
+        Self.milliseconds(
+            from: scheduledAtNanoseconds,
+            to: startedAtNanoseconds
+        )
+    }
+
+    var computationMilliseconds: Double {
+        Self.milliseconds(
+            from: startedAtNanoseconds,
+            to: finishedAtNanoseconds
+        )
+    }
+
+    private static func milliseconds(
+        from start: UInt64,
+        to end: UInt64
+    ) -> Double {
+        guard end >= start else { return 0 }
+        return Double(end - start) / 1_000_000
+    }
+}
+
 struct SwitcherSearchSchedulingPolicy: Equatable {
     let initialDebounceInterval: TimeInterval
     let fastComputationThresholdNanoseconds: UInt64
@@ -11,14 +42,14 @@ struct SwitcherSearchSchedulingPolicy: Equatable {
     let verySlowDebounceInterval: TimeInterval
 
     static let standard = SwitcherSearchSchedulingPolicy(
-        initialDebounceInterval: 0.020,
+        initialDebounceInterval: 0.018,
         fastComputationThresholdNanoseconds: 6_000_000,
         moderateComputationThresholdNanoseconds: 10_000_000,
         slowComputationThresholdNanoseconds: 16_000_000,
-        fastDebounceInterval: 0.014,
-        moderateDebounceInterval: 0.025,
-        slowDebounceInterval: 0.035,
-        verySlowDebounceInterval: 0.045
+        fastDebounceInterval: 0.012,
+        moderateDebounceInterval: 0.018,
+        slowDebounceInterval: 0.022,
+        verySlowDebounceInterval: 0.025
     )
 
     init(
@@ -160,7 +191,7 @@ private final class SwitcherSearchComputationTask:
     SwitcherSearchCancellable
 {
     private let computationTask:
-        Task<SwitcherSearchCoordinator.ComputationOutput, Never>
+        Task<SwitcherSearchCoordinator.ComputationOutput?, Never>
     private let deliveryTask: Task<Void, Never>
 
     @MainActor
@@ -171,12 +202,14 @@ private final class SwitcherSearchComputationTask:
         ) -> Void
     ) {
         let computationTask = Task.detached(priority: .userInitiated) {
-            SwitcherSearchCoordinator.computeOutput(from: input)
+            SwitcherSearchCoordinator.computeOutputIfNotCancelled(
+                from: input
+            )
         }
         self.computationTask = computationTask
         deliveryTask = Task { @MainActor in
             let output = await computationTask.value
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, let output else { return }
             completion(output)
         }
     }
@@ -228,6 +261,9 @@ final class SwitcherSearchSchedulingOwner {
         (any SwitcherSearchCancellable)?
     private(set) var revision: UInt64 = 0
     private(set) var debounceInterval: TimeInterval
+    private(set) var lastCompletedDiagnostic:
+        SwitcherSearchComputationDiagnostic?
+    private var scheduledAtNanoseconds: UInt64?
 
     var hasPendingWork: Bool {
         pendingDebounceToken != nil
@@ -258,6 +294,7 @@ final class SwitcherSearchSchedulingOwner {
     ) {
         cancel()
         let scheduledRevision = revision
+        scheduledAtNanoseconds = clock.monotonicNanoseconds
         guard debounced else {
             startComputation(
                 input: input,
@@ -294,6 +331,7 @@ final class SwitcherSearchSchedulingOwner {
         pendingDebounceToken = nil
         pendingComputationToken?.cancel()
         pendingComputationToken = nil
+        scheduledAtNanoseconds = nil
         revision &+= 1
     }
 
@@ -354,6 +392,18 @@ final class SwitcherSearchSchedulingOwner {
         debounceInterval = policy.debounceInterval(
             afterComputationNanoseconds: elapsedNanoseconds
         )
+        lastCompletedDiagnostic =
+            SwitcherSearchComputationDiagnostic(
+                query: output.query,
+                scope: output.scope,
+                revision: scheduledRevision,
+                scheduledAtNanoseconds:
+                    scheduledAtNanoseconds
+                        ?? startedAtNanoseconds,
+                startedAtNanoseconds: startedAtNanoseconds,
+                finishedAtNanoseconds: finishedAtNanoseconds
+            )
+        scheduledAtNanoseconds = nil
         completion(output)
     }
 }

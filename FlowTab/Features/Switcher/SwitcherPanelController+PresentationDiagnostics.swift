@@ -49,6 +49,49 @@ struct PanelVisibilityRecoveryDiagnostic: Equatable {
     }
 }
 
+struct PanelPresentationBreakdownDiagnostic: Equatable {
+    let kind: String
+    let sessionMs: Double
+    let screenMs: Double
+    let sizeMs: Double
+    let centerMs: Double
+    let accessibilityMs: Double
+    let levelMs: Double
+    let hideMs: Double
+    let initialVisibilityTrackingMs: Double
+    let monitorMs: Double
+    let firstMakeKeyMs: Double
+    let firstOrderRegardlessMs: Double
+    let secondMakeKeyMs: Double
+    let secondOrderRegardlessMs: Double
+    let presentationReadbackMs: Double
+    let autoEnterMs: Double
+
+    var makeKeyMs: Double {
+        firstMakeKeyMs + secondMakeKeyMs
+    }
+
+    var orderRegardlessMs: Double {
+        firstOrderRegardlessMs + secondOrderRegardlessMs
+    }
+
+    var totalMs: Double {
+        sessionMs
+            + screenMs
+            + sizeMs
+            + centerMs
+            + accessibilityMs
+            + levelMs
+            + hideMs
+            + initialVisibilityTrackingMs
+            + monitorMs
+            + makeKeyMs
+            + orderRegardlessMs
+            + presentationReadbackMs
+            + autoEnterMs
+    }
+}
+
 extension SwitcherPanelController {
     func logPanelPresentationBreakdown(
         kind: String,
@@ -59,28 +102,55 @@ extension SwitcherPanelController {
         centerReadyMs: Double,
         accessibilityReadyMs: Double,
         levelReadyMs: Double,
-        firstOrderReadyMs: Double,
-        hideReadyMs: Double,
-        secondOrderReadyMs: Double,
-        recoveryReadyMs: Double,
-        monitorReadyMs: Double,
-        autoEnterReadyMs: Double
+        hideMs: Double,
+        initialVisibilityTrackingMs: Double,
+        monitorMs: Double,
+        firstMakeKeyMs: Double,
+        firstOrderRegardlessMs: Double,
+        secondMakeKeyMs: Double,
+        secondOrderRegardlessMs: Double,
+        presentationReadbackMs: Double,
+        autoEnterMs: Double
     ) {
+        let diagnostic = PanelPresentationBreakdownDiagnostic(
+            kind: kind,
+            sessionMs: sessionReadyMs - showStartMs,
+            screenMs: screenReadyMs - sessionReadyMs,
+            sizeMs: sizeReadyMs - screenReadyMs,
+            centerMs: centerReadyMs - sizeReadyMs,
+            accessibilityMs: accessibilityReadyMs - centerReadyMs,
+            levelMs: levelReadyMs - accessibilityReadyMs,
+            hideMs: hideMs,
+            initialVisibilityTrackingMs: initialVisibilityTrackingMs,
+            monitorMs: monitorMs,
+            firstMakeKeyMs: firstMakeKeyMs,
+            firstOrderRegardlessMs: firstOrderRegardlessMs,
+            secondMakeKeyMs: secondMakeKeyMs,
+            secondOrderRegardlessMs: secondOrderRegardlessMs,
+            presentationReadbackMs: presentationReadbackMs,
+            autoEnterMs: autoEnterMs
+        )
+        lastPanelPresentationBreakdownDiagnostic = diagnostic
         logInputTrace(
             "show kind=\(kind) phase=presentBreakdown "
-                + "sessionMs=\(formatMilliseconds(sessionReadyMs - showStartMs)) "
-                + "screenMs=\(formatMilliseconds(screenReadyMs - sessionReadyMs)) "
-                + "sizeMs=\(formatMilliseconds(sizeReadyMs - screenReadyMs)) "
-                + "centerMs=\(formatMilliseconds(centerReadyMs - sizeReadyMs)) "
-                + "accessibilityMs=\(formatMilliseconds(accessibilityReadyMs - centerReadyMs)) "
-                + "levelMs=\(formatMilliseconds(levelReadyMs - accessibilityReadyMs)) "
-                + "order1Ms=\(formatMilliseconds(firstOrderReadyMs - levelReadyMs)) "
-                + "hideMs=\(formatMilliseconds(hideReadyMs - firstOrderReadyMs)) "
-                + "order2Ms=\(formatMilliseconds(secondOrderReadyMs - hideReadyMs)) "
-                + "recoveryScheduleMs=\(formatMilliseconds(recoveryReadyMs - secondOrderReadyMs)) "
-                + "monitorMs=\(formatMilliseconds(monitorReadyMs - recoveryReadyMs)) "
-                + "autoEnterMs=\(formatMilliseconds(autoEnterReadyMs - monitorReadyMs)) "
-                + "totalMs=\(formatMilliseconds(autoEnterReadyMs - showStartMs))"
+                + "sessionMs=\(formatMilliseconds(diagnostic.sessionMs)) "
+                + "screenMs=\(formatMilliseconds(diagnostic.screenMs)) "
+                + "sizeMs=\(formatMilliseconds(diagnostic.sizeMs)) "
+                + "centerMs=\(formatMilliseconds(diagnostic.centerMs)) "
+                + "accessibilityMs=\(formatMilliseconds(diagnostic.accessibilityMs)) "
+                + "levelMs=\(formatMilliseconds(diagnostic.levelMs)) "
+                + "hideMs=\(formatMilliseconds(diagnostic.hideMs)) "
+                + "initialVisibilityTrackingMs=\(formatMilliseconds(diagnostic.initialVisibilityTrackingMs)) "
+                + "monitorMs=\(formatMilliseconds(diagnostic.monitorMs)) "
+                + "firstMakeKeyMs=\(formatMilliseconds(diagnostic.firstMakeKeyMs)) "
+                + "firstOrderRegardlessMs=\(formatMilliseconds(diagnostic.firstOrderRegardlessMs)) "
+                + "secondMakeKeyMs=\(formatMilliseconds(diagnostic.secondMakeKeyMs)) "
+                + "secondOrderRegardlessMs=\(formatMilliseconds(diagnostic.secondOrderRegardlessMs)) "
+                + "makeKeyMs=\(formatMilliseconds(diagnostic.makeKeyMs)) "
+                + "orderRegardlessMs=\(formatMilliseconds(diagnostic.orderRegardlessMs)) "
+                + "presentationReadbackMs=\(formatMilliseconds(diagnostic.presentationReadbackMs)) "
+                + "autoEnterMs=\(formatMilliseconds(diagnostic.autoEnterMs)) "
+                + "totalMs=\(formatMilliseconds(diagnostic.totalMs))"
         )
     }
 

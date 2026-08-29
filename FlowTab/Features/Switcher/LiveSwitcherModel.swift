@@ -114,6 +114,44 @@ final class LiveSwitcherModel: ObservableObject {
         }
     }
 
+    struct AppSwitcherSessionLoadDiagnostic: Equatable {
+        let result: String
+        let event: String
+        let trigger: String
+        let appCount: Int
+        let windowCount: Int
+        let projectionMs: Double
+        let recencyMs: Double
+        let sessionBuildMs: Double
+        let indexMs: Double
+        let publishMs: Double
+
+        var totalMs: Double {
+            projectionMs
+                + recencyMs
+                + sessionBuildMs
+                + indexMs
+                + publishMs
+        }
+    }
+
+    struct AppSwitcherSessionStartDiagnostic: Equatable {
+        let result: String
+        let directoryRefreshMs: Double
+        let invalidationMs: Double
+        let stateResetMs: Double
+        let projectionLoadMs: Double
+        let maintenanceRequestMs: Double
+
+        var totalMs: Double {
+            directoryRefreshMs
+                + invalidationMs
+                + stateResetMs
+                + projectionLoadMs
+                + maintenanceRequestMs
+        }
+    }
+
     struct SearchIndexReadDiagnostic: Equatable {
         let reason: String
         let readiness: RuntimeSearchIndexReadiness
@@ -157,12 +195,20 @@ final class LiveSwitcherModel: ObservableObject {
         }
     }
 
+    struct SearchResultPublicationDiagnostic: Equatable {
+        let query: String
+        let debounceMilliseconds: Double
+        let computationMilliseconds: Double
+        let publishedAtMilliseconds: Double
+    }
+
     @Published var session: SwitcherSession? {
         didSet {
             guard let session else {
                 sessionAppsByID = [:]
                 return
             }
+            updateAppLayerRenderSnapshot(from: session)
             handleSessionPreviewSnapshotLifecycle(session)
             guard searchViewState.isActive else {
                 return
@@ -178,6 +224,8 @@ final class LiveSwitcherModel: ObservableObject {
     @Published var searchResultScrollRevision: UInt64 = 0
     @Published var searchLayoutMeasurements: SwitcherSearchLayoutMeasurements = .fallback
     @Published var terminatingAppID: String?
+    @Published var appLayerRenderSnapshot:
+        SwitcherAppLayerRenderSnapshot?
 
     let runtimeProjectionService: any RuntimeProjectionServing
     let activator = RuntimeActivator()
@@ -212,6 +260,7 @@ final class LiveSwitcherModel: ObservableObject {
 
     var sessionAppsByID: [String: AppSwitchCandidate] = [:]
     var committedSearchAppsByID: [String: AppSwitchCandidate] = [:]
+    var preparedSearchIndexIdentity: PreparedSearchIndexIdentity?
     var runtimeContextsByID: [String: RuntimeAppContext] = [:]
     var rememberedWindowIDByAppID: [String: String] = [:]
     var previewCaptureAttemptedKeys: Set<String> = []
@@ -223,6 +272,8 @@ final class LiveSwitcherModel: ObservableObject {
     var previewSessionPinnedImagesByKey: [String: NSImage] = [:]
     var previewDeferredCaptureScheduledAppIDs: Set<String> = []
     var previewCaptureGeneration: UInt64 = 0
+    var previewCaptureCancellationsByID:
+        [UUID: WindowPreviewCaptureCancellation] = [:]
     let previewCaptureSemaphore = DispatchSemaphore(value: 4)
     var previewWindowSnapshotsByAppID: [String: [WindowCandidate]] = [:]
     var lastWindowPreviewExposureLogSummary: String?
@@ -233,12 +284,30 @@ final class LiveSwitcherModel: ObservableObject {
     var terminateAppInstanceGeneration: UInt64 = 0
     var runtimeProjectionMaintenanceGeneration: UInt64 = 0
     var runtimeProjectionMaintenanceEnabled = true
+    var deferredRuntimeProjectionMaintenanceDirection:
+        CycleDirection?
     var selectedAppWindowProjectionGeneration: UInt64 = 0
     var selectedAppWindowProjectionPendingAppID: String?
+    var switcherSessionGeneration: UInt64 = 0
+    var sessionAppWindowReadiness: SessionAppWindowReadiness?
+    var lastSelectedAppWindowReadinessReadDiagnostic:
+        SelectedAppWindowReadinessReadDiagnostic?
+    var selectedAppWindowMaintenanceWaitStartedAtMilliseconds:
+        Double?
+    var lastSelectedAppWindowMaintenanceWaitDiagnostic:
+        SelectedAppWindowMaintenanceWaitDiagnostic?
+    var lastSelectedAppWindowSessionSwitchAtMilliseconds:
+        Double?
+    var selectedAppWindowPriorityRequestIdentity:
+        SessionAppWindowIdentity?
     var pendingManualWindowLayerEntryAppID: String?
     var lastProjectionInvalidationRecord: ProjectionInvalidationRecord?
     var lastRuntimeProjectionMaintenanceDiagnostic: RuntimeProjectionMaintenanceDiagnostic?
+    var lastAppSwitcherSessionLoadDiagnostic: AppSwitcherSessionLoadDiagnostic?
+    var lastAppSwitcherSessionStartDiagnostic: AppSwitcherSessionStartDiagnostic?
     var lastSearchIndexReadDiagnostic: SearchIndexReadDiagnostic?
+    var lastSearchResultPublicationDiagnostic:
+        SearchResultPublicationDiagnostic?
     var pendingSearchActivationAfterFreshnessBarrier = false
 
     init(
@@ -350,18 +419,50 @@ final class LiveSwitcherModel: ObservableObject {
         onSearchResultScrollRequestForTesting?(resultID)
     }
 
-    func startSession(triggerDirection: CycleDirection) -> Bool {
+    func startSession(
+        triggerDirection: CycleDirection,
+        deferMaintenanceUntilFirstVisibleFrame: Bool = false
+    ) -> Bool {
+        lastAppSwitcherSessionLoadDiagnostic = nil
+        let startMs = Self.monotonicMilliseconds()
         runtimeProjectionService.refreshApplicationDirectoryMembershipForPresentation()
+        let directoryReadyMs = Self.monotonicMilliseconds()
         invalidateSelectedAppWindowProjection(reason: .startSession)
+        let invalidationReadyMs = Self.monotonicMilliseconds()
         clearTerminateSelectedAppAnimation()
         overlayStyle = .appAndWindow
         titleBarStyleInferenceEnabled = false
-        guard loadFastAppSwitcherProjectionSession(triggerDirection: triggerDirection, preferredSelectedAppID: nil) else {
-            requestRuntimeProjectionMaintenance(triggerDirection: triggerDirection)
-            return false
+        let stateReadyMs = Self.monotonicMilliseconds()
+        let loaded = loadFastAppSwitcherProjectionSession(
+            triggerDirection: triggerDirection,
+            preferredSelectedAppID: nil
+        )
+        let projectionReadyMs = Self.monotonicMilliseconds()
+        if loaded && deferMaintenanceUntilFirstVisibleFrame {
+            deferRuntimeProjectionMaintenance(
+                triggerDirection: triggerDirection
+            )
+        } else {
+            requestRuntimeProjectionMaintenance(
+                triggerDirection: triggerDirection
+            )
         }
-        requestRuntimeProjectionMaintenance(triggerDirection: triggerDirection)
-        return true
+        let completeMs = Self.monotonicMilliseconds()
+        lastAppSwitcherSessionStartDiagnostic =
+            AppSwitcherSessionStartDiagnostic(
+                result: loaded ? "ready" : "empty",
+                directoryRefreshMs:
+                    directoryReadyMs - startMs,
+                invalidationMs:
+                    invalidationReadyMs - directoryReadyMs,
+                stateResetMs:
+                    stateReadyMs - invalidationReadyMs,
+                projectionLoadMs:
+                    projectionReadyMs - stateReadyMs,
+                maintenanceRequestMs:
+                    completeMs - projectionReadyMs
+            )
+        return loaded
     }
 
     func terminateSelectedApp() -> TerminateSelectedAppResult {
@@ -429,30 +530,20 @@ final class LiveSwitcherModel: ObservableObject {
 
     @discardableResult
     func handleAppSwitcherProjectionDidUpdate() -> Bool {
-        guard let currentSession = session else { return false }
-        guard !searchViewState.isActive else { return false }
-        guard !isPresentingWindowLayerSnapshot(currentSession) else { return false }
-        let preferredSelectedAppID = currentSession.selectedApp.id
-        return loadAppSwitcherProjectionSession(
-            triggerDirection: .forward,
-            preferredSelectedAppID: preferredSelectedAppID,
-            animateAppStripUpdate: true,
-            preserveSearchState: false,
-            resetWhenEmpty: false,
-            preservePreviewSnapshotState: true,
-            preservingVisibleAppOrderFrom: currentSession.apps
-        )
+        guard session != nil else { return false }
+        return refreshSelectedAppWindowReadiness()
     }
 
     @discardableResult
     func handleCurrentAppWindowProjectionDidUpdate(appID: String?) -> Bool {
         guard let currentSession = session else { return false }
         guard !searchViewState.isActive else { return false }
+        guard case .appCycle = currentSession.mode else { return false }
         let targetAppID = appID ?? currentSession.selectedApp.id
-        guard currentSession.apps.contains(where: { $0.id == targetAppID }) else { return false }
-        guard targetAppID == currentSession.selectedApp.id else { return false }
-        guard !isPresentingWindowLayerSnapshot(currentSession) else { return false }
-        return applyCurrentAppWindowProjectionIfReady(appID: targetAppID)
+        guard targetAppID == currentSession.selectedApp.id else {
+            return false
+        }
+        return refreshSelectedAppWindowReadiness()
     }
 
     func isPresentingWindowLayerSnapshot(_ session: SwitcherSession) -> Bool {
@@ -519,6 +610,7 @@ final class LiveSwitcherModel: ObservableObject {
         if currentAppID != previousAppID {
             autoEnterSuppressedAppID = nil
             pendingManualWindowLayerEntryAppID = nil
+            resetSelectedAppWindowReadinessForSelectionChange()
         }
 
         if
@@ -561,6 +653,7 @@ final class LiveSwitcherModel: ObservableObject {
         if session.selectedApp.id != previousAppID {
             autoEnterSuppressedAppID = nil
             pendingManualWindowLayerEntryAppID = nil
+            resetSelectedAppWindowReadinessForSelectionChange()
         }
         self.session = session
         return true
@@ -593,20 +686,14 @@ final class LiveSwitcherModel: ObservableObject {
 
     @discardableResult
     func autoEnterWindowLayerIfPossible() -> Bool {
-        guard !pendingSearchActivationAfterFreshnessBarrier, var session else { return false }
-        if case .windowCycle = session.mode {
+        guard !pendingSearchActivationAfterFreshnessBarrier,
+              let session,
+              autoEnterSuppressedAppID != session.selectedApp.id
+        else {
             return false
         }
-        if autoEnterSuppressedAppID == session.selectedApp.id {
-            return false
-        }
-        guard session.selectedApp.windows.count >= 2 else { return false }
-        session.enterWindowCycleIfPossible()
-        self.session = session
-        if case .windowCycle = session.mode {
-            return true
-        }
-        return false
+        return enterSelectedAppWindowLayerUsingCurrentReadiness()
+            == .entered
     }
 
     func debugSelectionSummary() -> String {
@@ -624,6 +711,7 @@ final class LiveSwitcherModel: ObservableObject {
         cancelPendingSearchComputation()
         pendingSearchActivationAfterFreshnessBarrier = false
         self.session = nil
+        resetSessionAppWindowReadinessTracking()
         _ = searchCoordinator.exit()
         publishSearchStateIfNeeded()
 
@@ -664,10 +752,11 @@ final class LiveSwitcherModel: ObservableObject {
         cancelPendingSearchComputation()
         pendingSearchActivationAfterFreshnessBarrier = false
         session = nil
+        resetSessionAppWindowReadinessTracking()
         pendingTerminateRequest = nil
         terminatingAppID = nil
         overlayStyle = .appAndWindow
-        searchCoordinator.resetIndex()
+        _ = searchCoordinator.exit()
         committedSearchAppsByID = [:]
         publishSearchStateIfNeeded()
         resetRuntimeState()

@@ -2,7 +2,9 @@ import Foundation
 
 extension SwitcherPanelController {
     func scheduleDelayedWindowLayerEntryIfNeeded(
-        preservingDeadline: Bool = false
+        preservingDeadline: Bool = false,
+        prewarmsPreviews: Bool = true,
+        requestsProjection: Bool = true
     ) {
         guard autoEnterWindowLayerEnabled else {
             clearDelayedWindowLayerEntryState()
@@ -28,8 +30,9 @@ extension SwitcherPanelController {
         let targetAppID = session.selectedApp.id
         let presentationGeneration =
             presentationSessionGeneration
-        let prewarmedPreviewCount =
-            prewarmSelectedAppWindowPreviewPage()
+        let prewarmedPreviewCount = prewarmsPreviews
+            ? prewarmSelectedAppWindowPreviewPage()
+            : 0
 
         if preservingDeadline,
            delayedWindowLayerEntryObservationOwner.matches(
@@ -42,6 +45,7 @@ extension SwitcherPanelController {
                     delayedWindowLayerEntryObservationOwner.generation,
                 presentationGeneration: presentationGeneration,
                 prewarmedPreviewCount: prewarmedPreviewCount,
+                requestsProjection: requestsProjection,
                 source: .sessionLayoutChanged
             )
             return
@@ -91,6 +95,7 @@ extension SwitcherPanelController {
             observationGeneration: observationGeneration,
             presentationGeneration: presentationGeneration,
             prewarmedPreviewCount: prewarmedPreviewCount,
+            requestsProjection: requestsProjection,
             source: .projectionRequestReturnReadback
         )
     }
@@ -163,10 +168,11 @@ extension SwitcherPanelController {
         observationGeneration: Int,
         presentationGeneration: Int,
         prewarmedPreviewCount: Int,
+        requestsProjection: Bool,
         source: DelayedWindowLayerEntryEvidenceSource
     ) {
-        let requestedProjection =
-            model.scheduleSelectedAppWindowProjectionIfNeeded(
+        let requestedProjection = requestsProjection
+            && model.scheduleSelectedAppWindowProjectionIfNeeded(
                 for: targetAppID
             )
         guard delayedWindowLayerEntryObservationOwner.matches(
@@ -215,7 +221,8 @@ extension SwitcherPanelController {
                 presentationSessionGeneration,
             selectedAppID: session?.selectedApp.id,
             selectedWindowCount:
-                session?.selectedApp.windows.count ?? 0,
+                model.sessionAppWindowReadiness?
+                    .readyWindowCount ?? 0,
             projectionGeneration:
                 model.selectedAppWindowProjectionGeneration,
             isPanelPresented: isPanelPresented,

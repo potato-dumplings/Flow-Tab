@@ -243,6 +243,203 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(recorder.priorityObservation, 0)
         XCTAssertEqual(recorder.count, normalWorkCount)
     }
+
+    func testRuntimeProjectionMaintenanceOwnerKeepsOnlyLatestPriorityWorkPerKey() async {
+        let owner = RuntimeProjectionMaintenanceOwner(
+            label: "FlowTabTests.RuntimeProjectionMaintenanceOwner.PriorityCoalescing"
+        )
+        defer { owner.cancelPendingPriorityWork() }
+        let queueBlocked = expectation(
+            description: "unmetCondition=priorityCoalescingQueueBlocked"
+        )
+        let latestApplied = expectation(
+            description: "unmetCondition=latestPriorityWorkApplied"
+        )
+        let distinctApplied = expectation(
+            description: "unmetCondition=distinctPriorityWorkApplied"
+        )
+        let releaseQueue = DispatchSemaphore(value: 0)
+        let recorder = RuntimeProjectionMaintenanceEventRecorder()
+        let selectedAppKey = RuntimeProjectionMaintenanceCoalescingKey(
+            rawValue: "selectedCurrentAppWindows:18405:com.example.editor"
+        )
+        let distinctKey = RuntimeProjectionMaintenanceCoalescingKey(
+            rawValue: "selectedCurrentAppWindows:18406:com.example.browser"
+        )
+
+        owner.queue.async {
+            queueBlocked.fulfill()
+            releaseQueue.wait()
+        }
+        await fulfillment(
+            of: [queueBlocked],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .appDelegateWorkspaceLifecycleSignal
+        )
+
+        let discardedGeneration = owner.enqueueLatestPriority(
+            key: selectedAppKey
+        ) { generation in
+            recorder.append("discarded:\(generation)")
+        }
+        let latestGeneration = owner.enqueueLatestPriority(
+            key: selectedAppKey
+        ) { generation in
+            recorder.append("latest:\(generation)")
+            latestApplied.fulfill()
+        }
+        let distinctGeneration = owner.enqueueLatestPriority(
+            key: distinctKey
+        ) { generation in
+            recorder.append("distinct:\(generation)")
+            distinctApplied.fulfill()
+        }
+
+        XCTAssertEqual(discardedGeneration?.rawValue, 1)
+        XCTAssertEqual(latestGeneration?.rawValue, 2)
+        XCTAssertEqual(distinctGeneration?.rawValue, 3)
+        XCTAssertEqual(owner.pendingPriorityWorkCount, 2)
+        releaseQueue.signal()
+        await fulfillment(
+            of: [latestApplied, distinctApplied],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .appDelegateWorkspaceLifecycleSignal
+        )
+        owner.performSynchronously {}
+
+        XCTAssertEqual(
+            recorder.snapshot(),
+            ["latest:2", "distinct:3"]
+        )
+        XCTAssertEqual(owner.pendingPriorityWorkCount, 0)
+    }
+
+    func testRuntimeProjectionServiceCoalescesRepeatedSelectedCurrentAppPriorityWork() async {
+        let owner = RuntimeProjectionMaintenanceOwner(
+            label: "FlowTabTests.RuntimeProjectionService.SelectedAppPriorityCoalescing"
+        )
+        defer { owner.cancelPendingPriorityWork() }
+        let queueBlocked = expectation(
+            description: "unmetCondition=selectedAppPriorityQueueBlocked"
+        )
+        let releaseQueue = DispatchSemaphore(value: 0)
+        let coordinator = RuntimeReconciliationCoordinator()
+        let executionLock = NSLock()
+        var executedRequestCount = 0
+        let service = RuntimeProjectionService(
+            maintenanceOwner: owner,
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: RuntimeWindowRecordStore(),
+                reconciliationCoordinator: coordinator
+            ),
+            reconciliationExecutor: { _, _ in
+                executionLock.lock()
+                executedRequestCount += 1
+                executionLock.unlock()
+                return .completed
+            }
+        )
+
+        owner.queue.async {
+            queueBlocked.fulfill()
+            releaseQueue.wait()
+        }
+        await fulfillment(
+            of: [queueBlocked],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .appDelegateWorkspaceLifecycleSignal
+        )
+
+        for _ in 0..<1_000 {
+            service.signalSelectedCurrentAppWindowsChanged(
+                appID: "com.example.editor",
+                pid: 18_405
+            )
+        }
+        XCTAssertEqual(owner.pendingPriorityWorkCount, 1)
+
+        releaseQueue.signal()
+        service.waitForMaintenanceQueueForTesting()
+        executionLock.lock()
+        let finalExecutedRequestCount = executedRequestCount
+        executionLock.unlock()
+
+        XCTAssertEqual(finalExecutedRequestCount, 1)
+        XCTAssertEqual(owner.pendingPriorityWorkCount, 0)
+    }
+
+    func testRuntimeProjectionMaintenanceOwnerKeepsLatestCoalescedWorkAcrossQueuedAndActiveBursts() async {
+        let owner = RuntimeProjectionMaintenanceOwner(
+            label: "FlowTabTests.RuntimeProjectionMaintenanceOwner.Coalescing"
+        )
+        defer { owner.cancelPendingPriorityWork() }
+        let key = RuntimeProjectionMaintenanceCoalescingKey(
+            rawValue: "spaceTopology"
+        )
+        let queueBlocked = expectation(
+            description: "unmetCondition=coalescingQueueBlocked"
+        )
+        let firstWorkStarted = expectation(
+            description: "unmetCondition=firstCoalescedWorkStarted"
+        )
+        let latestWorkApplied = expectation(
+            description: "unmetCondition=latestCoalescedWorkApplied"
+        )
+        let releaseQueue = DispatchSemaphore(value: 0)
+        let releaseFirstWork = DispatchSemaphore(value: 0)
+        let recorder = RuntimeProjectionMaintenanceEventRecorder()
+
+        owner.queue.async {
+            queueBlocked.fulfill()
+            releaseQueue.wait()
+        }
+        await fulfillment(
+            of: [queueBlocked],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .appDelegateWorkspaceLifecycleSignal
+        )
+
+        owner.enqueueLatest(key: key) {
+            recorder.append("discardedQueued")
+        }
+        owner.enqueueLatest(key: key) {
+            firstWorkStarted.fulfill()
+            releaseFirstWork.wait()
+            recorder.append("first")
+        }
+        XCTAssertEqual(owner.pendingCoalescedWorkCount, 1)
+        releaseQueue.signal()
+        await fulfillment(
+            of: [firstWorkStarted],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .appDelegateWorkspaceLifecycleSignal
+        )
+
+        owner.enqueueLatest(key: key) {
+            recorder.append("discardedActive")
+        }
+        owner.enqueueLatest(key: key) {
+            recorder.append("latest")
+            latestWorkApplied.fulfill()
+        }
+        XCTAssertEqual(owner.pendingCoalescedWorkCount, 1)
+        releaseFirstWork.signal()
+        await fulfillment(
+            of: [latestWorkApplied],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .appDelegateWorkspaceLifecycleSignal
+        )
+        owner.performSynchronously {}
+
+        XCTAssertEqual(recorder.snapshot(), ["first", "latest"])
+        XCTAssertEqual(owner.pendingCoalescedWorkCount, 0)
+    }
 }
 
 private final class RuntimeProjectionMaintenanceEventRecorder: @unchecked Sendable {

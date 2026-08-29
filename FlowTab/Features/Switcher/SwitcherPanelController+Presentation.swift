@@ -39,8 +39,12 @@ extension SwitcherPanelController {
     }
 
     func show(direction: CycleDirection) {
+        lastPanelPresentationBreakdownDiagnostic = nil
         let showStartMs = monotonicMilliseconds()
-        guard model.startSession(triggerDirection: direction) else {
+        guard model.startSession(
+            triggerDirection: direction,
+            deferMaintenanceUntilFirstVisibleFrame: true
+        ) else {
             let failedMs = monotonicMilliseconds() - showStartMs
             logInputTrace(
                 "show kind=global result=failed durationMs=\(formatMilliseconds(failedMs))"
@@ -60,7 +64,10 @@ extension SwitcherPanelController {
 
     func showSearch(direction: CycleDirection) {
         let showStartMs = monotonicMilliseconds()
-        guard model.startSearchSession(triggerDirection: direction) else {
+        guard model.startSearchSession(
+            triggerDirection: direction,
+            deferMaintenanceUntilFirstVisibleFrame: true
+        ) else {
             let failedMs = monotonicMilliseconds() - showStartMs
             if model.pendingSearchActivationAfterFreshnessBarrier {
                 logInputTrace(
@@ -253,6 +260,9 @@ extension SwitcherPanelController {
         let screenReadyMs = monotonicMilliseconds()
         activePresentationScreen = targetScreen
         updatePanelSize(for: targetScreen)
+        activePresentationInitialContentSize = panel.contentRect(
+            forFrameRect: panel.frame
+        ).size
         let sizeReadyMs = monotonicMilliseconds()
         centerPanelOnActiveScreen(preferredScreen: targetScreen)
         let centerReadyMs = monotonicMilliseconds()
@@ -261,25 +271,58 @@ extension SwitcherPanelController {
         updatePanelPresentationLevel(trigger: trigger)
         prepareInitialWindowOnlyPanelReveal(kind: kind)
         let levelReadyMs = monotonicMilliseconds()
+
+        let initialVisibilityTrackingStartMs = monotonicMilliseconds()
         let initialVisibilityGeneration =
             beginInitialPresentationVisibilityTracking(trigger: trigger)
-        panel.makeKeyAndOrderFront(nil)
+        let initialVisibilityTrackingMs =
+            monotonicMilliseconds() - initialVisibilityTrackingStartMs
+
+        if model.isSearchActive {
+            activateApplicationForPanelPresentationIfNeeded()
+        }
+
+        let panelWasAlreadyOrdered = panel.isVisible
+        var stageStartMs = monotonicMilliseconds()
+        if panelWasAlreadyOrdered {
+            panel.makeKey()
+        } else {
+            panel.makeKeyAndOrderFront(nil)
+        }
+        let firstMakeKeyMs = monotonicMilliseconds() - stageStartMs
+        stageStartMs = monotonicMilliseconds()
         panel.orderFrontRegardless()
-        let firstOrderReadyMs = monotonicMilliseconds()
+        let firstOrderRegardlessMs =
+            monotonicMilliseconds() - stageStartMs
+
+        stageStartMs = monotonicMilliseconds()
         hideNonPanelWindowsIfNeeded()
-        let hideReadyMs = monotonicMilliseconds()
-        panel.makeKeyAndOrderFront(nil)
-        panel.orderFrontRegardless()
-        let secondOrderReadyMs = monotonicMilliseconds()
+        let hideMs = monotonicMilliseconds() - stageStartMs
+
+        let secondMakeKeyMs = 0.0
+        let secondOrderRegardlessMs = 0.0
+
+        stageStartMs = monotonicMilliseconds()
         scheduleInitialPanelVisibilityRecovery(
             trigger: trigger,
             initialVisibilityGeneration: initialVisibilityGeneration
         )
-        let recoveryReadyMs = monotonicMilliseconds()
+        let presentationReadbackMs =
+            monotonicMilliseconds() - stageStartMs
+
+        stageStartMs = monotonicMilliseconds()
         installEventMonitors()
-        let monitorReadyMs = monotonicMilliseconds()
-        scheduleDelayedWindowLayerEntryIfNeeded()
+        let monitorMs = monotonicMilliseconds() - stageStartMs
+
+        stageStartMs = monotonicMilliseconds()
+        if !model.isSearchActive && !model.isWindowOnlyOverlay {
+            _ = model.scheduleSelectedAppWindowProjectionIfNeeded()
+        }
+        scheduleDelayedWindowLayerEntryIfNeeded(
+            prewarmsPreviews: false
+        )
         let presentedMs = monotonicMilliseconds()
+        let autoEnterMs = presentedMs - stageStartMs
         logPanelPresentationBreakdown(
             kind: logKind,
             showStartMs: showStartMs,
@@ -289,12 +332,15 @@ extension SwitcherPanelController {
             centerReadyMs: centerReadyMs,
             accessibilityReadyMs: accessibilityReadyMs,
             levelReadyMs: levelReadyMs,
-            firstOrderReadyMs: firstOrderReadyMs,
-            hideReadyMs: hideReadyMs,
-            secondOrderReadyMs: secondOrderReadyMs,
-            recoveryReadyMs: recoveryReadyMs,
-            monitorReadyMs: monitorReadyMs,
-            autoEnterReadyMs: presentedMs
+            hideMs: hideMs,
+            initialVisibilityTrackingMs: initialVisibilityTrackingMs,
+            monitorMs: monitorMs,
+            firstMakeKeyMs: firstMakeKeyMs,
+            firstOrderRegardlessMs: firstOrderRegardlessMs,
+            secondMakeKeyMs: secondMakeKeyMs,
+            secondOrderRegardlessMs: secondOrderRegardlessMs,
+            presentationReadbackMs: presentationReadbackMs,
+            autoEnterMs: autoEnterMs
         )
         logInputTrace(
             "show kind=\(logKind) result=presented sessionMs=\(formatMilliseconds(sessionReadyMs - showStartMs)) totalMs=\(formatMilliseconds(presentedMs - showStartMs)) \(searchTraceStateSummary())"
@@ -348,6 +394,7 @@ extension SwitcherPanelController {
             x: frame.midX - panelSize.width / 2,
             y: frame.midY - panelSize.height / 2
         )
+        guard panel.frame.origin != origin else { return }
         panel.setFrameOrigin(origin)
     }
 
@@ -391,6 +438,7 @@ extension SwitcherPanelController {
 
     func endPresentationSession() {
         guard isPanelPresented || hasActivePresentationSession else { return }
+        let reusableShellContentSize = activePresentationInitialContentSize
         cancelPendingFocusedWindowSessionPresentation(
             reason: "presentationEnded"
         )
@@ -399,34 +447,56 @@ extension SwitcherPanelController {
         cancelTerminateInterruptionProtection()
         cancelPanelPresentationRecovery()
         clearInitialPresentationVisibilityTracking(invalidate: true)
+        clearInitialVisibleFrameTracking()
         removeEventMonitors()
-        panel.orderOut(nil)
         cancelInitialWindowOnlyPanelReveal()
+        panelPresentationActive = false
+        _ = panel.makeFirstResponder(nil)
+        panel.orderOut(nil)
+        panel.alphaValue = 0
+        panel.ignoresMouseEvents = true
         panel.updateSwitcherAccessibilityApps([], tileSize: 1, spacing: 0, appStripHeaderOffset: 0)
         panel.level = SwitcherPanelWindowConfiguration.level
         panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
         activeHotkeySessionKind = nil
+        activePresentationInitialContentSize = nil
         activePresentationScreen = nil
         lastSearchLayoutSizingLogSummary = nil
         panelVisibilityRecoveryState = .idle
         if panelVisibilityOverride != nil {
             panelVisibilityOverride = false
         }
+        panel.orderFrontRegardless()
+        prepareReusablePanelShell(contentSize: reusableShellContentSize)
     }
 
     func beginPresentationSession(kind: HotkeySessionKind, trigger: String) {
         cancelPanelVisibilityProbe()
         presentationSessionGeneration += 1
         activeHotkeySessionKind = kind
+        activePresentationInitialContentSize = nil
+        panelPresentationActive = true
+        panel.ignoresMouseEvents = false
+        beginInitialVisibleFrameTracking()
         resetPointerSelectionGate()
         logInputTrace(
             "presentationSession trigger=\(trigger) action=begin kind=\(kind) generation=\(presentationSessionGeneration)"
         )
     }
 
+    private func prepareReusablePanelShell(contentSize: NSSize?) {
+        guard let contentSize else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !panelPresentationActive else { return }
+            setPanelContentSize(contentSize, recenterScreen: nil)
+            panel.orderFrontRegardless()
+        }
+    }
+
     func invalidatePresentationSessionGeneration(trigger: String) {
         cancelPanelVisibilityProbe()
         presentationSessionGeneration += 1
+        clearInitialVisibleFrameTracking()
         logInputTrace(
             "presentationSession trigger=\(trigger) action=invalidate generation=\(presentationSessionGeneration)"
         )

@@ -15,6 +15,63 @@ monotonic_ns() {
   "$MONOTONIC_CLOCK"
 }
 
+flowtab_perf_cpu_time_centiseconds() {
+  local value="$1"
+
+  LC_ALL=C /usr/bin/awk -v value="$value" '
+    BEGIN {
+      days = 0
+      day_count = split(value, day_parts, "-")
+      if (day_count == 2) {
+        if (day_parts[1] !~ /^[0-9]+$/) exit 1
+        days = day_parts[1] + 0
+        value = day_parts[2]
+      } else if (day_count != 1) {
+        exit 1
+      }
+
+      time_count = split(value, time_parts, ":")
+      if (time_count == 2) {
+        hours = 0
+        minutes = time_parts[1]
+        seconds = time_parts[2]
+      } else if (time_count == 3) {
+        hours = time_parts[1]
+        minutes = time_parts[2]
+        seconds = time_parts[3]
+      } else {
+        exit 1
+      }
+
+      if (hours !~ /^[0-9]+$/ || minutes !~ /^[0-9]+$/) exit 1
+      if (seconds !~ /^[0-9]+([.][0-9][0-9]?)?$/) exit 1
+      if (minutes + 0 >= 60 || seconds + 0 >= 60) exit 1
+      if (day_count == 2 && hours + 0 >= 24) exit 1
+
+      total_seconds = (((days * 24 + hours) * 60 + minutes) * 60) + seconds
+      printf "%.0f\n", total_seconds * 100
+    }
+  '
+}
+
+flowtab_perf_interval_cpu_percent() {
+  local current_centiseconds="$1"
+  local previous_centiseconds="$2"
+  local elapsed_nanoseconds="$3"
+
+  LC_ALL=C /usr/bin/awk \
+    -v current="$current_centiseconds" \
+    -v previous="$previous_centiseconds" \
+    -v elapsed="$elapsed_nanoseconds" '
+      BEGIN {
+        if (current !~ /^[0-9]+$/ || previous !~ /^[0-9]+$/) exit 1
+        if (elapsed !~ /^[0-9]+$/ || elapsed + 0 <= 0) exit 1
+        if (current + 0 < previous + 0) exit 1
+        printf "%.3f\n", ((current - previous) * 1000000000) / elapsed
+      }
+    '
+}
+
 target_identity_readback_failed() {
   TARGET_LAUNCH_READBACK_ERROR="$1"
   TARGET_LAUNCH_LAST_OBSERVATION="$1"
@@ -544,18 +601,48 @@ probe_target_identity() {
 sample_flowtab() {
   local line
   local cpu
+  local cpu_time
+  local cpu_centiseconds
+  local sample_monotonic_ns
   local rss
 
   if ! probe_target_identity; then
     return 1
   fi
-  line="$(LC_ALL=C ps -p "$TARGET_PID" -o %cpu= -o rss= 2>/dev/null | LC_ALL=C awk '{$1=$1; print}' || true)"
+  line="$(LC_ALL=C ps -p "$TARGET_PID" -o cputime= -o rss= 2>/dev/null | LC_ALL=C awk '{$1=$1; print}' || true)"
   if [[ -z "$line" ]]; then
     IDENTITY_VERDICT="sample_unavailable"
     return 1
   fi
-  cpu="$(LC_ALL=C awk '{print $1}' <<<"$line")"
+  cpu_time="$(LC_ALL=C awk '{print $1}' <<<"$line")"
   rss="$(LC_ALL=C awk '{print $2}' <<<"$line")"
+  if ! cpu_centiseconds="$(
+    flowtab_perf_cpu_time_centiseconds "$cpu_time"
+  )"; then
+    IDENTITY_VERDICT="cpu_time_parse_error"
+    return 1
+  fi
+  if ! sample_monotonic_ns="$(monotonic_ns)"; then
+    IDENTITY_VERDICT="cpu_sample_clock_error"
+    return 1
+  fi
+
+  if [[ -z "$TARGET_PREVIOUS_CPU_CENTISECONDS" ]]; then
+    TARGET_PREVIOUS_CPU_CENTISECONDS="$cpu_centiseconds"
+    TARGET_PREVIOUS_CPU_SAMPLE_MONOTONIC_NS="$sample_monotonic_ns"
+    return 0
+  fi
+  if ! cpu="$(
+    flowtab_perf_interval_cpu_percent \
+      "$cpu_centiseconds" \
+      "$TARGET_PREVIOUS_CPU_CENTISECONDS" \
+      "$((sample_monotonic_ns - TARGET_PREVIOUS_CPU_SAMPLE_MONOTONIC_NS))"
+  )"; then
+    IDENTITY_VERDICT="cpu_interval_error"
+    return 1
+  fi
+  TARGET_PREVIOUS_CPU_CENTISECONDS="$cpu_centiseconds"
+  TARGET_PREVIOUS_CPU_SAMPLE_MONOTONIC_NS="$sample_monotonic_ns"
 
   SAMPLE_COUNT=$((SAMPLE_COUNT + 1))
   record_identity_binding "$IDENTITY_VERDICT"

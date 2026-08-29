@@ -5,6 +5,28 @@ import FlowTabCore
 let sharedRuntimeProjectionService = RuntimeProjectionService()
 
 final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Sendable {
+    private static let spaceTopologyMaintenanceKey =
+        RuntimeProjectionMaintenanceCoalescingKey(
+            rawValue: "spaceTopology"
+        )
+
+    private static func appSwitcherProjectionMaintenanceKey(
+        for reason: RuntimeProjectionMaintenanceReason
+    ) -> RuntimeProjectionMaintenanceCoalescingKey {
+        RuntimeProjectionMaintenanceCoalescingKey(
+            rawValue: "appSwitcherProjection:\(reason.rawValue)"
+        )
+    }
+
+    private static func selectedCurrentAppWindowsMaintenanceKey(
+        appID: String,
+        pid: pid_t
+    ) -> RuntimeProjectionMaintenanceCoalescingKey {
+        RuntimeProjectionMaintenanceCoalescingKey(
+            rawValue: "selectedCurrentAppWindows:\(pid):\(appID)"
+        )
+    }
+
     private enum CompletedCGWindowCleanupPolicy {
         case all
         case preservingActivationFreshness
@@ -97,7 +119,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason) {
-        maintenanceOwner.enqueue { [self] in
+        maintenanceOwner.enqueueLatest(
+            key: Self.appSwitcherProjectionMaintenanceKey(for: reason)
+        ) { [weak self] in
+            guard let self else { return }
             defer {
                 publishAppSwitcherProjectionMaintenanceCompletion(reason: reason)
             }
@@ -257,7 +282,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func signalSpaceTopologyChanged() {
-        maintenanceOwner.enqueue { [self] in
+        maintenanceOwner.enqueueLatest(
+            key: Self.spaceTopologyMaintenanceKey
+        ) { [weak self] in
+            guard let self else { return }
             let now = Date.timeIntervalSinceReferenceDate
             transientRepairObservationDriver.cancel(
                 target: .spaceTopology,
@@ -404,7 +432,12 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             pid: pid,
             pendingScope: pendingScope
         )
-        maintenanceOwner.enqueue { [self] in
+        maintenanceOwner.enqueueLatestPriority(
+            key: Self.selectedCurrentAppWindowsMaintenanceKey(
+                appID: appID,
+                pid: pid
+            )
+        ) { [self] _ in
             readModelStore.ensureAppWindowsDirty(
                 appID: appID,
                 pid: pid,

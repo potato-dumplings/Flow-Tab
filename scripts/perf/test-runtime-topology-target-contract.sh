@@ -80,7 +80,18 @@ test_caller_uses_named_monotonic_contract() {
   done
 }
 
+test_runner_uses_interval_process_cpu_contract() {
+  /usr/bin/grep -F -q -- '-o cputime= -o rss=' "$TARGET_PATH" \
+    || fail "runtime pressure does not read cumulative process CPU time"
+  if /usr/bin/grep -F -q -- '-o %cpu=' "$TARGET_PATH"; then
+    fail "runtime pressure still uses the decaying ps CPU percentage"
+  fi
+  /usr/bin/grep -F -q 'flowtab_perf_interval_cpu_percent' "$TARGET_PATH" \
+    || fail "runtime pressure does not derive interval CPU percentage"
+}
+
 test_preexisting_identity_filter_is_exact
 test_caller_uses_named_monotonic_contract
+test_runner_uses_interval_process_cpu_contract
 
-echo "Runtime-topology target launch checks exact baseline and named caller evidence."
+echo "Runtime-topology target checks exact launch and interval CPU contracts."

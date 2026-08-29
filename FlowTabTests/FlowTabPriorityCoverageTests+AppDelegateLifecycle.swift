@@ -711,7 +711,7 @@ extension FlowTabPriorityCoverageTests {
         mainRecord.monitor.emit(phase: .pressed, isBackward: false)
         panelController.panelVisibilityOverride = true
         XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 1)
-        XCTAssertEqual(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
+        XCTAssertEqual(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(), [])
         XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: currentAppID), 0)
         XCTAssertNotNil(panelController.modelForTesting.session)
         let initialSelectedAppID = panelController.modelForTesting.selectedApp?.id

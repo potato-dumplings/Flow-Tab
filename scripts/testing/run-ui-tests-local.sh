@@ -582,6 +582,7 @@ remove_xctestrun_environment_value() {
 }
 
 configure_ui_test_runner_environment() {
+  local environment_name
   local products_root
   local xctestrun_path
   local -a xctestrun_paths=()
@@ -634,6 +635,24 @@ configure_ui_test_runner_environment() {
       "${UI_TEST_XCTESTRUN_PATH}" \
       "FlowTabUITests.EnvironmentVariables.FLOWTAB_UI_TEST_APP_PATH"
   fi
+  for environment_name in \
+    FLOWTAB_APP_PANEL_PRESSURE_FLOW \
+    FLOWTAB_APP_PANEL_PRESSURE_SCENARIO \
+    FLOWTAB_APP_PANEL_PRESSURE_DURATION_SECONDS \
+    FLOWTAB_APP_PANEL_PRESSURE_COOLDOWN_SECONDS \
+    FLOWTAB_APP_PANEL_PRESSURE_METRICS_PATH
+  do
+    if [[ -n "${!environment_name:-}" ]]; then
+      set_xctestrun_environment_value \
+        "${UI_TEST_XCTESTRUN_PATH}" \
+        "FlowTabUITests.EnvironmentVariables.${environment_name}" \
+        "${!environment_name}"
+    else
+      remove_xctestrun_environment_value \
+        "${UI_TEST_XCTESTRUN_PATH}" \
+        "FlowTabUITests.EnvironmentVariables.${environment_name}"
+    fi
+  done
   echo "Configured UI test runner environment: ${UI_TEST_XCTESTRUN_PATH}"
 }
 

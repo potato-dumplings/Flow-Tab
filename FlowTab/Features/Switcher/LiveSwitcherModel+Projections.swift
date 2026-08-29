@@ -297,6 +297,7 @@ extension LiveSwitcherModel {
         }
 
         session = rebuiltSession
+        beginSessionAppWindowReadinessTracking()
         if
             let pendingTerminateRequest,
             !rebuiltSession.apps.contains(where: { $0.id == pendingTerminateRequest.appID })
@@ -336,6 +337,7 @@ extension LiveSwitcherModel {
     func requestRuntimeProjectionMaintenance(triggerDirection: CycleDirection) {
         guard runtimeProjectionMaintenanceEnabled else { return }
 
+        deferredRuntimeProjectionMaintenanceDirection = nil
         runtimeProjectionMaintenanceGeneration &+= 1
         let startMs = Self.monotonicMilliseconds()
         runtimeProjectionService.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
@@ -348,84 +350,63 @@ extension LiveSwitcherModel {
         )
     }
 
+    func deferRuntimeProjectionMaintenance(
+        triggerDirection: CycleDirection
+    ) {
+        guard runtimeProjectionMaintenanceEnabled else { return }
+        deferredRuntimeProjectionMaintenanceDirection =
+            triggerDirection
+    }
+
+    @discardableResult
+    func performDeferredRuntimeProjectionMaintenance() -> Bool {
+        guard let triggerDirection =
+            deferredRuntimeProjectionMaintenanceDirection
+        else {
+            return false
+        }
+        requestRuntimeProjectionMaintenance(
+            triggerDirection: triggerDirection
+        )
+        return true
+    }
+
     func invalidateRuntimeProjectionMaintenanceRequest(
         reason: ProjectionInvalidationReason = .explicitRuntimeProjectionMaintenanceInvalidation
     ) {
+        let clearedDeferredMaintenanceRequest =
+            deferredRuntimeProjectionMaintenanceDirection != nil
+        deferredRuntimeProjectionMaintenanceDirection = nil
         runtimeProjectionMaintenanceGeneration &+= 1
         recordProjectionInvalidation(
             reason: reason,
             scope: .runtimeProjectionMaintenance,
-            clearedDeferredMaintenanceRequest: false
+            clearedDeferredMaintenanceRequest:
+                clearedDeferredMaintenanceRequest
         )
     }
 
     @discardableResult
     func scheduleSelectedAppWindowProjectionIfNeeded(for appID: String? = nil) -> Bool {
-        guard let currentSession = session else { return false }
-        guard case .appCycle = currentSession.mode else { return false }
-        let targetAppID = appID ?? currentSession.selectedApp.id
-        guard targetAppID == currentSession.selectedApp.id else { return false }
-        guard currentSession.selectedApp.windows.isEmpty else { return false }
-        if selectedAppWindowProjectionPendingAppID == targetAppID {
+        guard let currentSession = session,
+              case .appCycle = currentSession.mode
+        else {
             return false
         }
-
-        selectedAppWindowProjectionGeneration &+= 1
-        let generation = selectedAppWindowProjectionGeneration
-        selectedAppWindowProjectionPendingAppID = targetAppID
-        let startMs = Self.monotonicMilliseconds()
-        let runtimeService = runtimeProjectionService
-
-        RuntimeLog.debug(
-            .projection,
-            "selectedAppWindowProjection result=scheduled appID=\(targetAppID)"
-        )
-
-        if let projection = runtimeService.readCurrentAppWindowProjection(appID: targetAppID) {
-            let projectionReadMs = Self.monotonicMilliseconds()
-            if projection.freshness.isCompleteForScope {
-                completeSelectedAppWindowProjection(
-                    currentAppWindowPayloadWithWindowRecencyApplied(
-                        projection.currentAppWindowPayload
-                    ),
-                    appID: targetAppID,
-                    generation: generation,
-                    startMs: startMs,
-                    projectionReadMs: projectionReadMs
-                )
-                return true
-            }
-            if !projection.currentAppWindowPayload.candidate.windows.isEmpty {
-                if let pid = runtimeContextsByID[targetAppID]?.ownerPID {
-                    runtimeService.signalSelectedCurrentAppWindowsChanged(appID: targetAppID, pid: pid)
-                }
-                RuntimeLog.debug(
-                    .projection,
-                    "selectedAppWindowProjection result=degradedStaleCommitted appID=\(targetAppID) windows=\(projection.currentAppWindowPayload.candidate.windows.count)"
-                )
-                completeSelectedAppWindowProjection(
-                    nil,
-                    appID: targetAppID,
-                    generation: generation,
-                    startMs: startMs,
-                    projectionReadMs: projectionReadMs
-                )
-                return false
-            }
+        let targetAppID = appID ?? currentSession.selectedApp.id
+        guard targetAppID == currentSession.selectedApp.id else {
+            return false
         }
-
-        let projectionReadMs = Self.monotonicMilliseconds()
-        if let pid = runtimeContextsByID[targetAppID]?.ownerPID {
-            runtimeService.signalSelectedCurrentAppWindowsChanged(appID: targetAppID, pid: pid)
+        switch resolveSelectedAppWindowReadiness() {
+        case .ready:
+            return false
+        case .pending(let identity):
+            return requestSelectedAppWindowMaintenanceIfNeeded(
+                identity: identity
+            )
+        case .unavailable:
+            return false
         }
-        completeSelectedAppWindowProjection(
-            nil,
-            appID: targetAppID,
-            generation: generation,
-            startMs: startMs,
-            projectionReadMs: projectionReadMs
-        )
-        return runtimeContextsByID[targetAppID] != nil
     }
 
     @discardableResult
@@ -488,7 +469,8 @@ extension LiveSwitcherModel {
         appID: String,
         generation: UInt64,
         startMs: Double,
-        projectionReadMs: Double
+        projectionReadMs: Double,
+        notifiesSessionLayoutChange: Bool = true
     ) {
         defer {
             if selectedAppWindowProjectionPendingAppID == appID {
@@ -594,7 +576,9 @@ extension LiveSwitcherModel {
             projectionReadMs: projectionReadMs,
             applyEndMs: applyEndMs
         )
-        onSessionLayoutChanged?()
+        if notifiesSessionLayoutChange {
+            onSessionLayoutChanged?()
+        }
     }
 
     func invalidateSelectedAppWindowProjection(

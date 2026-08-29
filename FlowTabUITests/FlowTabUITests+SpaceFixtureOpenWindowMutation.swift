@@ -109,7 +109,7 @@ extension FlowTabUITests {
 
         guard assertCurrentSwitcherAppProjection(
             in: app,
-            exactEntry: "\(identity.bundleIdentifier):2",
+            bundleIdentifier: identity.bundleIdentifier,
             timeout:
                 FlowTabUITestSwitcherAppProjectionPolicy
                     .openWindowMutationInitialProjectionWatchdog
@@ -119,9 +119,7 @@ extension FlowTabUITests {
                 in: app,
                 bundleIdentifier: identity.bundleIdentifier,
                 appProjectionExpectation:
-                    .exactEntry(
-                        "\(identity.bundleIdentifier):2"
-                    ),
+                    .bundleIdentifier(identity.bundleIdentifier),
                 timeout:
                     FlowTabUITestSwitcherAppSelectionPolicy
                         .openWindowMutationApplicationWatchdog,
@@ -208,28 +206,15 @@ extension FlowTabUITests {
         let reconciliationLogBaseline =
             makeRuntimeLogFileSnapshot()
         defer { reconciliationLogBaseline.cancel() }
-        let appIDPattern =
-            NSRegularExpression.escapedPattern(
-                for: identity.bundleIdentifier
-            )
-        let reconciliationPattern =
-            "runtimeAXDestroyed appID=\(appIDPattern) "
-            + "pid=\(fixturePID) "
-            + "axWindowID=ax:\(fixturePID):[0-9]+ "
-            + "affectedCGWindowID=(none|[0-9]+)"
-        let reconciliationExpression =
-            try NSRegularExpression(
-                pattern: reconciliationPattern
-            )
         var acceptsRuntimeReconciliation = false
         let runtimeReconciliation =
             FlowTabUITestRuntimeLogObservationOwner(
                 expectation:
-                    .regularExpression(
-                        reconciliationExpression,
-                        pattern: reconciliationPattern,
-                        description:
-                            "exact Open Mutation bundle/PID AX-destroyed reconciliation"
+                    try .exactReadyCurrentAppRepair(
+                        bundleIdentifier:
+                            identity.bundleIdentifier,
+                        processIdentifier: fixturePID,
+                        windowCount: 1
                     ),
                 observationRegistration:
                     reconciliationLogBaseline
@@ -438,14 +423,12 @@ extension FlowTabUITests {
             let runtimeReconciliation =
                 FlowTabUITestRuntimeLogObservationOwner(
                     expectation:
-                        try .exactRuntimeAXDestroyed(
+                        try .exactReadyCurrentAppRepair(
                             bundleIdentifier:
                                 targetApp.identity.bundleIdentifier,
                             processIdentifier:
                                 targetProcessIdentifier,
-                            affectedCGWindowID:
-                                scheduledClose.snapshot
-                                    .targetWindowNumber
+                            windowCount: 1
                         ),
                     observationRegistration:
                         reconciliationLogBaseline

@@ -224,35 +224,11 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         let context = makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: windows)
-        let payload = RuntimeCurrentAppWindowPayload(
-            summary: RuntimeHomeAppSummary(
-                appID: appID,
-                displayName: candidate.displayName,
-                groupID: candidate.groupID,
-                lastActiveAt: candidate.lastActiveAt,
-                windowCount: windows.count,
-                pid: runningApp.processIdentifier
-            ),
+        return makeCurrentAppWindowProjectionService(
+            appID: appID,
             candidate: candidate,
             context: context,
-            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
-        )
-        return RecordingRuntimeProjectionService(
-            currentAppWindowProjectionsByAppID: [
-                appID: RuntimeCurrentAppWindowProjection(
-                    appID: appID,
-                    currentAppWindowPayload: payload,
-                    freshness: RuntimeProjectionFreshness(
-                        generatedAt: generatedAt,
-                        sourceGeneration: RuntimeReadModelGeneration(projection: 1),
-                        dirtyAppIDs: [],
-                        dirtyPIDs: [],
-                        dirtyCGWindowIDs: [],
-                        pendingRepairScopes: [],
-                        isCompleteForScope: true
-                    )
-                )
-            ]
+            generatedAt: generatedAt
         )
     }
     func makeCurrentAppWindowProjectionService(
@@ -263,32 +239,51 @@ extension FlowTabPriorityCoverageTests {
     ) -> RecordingRuntimeProjectionService {
         RecordingRuntimeProjectionService(
             currentAppWindowProjectionsByAppID: [
-                appID: RuntimeCurrentAppWindowProjection(
+                appID: makeCurrentAppWindowProjection(
                     appID: appID,
-                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        summary: RuntimeHomeAppSummary(
-                            appID: appID,
-                            displayName: candidate.displayName,
-                            groupID: candidate.groupID,
-                            lastActiveAt: candidate.lastActiveAt,
-                            windowCount: candidate.windows.count,
-                            pid: context.runningApp.processIdentifier
-                        ),
-                        candidate: candidate,
-                        context: context,
-                        appDirectoryEntries: [RuntimeAppDirectoryEntry(app: context.runningApp)]
-                    ),
-                    freshness: RuntimeProjectionFreshness(
-                        generatedAt: generatedAt,
-                        sourceGeneration: RuntimeReadModelGeneration(projection: 1),
-                        dirtyAppIDs: [],
-                        dirtyPIDs: [],
-                        dirtyCGWindowIDs: [],
-                        pendingRepairScopes: [],
-                        isCompleteForScope: true
-                    )
+                    candidate: candidate,
+                    context: context,
+                    generatedAt: generatedAt
                 )
             ]
+        )
+    }
+
+    func makeCurrentAppWindowProjection(
+        appID: String,
+        candidate: AppSwitchCandidate,
+        context: RuntimeAppContext,
+        generatedAt: TimeInterval = 10
+    ) -> RuntimeCurrentAppWindowProjection {
+        RuntimeCurrentAppWindowProjection(
+            appID: appID,
+            currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
+                summary: RuntimeHomeAppSummary(
+                    appID: appID,
+                    displayName: candidate.displayName,
+                    groupID: candidate.groupID,
+                    lastActiveAt: candidate.lastActiveAt,
+                    windowCount: candidate.windows.count,
+                    pid: context.runningApp.processIdentifier
+                ),
+                candidate: candidate,
+                context: context,
+                appDirectoryEntries: [
+                    RuntimeAppDirectoryEntry(
+                        app: context.runningApp
+                    )
+                ]
+            ),
+            freshness: RuntimeProjectionFreshness(
+                generatedAt: generatedAt,
+                sourceGeneration:
+                    RuntimeReadModelGeneration(projection: 1),
+                dirtyAppIDs: [],
+                dirtyPIDs: [],
+                dirtyCGWindowIDs: [],
+                pendingRepairScopes: [],
+                isCompleteForScope: true
+            )
         )
     }
     @MainActor
@@ -297,8 +292,15 @@ extension FlowTabPriorityCoverageTests {
         context: RuntimeAppContext,
         generatedAt: TimeInterval = 10
     ) -> (model: LiveSwitcherModel, runtimeProjectionService: RecordingRuntimeProjectionService) {
-        let runtimeProjectionService = RecordingRuntimeProjectionService(
-            appSwitcherApps: [app],
+        let runtimeProjectionService =
+            makeCurrentAppWindowProjectionService(
+                appID: app.id,
+                candidate: app,
+                context: context,
+                generatedAt: generatedAt
+            )
+        runtimeProjectionService.installAppSwitcherProjection(
+            apps: [app],
             contextsByID: [app.id: context],
             generatedAt: generatedAt
         )
@@ -306,6 +308,45 @@ extension FlowTabPriorityCoverageTests {
             model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService),
             runtimeProjectionService: runtimeProjectionService
         )
+    }
+
+    func makeCompleteAppSwitcherProjectionService(
+        apps: [AppSwitchCandidate],
+        generatedAt: TimeInterval = 10
+    ) -> RecordingRuntimeProjectionService {
+        let runningApp = NSRunningApplication.current
+        let contextsByID = Dictionary(
+            uniqueKeysWithValues: apps.map { app in
+                (
+                    app.id,
+                    makeRuntimeAppContext(
+                        appID: app.id,
+                        runningApp: runningApp,
+                        windows: app.windows
+                    )
+                )
+            }
+        )
+        let service = RecordingRuntimeProjectionService(
+            appSwitcherApps: apps,
+            contextsByID: contextsByID,
+            generatedAt: generatedAt
+        )
+        for app in apps {
+            guard let context = contextsByID[app.id] else {
+                continue
+            }
+            service.setCurrentAppWindowProjection(
+                makeCurrentAppWindowProjection(
+                    appID: app.id,
+                    candidate: app,
+                    context: context,
+                    generatedAt: generatedAt
+                ),
+                appID: app.id
+            )
+        }
+        return service
     }
     func makeIsolatedUserDefaults() -> UserDefaults? {
         let suiteName = "FlowTabPriorityCoverageTests.\(UUID().uuidString)"

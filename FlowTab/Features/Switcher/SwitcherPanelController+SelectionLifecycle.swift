@@ -29,6 +29,7 @@ extension SwitcherPanelController {
             "cancelSelection trigger=\(trigger) \(hotkeyHoldSetHardwareStateSummary(for: sessionKind)) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
         model.cancelSelection()
+        _ = panel.makeFirstResponder(nil)
     }
 
     private func beginSelectionEndReplaySuppression(

@@ -21,12 +21,22 @@ struct RuntimeProjectionMaintenanceGeneration:
     }
 }
 
+struct RuntimeProjectionMaintenanceCoalescingKey:
+    RawRepresentable,
+    Hashable,
+    Sendable
+{
+    let rawValue: String
+}
+
 final class RuntimeProjectionMaintenanceOwner: @unchecked Sendable {
+    typealias Work = @Sendable () -> Void
     typealias PriorityWork = @Sendable (
         RuntimeProjectionMaintenanceGeneration
     ) -> Void
 
     private struct PendingPriorityWork {
+        let coalescingKey: RuntimeProjectionMaintenanceCoalescingKey?
         let generation: RuntimeProjectionMaintenanceGeneration
         let perform: PriorityWork
     }
@@ -37,6 +47,10 @@ final class RuntimeProjectionMaintenanceOwner: @unchecked Sendable {
     private let lock = NSLock()
     private var nextPriorityGeneration: UInt64 = 1
     private var pendingPriorityWork: [PendingPriorityWork] = []
+    private var pendingCoalescedWork:
+        [RuntimeProjectionMaintenanceCoalescingKey: Work] = [:]
+    private var activeCoalescedWorkKeys:
+        Set<RuntimeProjectionMaintenanceCoalescingKey> = []
     private var acceptsPriorityWork = true
 
     init(label: String, qos: DispatchQoS = .utility) {
@@ -48,7 +62,7 @@ final class RuntimeProjectionMaintenanceOwner: @unchecked Sendable {
         cancelPendingPriorityWork()
     }
 
-    func enqueue(_ work: @escaping @Sendable () -> Void) {
+    func enqueue(_ work: @escaping Work) {
         queue.async { [weak self] in
             guard let self else { return }
             drainPriorityWork()
@@ -57,8 +71,36 @@ final class RuntimeProjectionMaintenanceOwner: @unchecked Sendable {
         }
     }
 
+    func enqueueLatest(
+        key: RuntimeProjectionMaintenanceCoalescingKey,
+        _ work: @escaping Work
+    ) {
+        lock.lock()
+        pendingCoalescedWork[key] = work
+        let shouldSchedule = activeCoalescedWorkKeys.insert(key).inserted
+        lock.unlock()
+
+        guard shouldSchedule else { return }
+        scheduleLatestWork(for: key)
+    }
+
     @discardableResult
     func enqueuePriority(
+        _ work: @escaping PriorityWork
+    ) -> RuntimeProjectionMaintenanceGeneration? {
+        enqueuePriority(coalescingKey: nil, work)
+    }
+
+    @discardableResult
+    func enqueueLatestPriority(
+        key: RuntimeProjectionMaintenanceCoalescingKey,
+        _ work: @escaping PriorityWork
+    ) -> RuntimeProjectionMaintenanceGeneration? {
+        enqueuePriority(coalescingKey: key, work)
+    }
+
+    private func enqueuePriority(
+        coalescingKey: RuntimeProjectionMaintenanceCoalescingKey?,
         _ work: @escaping PriorityWork
     ) -> RuntimeProjectionMaintenanceGeneration? {
         lock.lock()
@@ -70,16 +112,28 @@ final class RuntimeProjectionMaintenanceOwner: @unchecked Sendable {
             rawValue: nextPriorityGeneration
         )
         nextPriorityGeneration &+= 1
+        var shouldScheduleDrain = true
+        if let coalescingKey,
+            let existingIndex = pendingPriorityWork.firstIndex(where: {
+                $0.coalescingKey == coalescingKey
+            })
+        {
+            pendingPriorityWork.remove(at: existingIndex)
+            shouldScheduleDrain = false
+        }
         pendingPriorityWork.append(
             PendingPriorityWork(
+                coalescingKey: coalescingKey,
                 generation: generation,
                 perform: work
             )
         )
         lock.unlock()
 
-        queue.async { [weak self] in
-            self?.drainPriorityWork()
+        if shouldScheduleDrain {
+            queue.async { [weak self] in
+                self?.drainPriorityWork()
+            }
         }
         return generation
     }
@@ -110,6 +164,49 @@ final class RuntimeProjectionMaintenanceOwner: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return pendingPriorityWork.count
+    }
+
+    var pendingCoalescedWorkCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return pendingCoalescedWork.count
+    }
+
+    private func scheduleLatestWork(
+        for key: RuntimeProjectionMaintenanceCoalescingKey
+    ) {
+        queue.async { [weak self] in
+            self?.performLatestWork(for: key)
+        }
+    }
+
+    private func performLatestWork(
+        for key: RuntimeProjectionMaintenanceCoalescingKey
+    ) {
+        dispatchPrecondition(condition: .onQueue(queue))
+        drainPriorityWork()
+
+        lock.lock()
+        guard let work = pendingCoalescedWork.removeValue(forKey: key) else {
+            activeCoalescedWorkKeys.remove(key)
+            lock.unlock()
+            return
+        }
+        lock.unlock()
+
+        work()
+        drainPriorityWork()
+
+        lock.lock()
+        let shouldSchedule = pendingCoalescedWork[key] != nil
+        if !shouldSchedule {
+            activeCoalescedWorkKeys.remove(key)
+        }
+        lock.unlock()
+
+        if shouldSchedule {
+            scheduleLatestWork(for: key)
+        }
     }
 
     private func drainPriorityWork() {

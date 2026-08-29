@@ -180,12 +180,128 @@ extension SwitcherPanelController {
             generation: evidence.observationGeneration,
             reason: evidence.source.rawValue
         )
+        recordInitialOcclusionVisibility(
+            atMilliseconds: monotonicMilliseconds()
+        )
         logSearchTrace(
             "presentationRecovery trigger=\(trigger) action=complete reason=\(evidence.source.rawValue) generation=\(evidence.observationGeneration) presentationGeneration=\(evidence.presentationGeneration) snapshot{\(evidence.snapshot.logFields)} \(searchTraceStateSummary())"
         )
         scheduleModifierReleaseConfirmationAfterRecoveredPresentationIfNeeded(
             trigger: trigger
         )
+    }
+
+    func beginInitialVisibleFrameTracking() {
+        cancelDeferredSelectedAppPreviewPrewarm()
+        initialRenderMilestoneEvent = nil
+        initialOcclusionVisibleAtMilliseconds = nil
+        didCompleteInitialVisibleFrameWork = false
+        if model.isWindowOnlyOverlay {
+            expectedInitialRenderMilestone = .windowContent
+            expectedInitialRenderGeneration =
+                model.selectedAppWindowProjectionGeneration
+        } else if model.isSearchActive {
+            expectedInitialRenderMilestone = .searchShell
+            expectedInitialRenderGeneration =
+                model.searchResultScrollRevision
+        } else {
+            expectedInitialRenderMilestone = .appContent
+            expectedInitialRenderGeneration =
+                model.appLayerRenderSnapshot?.generation
+        }
+    }
+
+    func handleSwitcherRenderMilestone(
+        _ event: SwitcherRenderMilestoneEvent
+    ) {
+        for observer in renderMilestoneObservers.values {
+            observer(event)
+        }
+        guard !didCompleteInitialVisibleFrameWork,
+              event.milestone == expectedInitialRenderMilestone,
+              event.renderGeneration
+                == expectedInitialRenderGeneration
+        else {
+            return
+        }
+        initialRenderMilestoneEvent = event
+        completeInitialVisibleFrameWorkIfReady()
+    }
+
+    func addRenderMilestoneObserver(
+        _ observer: @escaping (SwitcherRenderMilestoneEvent) -> Void
+    ) -> UUID {
+        let id = UUID()
+        renderMilestoneObservers[id] = observer
+        return id
+    }
+
+    func removeRenderMilestoneObserver(_ id: UUID) {
+        renderMilestoneObservers[id] = nil
+    }
+
+    func clearInitialVisibleFrameTracking() {
+        cancelDeferredSelectedAppPreviewPrewarm()
+        expectedInitialRenderMilestone = nil
+        expectedInitialRenderGeneration = nil
+        initialRenderMilestoneEvent = nil
+        initialOcclusionVisibleAtMilliseconds = nil
+        didCompleteInitialVisibleFrameWork = false
+    }
+
+    private func recordInitialOcclusionVisibility(
+        atMilliseconds timestamp: Double
+    ) {
+        guard !didCompleteInitialVisibleFrameWork else { return }
+        initialOcclusionVisibleAtMilliseconds = timestamp
+        completeInitialVisibleFrameWorkIfReady()
+    }
+
+    private func completeInitialVisibleFrameWorkIfReady() {
+        guard !didCompleteInitialVisibleFrameWork,
+              let renderEvent = initialRenderMilestoneEvent,
+              let visibleAtMilliseconds =
+                initialOcclusionVisibleAtMilliseconds
+        else {
+            return
+        }
+        didCompleteInitialVisibleFrameWork = true
+        RuntimeLog.debug(
+            .switcherLayout,
+            "firstVisibleFrame milestone=\(renderEvent.milestone.rawValue) renderGeneration=\(renderEvent.renderGeneration) drawMs=\(formatMilliseconds(renderEvent.drawnAtMilliseconds)) occlusionMs=\(formatMilliseconds(visibleAtMilliseconds))"
+        )
+        guard activeHotkeySessionKind == .globalAppSwitcher else {
+            return
+        }
+        if !model.isSearchActive, !model.isWindowOnlyOverlay {
+            scheduleDeferredSelectedAppPreviewPrewarm()
+        }
+        _ = model.performDeferredRuntimeProjectionMaintenance()
+    }
+
+    private func scheduleDeferredSelectedAppPreviewPrewarm() {
+        cancelDeferredSelectedAppPreviewPrewarm()
+        let generation = presentationSessionGeneration
+        deferredSelectedAppPreviewPrewarmTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            guard !Task.isCancelled,
+                  let self,
+                  presentationSessionGeneration == generation,
+                  hasActivePresentationSession,
+                  activeHotkeySessionKind == .globalAppSwitcher,
+                  !model.isSearchActive,
+                  !model.isWindowOnlyOverlay
+            else {
+                return
+            }
+            deferredSelectedAppPreviewPrewarmTask = nil
+            _ = prewarmSelectedAppWindowPreviewPage()
+        }
+    }
+
+    private func cancelDeferredSelectedAppPreviewPrewarm() {
+        deferredSelectedAppPreviewPrewarmTask?.cancel()
+        deferredSelectedAppPreviewPrewarmTask = nil
     }
 
     private func handleInitialPresentationVisibilityRecoveryEscalation(

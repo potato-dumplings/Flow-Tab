@@ -555,7 +555,7 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertTrue(model.scheduleSelectedAppWindowProjectionIfNeeded(for: appID))
+        XCTAssertFalse(model.scheduleSelectedAppWindowProjectionIfNeeded(for: appID))
         XCTAssertEqual(model.session?.selectedApp.windows, [])
         XCTAssertEqual(layoutPublicationCount, 0)
     }

@@ -388,8 +388,8 @@ extension FlowTabPriorityCoverageTests {
     ) -> SwitcherPanelController {
         SwitcherPanelController(
             model: LiveSwitcherModel(
-                runtimeProjectionService: RecordingRuntimeProjectionService(
-                    appSwitcherApps: apps ?? searchScenarioApps()
+                runtimeProjectionService: makeCompleteAppSwitcherProjectionService(
+                    apps: apps ?? searchScenarioApps()
                 )
             ),
             modifierReleaseObservationScheduler:
@@ -508,7 +508,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerAppSwitcherProjectionCommitRefreshesOpenSession() {
+    func testSwitcherPanelControllerAppSwitcherProjectionCommitKeepsOpenSnapshotUntilNextSession() {
         let initialApps = [
             AppSwitchCandidate(
                 id: "com.example.alpha",
@@ -559,14 +559,25 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(controller.modelForTesting.session?.apps.map(\.id), initialApps.map(\.id))
 
         runtimeProjectionService.installAppSwitcherProjection(apps: updatedApps, generatedAt: 20)
-        XCTAssertTrue(controller.handleAppSwitcherProjectionDidUpdateForTesting())
+        XCTAssertFalse(controller.handleAppSwitcherProjectionDidUpdateForTesting())
 
-        XCTAssertEqual(controller.modelForTesting.session?.apps.map(\.id), updatedApps.map(\.id))
+        XCTAssertEqual(controller.modelForTesting.session?.apps.map(\.id), initialApps.map(\.id))
         XCTAssertEqual(controller.modelForTesting.selectedApp?.id, selectedAppIDBeforeUpdate)
-        XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 2)
+        XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 1)
         XCTAssertEqual(
             runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
             [.switcherSessionStarted]
+        )
+        controller.cancelSelectionForTesting()
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        XCTAssertEqual(
+            controller.modelForTesting.session?.apps.map(\.id),
+            updatedApps.map(\.id)
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherProjectionReadCount(),
+            2
         )
         controller.cancelSelectionForTesting()
     }
@@ -670,7 +681,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelSelectedAppWindowProjectionUsesRuntimeProjectionWithoutHomeSampling() {
+    func testLiveSwitcherModelKeepsAppSnapshotAtSessionStartAndAppliesReadyProjectionOnWindowEntry() {
         let appID = "com.example.projected-current-app"
         let runningApp = NSRunningApplication.current
         let appOnlyCandidate = AppSwitchCandidate(
@@ -717,7 +728,7 @@ extension FlowTabPriorityCoverageTests {
         let runtimeProjectionService = RecordingRuntimeProjectionService(
             appSwitcherProjection: RuntimeAppSwitcherProjection(
                 apps: [appOnlyCandidate],
-                contextsByID: [:],
+                contextsByID: [appID: context],
                 freshness: freshness
             ),
             currentAppWindowProjectionsByAppID: [
@@ -732,8 +743,14 @@ extension FlowTabPriorityCoverageTests {
         model.runtimeProjectionMaintenanceEnabled = false
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertTrue(model.scheduleSelectedAppWindowProjectionIfNeeded(for: appID))
+        XCTAssertEqual(model.session?.selectedApp.windows, [])
+        XCTAssertFalse(model.scheduleSelectedAppWindowProjectionIfNeeded(for: appID))
+        XCTAssertEqual(
+            model.enterSelectedAppWindowLayerUsingCurrentReadiness(),
+            .entered
+        )
 
+        XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
         XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["projected-window-1", "projected-window-2"])
         XCTAssertEqual(model.runtimeContextsByID[appID]?.windowsByID["projected-window-1"]?.title, "Projected One")
     }
@@ -810,7 +827,7 @@ extension FlowTabPriorityCoverageTests {
         model.runtimeProjectionMaintenanceEnabled = false
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertFalse(model.scheduleSelectedAppWindowProjectionIfNeeded(for: appID))
+        XCTAssertTrue(model.scheduleSelectedAppWindowProjectionIfNeeded(for: appID))
 
         XCTAssertEqual(model.session?.mode, .appCycle)
         XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), [])
@@ -902,7 +919,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelReplaysManualWindowLayerEntryAfterSelectedAppProjectionApplies() {
+    func testLiveSwitcherModelReadyWindowProjectionEntersAndFreezesWindowLayer() {
         let appID = "com.example.projected-window-layer-entry"
         let runningApp = NSRunningApplication.current
         let appOnlyCandidate = AppSwitchCandidate(
@@ -967,7 +984,10 @@ extension FlowTabPriorityCoverageTests {
         model.handle(.downArrow)
         XCTAssertEqual(model.session?.mode, .appCycle)
 
-        XCTAssertTrue(model.scheduleSelectedAppWindowProjectionIfNeeded(for: appID))
+        XCTAssertEqual(
+            model.enterSelectedAppWindowLayerUsingCurrentReadiness(),
+            .entered
+        )
 
         XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
         XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["projected-entry-1", "projected-entry-2"])
@@ -1619,13 +1639,17 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertEqual(
             controller.modelForTesting.session?.selectedApp.windows.map(\.id),
-            ["deferred-after-dirty-1", "deferred-after-dirty-2"]
+            []
         )
 
         XCTAssertTrue(scheduler.fireNextDeadline())
         XCTAssertEqual(
             controller.modelForTesting.session?.mode,
             .windowCycle(appID: appID)
+        )
+        XCTAssertEqual(
+            controller.modelForTesting.session?.selectedApp.windows.map(\.id),
+            ["deferred-after-dirty-1", "deferred-after-dirty-2"]
         )
         controller.cancelSelectionForTesting()
     }
@@ -1693,7 +1717,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         controller.advance(.downArrow)
         XCTAssertEqual(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().map(\.appID), [appID])
-        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 2)
 
         runtimeProjectionService.setCurrentAppWindowProjection(
             RuntimeCurrentAppWindowProjection(
@@ -1705,7 +1729,7 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertTrue(controller.handleCurrentAppWindowProjectionDidUpdateForTesting(appID: appID))
 
-        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 2)
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 3)
         XCTAssertEqual(controller.modelForTesting.session?.mode, .windowCycle(appID: appID))
         XCTAssertEqual(
             controller.modelForTesting.session?.selectedApp.windows.map(\.id),

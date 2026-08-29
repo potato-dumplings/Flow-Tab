@@ -4,6 +4,18 @@ import FlowTabCore
 
 extension SwitcherSearchCoordinator {
     static func computeOutput(from input: ComputationInput) -> ComputationOutput {
+        guard let output = computeOutputIfNotCancelled(from: input) else {
+            preconditionFailure(
+                "Synchronous search computation cannot be cancelled."
+            )
+        }
+        return output
+    }
+
+    static func computeOutputIfNotCancelled(
+        from input: ComputationInput
+    ) -> ComputationOutput? {
+        guard !Task.isCancelled else { return nil }
         let query = buildSearchKey(from: input.query)
         let rebuilt: [SwitcherSearchResult]
         var appCache = input.appMatchCache
@@ -13,14 +25,17 @@ extension SwitcherSearchCoordinator {
         case .app:
             if query.normalized.isEmpty {
                 appCache = nil
-                rebuilt = input.appEntries.map { app in
+                guard let allApps = cancellableMap(
+                    input.appEntries,
+                    transform: { app in
                     SwitcherSearchResult(
                         id: "app:\(app.appID)",
                         kind: .app(appID: app.appID),
                         primaryText: app.appDisplayName,
                         secondaryText: nil
                     )
-                }
+                }) else { return nil }
+                rebuilt = allApps
             } else if
                 let cache = appCache,
                 let cachedEntry = cache.entries[query.normalized]
@@ -45,15 +60,16 @@ extension SwitcherSearchCoordinator {
                     invertedIndex: input.appInvertedIndex,
                     totalCount: input.appEntries.count
                 )
+                guard !Task.isCancelled else { return nil }
                 let candidateIndexes = candidatePlan.indexes
                 let boundedCandidateIndexes = boundedCandidateIndexes(candidateIndexes, scope: .app, query: query)
                 let ranksCompleteCandidateSet = candidateIndexes.count == boundedCandidateIndexes.count
-                let rankedMatches = rankAppMatches(
+                guard let rankedMatches = rankAppMatches(
                     query: query,
                     entries: input.appEntries,
                     candidateIndexes: ranksCompleteCandidateSet ? candidateIndexes : boundedCandidateIndexes,
                     topResultLimit: Self.appTopResultLimit
-                )
+                ) else { return nil }
                 var ranked = (
                     matchedIndexes: rankedMatches.matchedIndexes,
                     topRanked: rankedMatches.topRanked,
@@ -66,12 +82,12 @@ extension SwitcherSearchCoordinator {
                     candidatePlan: candidatePlan,
                     totalCount: input.appEntries.count
                 ) {
-                    let fullScanRanked = rankAppMatches(
+                    guard let fullScanRanked = rankAppMatches(
                         query: query,
                         entries: input.appEntries,
                         candidateIndexes: Array(input.appEntries.indices),
                         topResultLimit: Self.appTopResultLimit
-                    )
+                    ) else { return nil }
                     if !fullScanRanked.topRanked.isEmpty {
                         RuntimeLog.info(
                             .search,
@@ -85,7 +101,9 @@ extension SwitcherSearchCoordinator {
                     )
                 }
                 let matchedIndexes = ranked.matchedIndexes
-                let topResults = ranked.topRanked.map { ranked in
+                guard let topResults = cancellableMap(
+                    ranked.topRanked,
+                    transform: { ranked in
                     let app = input.appEntries[ranked.order]
                     return SwitcherSearchResult(
                         id: "app:\(app.appID)",
@@ -93,7 +111,7 @@ extension SwitcherSearchCoordinator {
                         primaryText: app.appDisplayName,
                         secondaryText: nil
                     )
-                }
+                }) else { return nil }
                 let cachePolicy = cachePolicy(
                     for: query.normalized,
                     matchedIndexesAreComplete: ranked.matchedIndexesAreComplete
@@ -125,7 +143,9 @@ extension SwitcherSearchCoordinator {
         case .window:
             if query.normalized.isEmpty {
                 windowCache = nil
-                rebuilt = input.windowEntries.map { window in
+                guard let allWindows = cancellableMap(
+                    input.windowEntries,
+                    transform: { window in
                     let resolvedTitle = window.windowTitle.isEmpty ? "Untitled Window" : window.windowTitle
                     return SwitcherSearchResult(
                         id: "window:\(window.appID)#\(window.windowID)",
@@ -133,7 +153,8 @@ extension SwitcherSearchCoordinator {
                         primaryText: resolvedTitle,
                         secondaryText: window.appDisplayName
                     )
-                }
+                }) else { return nil }
+                rebuilt = allWindows
             } else if
                 let cache = windowCache,
                 let cachedEntry = cache.entries[query.normalized]
@@ -158,15 +179,16 @@ extension SwitcherSearchCoordinator {
                     invertedIndex: input.windowInvertedIndex,
                     totalCount: input.windowEntries.count
                 )
+                guard !Task.isCancelled else { return nil }
                 let candidateIndexes = candidatePlan.indexes
                 let boundedCandidateIndexes = boundedCandidateIndexes(candidateIndexes, scope: .window, query: query)
                 let ranksCompleteCandidateSet = candidateIndexes.count == boundedCandidateIndexes.count
-                let rankedMatches = rankWindowMatches(
+                guard let rankedMatches = rankWindowMatches(
                     query: query,
                     entries: input.windowEntries,
                     candidateIndexes: ranksCompleteCandidateSet ? candidateIndexes : boundedCandidateIndexes,
                     topResultLimit: Self.windowTopResultLimit
-                )
+                ) else { return nil }
                 var ranked = (
                     matchedIndexes: rankedMatches.matchedIndexes,
                     topRanked: rankedMatches.topRanked,
@@ -179,12 +201,12 @@ extension SwitcherSearchCoordinator {
                     candidatePlan: candidatePlan,
                     totalCount: input.windowEntries.count
                 ) {
-                    let fullScanRanked = rankWindowMatches(
+                    guard let fullScanRanked = rankWindowMatches(
                         query: query,
                         entries: input.windowEntries,
                         candidateIndexes: Array(input.windowEntries.indices),
                         topResultLimit: Self.windowTopResultLimit
-                    )
+                    ) else { return nil }
                     if !fullScanRanked.topRanked.isEmpty {
                         RuntimeLog.info(
                             .search,
@@ -198,7 +220,9 @@ extension SwitcherSearchCoordinator {
                     )
                 }
                 let matchedIndexes = ranked.matchedIndexes
-                let topResults = ranked.topRanked.map { ranked in
+                guard let topResults = cancellableMap(
+                    ranked.topRanked,
+                    transform: { ranked in
                     let window = input.windowEntries[ranked.order]
                     let resolvedTitle = window.windowTitle.isEmpty ? "Untitled Window" : window.windowTitle
                     return SwitcherSearchResult(
@@ -207,7 +231,7 @@ extension SwitcherSearchCoordinator {
                         primaryText: resolvedTitle,
                         secondaryText: window.appDisplayName
                     )
-                }
+                }) else { return nil }
                 let cachePolicy = cachePolicy(
                     for: query.normalized,
                     matchedIndexesAreComplete: ranked.matchedIndexesAreComplete
@@ -238,6 +262,7 @@ extension SwitcherSearchCoordinator {
             }
         }
 
+        guard !Task.isCancelled else { return nil }
         return ComputationOutput(
             query: input.query,
             scope: input.scope,
@@ -250,6 +275,21 @@ extension SwitcherSearchCoordinator {
             appMatchCache: appCache,
             windowMatchCache: windowCache
         )
+    }
+
+    private static func cancellableMap<Element, Result>(
+        _ values: [Element],
+        transform: (Element) -> Result
+    ) -> [Result]? {
+        var results: [Result] = []
+        results.reserveCapacity(values.count)
+        for (offset, value) in values.enumerated() {
+            if offset.isMultiple(of: 32), Task.isCancelled {
+                return nil
+            }
+            results.append(transform(value))
+        }
+        return Task.isCancelled ? nil : results
     }
 
     static func candidateIndexPlan(
@@ -297,6 +337,12 @@ extension SwitcherSearchCoordinator {
 
             var prefix = query.normalized
             while !prefix.isEmpty {
+                if Task.isCancelled {
+                    return CandidateIndexPlan(
+                        indexes: [],
+                        canCacheCompleteMatches: false
+                    )
+                }
                 prefix.removeLast()
                 if let entry = cache.entries[prefix] {
                     if entry.matchedIndexesAreComplete {
@@ -467,7 +513,12 @@ extension SwitcherSearchCoordinator {
         var seen: Set<Int> = []
 
         func appendPosting(_ posting: [Int]) {
-            for index in posting where seen.insert(index).inserted {
+            for (offset, index) in posting.enumerated()
+                where seen.insert(index).inserted
+            {
+                if offset.isMultiple(of: 32), Task.isCancelled {
+                    return
+                }
                 selected.append(index)
                 if selected.count >= limit {
                     return
@@ -481,6 +532,7 @@ extension SwitcherSearchCoordinator {
         for term in dedupTerms where !term.isEmpty {
             guard let posting = invertedIndex.termPostings[term] else { continue }
             appendPosting(posting)
+            if Task.isCancelled { return [] }
             if selected.count >= limit {
                 return selected
             }
@@ -489,6 +541,7 @@ extension SwitcherSearchCoordinator {
         for gram in bigrams(of: query.compact) {
             guard let posting = invertedIndex.bigramPostings[gram] else { continue }
             appendPosting(posting)
+            if Task.isCancelled { return [] }
             if selected.count >= limit {
                 return selected
             }
@@ -516,16 +569,24 @@ extension SwitcherSearchCoordinator {
 
         let dedupTerms = Set(query.terms + [query.compact, query.normalized].filter { !$0.isEmpty })
         for term in dedupTerms where !term.isEmpty {
+            if Task.isCancelled { return [] }
             guard let posting = invertedIndex.termPostings[term] else { continue }
-            for index in posting {
+            for (offset, index) in posting.enumerated() {
+                if offset.isMultiple(of: 32), Task.isCancelled {
+                    return []
+                }
                 weights[index, default: 0] += 4
             }
         }
 
         let grams = bigrams(of: query.compact)
         for gram in grams {
+            if Task.isCancelled { return [] }
             guard let posting = invertedIndex.bigramPostings[gram] else { continue }
-            for index in posting {
+            for (offset, index) in posting.enumerated() {
+                if offset.isMultiple(of: 32), Task.isCancelled {
+                    return []
+                }
                 weights[index, default: 0] += 1
                 gramHits[index, default: 0] += 1
             }
@@ -544,6 +605,7 @@ extension SwitcherSearchCoordinator {
             return nil
         }
 
+        guard !Task.isCancelled else { return [] }
         let sorted = selected.sorted { lhs, rhs in
             isBetterCoarseCandidate(lhs, than: rhs)
         }

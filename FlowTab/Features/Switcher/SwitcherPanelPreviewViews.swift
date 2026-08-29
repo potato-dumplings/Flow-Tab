@@ -333,7 +333,7 @@ extension AnyTransition {
 }
 
 struct AppTileView: View {
-    let app: AppSwitchCandidate
+    let displayName: String
     let isSelected: Bool
     let isTerminating: Bool
     let size: CGFloat
@@ -369,7 +369,7 @@ struct AppTileView: View {
                     .accessibilityIdentifier(accessibilityIdentifier)
             } else {
                 if size >= 11 {
-                    Text(app.displayName.prefix(1).uppercased())
+                    Text(displayName.prefix(1).uppercased())
                         .font(.system(size: fallbackFontSize, weight: .semibold))
                         .foregroundStyle(.primary)
                         .accessibilityLabel(Text(accessibilityLabel))

@@ -232,6 +232,14 @@
 		A46C00023D74000100B0D737 /* FlowTabUITests+SwitcherSearchConfirmationObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46C00013D74000100B0D737 /* FlowTabUITests+SwitcherSearchConfirmationObservation.swift */; };
 		A46C00043D74000100B0D737 /* FlowTabUITests+SwitcherSearchConfirmationObservationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46C00033D74000100B0D737 /* FlowTabUITests+SwitcherSearchConfirmationObservationTests.swift */; };
 		A46D00023D75000100B0D737 /* FlowTabUITests+TabSwitchStressEvidencePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46D00013D75000100B0D737 /* FlowTabUITests+TabSwitchStressEvidencePolicy.swift */; };
+		C0D100023E10000100B0D737 /* AppPanelPressureEvidenceTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D100013E10000100B0D737 /* AppPanelPressureEvidenceTransport.swift */; };
+		C0D1000C3E10000100B0D737 /* AppPanelPressureEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D1000B3E10000100B0D737 /* AppPanelPressureEvidence.swift */; };
+		C0D1000E3E10000100B0D737 /* AppPanelPressureEvidenceDelivery.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D1000D3E10000100B0D737 /* AppPanelPressureEvidenceDelivery.swift */; };
+		C0D1000A3E10000100B0D737 /* AppPanelPressureCommandTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D100093E10000100B0D737 /* AppPanelPressureCommandTransport.swift */; };
+		C0D100043E10000100B0D737 /* FlowTabUITests+AppPanelPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D100033E10000100B0D737 /* FlowTabUITests+AppPanelPressure.swift */; };
+		C0D100103E10000100B0D737 /* FlowTabUITests+AppPanelPressureConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D1000F3E10000100B0D737 /* FlowTabUITests+AppPanelPressureConfiguration.swift */; };
+		C0D100083E10000100B0D737 /* FlowTabUITests+AppPanelPressureInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D100073E10000100B0D737 /* FlowTabUITests+AppPanelPressureInteraction.swift */; };
+		C0D100063E10000100B0D737 /* FlowTabTests+AppPanelPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D100053E10000100B0D737 /* FlowTabTests+AppPanelPressure.swift */; };
 		A44600023D4E000100B0D737 /* FlowTabUITests+ScrollingSupportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44600013D4E000100B0D737 /* FlowTabUITests+ScrollingSupportTests.swift */; };
 		A44600043D4E000100B0D737 /* FlowTabUITests+ScrollingHittableElementObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44600033D4E000100B0D737 /* FlowTabUITests+ScrollingHittableElementObservation.swift */; };
 		A44700023D4F000100B0D737 /* FlowTabUITests+ScrollingElementVisibilityObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44700013D4F000100B0D737 /* FlowTabUITests+ScrollingElementVisibilityObservation.swift */; };
@@ -1339,6 +1347,14 @@
 		A46C00013D74000100B0D737 /* FlowTabUITests+SwitcherSearchConfirmationObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherSearchConfirmationObservation.swift"; sourceTree = "<group>"; };
 		A46C00033D74000100B0D737 /* FlowTabUITests+SwitcherSearchConfirmationObservationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherSearchConfirmationObservationTests.swift"; sourceTree = "<group>"; };
 		A46D00013D75000100B0D737 /* FlowTabUITests+TabSwitchStressEvidencePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+TabSwitchStressEvidencePolicy.swift"; sourceTree = "<group>"; };
+		C0D100013E10000100B0D737 /* AppPanelPressureEvidenceTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPanelPressureEvidenceTransport.swift; sourceTree = "<group>"; };
+		C0D1000B3E10000100B0D737 /* AppPanelPressureEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPanelPressureEvidence.swift; sourceTree = "<group>"; };
+		C0D1000D3E10000100B0D737 /* AppPanelPressureEvidenceDelivery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPanelPressureEvidenceDelivery.swift; sourceTree = "<group>"; };
+		C0D100093E10000100B0D737 /* AppPanelPressureCommandTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPanelPressureCommandTransport.swift; sourceTree = "<group>"; };
+		C0D100033E10000100B0D737 /* FlowTabUITests+AppPanelPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+AppPanelPressure.swift"; sourceTree = "<group>"; };
+		C0D1000F3E10000100B0D737 /* FlowTabUITests+AppPanelPressureConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+AppPanelPressureConfiguration.swift"; sourceTree = "<group>"; };
+		C0D100073E10000100B0D737 /* FlowTabUITests+AppPanelPressureInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+AppPanelPressureInteraction.swift"; sourceTree = "<group>"; };
+		C0D100053E10000100B0D737 /* FlowTabTests+AppPanelPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+AppPanelPressure.swift"; sourceTree = "<group>"; };
 		A44600013D4E000100B0D737 /* FlowTabUITests+ScrollingSupportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ScrollingSupportTests.swift"; sourceTree = "<group>"; };
 		A44600033D4E000100B0D737 /* FlowTabUITests+ScrollingHittableElementObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ScrollingHittableElementObservation.swift"; sourceTree = "<group>"; };
 		A44700013D4F000100B0D737 /* FlowTabUITests+ScrollingElementVisibilityObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ScrollingElementVisibilityObservation.swift"; sourceTree = "<group>"; };
@@ -1690,6 +1706,7 @@
 				FFFA00033D39000100B0D737 /* FlowTabTests+UITestInitialPanelOcclusionStalenessPressure.swift */,
 				FFFB00043D3A000100B0D737 /* FlowTabTests+TabSwitchStressRunner.swift */,
 				FFFB00053D3A000100B0D737 /* FlowTabTests+TabSwitchStressRunnerPressure.swift */,
+				C0D100053E10000100B0D737 /* FlowTabTests+AppPanelPressure.swift */,
 				FFFB00063D3A000100B0D737 /* TabSwitchStressTestSupport.swift */,
 				FFFC00013D3B000100B0D737 /* FlowTabTests+AppVisibilityReload.swift */,
 				A5B100013DC1000100B0D737 /* FlowTabTests+AppVisibilityRuntimeIdentity.swift */,
@@ -1701,6 +1718,9 @@
 			isa = PBXGroup;
 			children = (
 				4A6DAE892F727AF600B0D737 /* FlowTabUITests.swift */,
+				C0D100033E10000100B0D737 /* FlowTabUITests+AppPanelPressure.swift */,
+				C0D1000F3E10000100B0D737 /* FlowTabUITests+AppPanelPressureConfiguration.swift */,
+				C0D100073E10000100B0D737 /* FlowTabUITests+AppPanelPressureInteraction.swift */,
 				A8A000053F10000100B0D737 /* FlowTabUITests+SparkleUpdate.swift */,
 				B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */,
 				A1D700013F27000100B0D737 /* FlowTabUITests+SettingsNavigation.swift */,
@@ -2167,6 +2187,10 @@
 			isa = PBXGroup;
 			children = (
 				E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */,
+				C0D100093E10000100B0D737 /* AppPanelPressureCommandTransport.swift */,
+				C0D1000B3E10000100B0D737 /* AppPanelPressureEvidence.swift */,
+				C0D1000D3E10000100B0D737 /* AppPanelPressureEvidenceDelivery.swift */,
+				C0D100013E10000100B0D737 /* AppPanelPressureEvidenceTransport.swift */,
 				D1A1B1C42A00000100B0D737 /* FlowTabLaunchTesting.swift */,
 				A8A000033F10000100B0D737 /* FlowTabUITestUpdateCoordinator.swift */,
 				D1A1B1C12A00000100B0D737 /* FlowTabUITestBootstrapper.swift */,
@@ -2775,6 +2799,10 @@
 				FFFB01023D3A000100B0D737 /* TabSwitchStressRunner.swift in Sources */,
 				FFFB01033D3A000100B0D737 /* TabSwitchStressRunner+Shared.swift in Sources */,
 				FFFB01073D3A000100B0D737 /* TabSwitchStressEvidenceTransport.swift in Sources */,
+				C0D1000A3E10000100B0D737 /* AppPanelPressureCommandTransport.swift in Sources */,
+				C0D1000C3E10000100B0D737 /* AppPanelPressureEvidence.swift in Sources */,
+				C0D1000E3E10000100B0D737 /* AppPanelPressureEvidenceDelivery.swift in Sources */,
+				C0D100023E10000100B0D737 /* AppPanelPressureEvidenceTransport.swift in Sources */,
 				D1A1B1D52A00000100B0D737 /* RuntimeFrontmostProjectionTestSupport.swift in Sources */,
 				D1A1B1D22A00000100B0D737 /* NSView+FlowTabTesting.swift in Sources */,
 				D1A1B1D32A00000100B0D737 /* RuntimeBridge+Testing.swift in Sources */,
@@ -2961,6 +2989,7 @@
 				FFFA01033D39000100B0D737 /* FlowTabTests+UITestInitialPanelOcclusionStalenessPressure.swift in Sources */,
 				FFFB01043D3A000100B0D737 /* FlowTabTests+TabSwitchStressRunner.swift in Sources */,
 				FFFB01053D3A000100B0D737 /* FlowTabTests+TabSwitchStressRunnerPressure.swift in Sources */,
+				C0D100063E10000100B0D737 /* FlowTabTests+AppPanelPressure.swift in Sources */,
 				FFFB01063D3A000100B0D737 /* TabSwitchStressTestSupport.swift in Sources */,
 				FFFC01013D3B000100B0D737 /* FlowTabTests+AppVisibilityReload.swift in Sources */,
 				A5B100023DC1000100B0D737 /* FlowTabTests+AppVisibilityRuntimeIdentity.swift in Sources */,
@@ -2983,6 +3012,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C0D100043E10000100B0D737 /* FlowTabUITests+AppPanelPressure.swift in Sources */,
+				C0D100103E10000100B0D737 /* FlowTabUITests+AppPanelPressureConfiguration.swift in Sources */,
+				C0D100083E10000100B0D737 /* FlowTabUITests+AppPanelPressureInteraction.swift in Sources */,
 				4A6DAE8C2F727AF600B0D737 /* FlowTabUITestsLaunchTests.swift in Sources */,
 				4A6DAE8A2F727AF600B0D737 /* FlowTabUITests.swift in Sources */,
 				A8A001053F10000100B0D737 /* FlowTabUITests+SparkleUpdate.swift in Sources */,

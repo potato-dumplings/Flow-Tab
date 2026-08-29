@@ -338,6 +338,25 @@ test_receipt_failure_is_unmet_evidence() (
     || fail "receipt failure established launch readiness"
 )
 
+test_cpu_time_parser_supports_ps_formats() (
+  [[ "$(flowtab_perf_cpu_time_centiseconds '0:00.01')" == 1 ]] \
+    || fail "subsecond CPU time was parsed incorrectly"
+  [[ "$(flowtab_perf_cpu_time_centiseconds '1:02.34')" == 6234 ]] \
+    || fail "minute CPU time was parsed incorrectly"
+  [[ "$(flowtab_perf_cpu_time_centiseconds '2:03:04.56')" == 738456 ]] \
+    || fail "hour CPU time was parsed incorrectly"
+  [[ "$(flowtab_perf_cpu_time_centiseconds '1-02:03:04.56')" == 9378456 ]] \
+    || fail "day CPU time was parsed incorrectly"
+)
+
+test_interval_cpu_uses_cumulative_process_time_delta() (
+  local observed
+
+  observed="$(flowtab_perf_interval_cpu_percent 125 100 500000000)"
+  [[ "$observed" == 50.000 ]] \
+    || fail "interval CPU percent was not derived from elapsed process time: $observed"
+)
+
 test_immediate_readback_precedes_poll_and_qualifies
 test_delayed_candidate_qualifies_from_observation_time
 test_slow_schedule_only_changes_completion_latency
@@ -351,5 +370,7 @@ test_runner_exit_is_terminal_without_poll
 test_pre_request_start_is_rejected
 test_clock_failure_is_unmet_evidence
 test_receipt_failure_is_unmet_evidence
+test_cpu_time_parser_supports_ps_formats
+test_interval_cpu_uses_cumulative_process_time_delta
 
-echo "Runtime-topology target launch checks immediate, stable, delayed, slow-schedule, error, cancellation, and watchdog evidence."
+echo "Runtime-topology target checks launch identity and interval CPU evidence."
