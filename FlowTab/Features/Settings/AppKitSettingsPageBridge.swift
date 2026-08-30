@@ -2,7 +2,8 @@ import AppKit
 import SwiftUI
 
 struct AppKitSettingsPageContent: NSViewRepresentable {
-    let isActive: Bool
+    let lifecycle: HomeRetainedTabLifecycle
+    let isVisible: Bool
     @Binding var showInCommandTab: Bool
     @Binding var themeModeRaw: String
     @Binding var appLanguageRaw: String
@@ -44,47 +45,23 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
 
     func makeNSView(context: Context) -> AppKitSettingsPageContainerView {
         let container = AppKitSettingsPageContainerView()
+        container.update(with: state)
         context.coordinator.update(with: self)
-        context.coordinator.connect(to: container.pageView)
+        context.coordinator.connect(to: container)
         return container
     }
 
     func updateNSView(_ nsView: AppKitSettingsPageContainerView, context: Context) {
         context.coordinator.update(with: self)
-        context.coordinator.connect(to: nsView.pageView)
-        nsView.update(
-            with: AppKitSettingsPageState(
-                showInCommandTab: showInCommandTab,
-                themeModeRaw: themeModeRaw,
-                appLanguageRaw: appLanguageRaw,
-                windowLayerAutoEnterDelayText: windowLayerAutoEnterDelayText,
-                autoRestoreMinimizedWindowOnSwitch: autoRestoreMinimizedWindowOnSwitch,
-                hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer,
-                showPermissionReminder: showPermissionReminder,
-                allowLaunchAtLogin: allowLaunchAtLogin,
-                searchEnabled: searchEnabled,
-                searchDefaultScopeRaw: searchDefaultScopeRaw,
-                hiddenAppCount: hiddenAppCount,
-                hotkeyPrimaryModifierRaw: hotkeyPrimaryModifierRaw,
-                hotkeyReverseModifiersRaw: hotkeyReverseModifiersRaw,
-                hotkeyMainKeyRaw: hotkeyMainKeyRaw,
-                hotkeyQuitKeyRaw: hotkeyQuitKeyRaw,
-                inAppWindowHotkeyBaseKeysRaw:
-                    inAppWindowHotkeyBaseKeysRaw,
-                inAppWindowHotkeyReverseKeysRaw:
-                    inAppWindowHotkeyReverseKeysRaw,
-                inAppWindowHotkeyMainKeysRaw:
-                    inAppWindowHotkeyMainKeysRaw,
-                commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
-                accessibilityTrusted: accessibilityTrusted,
-                screenCaptureTrusted: screenCaptureTrusted,
-                targetNSAppearanceName: presentationContext.targetNSAppearanceName,
-                hotkeyConflict: hotkeyConflict,
-                hotkeyPermissionRequirement:
-                    hotkeyPermissionRequirement
-            ),
-            isActive: isActive
-        )
+        context.coordinator.connect(to: nsView)
+        nsView.update(with: state)
+    }
+
+    static func dismantleNSView(
+        _ nsView: AppKitSettingsPageContainerView,
+        coordinator: AppKitSettingsPageBridgeCoordinator
+    ) {
+        coordinator.stop()
     }
 
     func sizeThatFits(
@@ -95,6 +72,42 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
         FlowFillViewportSizing.resolve(
             proposal: proposal,
             currentSize: nsView.bounds.size
+        )
+    }
+
+    private var state: AppKitSettingsPageState {
+        AppKitSettingsPageState(
+            showInCommandTab: showInCommandTab,
+            themeModeRaw: themeModeRaw,
+            appLanguageRaw: appLanguageRaw,
+            windowLayerAutoEnterDelayText: windowLayerAutoEnterDelayText,
+            autoRestoreMinimizedWindowOnSwitch:
+                autoRestoreMinimizedWindowOnSwitch,
+            hideMinimizedAppsFromAppLayer:
+                hideMinimizedAppsFromAppLayer,
+            showPermissionReminder: showPermissionReminder,
+            allowLaunchAtLogin: allowLaunchAtLogin,
+            searchEnabled: searchEnabled,
+            searchDefaultScopeRaw: searchDefaultScopeRaw,
+            hiddenAppCount: hiddenAppCount,
+            hotkeyPrimaryModifierRaw: hotkeyPrimaryModifierRaw,
+            hotkeyReverseModifiersRaw: hotkeyReverseModifiersRaw,
+            hotkeyMainKeyRaw: hotkeyMainKeyRaw,
+            hotkeyQuitKeyRaw: hotkeyQuitKeyRaw,
+            inAppWindowHotkeyBaseKeysRaw:
+                inAppWindowHotkeyBaseKeysRaw,
+            inAppWindowHotkeyReverseKeysRaw:
+                inAppWindowHotkeyReverseKeysRaw,
+            inAppWindowHotkeyMainKeysRaw:
+                inAppWindowHotkeyMainKeysRaw,
+            commandTabTakeoverRegistrationState:
+                commandTabTakeoverRegistrationState,
+            accessibilityTrusted: accessibilityTrusted,
+            screenCaptureTrusted: screenCaptureTrusted,
+            targetNSAppearanceName:
+                presentationContext.targetNSAppearanceName,
+            hotkeyConflict: hotkeyConflict,
+            hotkeyPermissionRequirement: hotkeyPermissionRequirement
         )
     }
 }

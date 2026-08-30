@@ -56,8 +56,9 @@ extension FlowTabTests {
                     ]
                 )
             }
+        let lifecycle = HomeRetainedTabLifecycle(state: .active)
         let hostedView = makeHomeDetailBehaviorHost(
-            isActive: true,
+            lifecycle: lifecycle,
             runtimeProjectionService: runtimeProjectionService,
             detailOwner: detailOwner,
             notificationCenter: notificationCenter
@@ -209,8 +210,9 @@ extension FlowTabTests {
             runtimeProjectionService: runtimeProjectionService,
             notificationCenter: notificationCenter
         )
+        let lifecycle = HomeRetainedTabLifecycle(state: .active)
         let hostedView = makeHomeDetailBehaviorHost(
-            isActive: true,
+            lifecycle: lifecycle,
             runtimeProjectionService: runtimeProjectionService,
             detailOwner: detailOwner,
             notificationCenter: notificationCenter
@@ -280,12 +282,7 @@ extension FlowTabTests {
             "A selected-app repair must not retrigger itself from its own incomplete summary commit"
         )
 
-        hostedView.rootView = makeHomeDetailBehaviorView(
-            isActive: false,
-            runtimeProjectionService: runtimeProjectionService,
-            detailOwner: detailOwner,
-            notificationCenter: notificationCenter
-        )
+        XCTAssertTrue(lifecycle.transition(to: .inactive))
         hostedView.layoutSubtreeIfNeeded()
     }
 
@@ -311,20 +308,16 @@ extension FlowTabTests {
             runtimeProjectionService: runtimeProjectionService,
             notificationCenter: notificationCenter
         )
+        let lifecycle = HomeRetainedTabLifecycle(state: .active)
         let hostedView = makeHomeDetailBehaviorHost(
-            isActive: true,
+            lifecycle: lifecycle,
             runtimeProjectionService: runtimeProjectionService,
             detailOwner: detailOwner,
             notificationCenter: notificationCenter
         )
         XCTAssertTrue(detailOwner.isObserving(appID: appID))
 
-        hostedView.rootView = makeHomeDetailBehaviorView(
-            isActive: false,
-            runtimeProjectionService: runtimeProjectionService,
-            detailOwner: detailOwner,
-            notificationCenter: notificationCenter
-        )
+        XCTAssertTrue(lifecycle.transition(to: .inactive))
         hostedView.layoutSubtreeIfNeeded()
         XCTAssertFalse(detailOwner.isObserving(appID: appID))
 
@@ -359,14 +352,14 @@ extension FlowTabTests {
 
     @MainActor
     private func makeHomeDetailBehaviorHost(
-        isActive: Bool,
+        lifecycle: HomeRetainedTabLifecycle,
         runtimeProjectionService: RecordingRuntimeProjectionService,
         detailOwner: HomeAppDetailProjectionObservationOwner,
         notificationCenter: NotificationCenter
     ) -> NSHostingView<HomeLandingView> {
         let hostedView = NSHostingView(
             rootView: makeHomeDetailBehaviorView(
-                isActive: isActive,
+                lifecycle: lifecycle,
                 runtimeProjectionService: runtimeProjectionService,
                 detailOwner: detailOwner,
                 notificationCenter: notificationCenter
@@ -379,13 +372,13 @@ extension FlowTabTests {
 
     @MainActor
     private func makeHomeDetailBehaviorView(
-        isActive: Bool,
+        lifecycle: HomeRetainedTabLifecycle,
         runtimeProjectionService: RecordingRuntimeProjectionService,
         detailOwner: HomeAppDetailProjectionObservationOwner,
         notificationCenter: NotificationCenter
     ) -> HomeLandingView {
         HomeLandingView(
-            isActive: isActive,
+            lifecycle: lifecycle,
             appLanguage: .english,
             runtimeProjectionService: runtimeProjectionService,
             permissionObservationOwner: HomePermissionObservationOwner(

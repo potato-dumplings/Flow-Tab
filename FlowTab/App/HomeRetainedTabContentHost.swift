@@ -96,10 +96,13 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
             {
                 apply(targetAppearance, to: binding.hostingView)
                 apply(container.bounds, to: binding.hostingView)
-                binding.presentation.update(
-                    isActive: true,
-                    contentRevision: descriptor.contentRevision
-                )
+                if binding.descriptor.contentRevision
+                    != descriptor.contentRevision
+                {
+                    binding.presentation.update(
+                        contentRevision: descriptor.contentRevision
+                    )
+                }
                 binding.descriptor = descriptor
                 return
             }
@@ -107,10 +110,8 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
             if let outgoingTab = activeTab,
                let outgoingBinding = bindings[outgoingTab]
             {
-                outgoingBinding.presentation.update(
-                    isActive: false,
-                    contentRevision:
-                        outgoingBinding.presentation.snapshot.contentRevision
+                outgoingBinding.presentation.lifecycle.transition(
+                    to: .inactive
                 )
                 clearFirstResponder(
                     in: outgoingBinding.hostingView,
@@ -126,6 +127,9 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
                     forKey: selectedTab
                 )
             {
+                replacedBinding.presentation.lifecycle.transition(
+                    to: .inactive
+                )
                 replacedBinding.hostingView.removeFromSuperview()
             }
 
@@ -135,9 +139,10 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
                 incomingBinding = cachedBinding
                 requiresInitialLayout = false
             } else {
+                let lifecycle = HomeRetainedTabLifecycle()
                 let presentation = HomeRetainedTabPagePresentation(
                     tab: selectedTab,
-                    isActive: true,
+                    lifecycle: lifecycle,
                     contentRevision: descriptor.contentRevision,
                     contentProvider: contentForTab
                 )
@@ -163,14 +168,18 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
             incomingBinding.presentation.updateContentProvider(contentForTab)
             apply(targetAppearance, to: incomingView)
             apply(container.bounds, to: incomingView)
-            incomingBinding.presentation.update(
-                isActive: true,
-                contentRevision: descriptor.contentRevision
-            )
+            if incomingBinding.descriptor.contentRevision
+                != descriptor.contentRevision
+            {
+                incomingBinding.presentation.update(
+                    contentRevision: descriptor.contentRevision
+                )
+            }
             incomingBinding.descriptor = descriptor
             if incomingView.superview !== container {
                 container.addSubview(incomingView)
             }
+            incomingBinding.presentation.lifecycle.transition(to: .active)
             if incomingView.isHidden {
                 incomingView.isHidden = false
             }
@@ -182,26 +191,6 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
                 incomingView.layoutSubtreeIfNeeded()
             }
             activeTab = selectedTab
-        }
-
-        func present(
-            selectedTab: HomeTab,
-            targetAppearance: NSAppearance,
-            contentIdentity: AnyHashable? = nil,
-            contentRevision: AnyHashable = AnyHashable(0),
-            contentForTab: @escaping ContentProvider,
-            in container: NSView
-        ) {
-            present(
-                selectedTab: selectedTab,
-                targetAppearance: targetAppearance,
-                descriptor: HomeRetainedTabPageDescriptor(
-                    identity: contentIdentity ?? AnyHashable(selectedTab),
-                    contentRevision: contentRevision
-                ),
-                contentForTab: contentForTab,
-                in: container
-            )
         }
 
         private func apply(
@@ -221,11 +210,7 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
 
         func dismantle(from container: NSView) {
             for binding in bindings.values {
-                binding.presentation.update(
-                    isActive: false,
-                    contentRevision:
-                        binding.presentation.snapshot.contentRevision
-                )
+                binding.presentation.lifecycle.transition(to: .inactive)
             }
             container.window?.makeFirstResponder(nil)
             for binding in bindings.values {

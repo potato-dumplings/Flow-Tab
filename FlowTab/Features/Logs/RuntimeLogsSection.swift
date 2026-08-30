@@ -336,7 +336,7 @@ final class RuntimeLogLinesViewModel: ObservableObject {
 
 struct RuntimeLogsSection: View {
     @Binding var runtimeLogLevelRaw: String
-    let isActive: Bool
+    let lifecycle: HomeRetainedTabLifecycle
     let hotkeyShortcutText: String
     let appLanguage: AppLanguage
     let targetAppearance: NSAppearance
@@ -503,13 +503,13 @@ struct RuntimeLogsSection: View {
         .onAppear {
             synchronizeLogLevelIfNeeded()
             logsViewModel.updateActivity(
-                isActive: isActive,
+                isActive: lifecycle.state == .active,
                 minimumLevel: selectedLogLevel
             )
         }
-        .onChange(of: isActive) { newValue in
+        .onReceive(lifecycle.transitions) { state in
             logsViewModel.updateActivity(
-                isActive: newValue,
+                isActive: state == .active,
                 minimumLevel: selectedLogLevel
             )
         }
@@ -520,7 +520,7 @@ struct RuntimeLogsSection: View {
                 return
             }
             logsViewModel.updateActivity(
-                isActive: isActive,
+                isActive: lifecycle.state == .active,
                 minimumLevel: resolved
             )
         }

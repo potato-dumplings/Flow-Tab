@@ -199,16 +199,17 @@ extension FlowTabTests {
         container.frame = NSRect(x: 0, y: 0, width: 1_200, height: 820)
         let state = makeSettingsLayoutActivityState()
 
-        container.update(with: state, isActive: true)
+        container.update(with: state)
+        container.setActive(true)
         await awaitSettingsLayoutMainQueueTurn()
-        container.update(with: state, isActive: false)
+        container.setActive(false)
         await awaitSettingsLayoutMainQueueTurn()
 
         let probe = SettingsActivityLayoutProbeView()
         container.addSubview(probe)
         probe.prepareForObservation()
 
-        container.update(with: state, isActive: true)
+        container.setActive(true)
         XCTAssertEqual(
             probe.layoutCount,
             0,
@@ -228,15 +229,10 @@ extension FlowTabTests {
     func testSettingsStateChangeDefersWhileInactiveAndRefreshesOnActivation() async throws {
         let container = AppKitSettingsPageContainerView()
         container.frame = NSRect(x: 0, y: 0, width: 1_200, height: 820)
-        container.update(
-            with: makeSettingsLayoutActivityState(),
-            isActive: true
-        )
+        container.update(with: makeSettingsLayoutActivityState())
+        container.setActive(true)
         await awaitSettingsLayoutMainQueueTurn()
-        container.update(
-            with: makeSettingsLayoutActivityState(),
-            isActive: false
-        )
+        container.setActive(false)
         await awaitSettingsLayoutMainQueueTurn()
 
         let probe = SettingsActivityLayoutProbeView()
@@ -249,8 +245,7 @@ extension FlowTabTests {
                 language: .simplifiedChinese,
                 hiddenAppCount: 2,
                 targetAppearanceName: .darkAqua
-            ),
-            isActive: false
+            )
         )
 
         XCTAssertEqual(probe.layoutCount, 0)
@@ -259,15 +254,7 @@ extension FlowTabTests {
             .aqua
         )
 
-        container.update(
-            with: makeSettingsLayoutActivityState(
-                themeMode: .dark,
-                language: .simplifiedChinese,
-                hiddenAppCount: 2,
-                targetAppearanceName: .darkAqua
-            ),
-            isActive: true
-        )
+        container.setActive(true)
         await awaitSettingsLayoutMainQueueTurn()
 
         XCTAssertGreaterThan(probe.layoutCount, 0)
@@ -289,10 +276,7 @@ extension FlowTabTests {
     func testSettingsContainerSizeChangeStillTriggersLayout() async {
         let container = AppKitSettingsPageContainerView()
         container.frame = NSRect(x: 0, y: 0, width: 1_200, height: 820)
-        container.update(
-            with: makeSettingsLayoutActivityState(),
-            isActive: false
-        )
+        container.update(with: makeSettingsLayoutActivityState())
         await awaitSettingsLayoutMainQueueTurn()
 
         let probe = SettingsActivityLayoutProbeView()
@@ -323,7 +307,7 @@ extension FlowTabTests {
         container.frame = window.contentView?.bounds
             ?? NSRect(x: 0, y: 0, width: 1_200, height: 820)
         let state = makeSettingsLayoutActivityState()
-        container.update(with: state, isActive: false)
+        container.update(with: state)
         await awaitSettingsLayoutMainQueueTurn()
 
         let field = NSTextField(string: "editing")
@@ -331,7 +315,7 @@ extension FlowTabTests {
         container.pageView.addSubview(field)
         XCTAssertTrue(window.makeFirstResponder(field))
 
-        container.update(with: state, isActive: true)
+        container.setActive(true)
         await awaitSettingsLayoutMainQueueTurn()
 
         XCTAssertFalse(window.firstResponder === field)

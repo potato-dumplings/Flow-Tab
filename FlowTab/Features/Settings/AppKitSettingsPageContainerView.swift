@@ -39,14 +39,24 @@ final class AppKitSettingsPageContainerView: NSView {
         buildViewHierarchy()
     }
 
-    func update(with state: AppKitSettingsPageState, isActive: Bool) {
+    func update(with state: AppKitSettingsPageState) {
+        pendingState = state
+        guard wasActive else { return }
+        applyPendingStateIfNeeded()
+        applyPendingContentLayoutIfNeeded()
+    }
+
+    func setActive(_ isActive: Bool) {
+        guard wasActive != isActive else { return }
         let becameActive = isActive && !wasActive
         wasActive = isActive
-        pendingState = state
         if becameActive {
             clearInitialFirstResponderIfNeeded()
         }
-        guard isActive else { return }
+        guard isActive else {
+            resignPageFirstResponderIfNeeded()
+            return
+        }
         applyPendingStateIfNeeded()
         applyPendingContentLayoutIfNeeded()
     }

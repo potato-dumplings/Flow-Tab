@@ -56,7 +56,7 @@ extension FlowTabTests {
         let hostedView = NSHostingView(
             rootView: SettingsPresentationObservedContent(
                 content: AppSettingsView(
-                    isActive: true,
+                    lifecycle: HomeRetainedTabLifecycle(state: .active),
                     appVisibilityModel: AppVisibilityManagerModel()
                 )
                     .frame(width: 1_440, height: 900, alignment: .topLeading),

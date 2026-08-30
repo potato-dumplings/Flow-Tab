@@ -157,7 +157,7 @@ extension FlowTabTests {
     func testSettingsPageContentExpandsToWideSwiftUIProposal() throws {
         let hostedView = NSHostingView(
             rootView: AppSettingsView(
-                isActive: true,
+                lifecycle: HomeRetainedTabLifecycle(state: .active),
                 appVisibilityModel: AppVisibilityManagerModel()
             )
                 .frame(width: 1_200, height: 760, alignment: .topLeading)

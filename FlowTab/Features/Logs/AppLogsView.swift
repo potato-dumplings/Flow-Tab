@@ -3,7 +3,7 @@ import AppKit
 import FlowTabCore
 
 struct AppLogsView: View {
-    let isActive: Bool
+    let lifecycle: HomeRetainedTabLifecycle
     let appLanguage: AppLanguage
     let targetAppearance: NSAppearance
 
@@ -44,7 +44,7 @@ struct AppLogsView: View {
 
                     RuntimeLogsSection(
                         runtimeLogLevelRaw: $runtimeLogLevelRaw,
-                        isActive: isActive,
+                        lifecycle: lifecycle,
                         hotkeyShortcutText: hotkeyConfiguration.mainShortcutText,
                         appLanguage: appLanguage,
                         targetAppearance: targetAppearance

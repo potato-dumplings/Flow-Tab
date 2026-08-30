@@ -65,9 +65,10 @@ extension FlowTabTests {
         }
         let runtimeProjectionService =
             RecordingRuntimeProjectionService()
+        let lifecycle = HomeRetainedTabLifecycle(state: .active)
         let hostedView = NSHostingView(
             rootView: HomeLandingView(
-                isActive: true,
+                lifecycle: lifecycle,
                 appLanguage: .english,
                 runtimeProjectionService: runtimeProjectionService,
                 permissionObservationOwner: owner,
@@ -95,13 +96,7 @@ extension FlowTabTests {
         XCTAssertEqual(scheduler.availableEntries.count, 2)
         XCTAssertEqual(activationObserver.availableObservationCount, 1)
 
-        hostedView.rootView = HomeLandingView(
-            isActive: false,
-            appLanguage: .english,
-            runtimeProjectionService: runtimeProjectionService,
-            permissionObservationOwner: owner,
-            openSettings: {}
-        )
+        XCTAssertTrue(lifecycle.transition(to: .inactive))
         hostedView.layoutSubtreeIfNeeded()
 
         await fulfillment(

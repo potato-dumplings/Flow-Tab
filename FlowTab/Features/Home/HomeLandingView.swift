@@ -10,7 +10,7 @@ struct HomeLandingView: View {
     private static var cachedAccessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
     private static var cachedScreenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
 
-    let isActive: Bool
+    let lifecycle: HomeRetainedTabLifecycle
     let appLanguage: AppLanguage
     let openSettings: () -> Void
     private let installedApps: [InstalledAppRecord]
@@ -18,7 +18,7 @@ struct HomeLandingView: View {
     private let runtimeProjectionService: any RuntimeProjectionServing
 
     init(
-        isActive: Bool,
+        lifecycle: HomeRetainedTabLifecycle,
         appLanguage: AppLanguage,
         runtimeProjectionService: any RuntimeProjectionServing = homeRuntimeProjectionService,
         installedApps: [InstalledAppRecord] = [],
@@ -29,7 +29,7 @@ struct HomeLandingView: View {
         appDetailProjectionObservationOwner: HomeAppDetailProjectionObservationOwner? = nil,
         openSettings: @escaping () -> Void
     ) {
-        self.isActive = isActive
+        self.lifecycle = lifecycle
         self.appLanguage = appLanguage
         self.runtimeProjectionService = runtimeProjectionService
         self.installedApps = installedApps
@@ -171,15 +171,15 @@ struct HomeLandingView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
-            handleVisibilityChanged(isActive)
+            handleVisibilityChanged(lifecycle.state == .active)
         }
-        .onChange(of: isActive) { active in
-            handleVisibilityChanged(active)
+        .onReceive(lifecycle.transitions) { state in
+            handleVisibilityChanged(state == .active)
         }
         .onReceive(NotificationCenter.default.publisher(
             for: NSApplication.didBecomeActiveNotification
         )) { _ in
-            guard isActive else { return }
+            guard lifecycle.state == .active else { return }
             requestAppSummaryProjectionMaintenance(reason: "app_active")
         }
         .onDisappear {

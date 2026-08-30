@@ -178,13 +178,12 @@ extension FlowTabTests {
         window.contentView = container
 
         container.update(
-            with: makeSettingsPageState(language: .english, hiddenAppCount: 1),
-            isActive: true
+            with: makeSettingsPageState(language: .english, hiddenAppCount: 1)
         )
+        container.setActive(true)
         settleSettingsContainerLayout(container)
         container.update(
-            with: makeSettingsPageState(language: .simplifiedChinese, hiddenAppCount: 1),
-            isActive: true
+            with: makeSettingsPageState(language: .simplifiedChinese, hiddenAppCount: 1)
         )
         settleSettingsContainerLayout(container)
 
@@ -256,9 +255,9 @@ extension FlowTabTests {
                 themeMode: .light,
                 language: .simplifiedChinese,
                 hiddenAppCount: 1
-            ),
-            isActive: true
+            )
         )
+        container.setActive(true)
         settleSettingsContainerLayout(container)
         let lightFrames = settingsCardFramesByTitle(in: container.pageView, relativeTo: container)
 
@@ -267,8 +266,7 @@ extension FlowTabTests {
                 themeMode: .dark,
                 language: .simplifiedChinese,
                 hiddenAppCount: 1
-            ),
-            isActive: true
+            )
         )
         settleSettingsContainerLayout(container)
 
@@ -331,9 +329,9 @@ extension FlowTabTests {
                 themeMode: .light,
                 language: .simplifiedChinese,
                 hiddenAppCount: 1
-            ),
-            isActive: true
+            )
         )
+        container.setActive(true)
         container.layout()
         container.layoutSubtreeIfNeeded()
 
@@ -345,8 +343,7 @@ extension FlowTabTests {
                 themeMode: .dark,
                 language: .simplifiedChinese,
                 hiddenAppCount: 1
-            ),
-            isActive: true
+            )
         )
         container.layout()
         container.layoutSubtreeIfNeeded()

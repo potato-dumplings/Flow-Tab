@@ -483,15 +483,14 @@ extension FlowTabTests {
         window.contentView = container
 
         container.update(
-            with: makeSettingsPageState(themeModeRaw: ThemeMode.dark.rawValue),
-            isActive: true
+            with: makeSettingsPageState(themeModeRaw: ThemeMode.dark.rawValue)
         )
+        container.setActive(true)
         container.layoutSubtreeIfNeeded()
         XCTAssertEqual(container.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]), .darkAqua)
 
         container.update(
-            with: makeSettingsPageState(themeModeRaw: ThemeMode.followSystem.rawValue),
-            isActive: true
+            with: makeSettingsPageState(themeModeRaw: ThemeMode.followSystem.rawValue)
         )
         container.layoutSubtreeIfNeeded()
 
@@ -522,16 +521,15 @@ extension FlowTabTests {
             with: makeSettingsPageState(
                 themeModeRaw: ThemeMode.dark.rawValue,
                 language: .english
-            ),
-            isActive: true
+            )
         )
+        container.setActive(true)
         container.layoutSubtreeIfNeeded()
         container.update(
             with: makeSettingsPageState(
                 themeModeRaw: ThemeMode.dark.rawValue,
                 language: .simplifiedChinese
-            ),
-            isActive: true
+            )
         )
         container.layoutSubtreeIfNeeded()
 
@@ -586,9 +584,9 @@ extension FlowTabTests {
         container.frame = window.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 1_200, height: 820)
         window.contentView = container
         container.update(
-            with: makeSettingsPageState(themeModeRaw: themeMode.rawValue),
-            isActive: true
+            with: makeSettingsPageState(themeModeRaw: themeMode.rawValue)
         )
+        container.setActive(true)
         container.layoutSubtreeIfNeeded()
 
         XCTAssertEqual(

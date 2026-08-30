@@ -1,15 +1,64 @@
+import Combine
 import SwiftUI
 
 @MainActor
 final class AppKitSettingsPageBridgeCoordinator {
     private var content: AppKitSettingsPageContent?
+    private weak var connectedContainer: AppKitSettingsPageContainerView?
     private weak var connectedPageView: AppKitSettingsPageView?
+    private weak var lifecycle: HomeRetainedTabLifecycle?
+    private var lifecycleObservation: AnyCancellable?
+    private var isVisible = true
 
     func update(with content: AppKitSettingsPageContent) {
         self.content = content
+        isVisible = content.isVisible
+        bindLifecycleIfNeeded(content.lifecycle)
+        applyActivity()
     }
 
-    func connect(to pageView: AppKitSettingsPageView) {
+    func connect(to container: AppKitSettingsPageContainerView) {
+        if connectedContainer !== container {
+            connectedContainer?.setActive(false)
+            connectedContainer = container
+        }
+        connectCallbacks(to: container.pageView)
+        applyActivity()
+    }
+
+    func stop() {
+        connectedContainer?.setActive(false)
+        lifecycleObservation?.cancel()
+        lifecycleObservation = nil
+        lifecycle = nil
+        connectedContainer = nil
+        connectedPageView = nil
+        content = nil
+    }
+
+    private func bindLifecycleIfNeeded(
+        _ lifecycle: HomeRetainedTabLifecycle
+    ) {
+        guard self.lifecycle !== lifecycle else { return }
+        lifecycleObservation?.cancel()
+        self.lifecycle = lifecycle
+        lifecycleObservation = lifecycle.transitions.sink {
+            [weak self] state in
+            self?.applyActivity(state: state)
+        }
+    }
+
+    private func applyActivity(
+        state: HomeRetainedTabLifecycle.State? = nil
+    ) {
+        guard let lifecycle else { return }
+        let resolvedState = state ?? lifecycle.state
+        connectedContainer?.setActive(
+            resolvedState == .active && isVisible
+        )
+    }
+
+    private func connectCallbacks(to pageView: AppKitSettingsPageView) {
         guard connectedPageView !== pageView else { return }
         connectedPageView = pageView
 

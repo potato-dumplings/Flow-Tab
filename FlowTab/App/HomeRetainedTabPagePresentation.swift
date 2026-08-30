@@ -5,29 +5,32 @@ struct HomeRetainedTabPageDescriptor: Equatable {
     let contentRevision: AnyHashable
 }
 
-typealias HomeRetainedTabContentProvider = (HomeTab, Bool) -> AnyView
+typealias HomeRetainedTabContentProvider = (
+    HomeTab,
+    HomeRetainedTabLifecycle
+) -> AnyView
 
 @MainActor
 final class HomeRetainedTabPagePresentation: ObservableObject {
     struct Snapshot: Equatable {
-        let isActive: Bool
         let contentRevision: AnyHashable
     }
 
     let tab: HomeTab
+    let lifecycle: HomeRetainedTabLifecycle
     @Published private(set) var snapshot: Snapshot
 
     private var contentProvider: HomeRetainedTabContentProvider
 
     init(
         tab: HomeTab,
-        isActive: Bool,
+        lifecycle: HomeRetainedTabLifecycle,
         contentRevision: AnyHashable,
         contentProvider: @escaping HomeRetainedTabContentProvider
     ) {
         self.tab = tab
+        self.lifecycle = lifecycle
         snapshot = Snapshot(
-            isActive: isActive,
             contentRevision: contentRevision
         )
         self.contentProvider = contentProvider
@@ -40,12 +43,8 @@ final class HomeRetainedTabPagePresentation: ObservableObject {
     }
 
     @discardableResult
-    func update(
-        isActive: Bool,
-        contentRevision: AnyHashable
-    ) -> Bool {
+    func update(contentRevision: AnyHashable) -> Bool {
         let nextSnapshot = Snapshot(
-            isActive: isActive,
             contentRevision: contentRevision
         )
         guard snapshot != nextSnapshot else { return false }
@@ -54,7 +53,7 @@ final class HomeRetainedTabPagePresentation: ObservableObject {
     }
 
     func content() -> AnyView {
-        contentProvider(tab, snapshot.isActive)
+        contentProvider(tab, lifecycle)
     }
 }
 

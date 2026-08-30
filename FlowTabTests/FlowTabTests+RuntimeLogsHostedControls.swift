@@ -14,7 +14,7 @@ extension FlowTabTests {
                     get: { runtimeLogLevelRaw },
                     set: { runtimeLogLevelRaw = $0 }
                 ),
-                isActive: true,
+                lifecycle: HomeRetainedTabLifecycle(state: .active),
                 hotkeyShortcutText: "Option + Tab",
                 appLanguage: .english,
                 targetAppearance: appearance

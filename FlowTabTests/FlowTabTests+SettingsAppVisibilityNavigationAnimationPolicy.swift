@@ -14,7 +14,7 @@ extension FlowTabTests {
         let injectedPolicy =
             SettingsAppVisibilityNavigationAnimationPolicy(duration: 0.9)
         let view = AppSettingsView(
-            isActive: true,
+            lifecycle: HomeRetainedTabLifecycle(state: .active),
             appVisibilityModel: AppVisibilityManagerModel(),
             appVisibilityNavigationAnimationPolicy: injectedPolicy
         )

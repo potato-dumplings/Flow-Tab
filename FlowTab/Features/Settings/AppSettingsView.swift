@@ -4,17 +4,17 @@ import FlowTabCore
 
 @MainActor
 struct AppSettingsView: View {
-    let isActive: Bool
+    let lifecycle: HomeRetainedTabLifecycle
     let appVisibilityNavigationAnimationPolicy:
         SettingsAppVisibilityNavigationAnimationPolicy
 
     init(
-        isActive: Bool,
+        lifecycle: HomeRetainedTabLifecycle,
         appVisibilityModel: AppVisibilityManagerModel,
         appVisibilityNavigationAnimationPolicy:
             SettingsAppVisibilityNavigationAnimationPolicy = .default
     ) {
-        self.isActive = isActive
+        self.lifecycle = lifecycle
         _appVisibilityModel = ObservedObject(
             wrappedValue: appVisibilityModel
         )
@@ -170,7 +170,8 @@ struct AppSettingsView: View {
             FlowPageBackdropView()
 
             AppKitSettingsPageContent(
-                isActive: isActive && !showsAppVisibilityManager,
+                lifecycle: lifecycle,
+                isVisible: !showsAppVisibilityManager,
                 showInCommandTab: showInCommandTabPreference,
                 themeModeRaw: themeModeBinding,
                 appLanguageRaw: appLanguageBinding,
@@ -244,10 +245,10 @@ struct AppSettingsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
-            handleVisibilityChanged(isActive)
+            handleVisibilityChanged(lifecycle.state == .active)
         }
-        .onChange(of: isActive) { active in
-            handleVisibilityChanged(active)
+        .onReceive(lifecycle.transitions) { state in
+            handleVisibilityChanged(state == .active)
         }
         .onChange(of: showInCommandTab) { _ in
             notifyAppVisibilityPreferenceChanged()
@@ -279,7 +280,7 @@ struct AppSettingsView: View {
         .onReceive(NotificationCenter.default.publisher(
             for: NSApplication.didBecomeActiveNotification
         )) { _ in
-            guard isActive else { return }
+            guard lifecycle.state == .active else { return }
             refreshAccessibilityStatus()
             refreshScreenCaptureStatus()
         }

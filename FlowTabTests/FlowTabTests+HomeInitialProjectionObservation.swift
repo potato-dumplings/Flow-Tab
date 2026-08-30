@@ -135,9 +135,10 @@ extension FlowTabTests {
         defer {
             runtimeProjectionService.setAppSwitcherMaintenanceRequestHandler(nil)
         }
+        let lifecycle = HomeRetainedTabLifecycle(state: .active)
         let hostedView = NSHostingView(
             rootView: HomeLandingView(
-                isActive: true,
+                lifecycle: lifecycle,
                 appLanguage: .english,
                 runtimeProjectionService: runtimeProjectionService,
                 permissionObservationOwner: permissionOwner,
@@ -165,14 +166,7 @@ extension FlowTabTests {
         )
         XCTAssertTrue(projectionOwner.isObserving)
 
-        hostedView.rootView = HomeLandingView(
-            isActive: false,
-            appLanguage: .english,
-            runtimeProjectionService: runtimeProjectionService,
-            permissionObservationOwner: permissionOwner,
-            initialProjectionObservationOwner: projectionOwner,
-            openSettings: {}
-        )
+        XCTAssertTrue(lifecycle.transition(to: .inactive))
         hostedView.layoutSubtreeIfNeeded()
 
         XCTAssertFalse(projectionOwner.isObserving)
@@ -235,9 +229,10 @@ extension FlowTabTests {
         defer {
             notificationCenter.removeObserver(applicationToken)
         }
+        let lifecycle = HomeRetainedTabLifecycle(state: .active)
         let hostedView = NSHostingView(
             rootView: HomeLandingView(
-                isActive: true,
+                lifecycle: lifecycle,
                 appLanguage: .english,
                 runtimeProjectionService: runtimeProjectionService,
                 permissionObservationOwner: permissionOwner,
@@ -272,16 +267,7 @@ extension FlowTabTests {
             readCountBeforeCommit + 1
         )
 
-        hostedView.rootView = HomeLandingView(
-            isActive: false,
-            appLanguage: .english,
-            runtimeProjectionService: runtimeProjectionService,
-            permissionObservationOwner: permissionOwner,
-            initialProjectionObservationOwner: initialProjectionOwner,
-            appSummaryProjectionObservationOwner:
-                appSummaryProjectionOwner,
-            openSettings: {}
-        )
+        XCTAssertTrue(lifecycle.transition(to: .inactive))
         hostedView.layoutSubtreeIfNeeded()
         XCTAssertFalse(appSummaryProjectionOwner.isObserving)
 
@@ -323,9 +309,10 @@ extension FlowTabTests {
             readAccessibilityPermission: { true },
             readScreenCapturePermission: { true }
         )
+        let lifecycle = HomeRetainedTabLifecycle(state: .active)
         let hostedView = NSHostingView(
             rootView: HomeLandingView(
-                isActive: true,
+                lifecycle: lifecycle,
                 appLanguage: .english,
                 runtimeProjectionService: runtimeProjectionService,
                 permissionObservationOwner: permissionOwner,

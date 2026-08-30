@@ -98,7 +98,8 @@ extension FlowTabTests {
         var rejectedCandidate: HotkeySettingsChangeCandidate?
 
         let content = AppKitSettingsPageContent(
-            isActive: true,
+            lifecycle: HomeRetainedTabLifecycle(state: .active),
+            isVisible: true,
             showInCommandTab: state.binding(\.showInCommandTab),
             themeModeRaw: state.binding(\.themeModeRaw),
             appLanguageRaw: state.binding(\.appLanguageRaw),

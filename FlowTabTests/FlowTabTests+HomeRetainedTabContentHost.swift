@@ -176,8 +176,14 @@ extension FlowTabTests {
         let logsHost = container.subviews[1]
             as? NSHostingView<HomeRetainedTabPageRoot>
 
-        XCTAssertEqual(homeHost?.rootView.presentation.snapshot.isActive, false)
-        XCTAssertEqual(logsHost?.rootView.presentation.snapshot.isActive, true)
+        XCTAssertEqual(
+            homeHost?.rootView.presentation.lifecycle.state,
+            .inactive
+        )
+        XCTAssertEqual(
+            logsHost?.rootView.presentation.lifecycle.state,
+            .active
+        )
         XCTAssertTrue(homeHost?.isHidden == true)
         XCTAssertTrue(logsHost?.isHidden == false)
     }
@@ -355,9 +361,10 @@ extension FlowTabTests {
         XCTAssertFalse(replacementHost === initialHost)
         XCTAssertEqual(container.addCount, initialAddCount + 1)
         XCTAssertEqual(container.removeCount, initialRemoveCount + 1)
-        XCTAssertFalse(initialPresentation.snapshot.isActive)
-        XCTAssertTrue(
-            replacementHost.rootView.presentation.snapshot.isActive
+        XCTAssertEqual(initialPresentation.lifecycle.state, .inactive)
+        XCTAssertEqual(
+            replacementHost.rootView.presentation.lifecycle.state,
+            .active
         )
     }
 
@@ -387,8 +394,9 @@ extension FlowTabTests {
         coordinator.dismantle(from: container)
 
         XCTAssertTrue(container.subviews.isEmpty)
-        XCTAssertFalse(
-            homeHost?.rootView.presentation.snapshot.isActive ?? true
+        XCTAssertEqual(
+            homeHost?.rootView.presentation.lifecycle.state,
+            .inactive
         )
 
         coordinator.present(
@@ -398,66 +406,6 @@ extension FlowTabTests {
             in: container
         )
         XCTAssertFalse(container.subviews[0] === homeHost)
-    }
-
-    @MainActor
-    func testHomeRetainedTabPagePresentationPublishesOnlyChangedSnapshots() {
-        let presentation = HomeRetainedTabPagePresentation(
-            tab: .home,
-            isActive: true,
-            contentRevision: "revision-1"
-        ) { _, _ in
-            AnyView(EmptyView())
-        }
-        var observedSnapshots: [
-            HomeRetainedTabPagePresentation.Snapshot
-        ] = []
-        let observation = presentation.$snapshot
-            .dropFirst()
-            .sink { observedSnapshots.append($0) }
-        defer { observation.cancel() }
-
-        presentation.updateContentProvider { _, _ in
-            AnyView(Text("latest"))
-        }
-        XCTAssertFalse(
-            presentation.update(
-                isActive: true,
-                contentRevision: "revision-1"
-            )
-        )
-        XCTAssertTrue(
-            presentation.update(
-                isActive: false,
-                contentRevision: "revision-1"
-            )
-        )
-        XCTAssertFalse(
-            presentation.update(
-                isActive: false,
-                contentRevision: "revision-1"
-            )
-        )
-        XCTAssertTrue(
-            presentation.update(
-                isActive: false,
-                contentRevision: "revision-2"
-            )
-        )
-
-        XCTAssertEqual(
-            observedSnapshots,
-            [
-                .init(
-                    isActive: false,
-                    contentRevision: "revision-1"
-                ),
-                .init(
-                    isActive: false,
-                    contentRevision: "revision-2"
-                )
-            ]
-        )
     }
 
     @MainActor
@@ -527,15 +475,138 @@ extension FlowTabTests {
         XCTAssertEqual(
             observedSnapshots,
             [
-                .init(
-                    isActive: true,
-                    contentRevision: "revision-2"
-                )
+                .init(contentRevision: "revision-2")
             ]
         )
         XCTAssertEqual(
             ignoredRecorder.providerCalls.last,
             HomeRetainedTabProviderCall(tab: .home, isActive: true)
+        )
+    }
+
+    @MainActor
+    func testHomeRetainedTabHostStableSwitchesDoNotPublishContentOrReinvokeProviders() throws {
+        let recorder = HomeRetainedTabProbeRecorder()
+        let coordinator = HomeRetainedTabContentHost.Coordinator()
+        let container = HomeRetainedTabTrackingContainerView(
+            frame: NSRect(x: 0, y: 0, width: 800, height: 600)
+        )
+        let content = makeHomeRetainedTabProbeContent(recorder: recorder)
+
+        for tab in [HomeTab.home, .logs, .settings] {
+            coordinator.present(
+                selectedTab: tab,
+                targetAppearance: NSApp.effectiveAppearance,
+                contentIdentity: AnyHashable(tab),
+                contentRevision: "stable-revision",
+                contentForTab: content,
+                in: container
+            )
+            settleHomeRetainedTabHost(container)
+        }
+
+        let presentations = try container.subviews.map {
+            try XCTUnwrap(
+                ($0 as? NSHostingView<HomeRetainedTabPageRoot>)?
+                    .rootView.presentation
+            )
+        }
+        var publicationCount = 0
+        let observations = presentations.map { presentation in
+            presentation.$snapshot
+                .dropFirst()
+                .sink { _ in publicationCount += 1 }
+        }
+        defer { observations.forEach { $0.cancel() } }
+        recorder.providerCalls.removeAll()
+
+        for tab in [HomeTab.home, .logs, .settings, .home] {
+            coordinator.present(
+                selectedTab: tab,
+                targetAppearance: NSApp.effectiveAppearance,
+                contentIdentity: AnyHashable(tab),
+                contentRevision: "stable-revision",
+                contentForTab: content,
+                in: container
+            )
+            settleHomeRetainedTabHost(container)
+        }
+
+        XCTAssertEqual(publicationCount, 0)
+        XCTAssertTrue(recorder.providerCalls.isEmpty)
+    }
+
+    @MainActor
+    func testHomeRetainedTabHostEmitsOnlyOrderedLifecycleTransitions() throws {
+        let recorder = HomeRetainedTabProbeRecorder()
+        let coordinator = HomeRetainedTabContentHost.Coordinator()
+        let container = HomeRetainedTabTrackingContainerView(
+            frame: NSRect(x: 0, y: 0, width: 800, height: 600)
+        )
+        let content = makeHomeRetainedTabProbeContent(recorder: recorder)
+
+        for tab in [HomeTab.home, .logs, .settings] {
+            coordinator.present(
+                selectedTab: tab,
+                targetAppearance: NSApp.effectiveAppearance,
+                contentIdentity: AnyHashable(tab),
+                contentRevision: "stable-revision",
+                contentForTab: content,
+                in: container
+            )
+        }
+        let presentations = try container.subviews.map {
+            try XCTUnwrap(
+                ($0 as? NSHostingView<HomeRetainedTabPageRoot>)?
+                    .rootView.presentation
+            )
+        }
+        var events: [String] = []
+        let observations = presentations.map { presentation in
+            presentation.lifecycle.transitions.sink { state in
+                events.append(
+                    "\(presentation.tab):\(state)"
+                )
+            }
+        }
+        defer { observations.forEach { $0.cancel() } }
+
+        coordinator.present(
+            selectedTab: .home,
+            targetAppearance: NSApp.effectiveAppearance,
+            contentIdentity: AnyHashable(HomeTab.home),
+            contentRevision: "stable-revision",
+            contentForTab: content,
+            in: container
+        )
+        XCTAssertEqual(events, ["settings:inactive", "home:active"])
+
+        coordinator.present(
+            selectedTab: .home,
+            targetAppearance: NSApp.effectiveAppearance,
+            contentIdentity: AnyHashable(HomeTab.home),
+            contentRevision: "stable-revision",
+            contentForTab: content,
+            in: container
+        )
+        XCTAssertEqual(events, ["settings:inactive", "home:active"])
+
+        coordinator.present(
+            selectedTab: .logs,
+            targetAppearance: NSApp.effectiveAppearance,
+            contentIdentity: AnyHashable(HomeTab.logs),
+            contentRevision: "stable-revision",
+            contentForTab: content,
+            in: container
+        )
+        XCTAssertEqual(
+            events,
+            [
+                "settings:inactive",
+                "home:active",
+                "home:inactive",
+                "logs:active"
+            ]
         )
     }
 
@@ -665,10 +736,7 @@ extension FlowTabTests {
         XCTAssertEqual(
             snapshotsByTab[.home],
             [
-                .init(
-                    isActive: true,
-                    contentRevision: "revision-2"
-                )
+                .init(contentRevision: "revision-2")
             ]
         )
         XCTAssertNil(snapshotsByTab[.logs])
@@ -679,7 +747,8 @@ extension FlowTabTests {
     private func makeHomeRetainedTabProbeContent(
         recorder: HomeRetainedTabProbeRecorder
     ) -> HomeRetainedTabContentHost.ContentProvider {
-        { tab, isActive in
+        { tab, lifecycle in
+            let isActive = lifecycle.state == .active
             recorder.providerCalls.append(
                 HomeRetainedTabProviderCall(
                     tab: tab,
@@ -704,71 +773,5 @@ extension FlowTabTests {
             $0.needsLayout = true
             $0.layoutSubtreeIfNeeded()
         }
-    }
-}
-
-private struct HomeRetainedTabProviderCall: Hashable {
-    let tab: HomeTab
-    let isActive: Bool
-}
-
-@MainActor
-private final class HomeRetainedTabProbeRecorder {
-    var providerCalls: [HomeRetainedTabProviderCall] = []
-    var stateIdentities: [HomeTab: [UUID]] = [:]
-    var probeViews: [HomeTab: NSView] = [:]
-}
-
-private struct HomeRetainedTabStateProbeView: View {
-    let tab: HomeTab
-    let isActive: Bool
-    let recorder: HomeRetainedTabProbeRecorder
-    @State private var stateIdentity = UUID()
-
-    var body: some View {
-        HomeRetainedTabStateProbeRepresentable(
-            tab: tab,
-            isActive: isActive,
-            stateIdentity: stateIdentity,
-            recorder: recorder
-        )
-    }
-}
-
-private struct HomeRetainedTabStateProbeRepresentable: NSViewRepresentable {
-    let tab: HomeTab
-    let isActive: Bool
-    let stateIdentity: UUID
-    let recorder: HomeRetainedTabProbeRecorder
-
-    func makeNSView(context: Context) -> HomeRetainedTabResponderProbeView {
-        HomeRetainedTabResponderProbeView()
-    }
-
-    func updateNSView(
-        _ nsView: HomeRetainedTabResponderProbeView,
-        context: Context
-    ) {
-        recorder.probeViews[tab] = nsView
-        recorder.stateIdentities[tab, default: []].append(stateIdentity)
-    }
-}
-
-private final class HomeRetainedTabResponderProbeView: NSView {
-    override var acceptsFirstResponder: Bool { true }
-}
-
-private final class HomeRetainedTabTrackingContainerView: NSView {
-    private(set) var addCount = 0
-    private(set) var removeCount = 0
-
-    override func didAddSubview(_ subview: NSView) {
-        super.didAddSubview(subview)
-        addCount += 1
-    }
-
-    override func willRemoveSubview(_ subview: NSView) {
-        removeCount += 1
-        super.willRemoveSubview(subview)
     }
 }

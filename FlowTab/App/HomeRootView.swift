@@ -49,7 +49,7 @@ struct HomeRootView: View {
                 descriptor: retainedPageDescriptor(
                     for: tabState.selectedTab
                 ),
-                contentForTab: retainedContent(for:isActive:)
+                contentForTab: retainedContent(for:lifecycle:)
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -83,13 +83,13 @@ struct HomeRootView: View {
 
     private func retainedContent(
         for tab: HomeTab,
-        isActive: Bool
+        lifecycle: HomeRetainedTabLifecycle
     ) -> AnyView {
         switch tab {
         case .home:
             return AnyView(
                 HomeLandingView(
-                    isActive: isActive,
+                    lifecycle: lifecycle,
                     appLanguage: presentation.context.appLanguage,
                     runtimeProjectionService: runtimeProjectionService,
                     installedApps: appVisibilityModel.apps,
@@ -102,7 +102,7 @@ struct HomeRootView: View {
         case .logs:
             return AnyView(
                 AppLogsView(
-                    isActive: isActive,
+                    lifecycle: lifecycle,
                     appLanguage: presentation.context.appLanguage,
                     targetAppearance:
                         presentation.context.targetNSAppearance
@@ -111,7 +111,7 @@ struct HomeRootView: View {
         case .settings:
             return AnyView(
                 AppSettingsView(
-                    isActive: isActive,
+                    lifecycle: lifecycle,
                     appVisibilityModel: appVisibilityModel
                 )
             )
