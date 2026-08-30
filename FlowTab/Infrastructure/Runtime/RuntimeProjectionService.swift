@@ -9,6 +9,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         RuntimeProjectionMaintenanceCoalescingKey(
             rawValue: "spaceTopology"
         )
+    private static let searchIndexFreshnessMaintenanceKey =
+        RuntimeProjectionMaintenanceCoalescingKey(
+            rawValue: "searchIndexFreshness"
+        )
 
     private static func appSwitcherProjectionMaintenanceKey(
         for reason: RuntimeProjectionMaintenanceReason
@@ -189,7 +193,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason) {
-        maintenanceOwner.enqueue { [self] in
+        maintenanceOwner.enqueueLatest(
+            key: Self.searchIndexFreshnessMaintenanceKey
+        ) { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             transientRepairObservationDriver.cancelScoped(
                 reason: "searchFreshnessBarrier"

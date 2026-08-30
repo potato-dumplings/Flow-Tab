@@ -371,6 +371,52 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(owner.pendingPriorityWorkCount, 0)
     }
 
+    func testRuntimeProjectionServiceCoalescesQueuedSearchFreshnessBarriers() async {
+        let owner = RuntimeProjectionMaintenanceOwner(
+            label:
+                "FlowTabTests.RuntimeProjectionService.SearchFreshnessCoalescing"
+        )
+        defer { owner.cancelPendingPriorityWork() }
+        let queueBlocked = expectation(
+            description: "unmetCondition=searchFreshnessQueueBlocked"
+        )
+        let releaseQueue = DispatchSemaphore(value: 0)
+        let appDirectoryProvider =
+            RuntimeProjectionMaintenanceCountingAppDirectoryProvider()
+        let service = RuntimeProjectionService(
+            maintenanceOwner: owner,
+            appDirectoryProvider: appDirectoryProvider,
+            axWindowRepairAvailability: { false }
+        )
+
+        owner.queue.async {
+            queueBlocked.fulfill()
+            releaseQueue.wait()
+        }
+        await fulfillment(
+            of: [queueBlocked],
+            timeout:
+                FlowTabPriorityCoverageWatchdogPolicy
+                    .appDelegateWorkspaceLifecycleSignal
+        )
+
+        for _ in 0..<1_000 {
+            service.requestSearchIndexFreshnessBarrier(
+                reason: .searchFreshnessBarrier
+            )
+        }
+        XCTAssertEqual(owner.pendingCoalescedWorkCount, 1)
+
+        releaseQueue.signal()
+        service.waitForMaintenanceQueueForTesting()
+
+        XCTAssertEqual(
+            appDirectoryProvider.maintenanceReadCount,
+            1
+        )
+        XCTAssertEqual(owner.pendingCoalescedWorkCount, 0)
+    }
+
     func testRuntimeProjectionMaintenanceOwnerKeepsLatestCoalescedWorkAcrossQueuedAndActiveBursts() async {
         let owner = RuntimeProjectionMaintenanceOwner(
             label: "FlowTabTests.RuntimeProjectionMaintenanceOwner.Coalescing"
@@ -486,5 +532,28 @@ private final class RuntimeProjectionMaintenanceCounter: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return observedNormalCountAtPriority
+    }
+}
+
+private final class RuntimeProjectionMaintenanceCountingAppDirectoryProvider:
+    RuntimeAppDirectoryProviding,
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private var readCount = 0
+
+    var maintenanceReadCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return readCount
+    }
+
+    func appDirectoryEntriesForRuntimeMaintenance()
+        -> [RuntimeAppDirectoryEntry]
+    {
+        lock.lock()
+        readCount += 1
+        lock.unlock()
+        return []
     }
 }
