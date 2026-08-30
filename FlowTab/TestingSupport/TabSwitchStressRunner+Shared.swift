@@ -54,6 +54,95 @@ final class TabSwitchStressStartCommandOwner {
 }
 
 @MainActor
+final class TabSwitchStressPrewarmOwner {
+    static let sharedSettlementNanoseconds: UInt64 =
+        250_000_000
+    static let sharedTargets: [TabSwitchStressTarget] = [
+        .home,
+        .logs,
+        .settings,
+        .home
+    ]
+
+    private let runner: any TabSwitchStressRunning
+    private let scheduler: any TabSwitchStressScheduling
+    private let selectTarget: TabSwitchStressRunner.Selection
+    private let targets: [TabSwitchStressTarget]
+    private let settlementNanoseconds: UInt64
+
+    private var nextTargetIndex = 0
+    private var wakeGeneration: UInt64 = 0
+    private var wakeToken: (any TabSwitchStressCancellable)?
+    private(set) var didComplete = false
+    private(set) var isStarted = false
+
+    init(
+        runner: any TabSwitchStressRunning,
+        scheduler: any TabSwitchStressScheduling,
+        targets: [TabSwitchStressTarget] = sharedTargets,
+        settlementNanoseconds: UInt64 =
+            sharedSettlementNanoseconds,
+        selectTarget:
+            @escaping TabSwitchStressRunner.Selection
+    ) {
+        self.runner = runner
+        self.scheduler = scheduler
+        self.targets = targets
+        self.settlementNanoseconds =
+            settlementNanoseconds
+        self.selectTarget = selectTarget
+    }
+
+    func start() {
+        guard !isStarted, !didComplete else { return }
+        isStarted = true
+        scheduleNextStep()
+    }
+
+    func cancel() {
+        wakeGeneration &+= 1
+        wakeToken?.cancel()
+        wakeToken = nil
+        isStarted = false
+    }
+
+    deinit {
+        wakeToken?.cancel()
+    }
+
+    private func scheduleNextStep() {
+        wakeGeneration &+= 1
+        let generation = wakeGeneration
+        wakeToken = scheduler.schedule(
+            afterNanoseconds: settlementNanoseconds
+        ) { [weak self] in
+            self?.advance(generation: generation)
+        }
+    }
+
+    private func advance(generation: UInt64) {
+        guard isStarted,
+              !didComplete,
+              generation == wakeGeneration
+        else {
+            return
+        }
+        wakeToken = nil
+
+        guard nextTargetIndex < targets.count else {
+            didComplete = true
+            isStarted = false
+            runner.startIfNeeded()
+            return
+        }
+
+        _ = selectTarget(targets[nextTargetIndex])
+        nextTargetIndex += 1
+        scheduleNextStep()
+    }
+}
+
+@MainActor
 extension TabSwitchStressRunner {
     static func makeShared()
         -> TabSwitchStressRunner
@@ -83,7 +172,7 @@ extension TabSwitchStressRunner {
         )
     }
 
-    private static func selectSharedTarget(
+    static func selectSharedTarget(
         _ target: TabSwitchStressTarget
     ) -> TabSwitchStressTarget? {
         switch target {

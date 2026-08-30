@@ -36,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 #if FLOWTAB_TESTING
     private var tabSwitchStressStartCommandOwner:
         TabSwitchStressStartCommandOwner?
+    private var tabSwitchStressPrewarmOwner:
+        TabSwitchStressPrewarmOwner?
 #endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -100,6 +102,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 runner: resolvedStressRunner
             )
             tabSwitchStressStartCommandOwner = owner
+            owner.start()
+        } else if FlowTabTestLaunchOptions
+            .prewarmsTabsBeforeTabSwitchStress
+        {
+            let owner = TabSwitchStressPrewarmOwner(
+                runner: resolvedStressRunner,
+                scheduler: TabSwitchStressTaskScheduler(),
+                selectTarget:
+                    TabSwitchStressRunner
+                        .selectSharedTarget
+            )
+            tabSwitchStressPrewarmOwner = owner
             owner.start()
         } else {
             resolvedStressRunner.startIfNeeded()
@@ -205,6 +219,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 #if FLOWTAB_TESTING
         tabSwitchStressStartCommandOwner?.cancel()
         tabSwitchStressStartCommandOwner = nil
+        tabSwitchStressPrewarmOwner?.cancel()
+        tabSwitchStressPrewarmOwner = nil
         resolvedStressRunner.stop()
         FlowTabUITestBootstrapper
             .stopInitialPanelOcclusionStalenessInjection()

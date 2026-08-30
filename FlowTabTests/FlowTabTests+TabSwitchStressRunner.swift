@@ -447,6 +447,50 @@ extension FlowTabTests {
         XCTAssertEqual(runner.startCallCount, 1)
     }
 
+    @MainActor
+    func testTabSwitchStressPrewarmSettlesAllTabsBeforeStartingRunner() {
+        let runner = SpyStressRunner()
+        let scheduler = ManualTabSwitchStressScheduler()
+        var selectedTargets: [TabSwitchStressTarget] = []
+        let owner = TabSwitchStressPrewarmOwner(
+            runner: runner,
+            scheduler: scheduler,
+            selectTarget: { target in
+                selectedTargets.append(target)
+                return target
+            }
+        )
+
+        owner.start()
+        owner.start()
+
+        XCTAssertEqual(scheduler.tokens.count, 1)
+        XCTAssertEqual(runner.startCallCount, 0)
+
+        for index in 0..<4 {
+            scheduler.fire(at: index)
+            XCTAssertEqual(runner.startCallCount, 0)
+        }
+        scheduler.fire(at: 4)
+
+        XCTAssertEqual(
+            selectedTargets,
+            [.home, .logs, .settings, .home]
+        )
+        XCTAssertEqual(
+            scheduler.delays,
+            Array(
+                repeating:
+                    TabSwitchStressPrewarmOwner
+                        .sharedSettlementNanoseconds,
+                count: 5
+            )
+        )
+        XCTAssertTrue(owner.didComplete)
+        XCTAssertFalse(owner.isStarted)
+        XCTAssertEqual(runner.startCallCount, 1)
+    }
+
     func testTabSwitchStressLaunchOptionsExposeDeferredStartRoute() {
         withLaunchArgumentsForTesting(
             [
@@ -467,6 +511,28 @@ extension FlowTabTests {
                 FlowTabTestLaunchOptions
                     .tabSwitchStressStartNotificationName,
                 "flowtab.test.tab-stress.start"
+            )
+        }
+    }
+
+    func testTabSwitchStressLaunchOptionsExposeTabPrewarm() {
+        withLaunchArgumentsForTesting(
+            [
+                "FlowTab",
+                "--flowtab-tab-stress",
+                FlowTabTestLaunchOptions
+                    .tabSwitchStressPrewarmTabsArgument
+            ],
+            environment: [
+                FlowTabTestLaunchOptions
+                    .uiTestingEnvironmentKey:
+                        FlowTabTestLaunchOptions
+                            .uiTestingEnvironmentValue
+            ]
+        ) {
+            XCTAssertTrue(
+                FlowTabTestLaunchOptions
+                    .prewarmsTabsBeforeTabSwitchStress
             )
         }
     }

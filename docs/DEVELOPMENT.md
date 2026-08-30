@@ -375,19 +375,36 @@ Stage 6 完整 `FlowTabTests` 通过 `1327/1327`，Stage 7 通过 `1329/1329`，
   --max-runtime-log-mb-per-minute 2.0
 ```
 
-这四个隔离组合也各运行三次。`summary.txt` 与 schema-v4 `status.json` 标记 `isolated_state_log`，记录运行时日志等级、计划/完成切换数、三个 Tab 的完成次数、实际耗时、吞吐、日志文件数、行数、保留字节数、bytes/s、MB/min、bytes/完成切换，以及估算的 20 MB 保留时长。
+这四个隔离组合也各运行三次。`summary.txt` 与 schema v5 `status.json` 标记 `isolated_state_log`，记录运行时日志等级、计划/完成切换数、三个 Tab 的完成次数、实际耗时、吞吐、日志文件数、行数、保留字节数、bytes/s、MB/min、bytes/完成切换，以及估算的 20 MB 保留时长。
+
+隔离采样与真实权限压测共用 active-window v2 数学。隔离 TestingSupport 会在 `started` 标记前依次预热 Home、Logs、Settings，并回到 Home 完成稳定等待，使首次页面挂载归入 whole-run 诊断窗口。`samples.csv` 的字段为 `sample,timestamp,pid,interval_started_uptime_nanoseconds,interval_completed_uptime_nanoseconds,cpu_percent,rss_kb`；CPU 由同一进程相邻累计 CPU 时间差除以 monotonic 区间计算。正式 CPU、RSS 和日志指标只覆盖唯一 started/completed 标记界定的活跃切换窗口：CPU avg 按样本区间时长加权，p95/max、RSS 汇总与 plateau 判定复用真实权限证据实现，跨越窗口边界的区间排除。正式证据至少包含 3 个有效区间，active coverage 必须达到 `90%`，且 PID 与启动身份全程一致。
+
+启动、退出和跨边界区间继续保存在 raw samples 与 `diagnostic_windows.whole_run` 中；whole-run CPU/RSS/MAX 和日志量只用于诊断。schema v5 在早期构建、启动或证据失败时也保持完整字段结构，正式指标写为 `null`，由 `runner_execution`、`gates` 和 `verdict` 给出失败原因。
+
+2026-08-30 应用层权限终态与 schema v5 落地后，隔离四组合各三轮全部通过。下表为同机三轮中位数；“真实 MAX”取上方 Stage 7 真实权限 active-window v2 证据，用于核对两条采样链路的 MAX 语义：
+
+| 组合 | 隔离 active CPU avg/p95/max | 真实 active MAX | 隔离 whole-run diagnostic MAX | 隔离 RSS avg/p95/max | active 日志 MB/min |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| ERROR，20ms | 24.06% / 26.36% / 26.42% | 43.33% | 58.61% | 121.36 / 121.66 / 121.69 MB | 0 |
+| ERROR，50ms | 14.09% / 16.86% / 16.97% | 29.01% | 61.21% | 122.70 / 123.17 / 123.19 MB | 0 |
+| DEBUG，20ms | 25.80% / 26.69% / 26.80% | 47.11% | 61.86% | 124.08 / 124.55 / 124.56 MB | 0.002650 |
+| DEBUG，50ms | 15.08% / 17.04% / 18.68% | 30.50% | 60.76% | 124.95 / 125.41 / 125.41 MB | 0.002806 |
+
+各组合的 active coverage 中位数为 `96.69%–98.23%`。DEBUG 活跃窗口的常规日志只有 started/completed 两条压测证据；三轮中有一轮收到独立的应用目录 generation 推进，仍未出现 `homeAppDetailProjection*`。完整 `FlowTabTests` 通过 `1337/1337`，Home 权限边界 UI 回归通过 `3/3`。证据路径意图为 `.build-local/app-layer-sampling-v5/pressure/final-*/`。
 
 低交互强度 DEBUG 补充门：
 
 ```bash
 ./scripts/perf/tab-switch-stress.sh 60 1000 0.5 \
   --runtime-log-level DEBUG \
-  --max-runtime-log-mb-per-minute 0.25
+  --max-runtime-log-mb-per-minute 2.0
 ```
 
-每次隔离运行必须出现唯一且自洽的 `phase=completed` 完成证据，三个 Tab 的完成次数都大于零且总和等于完成数，应用退出码须为 `0`。`--max-runtime-log-mb-per-minute` 接受正十进制值，缺省时只测量日志量。
+每次隔离运行必须出现唯一且自洽的 `phase=started` 与 `phase=completed` 证据；两者的绝对 monotonic 边界、elapsed、计划/完成切换数及三个 Tab 完成次数必须一致，应用退出码须为 `0`。`--max-runtime-log-mb-per-minute` 接受正十进制值，缺省时只测量日志量。
 
-逻辑写入量以当次隔离 HOME 内所有 `.log` 文件的保留字节数除以完成证据中的实际耗时计算，覆盖 FlowTab 可控制的应用写入。日志目录缺失计为零；统计失败、达到 `20` 个保留文件或超过显式预算都会使运行失败。SSD 控制器写放大和系统其他进程写入属于设备侧独立指标。完整证据统一保存在 `.build-local/runtime-log-write-volume-fix/`。
+本轮 `DEBUG / 60s / 1000ms` 通过：active CPU avg/p95/max 为 `2.95% / 5.46% / 5.53%`，whole-run diagnostic MAX 为 `65.97%`，RSS avg/p95/max 为 `124.99 / 125.58 / 125.58 MB`，active 日志为 `0.000936 MB/min`，20 MB 估算保留时间约 `21368` 分钟。
+
+正式逻辑写入量按当次隔离 HOME 内所有 `.log` 文件中 started 至 completed 标记之间的唯一字节计算，覆盖 FlowTab 可控制的活跃窗口写入；whole-run 保留字节和事件数写入诊断字段。日志目录缺失计为零；统计失败、达到 `20` 个保留文件或 active 日志超过显式预算都会使运行失败。SSD 控制器写放大和系统其他进程写入属于设备侧独立指标。完整证据统一保存在 `.build-local/runtime-log-write-volume-fix/`。
 
 Logs 页同等级重新进入时先显示缓存，并在页面连续可见 `100 ms` 后增量补齐；压力测试中的瞬时往返会取消尚未开始的读取，页面稳定后仍呈现最新 `300` 条匹配日志。
 

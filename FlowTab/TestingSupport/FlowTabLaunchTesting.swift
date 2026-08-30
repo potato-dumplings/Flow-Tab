@@ -69,6 +69,8 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-tab-stress-runtime-log-level"
     static let tabSwitchStressStartNotificationArgument =
         "--flowtab-tab-stress-start-notification-name"
+    static let tabSwitchStressPrewarmTabsArgument =
+        "--flowtab-tab-stress-prewarm-tabs"
     static let appPanelPressureEvidenceNotificationArgument =
         "--flowtab-app-panel-pressure-evidence-notification-name"
     static let appPanelPressureEvidenceAcknowledgementNotificationArgument =
@@ -123,6 +125,7 @@ enum FlowTabTestLaunchOptions {
         appPanelPressureCommandAcknowledgementNotificationArgument,
         appPanelPressureCommandNotificationArgument,
         appPanelPressureEvidenceNotificationArgument,
+        tabSwitchStressPrewarmTabsArgument,
         tabSwitchStressStartNotificationArgument,
         projectionAcknowledgementRouteArgument,
         "--flowtab-ui-record-hotkey-reload-diagnostics",
@@ -580,6 +583,13 @@ enum FlowTabTestLaunchOptions {
     static var tabSwitchStressRuntimeLogLevelRawValue: String? {
         guard runsTabSwitchStressTest else { return nil }
         return value(after: tabSwitchStressRuntimeLogLevelArgument)
+    }
+
+    static var prewarmsTabsBeforeTabSwitchStress: Bool {
+        runsTabSwitchStressTest
+            && containsUITestArgument(
+                tabSwitchStressPrewarmTabsArgument
+            )
     }
 
     static var isRunningUITests: Bool {

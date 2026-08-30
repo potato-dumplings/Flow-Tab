@@ -253,7 +253,7 @@ Isolated state/log attribution:
   --output-dir ./.build-local/test-audit/rebuild/attempts/<attempt-50ms>
 ```
 
-Run this lane with the same four log-level/cadence combinations and three attempts per combination. Each output directory preserves `samples.csv`, `summary.txt`, `build.log`, `app.log`, and schema-v4 `status.json`, including the `isolated_state_log` lane and Home/Logs/Settings counts. Every run uses a fresh attempt directory; the script atomically creates the leaf and rejects reuse. Positional-only non-audit calls remain supported and receive a unique default directory under `./.build-local/tab-switch-stress/`.
+Run this lane with the same four log-level/cadence combinations and three attempts per combination. The TestingSupport route prewarms Home, Logs, and Settings before publishing the started marker. Each output directory preserves interval-based `samples.csv`, `summary.txt`, `build.log`, `app.log`, and schema-v5 `status.json`, including the `isolated_state_log` lane and Home/Logs/Settings counts. Formal CPU/RSS/log metrics cover only intervals fully contained by the unique started/completed monotonic window, require at least three active intervals and `90%` active coverage, and use the shared real-permission aggregation helpers. Startup, exit, boundary-crossing samples, and whole-run retained logs remain under diagnostics. Every run uses a fresh attempt directory; the script atomically creates the leaf and rejects reuse. Positional-only non-audit calls remain supported and receive a unique default directory under `./.build-local/tab-switch-stress/`.
 
 App-panel pressure:
 
