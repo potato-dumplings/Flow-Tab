@@ -49,6 +49,9 @@ struct HomeRootView: View {
                 contentIdentity: retainedContentIdentity(
                     for: tabState.selectedTab
                 ),
+                contentRevision: retainedContentRevision(
+                    for: tabState.selectedTab
+                ),
                 contentForTab: retainedContent(for:isActive:)
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -130,6 +133,35 @@ struct HomeRootView: View {
             )
         }
     }
+
+    private func retainedContentRevision(for tab: HomeTab) -> AnyHashable {
+        let presentationIdentity =
+            presentation.context.appearanceRebuildIdentity
+        switch tab {
+        case .home:
+            return AnyHashable(
+                HomeRetainedTabContentRevision(
+                    presentationIdentity: presentationIdentity,
+                    contentGeneration:
+                        appVisibilityModel.homeContentRevision
+                )
+            )
+        case .logs:
+            return AnyHashable(
+                HomeRetainedTabContentRevision(
+                    presentationIdentity: presentationIdentity,
+                    contentGeneration: 0
+                )
+            )
+        case .settings:
+            return AnyHashable(presentationIdentity)
+        }
+    }
+}
+
+private struct HomeRetainedTabContentRevision: Hashable {
+    let presentationIdentity: String
+    let contentGeneration: UInt64
 }
 
 private struct HomeSidebar: View {

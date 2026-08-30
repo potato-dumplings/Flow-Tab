@@ -1,4 +1,5 @@
 import Combine
+import Foundation
 import XCTest
 @testable import FlowTab
 
@@ -11,6 +12,30 @@ struct StaticAppVisibilityInventory: AppInventoryProviding {
 
     func installedApps() -> [InstalledAppRecord] {
         records
+    }
+}
+
+private final class MutableAppVisibilityInventory:
+    AppInventoryProviding,
+    @unchecked Sendable
+{
+    private let lock = NSLock()
+    private var records: [InstalledAppRecord]
+
+    init(records: [InstalledAppRecord]) {
+        self.records = records
+    }
+
+    func replaceRecords(_ records: [InstalledAppRecord]) {
+        lock.lock()
+        self.records = records
+        lock.unlock()
+    }
+
+    func installedApps() -> [InstalledAppRecord] {
+        lock.lock()
+        defer { lock.unlock() }
+        return records
     }
 }
 
@@ -232,6 +257,60 @@ extension FlowTabTests {
         XCTAssertEqual(observedGenerations, [0, 1, 2, 3])
     }
 
+    @MainActor
+    func testAppVisibilityHomeContentRevisionTracksOnlyHomeInputs() async {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
+
+        let editor = InstalledAppRecord(
+            id: "com.example.editor",
+            displayName: "Editor",
+            bundleIdentifier: "com.example.editor",
+            path: "/Applications/Editor.app",
+            isRunning: true
+        )
+        let browser = InstalledAppRecord(
+            id: "com.example.browser",
+            displayName: "Browser",
+            bundleIdentifier: "com.example.browser",
+            path: "/Applications/Browser.app",
+            isRunning: true
+        )
+        let inventory = MutableAppVisibilityInventory(records: [editor])
+        let model = AppVisibilityManagerModel(
+            inventoryService: inventory,
+            userDefaults: userDefaults
+        )
+
+        XCTAssertEqual(model.homeContentRevision, 0)
+        await reloadAppVisibilityModelAndWait(model)
+        XCTAssertEqual(model.homeContentRevision, 1)
+
+        model.updateQuery("Editor")
+        model.updateFilter(.running)
+        model.selectApp(editor.id)
+        XCTAssertEqual(model.homeContentRevision, 1)
+
+        await reloadAppVisibilityModelAndWait(model)
+        XCTAssertEqual(model.homeContentRevision, 1)
+
+        inventory.replaceRecords([editor, browser])
+        await reloadAppVisibilityModelAndWait(model)
+        XCTAssertEqual(model.homeContentRevision, 2)
+
+        model.setHidden(true, for: editor.id)
+        XCTAssertEqual(model.homeContentRevision, 3)
+        model.setHidden(true, for: editor.id)
+        XCTAssertEqual(model.homeContentRevision, 3)
+
+        AppVisibilityPreferencesStore.saveHiddenAppIDs(
+            [],
+            userDefaults: userDefaults
+        )
+        model.refreshStoredPreferences()
+        XCTAssertEqual(model.homeContentRevision, 4)
+    }
+
     func testAppVisibilityReloadWatchdogPolicyPreservesEventDeliveryBound() {
         let eventDelivery =
             AppVisibilityReloadWatchdogPolicy.eventDelivery
@@ -239,6 +318,29 @@ extension FlowTabTests {
         XCTAssertEqual(eventDelivery, 5)
         XCTAssertTrue(eventDelivery.isFinite)
         XCTAssertGreaterThan(eventDelivery, 0)
+    }
+
+    @MainActor
+    private func reloadAppVisibilityModelAndWait(
+        _ model: AppVisibilityManagerModel
+    ) async {
+        let reloadCompleted = expectation(
+            description: "app visibility reload completed"
+        )
+        reloadCompleted.assertForOverFulfill = true
+        let readinessObservation = model.$inventoryReadiness
+            .dropFirst()
+            .sink { readiness in
+                if readiness == .ready {
+                    reloadCompleted.fulfill()
+                }
+            }
+        model.reload()
+        await fulfillment(
+            of: [reloadCompleted],
+            timeout: AppVisibilityReloadWatchdogPolicy.eventDelivery
+        )
+        readinessObservation.cancel()
     }
 
     @MainActor

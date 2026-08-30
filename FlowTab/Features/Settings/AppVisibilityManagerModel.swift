@@ -78,6 +78,7 @@ final class AppVisibilityManagerModel: ObservableObject {
     @Published private(set) var filterProjectionGeneration: UInt64 = 0
     @Published private(set) var selectedAppID: String?
     @Published private(set) var selectionProjectionGeneration: UInt64 = 0
+    @Published private(set) var homeContentRevision: UInt64 = 0
 
     private let inventoryService: any AppInventoryProviding
     private let userDefaults: UserDefaults
@@ -148,8 +149,13 @@ final class AppVisibilityManagerModel: ObservableObject {
                 userDefaults: userDefaults
             )
         guard nextPreferenceHiddenAppIDs != preferenceHiddenAppIDs else { return }
+        let previousEffectiveHiddenAppIDs = effectiveHiddenAppIDs
         preferenceHiddenAppIDs = nextPreferenceHiddenAppIDs
         recomputeEffectiveHiddenAppIDs()
+        advanceHomeContentRevisionIfNeeded(
+            inventoryChanged: false,
+            previousEffectiveHiddenAppIDs: previousEffectiveHiddenAppIDs
+        )
         resolveSelectionAfterReload()
     }
 
@@ -182,6 +188,8 @@ final class AppVisibilityManagerModel: ObservableObject {
             return
         }
 
+        let previousApps = apps
+        let previousEffectiveHiddenAppIDs = effectiveHiddenAppIDs
         let preferenceConfigurableAppIDs = Set(
             records
                 .filter { $0.visibilityCapability.isConfigurable }
@@ -194,6 +202,10 @@ final class AppVisibilityManagerModel: ObservableObject {
         apps = records
         preferenceHiddenAppIDs = reconciliation.hiddenAppIDs
         recomputeEffectiveHiddenAppIDs()
+        advanceHomeContentRevisionIfNeeded(
+            inventoryChanged: previousApps != apps,
+            previousEffectiveHiddenAppIDs: previousEffectiveHiddenAppIDs
+        )
         resolveSelectionAfterReload()
         isLoading = false
         inventoryReadiness = .ready
@@ -236,7 +248,12 @@ final class AppVisibilityManagerModel: ObservableObject {
             userDefaults: userDefaults
         )
         guard preferenceHiddenAppIDs != previousHiddenAppIDs else { return }
+        let previousEffectiveHiddenAppIDs = effectiveHiddenAppIDs
         recomputeEffectiveHiddenAppIDs()
+        advanceHomeContentRevisionIfNeeded(
+            inventoryChanged: false,
+            previousEffectiveHiddenAppIDs: previousEffectiveHiddenAppIDs
+        )
         resolveSelectionAfterReload()
         NotificationCenter.default.post(name: .flowTabAppVisibilityPreferenceChanged, object: nil)
     }
@@ -281,6 +298,18 @@ final class AppVisibilityManagerModel: ObservableObject {
         if effectiveHiddenAppIDs != nextEffectiveHiddenAppIDs {
             effectiveHiddenAppIDs = nextEffectiveHiddenAppIDs
         }
+    }
+
+    private func advanceHomeContentRevisionIfNeeded(
+        inventoryChanged: Bool,
+        previousEffectiveHiddenAppIDs: Set<String>
+    ) {
+        guard inventoryChanged
+                || previousEffectiveHiddenAppIDs != effectiveHiddenAppIDs
+        else {
+            return
+        }
+        homeContentRevision &+= 1
     }
 
     private func matchScore(

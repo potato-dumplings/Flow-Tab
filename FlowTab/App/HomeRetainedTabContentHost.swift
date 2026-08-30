@@ -3,11 +3,12 @@ import SwiftUI
 
 @MainActor
 struct HomeRetainedTabContentHost: NSViewRepresentable {
-    typealias ContentProvider = (HomeTab, Bool) -> AnyView
+    typealias ContentProvider = HomeRetainedTabContentProvider
 
     let selectedTab: HomeTab
     var targetAppearance: NSAppearance = NSApp.effectiveAppearance
     var contentIdentity: AnyHashable? = nil
+    var contentRevision: AnyHashable = AnyHashable(0)
     let contentForTab: ContentProvider
 
     func makeCoordinator() -> Coordinator {
@@ -20,6 +21,7 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
             selectedTab: selectedTab,
             targetAppearance: targetAppearance,
             contentIdentity: contentIdentity,
+            contentRevision: contentRevision,
             contentForTab: contentForTab,
             in: container
         )
@@ -31,6 +33,7 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
             selectedTab: selectedTab,
             targetAppearance: targetAppearance,
             contentIdentity: contentIdentity,
+            contentRevision: contentRevision,
             contentForTab: contentForTab,
             in: container
         )
@@ -45,74 +48,105 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
 
     @MainActor
     final class Coordinator {
-        private var hostingViews: [HomeTab: NSHostingView<AnyView>] = [:]
-        private var contentIdentities: [HomeTab: AnyHashable] = [:]
+        private struct PageBinding {
+            let hostingView: NSHostingView<HomeRetainedTabPageRoot>
+            let presentation: HomeRetainedTabPagePresentation
+            let contentIdentity: AnyHashable?
+        }
+
+        private var bindings: [HomeTab: PageBinding] = [:]
         private var activeTab: HomeTab?
-        private var latestContentProvider: ContentProvider?
 
         func present(
             selectedTab: HomeTab,
             targetAppearance: NSAppearance,
             contentIdentity: AnyHashable? = nil,
+            contentRevision: AnyHashable = AnyHashable(0),
             contentForTab: @escaping ContentProvider,
             in container: NSView
         ) {
-            latestContentProvider = contentForTab
-            let identityChanged = contentIdentity.map {
-                contentIdentities[selectedTab] != $0
+            for binding in bindings.values {
+                binding.presentation.updateContentProvider(contentForTab)
+            }
+            let identityChanged = bindings[selectedTab].map {
+                $0.contentIdentity != contentIdentity
             } ?? false
 
             if activeTab == selectedTab,
-               let hostingView = hostingViews[selectedTab],
-               hostingView.superview === container,
+               let binding = bindings[selectedTab],
+               binding.hostingView.superview === container,
                !identityChanged
             {
-                apply(targetAppearance, to: hostingView)
-                hostingView.rootView = contentForTab(selectedTab, true)
+                apply(targetAppearance, to: binding.hostingView)
+                binding.hostingView.frame = container.bounds
+                binding.presentation.update(
+                    isActive: true,
+                    contentRevision: contentRevision
+                )
                 return
             }
 
             if let outgoingTab = activeTab,
-               let outgoingView = hostingViews[outgoingTab]
+               let outgoingBinding = bindings[outgoingTab]
             {
-                apply(targetAppearance, to: outgoingView)
-                outgoingView.rootView = contentForTab(outgoingTab, false)
-                clearFirstResponder(in: outgoingView, container: container)
-                outgoingView.isHidden = true
+                outgoingBinding.presentation.update(
+                    isActive: false,
+                    contentRevision:
+                        outgoingBinding.presentation.snapshot.contentRevision
+                )
+                clearFirstResponder(
+                    in: outgoingBinding.hostingView,
+                    container: container
+                )
+                outgoingBinding.hostingView.isHidden = true
             }
 
             if identityChanged,
-               let replacedView = hostingViews.removeValue(
+               let replacedBinding = bindings.removeValue(
                     forKey: selectedTab
                 )
             {
-                replacedView.removeFromSuperview()
+                replacedBinding.hostingView.removeFromSuperview()
             }
 
-            let incomingView: NSHostingView<AnyView>
+            let incomingBinding: PageBinding
             let requiresInitialLayout: Bool
-            if let cachedView = hostingViews[selectedTab] {
-                incomingView = cachedView
+            if let cachedBinding = bindings[selectedTab] {
+                incomingBinding = cachedBinding
                 requiresInitialLayout = false
-                apply(targetAppearance, to: incomingView)
-                incomingView.rootView = contentForTab(selectedTab, true)
             } else {
-                incomingView = NSHostingView(
-                    rootView: contentForTab(selectedTab, true)
+                let presentation = HomeRetainedTabPagePresentation(
+                    tab: selectedTab,
+                    isActive: true,
+                    contentRevision: contentRevision,
+                    contentProvider: contentForTab
                 )
-                incomingView.appearance = targetAppearance
-                incomingView.translatesAutoresizingMaskIntoConstraints = true
-                incomingView.autoresizingMask = [.width, .height]
-                incomingView.sizingOptions = []
-                incomingView.isHidden = true
-                hostingViews[selectedTab] = incomingView
+                let hostingView = NSHostingView(
+                    rootView: HomeRetainedTabPageRoot(
+                        presentation: presentation
+                    )
+                )
+                hostingView.translatesAutoresizingMaskIntoConstraints = true
+                hostingView.autoresizingMask = [.width, .height]
+                hostingView.sizingOptions = []
+                hostingView.isHidden = true
+                incomingBinding = PageBinding(
+                    hostingView: hostingView,
+                    presentation: presentation,
+                    contentIdentity: contentIdentity
+                )
+                bindings[selectedTab] = incomingBinding
                 requiresInitialLayout = true
             }
-            if let contentIdentity {
-                contentIdentities[selectedTab] = contentIdentity
-            }
 
+            let incomingView = incomingBinding.hostingView
+            incomingBinding.presentation.updateContentProvider(contentForTab)
+            apply(targetAppearance, to: incomingView)
             incomingView.frame = container.bounds
+            incomingBinding.presentation.update(
+                isActive: true,
+                contentRevision: contentRevision
+            )
             if incomingView.superview !== container {
                 container.addSubview(incomingView)
             }
@@ -138,17 +172,19 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
         }
 
         func dismantle(from container: NSView) {
-            if let contentForTab = latestContentProvider {
-                for (tab, hostingView) in hostingViews {
-                    hostingView.rootView = contentForTab(tab, false)
-                }
+            for binding in bindings.values {
+                binding.presentation.update(
+                    isActive: false,
+                    contentRevision:
+                        binding.presentation.snapshot.contentRevision
+                )
             }
             container.window?.makeFirstResponder(nil)
-            container.subviews.forEach { $0.removeFromSuperview() }
-            hostingViews.removeAll()
-            contentIdentities.removeAll()
+            for binding in bindings.values {
+                binding.hostingView.removeFromSuperview()
+            }
+            bindings.removeAll()
             activeTab = nil
-            latestContentProvider = nil
         }
 
         private func clearFirstResponder(

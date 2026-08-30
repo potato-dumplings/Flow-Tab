@@ -611,6 +611,7 @@
 		A8F100033D2A000100B0D737 /* FlowTabTests+HomeAppRowPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F100043D2A000100B0D737 /* FlowTabTests+HomeAppRowPresentation.swift */; };
 		A6F200023FD2000100B0D737 /* HomeRetainedTabContentHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F200013FD2000100B0D737 /* HomeRetainedTabContentHost.swift */; };
 		A6F200043FD2000100B0D737 /* FlowTabTests+HomeRetainedTabContentHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F200033FD2000100B0D737 /* FlowTabTests+HomeRetainedTabContentHost.swift */; };
+		A6F200063FD2000100B0D737 /* HomeRetainedTabPagePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F200053FD2000100B0D737 /* HomeRetainedTabPagePresentation.swift */; };
 		D43000012FFD000100B0D737 /* HomeOverviewComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43000112FFD000100B0D737 /* HomeOverviewComponents.swift */; };
 		D43000022FFD000100B0D737 /* RuntimeAXWindowChangeMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43000122FFD000100B0D737 /* RuntimeAXWindowChangeMonitor.swift */; };
 		D43000032FFD000100B0D737 /* RuntimeAXWindowObservationTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43000132FFD000100B0D737 /* RuntimeAXWindowObservationTransport.swift */; };
@@ -1086,6 +1087,7 @@
 		A8F100043D2A000100B0D737 /* FlowTabTests+HomeAppRowPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HomeAppRowPresentation.swift"; sourceTree = "<group>"; };
 		A6F200013FD2000100B0D737 /* HomeRetainedTabContentHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRetainedTabContentHost.swift; sourceTree = "<group>"; };
 		A6F200033FD2000100B0D737 /* FlowTabTests+HomeRetainedTabContentHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HomeRetainedTabContentHost.swift"; sourceTree = "<group>"; };
+		A6F200053FD2000100B0D737 /* HomeRetainedTabPagePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRetainedTabPagePresentation.swift; sourceTree = "<group>"; };
 		D43000112FFD000100B0D737 /* HomeOverviewComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeOverviewComponents.swift; sourceTree = "<group>"; };
 		D43000122FFD000100B0D737 /* RuntimeAXWindowChangeMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAXWindowChangeMonitor.swift; sourceTree = "<group>"; };
 		D43000132FFD000100B0D737 /* RuntimeAXWindowObservationTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAXWindowObservationTransport.swift; sourceTree = "<group>"; };
@@ -2025,6 +2027,7 @@
 				B1C2D3E32F74000100B0D737 /* AppLocalization.swift */,
 				C10000122F75000100B0D737 /* HomeRootView.swift */,
 				A6F200013FD2000100B0D737 /* HomeRetainedTabContentHost.swift */,
+				A6F200053FD2000100B0D737 /* HomeRetainedTabPagePresentation.swift */,
 				4A6DAE6F2F727AF500B0D737 /* ContentView.swift */,
 			);
 			path = App;
@@ -2654,6 +2657,7 @@
 				C20000022FBD000100B0D737 /* HomeWindowRowButton.swift in Sources */,
 				C10000022F75000100B0D737 /* HomeRootView.swift in Sources */,
 				A6F200023FD2000100B0D737 /* HomeRetainedTabContentHost.swift in Sources */,
+				A6F200063FD2000100B0D737 /* HomeRetainedTabPagePresentation.swift in Sources */,
 				C10000012F75000100B0D737 /* AppFoundation.swift in Sources */,
 				EED100023D1C000100B0D737 /* TemporaryRegularActivationRestorationOwner.swift in Sources */,
 				C10000272F75000100B0D737 /* FlowTypography.swift in Sources */,
