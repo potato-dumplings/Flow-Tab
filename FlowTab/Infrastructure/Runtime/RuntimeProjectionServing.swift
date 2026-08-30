@@ -160,6 +160,18 @@ protocol RuntimeProjectionServing: Sendable {
 extension RuntimeProjectionServing {
     func refreshApplicationDirectoryMembershipForPresentation() {}
 
+    func consumeAXWindowChangeEvidence(
+        _ evidence: RuntimeAXWindowChangeEvidence
+    ) {
+        switch evidence.source {
+        case .observedTransition:
+            markAppWindowsDirty(evidence)
+        case .initialReadback, .trailingReadback:
+            guard evidence.requiresReconciliation else { return }
+            signalAppWindowsChanged(evidence)
+        }
+    }
+
     func signalAppActivated(
         appID: String,
         pid: pid_t,

@@ -41,10 +41,12 @@ extension AppDelegate {
         )
     }
 
-    func makeAppLaunchWindowEvidenceCoordinator()
-        -> any RuntimeAppLaunchWindowEvidenceCoordinating
+    func makeAppWindowEvidenceCoordinator()
+        -> any RuntimeAppWindowEvidenceCoordinating
     {
-        makeDefaultAppLaunchWindowEvidenceCoordinator()
+        RuntimeAppWindowEvidenceCoordinator(
+            runtimeProjectionService: resolvedRuntimeProjectionService
+        )
     }
 
     func makePanelController() -> SwitcherPanelController {

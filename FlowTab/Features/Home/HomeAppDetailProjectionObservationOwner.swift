@@ -3,14 +3,11 @@ import Foundation
 
 enum HomeAppDetailProjectionRequest {
     case selected(appID: String, pid: pid_t)
-    case appWindowsChanged(RuntimeAXWindowChangeEvidence)
 
     var appID: String {
         switch self {
         case let .selected(appID, _):
             appID
-        case let .appWindowsChanged(evidence):
-            evidence.appID
         }
     }
 
@@ -18,8 +15,6 @@ enum HomeAppDetailProjectionRequest {
         switch self {
         case let .selected(_, pid):
             pid
-        case let .appWindowsChanged(evidence):
-            evidence.pid
         }
     }
 
@@ -30,13 +25,6 @@ enum HomeAppDetailProjectionRequest {
                 appID: appID,
                 pid: pid
             )
-        case let .appWindowsChanged(evidence):
-            switch evidence.source {
-            case .observedTransition:
-                service.markAppWindowsDirty(evidence)
-            case .initialReadback, .trailingReadback:
-                service.signalAppWindowsChanged(evidence)
-            }
         }
     }
 }

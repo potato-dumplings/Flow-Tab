@@ -324,7 +324,7 @@ final class RuntimeAXWindowObservationRetryCoordinator {
         )
         RuntimeLog.debug(
             .axObserver,
-            "homeAXObserverRetry result=scheduled appID=\(appID) pid=\(pid) installGeneration=\(installGeneration) attempt=\(attempt) axError=\(error.rawValue) delaySeconds=\(interval)"
+            "runtimeAXObserverRetry result=scheduled appID=\(appID) pid=\(pid) installGeneration=\(installGeneration) attempt=\(attempt) axError=\(error.rawValue) delaySeconds=\(interval)"
         )
         return evidence
     }
@@ -338,7 +338,7 @@ final class RuntimeAXWindowObservationRetryCoordinator {
         pending.token?.cancel()
         RuntimeLog.debug(
             .axObserver,
-            "homeAXObserverRetry result=succeeded appID=\(appID) pid=\(pid) installGeneration=\(pending.evidence.installGeneration) attempt=\(pending.evidence.attempt)"
+            "runtimeAXObserverRetry result=succeeded appID=\(appID) pid=\(pid) installGeneration=\(pending.evidence.installGeneration) attempt=\(pending.evidence.attempt)"
         )
         return pending.evidence.attempt
     }
@@ -357,7 +357,7 @@ final class RuntimeAXWindowObservationRetryCoordinator {
         pending.token?.cancel()
         RuntimeLog.debug(
             .axObserver,
-            "homeAXObserverRetry result=cancelled appID=\(pending.evidence.appID) pid=\(pid) installGeneration=\(pending.evidence.installGeneration) attempt=\(pending.evidence.attempt) reason=\(reason)"
+            "runtimeAXObserverRetry result=cancelled appID=\(pending.evidence.appID) pid=\(pid) installGeneration=\(pending.evidence.installGeneration) attempt=\(pending.evidence.attempt) reason=\(reason)"
         )
     }
 

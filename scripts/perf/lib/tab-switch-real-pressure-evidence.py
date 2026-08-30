@@ -4,6 +4,7 @@ import csv
 import json
 import math
 import os
+import re
 import sys
 import tempfile
 
@@ -11,6 +12,17 @@ import tempfile
 LOG_CAPACITY = 20
 RSS_ABSOLUTE_GROWTH_ALLOWANCE_KB = 32 * 1024
 RSS_RELATIVE_GROWTH_ALLOWANCE = 0.15
+OBSERVER_INSTALL_EVENT_NAMES = (
+    "runtimeAXObserverInstall",
+    "homeAXObserverInstall",
+)
+OBSERVER_RETRY_EVENT_NAMES = (
+    "runtimeAXObserverRetry",
+    "homeAXObserverRetry",
+)
+TAB_SWITCH_WARMUP_MARKER = (
+    "FlowTabTabSwitchStressEvidence phase=started"
+)
 
 
 def percentile(values, value):
@@ -46,7 +58,7 @@ def load_samples_or_empty(path):
     return load_samples(path) if os.path.isfile(path) else []
 
 
-def log_volume(runtime_home, elapsed_seconds, completed_switches):
+def runtime_log_paths(runtime_home):
     directory = os.path.join(
         runtime_home,
         "Library",
@@ -54,13 +66,17 @@ def log_volume(runtime_home, elapsed_seconds, completed_switches):
         "FlowTab",
         "logs",
     )
-    paths = []
-    if os.path.isdir(directory):
-        paths = [
-            os.path.join(directory, name)
-            for name in sorted(os.listdir(directory))
-            if name.endswith(".log")
-        ]
+    if not os.path.isdir(directory):
+        return []
+    return [
+        os.path.join(directory, name)
+        for name in sorted(os.listdir(directory))
+        if name.endswith(".log")
+    ]
+
+
+def log_volume(runtime_home, elapsed_seconds, completed_switches):
+    paths = runtime_log_paths(runtime_home)
     retained_bytes = sum(os.path.getsize(path) for path in paths)
     line_count = 0
     for path in paths:
@@ -78,6 +94,88 @@ def log_volume(runtime_home, elapsed_seconds, completed_switches):
         ),
         "bytes_per_completed_switch": retained_bytes / switches,
         "capacity_saturated": len(paths) >= LOG_CAPACITY,
+    }
+
+
+def observer_install_evidence(runtime_home):
+    marker_count = 0
+    after_warmup = False
+    all_successful_installs = 0
+    successful_installs = 0
+    current_install_events = 0
+    historical_install_events = 0
+    retry_events = 0
+    retry_installs = 0
+    rebind_events = 0
+    identities = set()
+    app_ids_by_pid = {}
+
+    for path in runtime_log_paths(runtime_home):
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                if TAB_SWITCH_WARMUP_MARKER in line:
+                    marker_count += 1
+                    after_warmup = True
+                    continue
+                install_event_name = next(
+                    (
+                        name
+                        for name in OBSERVER_INSTALL_EVENT_NAMES
+                        if name in line and "result=installed" in line
+                    ),
+                    None,
+                )
+                if install_event_name is not None:
+                    all_successful_installs += 1
+                    if not after_warmup:
+                        continue
+                    successful_installs += 1
+                    if install_event_name == OBSERVER_INSTALL_EVENT_NAMES[0]:
+                        current_install_events += 1
+                    else:
+                        historical_install_events += 1
+                    app_id_match = re.search(r"(?:^| )appID=([^ ]+)", line)
+                    pid_match = re.search(r"(?:^| )pid=([0-9]+)", line)
+                    retry_match = re.search(
+                        r"(?:^| )retryAttempt=([0-9]+)", line
+                    )
+                    if app_id_match and pid_match:
+                        app_id = app_id_match.group(1)
+                        pid = int(pid_match.group(1))
+                        identities.add((app_id, pid))
+                        app_ids_by_pid.setdefault(pid, set()).add(app_id)
+                    if retry_match and int(retry_match.group(1)) > 0:
+                        retry_installs += 1
+                if after_warmup and any(
+                    name in line for name in OBSERVER_RETRY_EVENT_NAMES
+                ):
+                    retry_events += 1
+                if after_warmup and "runtimeAXObserverRebind" in line:
+                    rebind_events += 1
+
+    unique_bindings = len(identities)
+    replacement_pids = sum(
+        1 for app_ids in app_ids_by_pid.values() if len(app_ids) > 1
+    )
+    allowed_successful_installs = unique_bindings + retry_installs
+    return {
+        "warmup_marker_count": marker_count,
+        "all_successful_install_count": all_successful_installs,
+        "post_warmup_successful_install_count": successful_installs,
+        "post_warmup_unique_binding_count": unique_bindings,
+        "post_warmup_retry_install_count": retry_installs,
+        "post_warmup_retry_event_count": retry_events,
+        "post_warmup_rebind_event_count": rebind_events,
+        "post_warmup_replacement_pid_count": replacement_pids,
+        "post_warmup_current_install_event_count": current_install_events,
+        "post_warmup_historical_install_event_count": (
+            historical_install_events
+        ),
+        "allowed_successful_install_count": allowed_successful_installs,
+        "structure_satisfied": (
+            marker_count == 1
+            and successful_installs <= allowed_successful_installs
+        ),
     }
 
 
@@ -123,6 +221,7 @@ def evaluate(
         elapsed_seconds,
         completed_switches,
     )
+    observer_evidence = observer_install_evidence(runtime_home)
 
     cpu_values = [row["cpu"] for row in samples]
     rss_values = [row["rss_kb"] for row in samples]
@@ -292,6 +391,22 @@ def evaluate(
                 else "disabled"
             ),
         ),
+        gate(
+            "runtime_ax_observer_structure",
+            runtime_log_level != "DEBUG"
+            or observer_evidence["structure_satisfied"],
+            (
+                observer_evidence
+                if runtime_log_level == "DEBUG"
+                else "not_evaluated_at_error_log_level"
+            ),
+            (
+                "one warm-up marker and successful installs <= "
+                "unique bindings + retry installs"
+                if runtime_log_level == "DEBUG"
+                else "evaluated by paired DEBUG run"
+            ),
+        ),
     ]
     return {
         "schema_version": 1,
@@ -377,6 +492,7 @@ def evaluate(
             ),
         },
         "runtime_logs": volume,
+        "runtime_ax_observer": observer_evidence,
         "runtime_pressure": runtime_status,
         "gates": gates,
     }
@@ -409,6 +525,26 @@ def render_summary(result):
         "rss_mb="
         + f"avg:{rss['average']},p95:{rss['p95']},max:{rss['max']},"
         + f"plateau_growth:{rss['plateau_growth']}",
+        "runtime_ax_observer="
+        + f"warmup_markers:{result['runtime_ax_observer']['warmup_marker_count']},"
+        + "post_warmup_installs:"
+        + str(
+            result["runtime_ax_observer"][
+                "post_warmup_successful_install_count"
+            ]
+        )
+        + ",unique_bindings:"
+        + str(
+            result["runtime_ax_observer"][
+                "post_warmup_unique_binding_count"
+            ]
+        )
+        + ",retry_installs:"
+        + str(
+            result["runtime_ax_observer"][
+                "post_warmup_retry_install_count"
+            ]
+        ),
     ]
     lines.extend(
         f"gate.{item['name']}={'passed' if item['passed'] else 'failed'}"
@@ -476,6 +612,52 @@ def self_test():
             333.333,
             0,
         )["verdict"] == "environment_blocked"
+        log_directory = os.path.join(
+            runtime_home,
+            "Library",
+            "Application Support",
+            "FlowTab",
+            "logs",
+        )
+        os.makedirs(log_directory)
+        with open(
+            os.path.join(log_directory, "Flow_Tab_test.log"),
+            "w",
+            encoding="utf-8",
+        ) as handle:
+            handle.write(
+                "homeAXObserverInstall result=installed "
+                "appID=com.example.prewarm pid=1 retryAttempt=0\n"
+                + TAB_SWITCH_WARMUP_MARKER
+                + "\n"
+                + "runtimeAXObserverInstall result=installed "
+                "appID=com.example.current pid=2 retryAttempt=0\n"
+                + "homeAXObserverInstall result=installed "
+                "appID=com.example.historical pid=3 retryAttempt=0\n"
+                + "runtimeAXObserverInstall result=installed "
+                "appID=com.example.current pid=2 retryAttempt=1\n"
+                + "runtimeAXObserverRetry result=succeeded "
+                "appID=com.example.current pid=2\n"
+            )
+        observer_evidence = observer_install_evidence(runtime_home)
+        assert observer_evidence["warmup_marker_count"] == 1
+        assert observer_evidence["all_successful_install_count"] == 4
+        assert observer_evidence[
+            "post_warmup_successful_install_count"
+        ] == 3
+        assert observer_evidence[
+            "post_warmup_unique_binding_count"
+        ] == 2
+        assert observer_evidence[
+            "post_warmup_retry_install_count"
+        ] == 1
+        assert observer_evidence[
+            "post_warmup_current_install_event_count"
+        ] == 2
+        assert observer_evidence[
+            "post_warmup_historical_install_event_count"
+        ] == 1
+        assert observer_evidence["structure_satisfied"] is True
     print("Real Tab pressure permission, fixture, tab, RSS, and log gates passed.")
 
 

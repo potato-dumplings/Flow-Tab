@@ -105,8 +105,8 @@ extension FlowTabPriorityCoverageTests {
             stressRunner: stressRunner,
             runtimeProjectionService: runtimeProjectionService,
             workspaceNotificationCenter: workspaceNotificationCenter,
-            appLaunchWindowEvidenceCoordinator:
-                SpyAppLaunchWindowEvidenceCoordinator()
+            appWindowEvidenceCoordinator:
+                SpyAppWindowEvidenceCoordinator()
         )
 
         delegate = AppDelegate()
@@ -174,15 +174,20 @@ extension FlowTabPriorityCoverageTests {
         let previousAXTrusted =
             AccessibilityPermissionChecker.isTrustedOverrideForTesting
         let runtimeProjectionService = RecordingRuntimeProjectionService()
-        let appLaunchWindowEvidenceCoordinator =
-            SpyAppLaunchWindowEvidenceCoordinator()
+        let appWindowEvidenceCoordinator =
+            SpyAppWindowEvidenceCoordinator()
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let stressRunner = SpyStressRunner()
         let workspaceNotificationCenter = NotificationCenter()
-        var observationPrecededLaunchSignal = false
-        appLaunchWindowEvidenceCoordinator.onPrepareObservation = { _, _ in
-            observationPrecededLaunchSignal =
+        var bindingPrecededLaunchSignal = false
+        appWindowEvidenceCoordinator.onApplicationDidLaunch = { _, _ in
+            bindingPrecededLaunchSignal =
                 runtimeProjectionService.appLaunchSignalsRecorded().isEmpty
+        }
+        var removalPrecededTerminationSignal = false
+        appWindowEvidenceCoordinator.onApplicationDidTerminate = { _, _ in
+            removalPrecededTerminationSignal =
+                runtimeProjectionService.appTerminationSignalsRecorded().isEmpty
         }
         var delegate: AppDelegate?
         defer {
@@ -219,8 +224,8 @@ extension FlowTabPriorityCoverageTests {
             stressRunner: stressRunner,
             runtimeProjectionService: runtimeProjectionService,
             workspaceNotificationCenter: workspaceNotificationCenter,
-            appLaunchWindowEvidenceCoordinator:
-                appLaunchWindowEvidenceCoordinator
+            appWindowEvidenceCoordinator:
+                appWindowEvidenceCoordinator
         )
 
         delegate = AppDelegate()
@@ -305,21 +310,23 @@ extension FlowTabPriorityCoverageTests {
             workspaceTerminationSchedules.first?.pid,
             expectedPID
         )
-        XCTAssertTrue(observationPrecededLaunchSignal)
+        XCTAssertTrue(bindingPrecededLaunchSignal)
+        XCTAssertTrue(removalPrecededTerminationSignal)
+        XCTAssertEqual(appWindowEvidenceCoordinator.startCallCount, 1)
         XCTAssertEqual(
-            appLaunchWindowEvidenceCoordinator.preparedObservations.map(\.appID),
+            appWindowEvidenceCoordinator.launchedApplications.map(\.appID),
             [expectedAppID]
         )
         XCTAssertEqual(
-            appLaunchWindowEvidenceCoordinator.preparedObservations.map(\.pid),
+            appWindowEvidenceCoordinator.launchedApplications.map(\.pid),
             [expectedPID]
         )
         XCTAssertEqual(
-            appLaunchWindowEvidenceCoordinator.cancelledObservations.map(\.appID),
+            appWindowEvidenceCoordinator.terminatedApplications.map(\.appID),
             [expectedAppID]
         )
         XCTAssertEqual(
-            appLaunchWindowEvidenceCoordinator.cancelledObservations.map(\.pid),
+            appWindowEvidenceCoordinator.terminatedApplications.map(\.pid),
             [expectedPID]
         )
 

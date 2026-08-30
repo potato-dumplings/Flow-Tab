@@ -87,7 +87,6 @@ struct HomeLandingView: View {
     @State private var selectedDetailRefreshExpectations:
         [String: HomeSelectedAppRefreshExpectation] = [:]
     @State private var selectedAppID: String?
-    @State private var windowChangeMonitor = RuntimeAXWindowChangeMonitor()
 
     private var accessibilityTrusted: Bool {
         permissionObservationOwner.accessibilityTrusted
@@ -436,7 +435,6 @@ struct HomeLandingView: View {
             appSummaryProjectionObservationOwner.stop(reason: "homeInactive")
             appDetailProjectionObservationOwner.stopAll(reason: "homeInactive")
             permissionObservationOwner.stop()
-            windowChangeMonitor.stop()
             return
         }
 
@@ -449,7 +447,6 @@ struct HomeLandingView: View {
         }
 
         startPermissionObservationIfNeeded()
-        setupWindowMonitorIfNeeded()
         if let selectedAppID = currentSelectedAppID {
             requestSelectedAppRefresh(
                 appID: selectedAppID,
@@ -457,22 +454,6 @@ struct HomeLandingView: View {
                 reason: "ensure_selected_cache"
             )
         }
-    }
-
-    private func setupWindowMonitorIfNeeded() {
-        guard accessibilityTrusted else {
-            windowChangeMonitor.stop()
-            return
-        }
-
-        windowChangeMonitor.onAppWindowChanged = { evidence in
-            guard evidence.requiresReconciliation else { return }
-            requestAppDetailProjection(
-                .appWindowsChanged(evidence),
-                reason: "ax_window_changed"
-            )
-        }
-        windowChangeMonitor.rebind(appSummaries)
     }
 
     private func restoreCachedStateIfNeeded() {
@@ -493,11 +474,6 @@ struct HomeLandingView: View {
             requestAppSummaryProjectionMaintenance(
                 reason: "permission_changed_\(evidence.source.rawValue)"
             )
-            if evidence.target == .accessibility,
-               !evidence.isGranted
-            {
-                windowChangeMonitor.stop()
-            }
             persistCache()
         }
     }
@@ -608,7 +584,6 @@ struct HomeLandingView: View {
             for: validAppIDs
         )
         syncSelectedApp()
-        setupWindowMonitorIfCountsReady()
         persistCache()
 
         if evidence.isReadyForPresentation {
@@ -666,7 +641,6 @@ struct HomeLandingView: View {
             for: validAppIDs
         )
         syncSelectedApp()
-        setupWindowMonitorIfNeeded()
         persistCache()
 
         if let selectedAppID = currentSelectedAppID,
@@ -808,17 +782,11 @@ struct HomeLandingView: View {
         }
 
         syncSelectedApp()
-        setupWindowMonitorIfCountsReady()
         persistCache()
         RuntimeLog.debug(
             .projection,
             "homeAppDetailProjectionRead result=applied appID=\(appID) updateWindows=\(updateWindows) complete=\(evidence.isComplete ? 1 : 0) reason=\(reason) windows=\(windowsByAppID[appID]?.count ?? -1) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
         )
-    }
-
-    private func setupWindowMonitorIfCountsReady() {
-        guard loadingWindowCountAppIDs.isEmpty else { return }
-        setupWindowMonitorIfNeeded()
     }
 
     private func formatHomeMilliseconds(_ value: Double) -> String {
@@ -844,7 +812,6 @@ struct HomeLandingView: View {
         )
         selectedDetailRefreshExpectations.removeAll()
         permissionObservationOwner.stop()
-        windowChangeMonitor.stop()
         persistCache()
     }
 }

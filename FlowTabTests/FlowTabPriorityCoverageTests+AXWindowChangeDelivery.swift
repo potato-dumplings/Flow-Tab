@@ -154,16 +154,13 @@ extension FlowTabPriorityCoverageTests {
             deliveredEvidence.append(evidence)
             delivered.fulfill()
         }
-        let summary = RuntimeHomeAppSummary(
+        let binding = RuntimeAXWindowObservationBinding(
             appID: "com.example.transient-observer",
-            displayName: "Transient Observer",
-            groupID: "com.example.transient-observer",
-            lastActiveAt: 1,
-            windowCount: 1,
-            pid: 2_000_000_000
+            pid: 2_000_000_000,
+            expectedWindowCount: 1
         )
 
-        monitor.rebind([summary])
+        monitor.rebind([binding])
         XCTAssertEqual(workScheduler.workItems.count, 1)
         workScheduler.fireWorkItem(at: 0)
         await fulfillment(of: [retryScheduled], timeout: 5)
@@ -175,8 +172,8 @@ extension FlowTabPriorityCoverageTests {
         await fulfillment(of: [delivered], timeout: 5)
 
         XCTAssertEqual(deliveredEvidence.count, 1)
-        XCTAssertEqual(deliveredEvidence[0].appID, summary.appID)
-        XCTAssertEqual(deliveredEvidence[0].pid, summary.pid)
+        XCTAssertEqual(deliveredEvidence[0].appID, binding.appID)
+        XCTAssertEqual(deliveredEvidence[0].pid, binding.pid)
         XCTAssertEqual(deliveredEvidence[0].source, .initialReadback)
         XCTAssertEqual(deliveredEvidence[0].initialReadback, changedReadback)
         XCTAssertTrue(deliveredEvidence[0].requiresReconciliation)
@@ -191,22 +188,19 @@ extension FlowTabPriorityCoverageTests {
             observationWorkScheduler: scheduler,
             accessibilityTrustProvider: { true }
         )
-        let summary = RuntimeHomeAppSummary(
+        let binding = RuntimeAXWindowObservationBinding(
             appID: "com.example.home-rebind",
-            displayName: "Home Rebind",
-            groupID: "com.example.home-rebind",
-            lastActiveAt: 1,
-            windowCount: 1,
-            pid: 18_418
+            pid: 18_418,
+            expectedWindowCount: 1
         )
 
-        monitor.rebind([summary])
-        monitor.rebind([summary])
+        monitor.rebind([binding])
+        monitor.rebind([binding])
 
         XCTAssertEqual(scheduler.workItems.count, 1)
 
         monitor.stop()
-        monitor.rebind([summary])
+        monitor.rebind([binding])
 
         XCTAssertEqual(scheduler.workItems.count, 2)
     }
@@ -225,9 +219,10 @@ extension FlowTabPriorityCoverageTests {
         let pid = pid_t(2_000_000_001)
         let appID = "com.example.created-window-observation"
         monitor.rebind([
-            RuntimeHomeAppSummary(
-                appID: appID, displayName: "Created Window Observation",
-                groupID: appID, lastActiveAt: 1, windowCount: 0, pid: pid
+            RuntimeAXWindowObservationBinding(
+                appID: appID,
+                pid: pid,
+                expectedWindowCount: 0
             )
         ])
         workScheduler.fireWorkItem(at: 0)
@@ -713,6 +708,130 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    @MainActor
+    func testAXWindowChangeMonitorBindingDeltaTouchesOnlyChangedProcesses() async {
+        let workScheduler = ManualAXWindowObservationWorkScheduler()
+        let installer = StubAXWindowObserverInstaller(
+            outcomes: [
+                .installed(
+                    initialReadback:
+                        matchedAXWindowInitialReadbackEvidence(windowCount: 1)
+                ),
+                .installed(
+                    initialReadback:
+                        matchedAXWindowInitialReadbackEvidence(windowCount: 2)
+                ),
+                .installed(
+                    initialReadback:
+                        matchedAXWindowInitialReadbackEvidence(windowCount: 0)
+                )
+            ]
+        )
+        let monitor = RuntimeAXWindowChangeMonitor(
+            observationWorkScheduler: workScheduler,
+            observerInstaller: installer,
+            accessibilityTrustProvider: { true }
+        )
+        defer { monitor.stop() }
+        let first = RuntimeAXWindowObservationBinding(
+            appID: "com.example.delta.first",
+            pid: 18_450,
+            expectedWindowCount: 1
+        )
+        let second = RuntimeAXWindowObservationBinding(
+            appID: "com.example.delta.second",
+            pid: 18_451,
+            expectedWindowCount: 2
+        )
+
+        monitor.rebind([first, second])
+        monitor.rebind([first, second])
+        XCTAssertEqual(workScheduler.workItems.count, 2)
+
+        workScheduler.fireWorkItem(at: 0)
+        workScheduler.fireWorkItem(at: 1)
+        for _ in 0..<4 { await Task.yield() }
+        XCTAssertEqual(
+            installer.requests.map(\.pid).sorted(),
+            [first.pid, second.pid]
+        )
+
+        let updatedFirst = RuntimeAXWindowObservationBinding(
+            appID: first.appID,
+            pid: first.pid,
+            expectedWindowCount: 3
+        )
+        monitor.rebind([updatedFirst, second])
+        XCTAssertEqual(workScheduler.workItems.count, 3)
+        XCTAssertEqual(installer.requests.count, 2)
+
+        let replacement = RuntimeAXWindowObservationBinding(
+            appID: "com.example.delta.replacement",
+            pid: second.pid,
+            expectedWindowCount: 0
+        )
+        monitor.rebind([updatedFirst, replacement])
+        XCTAssertEqual(workScheduler.workItems.count, 5)
+        XCTAssertEqual(installer.requests.count, 2)
+
+        workScheduler.fireWorkItem(at: 4)
+        for _ in 0..<4 { await Task.yield() }
+        XCTAssertEqual(installer.requests.last?.pid, replacement.pid)
+        XCTAssertEqual(
+            installer.requests.last?.context.appID,
+            replacement.appID
+        )
+    }
+
+    @MainActor
+    func testAXWindowChangeMonitorDropsLateInstallAfterPIDReplacement() async {
+        let workScheduler = ManualAXWindowObservationWorkScheduler()
+        let installer = StubAXWindowObserverInstaller(
+            outcomes: [
+                .installed(
+                    initialReadback:
+                        matchedAXWindowInitialReadbackEvidence(windowCount: 1)
+                ),
+                .installed(
+                    initialReadback:
+                        matchedAXWindowInitialReadbackEvidence(windowCount: 0)
+                )
+            ]
+        )
+        let monitor = RuntimeAXWindowChangeMonitor(
+            observationWorkScheduler: workScheduler,
+            observerInstaller: installer,
+            accessibilityTrustProvider: { true }
+        )
+        defer { monitor.stop() }
+        let pid: pid_t = 18_452
+        let first = RuntimeAXWindowObservationBinding(
+            appID: "com.example.late.first",
+            pid: pid,
+            expectedWindowCount: 1
+        )
+        let replacement = RuntimeAXWindowObservationBinding(
+            appID: "com.example.late.replacement",
+            pid: pid,
+            expectedWindowCount: 0
+        )
+        var evidence: [RuntimeAXWindowChangeEvidence] = []
+        monitor.onAppWindowChanged = { evidence.append($0) }
+
+        monitor.rebind([first])
+        monitor.rebind([replacement])
+        XCTAssertEqual(workScheduler.workItems.count, 2)
+
+        workScheduler.fireWorkItem(at: 0)
+        for _ in 0..<4 { await Task.yield() }
+        XCTAssertTrue(evidence.isEmpty)
+
+        workScheduler.fireWorkItem(at: 1)
+        for _ in 0..<4 { await Task.yield() }
+        XCTAssertEqual(evidence.map(\.appID), [replacement.appID])
+        XCTAssertEqual(evidence.map(\.pid), [pid])
+    }
+
 }
 
 private func matchedAXWindowInitialReadbackEvidence(
@@ -753,6 +872,11 @@ private final class StubAXWindowObserverInstaller:
 
     private let lock = NSLock()
     private var outcomes: [Outcome]
+    private var capturedRequests: [RuntimeAXWindowObserverInstallRequest] = []
+
+    var requests: [RuntimeAXWindowObserverInstallRequest] {
+        lock.withLock { capturedRequests }
+    }
 
     init(outcomes: [Outcome]) {
         self.outcomes = outcomes
@@ -761,7 +885,10 @@ private final class StubAXWindowObserverInstaller:
     func install(
         _ request: RuntimeAXWindowObserverInstallRequest
     ) -> RuntimeAXWindowObserverInstallResult {
-        let outcome = lock.withLock { outcomes.removeFirst() }
+        let outcome = lock.withLock {
+            capturedRequests.append(request)
+            return outcomes.removeFirst()
+        }
         switch outcome {
         case .unavailable(let error):
             return RuntimeAXWindowObserverInstallResult(

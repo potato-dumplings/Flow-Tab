@@ -29,8 +29,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var appVisibilityObserver: NSObjectProtocol?
     private(set) var languageObserver: NSObjectProtocol?
     private(set) var workspaceLifecycleObservers: [NSObjectProtocol] = []
-    private var appLaunchWindowEvidenceCoordinator:
-        (any RuntimeAppLaunchWindowEvidenceCoordinating)?
+    private var appWindowEvidenceCoordinator:
+        (any RuntimeAppWindowEvidenceCoordinating)?
     private var appVisibilityReconciliationTask: Task<Void, Never>?
     private var requestedAccessibilityPermissionThisLaunch = false
 #if FLOWTAB_TESTING
@@ -76,7 +76,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installHotkeyObserver()
         installAppVisibilityObserver()
         installLanguageObserver()
-        appLaunchWindowEvidenceCoordinator = makeAppLaunchWindowEvidenceCoordinator()
+        let appWindowEvidenceCoordinator =
+            makeAppWindowEvidenceCoordinator()
+        self.appWindowEvidenceCoordinator = appWindowEvidenceCoordinator
+        appWindowEvidenceCoordinator.start()
         installWorkspaceLifecycleObserver()
         startAppVisibilityReconciliation()
 
@@ -152,6 +155,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) {
         resolvedRuntimeProjectionService.refreshApplicationDirectoryMembershipForPresentation()
+        appWindowEvidenceCoordinator?.reconcileNow()
         let accessSnapshot = currentHotkeyChordEventAccessSnapshot()
         if lastHotkeyAccessibilityTrusted
             != accessSnapshot.accessibilityTrusted
@@ -192,8 +196,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             workspaceLifecycleObservers.removeAll()
         }
-        appLaunchWindowEvidenceCoordinator?.stop()
-        appLaunchWindowEvidenceCoordinator = nil
+        appWindowEvidenceCoordinator?.stop()
+        appWindowEvidenceCoordinator = nil
         appVisibilityReconciliationTask?.cancel()
         appVisibilityReconciliationTask = nil
         hotkeyMonitor?.stop()
@@ -577,55 +581,61 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            guard let self else { return }
-            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
-                return
+            MainActor.assumeIsolated {
+                guard let self,
+                      let app = notification.userInfo?[
+                        NSWorkspace.applicationUserInfoKey
+                      ] as? NSRunningApplication
+                else { return }
+                let appID = RuntimeAppIdentity.appID(for: app)
+                self.appWindowEvidenceCoordinator?.applicationDidLaunch(
+                    appID: appID,
+                    pid: app.processIdentifier
+                )
+                guard let appDirectoryEntry = RuntimeAppDirectoryFactSource
+                    .runningApplicationEntry(for: app)
+                else { return }
+                self.resolvedRuntimeProjectionService.signalAppLaunched(
+                    appID: appID,
+                    pid: app.processIdentifier,
+                    appDirectoryEntry: appDirectoryEntry
+                )
             }
-            guard let appDirectoryEntry = RuntimeAppDirectoryFactSource.runningApplicationEntry(
-                for: app
-            ) else {
-                return
-            }
-            let appID = RuntimeAppIdentity.appID(for: app)
-            self.appLaunchWindowEvidenceCoordinator?.prepareObservation(
-                appID: appID,
-                pid: app.processIdentifier
-            )
-            self.resolvedRuntimeProjectionService.signalAppLaunched(
-                appID: appID,
-                pid: app.processIdentifier,
-                appDirectoryEntry: appDirectoryEntry
-            )
         }
         let didActivateObserver = resolvedWorkspaceNotificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            guard let self else { return }
-            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
-                return
+            MainActor.assumeIsolated {
+                guard let app = notification.userInfo?[
+                    NSWorkspace.applicationUserInfoKey
+                ] as? NSRunningApplication else { return }
+                self?.signalWorkspaceAppActivated(app)
             }
-            self.signalWorkspaceAppActivated(app)
         }
         let didTerminateObserver = resolvedWorkspaceNotificationCenter.addObserver(
             forName: NSWorkspace.didTerminateApplicationNotification,
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            guard let self else { return }
-            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
-                return
+            MainActor.assumeIsolated {
+                guard let self,
+                      let app = notification.userInfo?[
+                        NSWorkspace.applicationUserInfoKey
+                      ] as? NSRunningApplication
+                else { return }
+                let appID = RuntimeAppIdentity.appID(for: app)
+                self.appWindowEvidenceCoordinator?.applicationDidTerminate(
+                    appID: appID,
+                    pid: app.processIdentifier
+                )
+                self.resolvedRuntimeProjectionService
+                    .scheduleWorkspaceAppTerminated(
+                        appID: appID,
+                        pid: app.processIdentifier
+                    )
             }
-            let appID = RuntimeAppIdentity.appID(for: app)
-            self.appLaunchWindowEvidenceCoordinator?.cancelObservation(
-                appID: appID,
-                pid: app.processIdentifier
-            )
-            self.resolvedRuntimeProjectionService.scheduleWorkspaceAppTerminated(
-                appID: appID,
-                pid: app.processIdentifier
-            )
         }
         workspaceLifecycleObservers = [
             didLaunchObserver,
@@ -679,24 +689,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 )
             }
         }
-    }
-
-    func makeDefaultAppLaunchWindowEvidenceCoordinator()
-        -> any RuntimeAppLaunchWindowEvidenceCoordinating
-    {
-        RuntimeAppLaunchWindowEvidenceCoordinator(
-            onAppWindowEvidence: { [weak self] evidence in
-                guard let service = self?.resolvedRuntimeProjectionService
-                else { return }
-                switch evidence.source {
-                case .observedTransition:
-                    service.markAppWindowsDirty(evidence)
-                case .initialReadback, .trailingReadback:
-                    guard evidence.requiresReconciliation else { return }
-                    service.signalAppWindowsChanged(evidence)
-                }
-            }
-        )
     }
 
     func applyActivationPolicyFromPreferences() {

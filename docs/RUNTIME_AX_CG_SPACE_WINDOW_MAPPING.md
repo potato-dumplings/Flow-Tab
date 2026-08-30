@@ -682,7 +682,11 @@ AX notification 不是绝对可靠的系统权威事件源，但很适合作为 
 - AX 空列表：进入 transient retry，不直接清空窗口。
 - AX notification 缺失：由 periodic stale repair 和 Space/CG diff 补漏。
 - AX observer 安装遇到可恢复错误时由 transport 按 250 ms 起步、指数增长至 4 s 上限持续重试；每个 PID 同时只保留一个安装或重试任务。
-- observer 安装结果必须匹配当前 appID、PID 与 binding generation。Home 异步安装结果立即携带一次 live AX window collection readback；显式 app-launch observation 以 launch repair 为基线并安排一次 250 ms 有界复查，可恢复安装失败也从 250 ms 开始重试。映射变化、停止观察或释放对象时取消对应任务。
+- `AppDelegate` 唯一持有 `RuntimeAppWindowEvidenceCoordinator`。协调器从 Accessibility 权限、Workspace 应用启动/终止与共享 projection commit 接收生命周期证据，在 Home、Logs、Settings 或主窗口关闭期间持续维护应用进程级观察集合。
+- 每条 `RuntimeAXWindowObservationBinding` 使用精确 `(appID, pid)` 身份，并从共享 Home summary projection 读取 `expectedWindowCount`。缺失 summary 时使用零窗口基线，由首次 live AX readback 决定是否提交 scoped reconciliation。
+- binding 集合先按精确身份归一化，重复身份保留最大非负窗口数。相同集合直接结束；新增或 PID 复用异步安装，移除精确注销，窗口数变化只同步目标 PID 的 destroyed-window registrations。共享 projection commit 只在 binding 内容变化时形成 rebind。
+- observer 安装结果必须匹配当前 appID、PID、install generation 与 binding generation。应用终止、权限撤销、binding 替换和协调器停止都会使迟到结果失效，并在后台清理其远端注册。
+- `.observedTransition` 立即进入 `markAppWindowsDirty`；`.initialReadback` 与 `.trailingReadback` 仅在 `requiresReconciliation` 成立时进入 `signalAppWindowsChanged`。所有窗口证据统一由共享 Runtime service 消费。
 - destroyed observer 注册按 `AXUIElement` 等价关系增删；收到 window-created 后从 live AX window collection 刷新注册，若前一次同步仍在执行则记录一次 pending refresh 并在完成后重放。字符串 AX 索引只参与单次采样内的 AX/CG 配对。
 - `.apiDisabled` 等待 Accessibility 授权生命周期重新绑定；终止型错误等待下一次 binding generation。
 
@@ -757,6 +761,7 @@ Home 不负责：
 Runtime infrastructure 负责：
 
 - source input adapters。
+- 应用进程级 AX window observer 的唯一所有权、权限生命周期、binding 差量与 retry/backoff。
 - `RuntimeReadModelStore`。
 - `RuntimeMaintenanceScheduler`。
 - reconciliation coordinator。
@@ -1323,3 +1328,11 @@ Phase 7 completion-audit ledger: [RUNTIME_PROJECTION_COMPLETION_AUDIT.md](RUNTIM
 - AX 原始 transition 在 trailing readback 前立即使 current-app projection dirty/incomplete；0.16 秒尾随窗口合并连续事件并触发一次 repair。destroyed 只推进应用级失效代际，完整 AX/CG 事实负责删除、重绑与清除代际，不完整事实进入 `.windowTopologyConvergence`。
 - 首次物理 Control+Tab 读取 dirty/incomplete projection 时保存 pending focused session，面板保持关闭；严格晚于基线且完整的 projection commit 到达且 Control 仍按下时才展示最终窗口集合。历史 Option+Tab 准备会话在基线投影出现后立即释放按键，并由 2 秒 watchdog 限定准备阶段。
 - 完整 `FlowTabTests` 1,257/1,257 通过；四条 fixed-path UI 回归 4/4 通过，总耗时 38.768 秒，其中历史 Option+Tab 创建/关闭分别为 10.755/11.537 秒。canonical runtime-topology pressure warm repeat 以 0.5 秒节奏采样，1/1 UI 通过，22/22 次 PID/签名身份匹配，稳定身份窗口 5,145 ms，应用与进程 cleanup 精确。CPU avg/p95/max 为 96.55/178.00/182.80%，RSS avg/p95/max 为 163.09/216.56/223.64 MB；相对最近同机同路径基线，CPU 变化 +5.05/+4.60/+0.30 个百分点，RSS 变化 +6.33/+18.17/+8.55 MB，首末 RSS 约为 150.1/145.2 MB。证据路径意图为 `.build-local/control-tab-window-mutation/after/pressure-runtime-topology-022`。
+
+## Runtime 进程级 AX 观察所有权不变量（2026-08-29）
+
+- 真实权限 Tab 压力基线在 20 ms 场景记录 19,043 次 observer 安装/初始读回，仅对应 20 次真实窗口变化；50 ms 场景仍记录 7,644 次。该证据确立了应用进程级 observer 所有权与安装次数结构门禁。
+- `RuntimeAppWindowEvidenceCoordinator` 随应用进程启动并持续到应用终止。Home 只保留 projection 展示和可见 scope 生命周期，所有面板共享同一份 Runtime 窗口证据。
+- 初始启动先刷新 app directory，再用当前 `windowRepairApplications` 与精确 Home summary 计数 seed bindings。Workspace launch 先加入精确身份再提交 projection launch signal；termination 先移除精确身份再提交 termination；权限恢复一次性按当前运行应用重建集合。
+- `runtimeAXObserverRebind` 记录 `desired/added/removed/updated/retry`，相同集合不产生日志；`runtimeAXObserverInstall` 记录成功、终止错误与 retry attempt。真实压力 evidence parser 同时识别历史 `homeAXObserverInstall` 和当前事件名，并输出 warm-up 后成功安装、唯一 binding、retry 与 replacement 计数。
+- 永久回归覆盖 binding 归一化、相同集合零安装、目标 PID 差量、PID 复用、权限撤销/恢复、安装失败 retry、迟到完成丢弃、共享 projection 计数反馈、证据路由与 AppDelegate 生命周期顺序。

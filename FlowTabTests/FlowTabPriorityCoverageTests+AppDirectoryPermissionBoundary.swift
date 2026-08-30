@@ -606,29 +606,23 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testRuntimeHomeWindowObservationExcludesCurrentProcess() {
-        let currentSummary = RuntimeHomeAppSummary(
+        let currentBinding = RuntimeAXWindowObservationBinding(
             appID: "com.example.flowtab",
-            displayName: "FlowTab",
-            groupID: "com.example.flowtab",
-            lastActiveAt: 1,
-            windowCount: 0,
-            pid: 43_001
+            pid: 43_001,
+            expectedWindowCount: 0
         )
-        let editorSummary = RuntimeHomeAppSummary(
+        let editorBinding = RuntimeAXWindowObservationBinding(
             appID: "com.example.editor",
-            displayName: "Editor",
-            groupID: "com.example.editor",
-            lastActiveAt: 0,
-            windowCount: 1,
-            pid: 43_002
+            pid: 43_002,
+            expectedWindowCount: 1
         )
 
         XCTAssertEqual(
-            RuntimeAXWindowChangeMonitor.expectedAppIDsByPID(
-                from: [currentSummary, editorSummary],
-                currentPID: currentSummary.pid
-            ),
-            [editorSummary.pid: editorSummary.appID]
+            RuntimeAXWindowObservationBindingCollection(
+                [currentBinding, editorBinding],
+                currentPID: currentBinding.pid
+            ).byPID,
+            [editorBinding.pid: editorBinding]
         )
     }
 }

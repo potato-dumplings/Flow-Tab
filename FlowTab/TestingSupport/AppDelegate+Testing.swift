@@ -20,8 +20,8 @@ struct AppDelegateTestHooks {
     var runtimeProjectionService: (any RuntimeProjectionServing)? = nil
     var updateCoordinator: (any FlowTabUpdateCoordinating)? = nil
     var workspaceNotificationCenter: NotificationCenter? = nil
-    var appLaunchWindowEvidenceCoordinator:
-        (any RuntimeAppLaunchWindowEvidenceCoordinating)? = nil
+    var appWindowEvidenceCoordinator:
+        (any RuntimeAppWindowEvidenceCoordinating)? = nil
     var appVisibilityRecordsProvider:
         (@Sendable () -> [InstalledAppRecord])? = nil
 }
@@ -84,11 +84,18 @@ extension AppDelegate {
         )
     }
 
-    func makeAppLaunchWindowEvidenceCoordinator()
-        -> any RuntimeAppLaunchWindowEvidenceCoordinating
+    func makeAppWindowEvidenceCoordinator()
+        -> any RuntimeAppWindowEvidenceCoordinating
     {
-        Self.testHooks.appLaunchWindowEvidenceCoordinator
-            ?? makeDefaultAppLaunchWindowEvidenceCoordinator()
+        if let coordinator = Self.testHooks.appWindowEvidenceCoordinator {
+            return coordinator
+        }
+        guard !FlowTabTestLaunchOptions.isRunningUnitTests else {
+            return UnitTestRuntimeAppWindowEvidenceCoordinator()
+        }
+        return RuntimeAppWindowEvidenceCoordinator(
+            runtimeProjectionService: resolvedRuntimeProjectionService
+        )
     }
 
     func makePanelController() -> SwitcherPanelController {
@@ -158,5 +165,16 @@ extension AppDelegate {
     var hasStatusItemForTesting: Bool {
         statusItem != nil
     }
+}
+
+@MainActor
+private final class UnitTestRuntimeAppWindowEvidenceCoordinator:
+    RuntimeAppWindowEvidenceCoordinating
+{
+    func start() {}
+    func reconcileNow() {}
+    func applicationDidLaunch(appID _: String, pid _: pid_t) {}
+    func applicationDidTerminate(appID _: String, pid _: pid_t) {}
+    func stop() {}
 }
 #endif
