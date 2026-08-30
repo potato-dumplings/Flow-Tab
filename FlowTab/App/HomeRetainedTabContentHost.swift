@@ -78,7 +78,7 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
                 apply(targetAppearance, to: outgoingView)
                 outgoingView.rootView = contentForTab(outgoingTab, false)
                 clearFirstResponder(in: outgoingView, container: container)
-                outgoingView.removeFromSuperview()
+                outgoingView.isHidden = true
             }
 
             if identityChanged,
@@ -104,6 +104,7 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
                 incomingView.translatesAutoresizingMaskIntoConstraints = true
                 incomingView.autoresizingMask = [.width, .height]
                 incomingView.sizingOptions = []
+                incomingView.isHidden = true
                 hostingViews[selectedTab] = incomingView
                 requiresInitialLayout = true
             }
@@ -112,7 +113,10 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
             }
 
             incomingView.frame = container.bounds
-            container.addSubview(incomingView)
+            if incomingView.superview !== container {
+                container.addSubview(incomingView)
+            }
+            incomingView.isHidden = false
             if requiresInitialLayout,
                container.bounds.width > 0,
                container.bounds.height > 0

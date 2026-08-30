@@ -5,12 +5,19 @@ import XCTest
 
 extension FlowTabTests {
     @MainActor
-    func testHomeRetainedTabHostMountsOnlySelectedPageAndReusesHosts() {
+    func testHomeRetainedTabHostKeepsVisitedPagesAttachedAndReusesHosts() {
         let recorder = HomeRetainedTabProbeRecorder()
         let coordinator = HomeRetainedTabContentHost.Coordinator()
         let container = HomeRetainedTabTrackingContainerView(
             frame: NSRect(x: 0, y: 0, width: 800, height: 600)
         )
+        let window = NSWindow(
+            contentRect: container.frame,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = container
         let content = makeHomeRetainedTabProbeContent(recorder: recorder)
 
         coordinator.present(
@@ -22,6 +29,8 @@ extension FlowTabTests {
         settleHomeRetainedTabHost(container)
         XCTAssertEqual(container.subviews.count, 1)
         let homeHost = container.subviews[0]
+        XCTAssertFalse(homeHost.isHidden)
+        XCTAssertTrue(homeHost.window === window)
         let initialAddCount = container.addCount
         let initialRemoveCount = container.removeCount
 
@@ -43,8 +52,27 @@ extension FlowTabTests {
             in: container
         )
         settleHomeRetainedTabHost(container)
-        XCTAssertEqual(container.subviews.count, 1)
-        XCTAssertFalse(container.subviews[0] === homeHost)
+        XCTAssertEqual(container.subviews.count, 2)
+        let logsHost = container.subviews[1]
+        XCTAssertTrue(homeHost.isHidden)
+        XCTAssertFalse(logsHost.isHidden)
+        XCTAssertTrue(logsHost.window === window)
+
+        coordinator.present(
+            selectedTab: .settings,
+            targetAppearance: NSApp.effectiveAppearance,
+            contentForTab: content,
+            in: container
+        )
+        settleHomeRetainedTabHost(container)
+        XCTAssertEqual(container.subviews.count, 3)
+        let settingsHost = container.subviews[2]
+        XCTAssertTrue(homeHost.isHidden)
+        XCTAssertTrue(logsHost.isHidden)
+        XCTAssertFalse(settingsHost.isHidden)
+        XCTAssertTrue(settingsHost.window === window)
+        let warmAddCount = container.addCount
+        let warmRemoveCount = container.removeCount
 
         coordinator.present(
             selectedTab: .home,
@@ -53,8 +81,15 @@ extension FlowTabTests {
             in: container
         )
         settleHomeRetainedTabHost(container)
-        XCTAssertEqual(container.subviews.count, 1)
-        XCTAssertTrue(container.subviews[0] === homeHost)
+        XCTAssertEqual(container.subviews.count, 3)
+        XCTAssertFalse(homeHost.isHidden)
+        XCTAssertTrue(logsHost.isHidden)
+        XCTAssertTrue(settingsHost.isHidden)
+        XCTAssertEqual(container.addCount, warmAddCount)
+        XCTAssertEqual(container.removeCount, warmRemoveCount)
+        XCTAssertTrue(homeHost.window === window)
+        XCTAssertTrue(logsHost.window === window)
+        XCTAssertTrue(settingsHost.window === window)
     }
 
     @MainActor
@@ -66,6 +101,23 @@ extension FlowTabTests {
         )
 
         coordinator.present(
+            selectedTab: .home,
+            targetAppearance: NSApp.effectiveAppearance,
+            contentForTab: makeHomeRetainedTabProbeContent(
+                recorder: recorder
+            ),
+            in: container
+        )
+        settleHomeRetainedTabHost(container)
+        coordinator.present(
+            selectedTab: .logs,
+            targetAppearance: NSApp.effectiveAppearance,
+            contentForTab: makeHomeRetainedTabProbeContent(
+                recorder: recorder
+            ),
+            in: container
+        )
+        coordinator.present(
             selectedTab: .settings,
             targetAppearance: NSApp.effectiveAppearance,
             contentForTab: makeHomeRetainedTabProbeContent(
@@ -74,16 +126,22 @@ extension FlowTabTests {
             in: container
         )
         settleHomeRetainedTabHost(container)
-        let settingsHost = container.subviews[0]
 
-        XCTAssertTrue(settingsHost.translatesAutoresizingMaskIntoConstraints)
+        XCTAssertEqual(container.subviews.count, 3)
+        XCTAssertTrue(container.subviews.allSatisfy(
+            \.translatesAutoresizingMaskIntoConstraints
+        ))
         XCTAssertTrue(container.constraints.isEmpty)
-        XCTAssertEqual(settingsHost.frame, container.bounds)
+        XCTAssertTrue(container.subviews.allSatisfy {
+            $0.frame == container.bounds
+        })
 
         container.setFrameSize(NSSize(width: 960, height: 720))
         settleHomeRetainedTabHost(container)
 
-        XCTAssertEqual(settingsHost.frame, container.bounds)
+        XCTAssertTrue(container.subviews.allSatisfy {
+            $0.frame == container.bounds
+        })
     }
 
     @MainActor
