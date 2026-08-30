@@ -46,10 +46,7 @@ struct HomeRootView: View {
             HomeRetainedTabContentHost(
                 selectedTab: tabState.selectedTab,
                 targetAppearance: presentation.context.targetNSAppearance,
-                contentIdentity: retainedContentIdentity(
-                    for: tabState.selectedTab
-                ),
-                contentRevision: retainedContentRevision(
+                descriptor: retainedPageDescriptor(
                     for: tabState.selectedTab
                 ),
                 contentForTab: retainedContent(for:isActive:)
@@ -121,25 +118,15 @@ struct HomeRootView: View {
         }
     }
 
-    private func retainedContentIdentity(for tab: HomeTab) -> AnyHashable {
-        switch tab {
-        case .home:
-            return AnyHashable(HomeTab.home)
-        case .logs:
-            return AnyHashable(HomeTab.logs)
-        case .settings:
-            return AnyHashable(
-                "settings-\(presentation.context.appearanceRebuildIdentity)"
-            )
-        }
-    }
-
-    private func retainedContentRevision(for tab: HomeTab) -> AnyHashable {
+    private func retainedPageDescriptor(
+        for tab: HomeTab
+    ) -> HomeRetainedTabPageDescriptor {
         let presentationIdentity =
             presentation.context.appearanceRebuildIdentity
+        let contentRevision: AnyHashable
         switch tab {
         case .home:
-            return AnyHashable(
+            contentRevision = AnyHashable(
                 HomeRetainedTabContentRevision(
                     presentationIdentity: presentationIdentity,
                     contentGeneration:
@@ -147,15 +134,19 @@ struct HomeRootView: View {
                 )
             )
         case .logs:
-            return AnyHashable(
+            contentRevision = AnyHashable(
                 HomeRetainedTabContentRevision(
                     presentationIdentity: presentationIdentity,
                     contentGeneration: 0
                 )
             )
         case .settings:
-            return AnyHashable(presentationIdentity)
+            contentRevision = AnyHashable(presentationIdentity)
         }
+        return HomeRetainedTabPageDescriptor(
+            identity: AnyHashable(tab),
+            contentRevision: contentRevision
+        )
     }
 }
 

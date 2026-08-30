@@ -7,8 +7,7 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
 
     let selectedTab: HomeTab
     var targetAppearance: NSAppearance = NSApp.effectiveAppearance
-    var contentIdentity: AnyHashable? = nil
-    var contentRevision: AnyHashable = AnyHashable(0)
+    let descriptor: HomeRetainedTabPageDescriptor
     let contentForTab: ContentProvider
 
     func makeCoordinator() -> Coordinator {
@@ -20,8 +19,7 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
         context.coordinator.present(
             selectedTab: selectedTab,
             targetAppearance: targetAppearance,
-            contentIdentity: contentIdentity,
-            contentRevision: contentRevision,
+            descriptor: descriptor,
             contentForTab: contentForTab,
             in: container
         )
@@ -32,10 +30,20 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
         context.coordinator.present(
             selectedTab: selectedTab,
             targetAppearance: targetAppearance,
-            contentIdentity: contentIdentity,
-            contentRevision: contentRevision,
+            descriptor: descriptor,
             contentForTab: contentForTab,
             in: container
+        )
+    }
+
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        nsView: NSView,
+        context: Context
+    ) -> CGSize? {
+        FlowFillViewportSizing.resolve(
+            proposal: proposal,
+            currentSize: nsView.bounds.size
         )
     }
 
@@ -48,10 +56,20 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
 
     @MainActor
     final class Coordinator {
-        private struct PageBinding {
+        private final class PageBinding {
             let hostingView: NSHostingView<HomeRetainedTabPageRoot>
             let presentation: HomeRetainedTabPagePresentation
-            let contentIdentity: AnyHashable?
+            var descriptor: HomeRetainedTabPageDescriptor
+
+            init(
+                hostingView: NSHostingView<HomeRetainedTabPageRoot>,
+                presentation: HomeRetainedTabPagePresentation,
+                descriptor: HomeRetainedTabPageDescriptor
+            ) {
+                self.hostingView = hostingView
+                self.presentation = presentation
+                self.descriptor = descriptor
+            }
         }
 
         private var bindings: [HomeTab: PageBinding] = [:]
@@ -60,8 +78,7 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
         func present(
             selectedTab: HomeTab,
             targetAppearance: NSAppearance,
-            contentIdentity: AnyHashable? = nil,
-            contentRevision: AnyHashable = AnyHashable(0),
+            descriptor: HomeRetainedTabPageDescriptor,
             contentForTab: @escaping ContentProvider,
             in container: NSView
         ) {
@@ -69,7 +86,7 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
                 binding.presentation.updateContentProvider(contentForTab)
             }
             let identityChanged = bindings[selectedTab].map {
-                $0.contentIdentity != contentIdentity
+                $0.descriptor.identity != descriptor.identity
             } ?? false
 
             if activeTab == selectedTab,
@@ -78,11 +95,12 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
                !identityChanged
             {
                 apply(targetAppearance, to: binding.hostingView)
-                binding.hostingView.frame = container.bounds
+                apply(container.bounds, to: binding.hostingView)
                 binding.presentation.update(
                     isActive: true,
-                    contentRevision: contentRevision
+                    contentRevision: descriptor.contentRevision
                 )
+                binding.descriptor = descriptor
                 return
             }
 
@@ -98,7 +116,9 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
                     in: outgoingBinding.hostingView,
                     container: container
                 )
-                outgoingBinding.hostingView.isHidden = true
+                if !outgoingBinding.hostingView.isHidden {
+                    outgoingBinding.hostingView.isHidden = true
+                }
             }
 
             if identityChanged,
@@ -118,7 +138,7 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
                 let presentation = HomeRetainedTabPagePresentation(
                     tab: selectedTab,
                     isActive: true,
-                    contentRevision: contentRevision,
+                    contentRevision: descriptor.contentRevision,
                     contentProvider: contentForTab
                 )
                 let hostingView = NSHostingView(
@@ -133,7 +153,7 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
                 incomingBinding = PageBinding(
                     hostingView: hostingView,
                     presentation: presentation,
-                    contentIdentity: contentIdentity
+                    descriptor: descriptor
                 )
                 bindings[selectedTab] = incomingBinding
                 requiresInitialLayout = true
@@ -142,15 +162,18 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
             let incomingView = incomingBinding.hostingView
             incomingBinding.presentation.updateContentProvider(contentForTab)
             apply(targetAppearance, to: incomingView)
-            incomingView.frame = container.bounds
+            apply(container.bounds, to: incomingView)
             incomingBinding.presentation.update(
                 isActive: true,
-                contentRevision: contentRevision
+                contentRevision: descriptor.contentRevision
             )
+            incomingBinding.descriptor = descriptor
             if incomingView.superview !== container {
                 container.addSubview(incomingView)
             }
-            incomingView.isHidden = false
+            if incomingView.isHidden {
+                incomingView.isHidden = false
+            }
             if requiresInitialLayout,
                container.bounds.width > 0,
                container.bounds.height > 0
@@ -161,6 +184,26 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
             activeTab = selectedTab
         }
 
+        func present(
+            selectedTab: HomeTab,
+            targetAppearance: NSAppearance,
+            contentIdentity: AnyHashable? = nil,
+            contentRevision: AnyHashable = AnyHashable(0),
+            contentForTab: @escaping ContentProvider,
+            in container: NSView
+        ) {
+            present(
+                selectedTab: selectedTab,
+                targetAppearance: targetAppearance,
+                descriptor: HomeRetainedTabPageDescriptor(
+                    identity: contentIdentity ?? AnyHashable(selectedTab),
+                    contentRevision: contentRevision
+                ),
+                contentForTab: contentForTab,
+                in: container
+            )
+        }
+
         private func apply(
             _ targetAppearance: NSAppearance,
             to hostingView: NSView
@@ -169,6 +212,11 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
                 return
             }
             hostingView.appearance = targetAppearance
+        }
+
+        private func apply(_ frame: NSRect, to hostingView: NSView) {
+            guard hostingView.frame != frame else { return }
+            hostingView.frame = frame
         }
 
         func dismantle(from container: NSView) {

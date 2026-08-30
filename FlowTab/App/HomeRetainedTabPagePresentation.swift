@@ -1,5 +1,10 @@
 import SwiftUI
 
+struct HomeRetainedTabPageDescriptor: Equatable {
+    let identity: AnyHashable
+    let contentRevision: AnyHashable
+}
+
 typealias HomeRetainedTabContentProvider = (HomeTab, Bool) -> AnyView
 
 @MainActor

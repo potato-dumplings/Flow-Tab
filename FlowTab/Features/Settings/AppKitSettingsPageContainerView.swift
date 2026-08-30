@@ -11,17 +11,19 @@ final class AppKitSettingsPageContainerView: NSView {
     private let documentView = AppKitFlippedDocumentView()
     private let horizontalContentInset = FlowPageLayout.horizontalInset
     private let verticalContentInset = FlowPageLayout.alignedTopInset
-    private let maximumLayoutSettlingPasses = 3
     private var wasActive = false
     private var pendingInitialFocusClear = false
     private var contentRefreshGate = AppKitSettingsPageContentRefreshGate()
     private var layoutMeasurementCache =
         AppKitSettingsPageLayoutMeasurementCache()
     private var appliedAppearanceName: NSAppearance.Name?
+    private var appliedLayoutSignature:
+        AppKitSettingsPageLayoutSignature?
     private var pendingState: AppKitSettingsPageState?
-    private var activationRefreshGeneration: UInt64 = 0
-    private var scheduledActivationRefreshGeneration: UInt64?
+    private var isApplyingState = false
+    private var hasPendingContentLayout = false
     private var hasDeferredLayoutRefresh = false
+    private var hasEstablishedInitialScrollPosition = false
     private var pageLeadingConstraint: NSLayoutConstraint?
     private var pageTopConstraint: NSLayoutConstraint?
     private var pageWidthConstraint: NSLayoutConstraint?
@@ -44,25 +46,9 @@ final class AppKitSettingsPageContainerView: NSView {
         if becameActive {
             clearInitialFirstResponderIfNeeded()
         }
-
-        guard contentRefreshGate.hasAppliedState else {
-            applyPendingStateIfNeeded()
-            return
-        }
-        guard isActive else {
-            cancelScheduledActivationRefresh()
-            return
-        }
-        if becameActive {
-            scheduleActivationRefresh()
-            return
-        }
-        guard !hasScheduledActivationRefresh else { return }
+        guard isActive else { return }
         applyPendingStateIfNeeded()
-    }
-
-    private var hasScheduledActivationRefresh: Bool {
-        scheduledActivationRefreshGeneration != nil
+        applyPendingContentLayoutIfNeeded()
     }
 
     private func applyPendingStateIfNeeded() {
@@ -77,31 +63,10 @@ final class AppKitSettingsPageContainerView: NSView {
             fallback: inheritedAppearanceFallback
         )
         applyAppearanceIfNeeded(targetAppearance)
+        isApplyingState = true
         pageView.update(with: state)
-        refreshLayoutAfterSettingsUpdate()
-    }
-
-    private func scheduleActivationRefresh() {
-        guard !hasScheduledActivationRefresh else { return }
-        activationRefreshGeneration &+= 1
-        let generation = activationRefreshGeneration
-        scheduledActivationRefreshGeneration = generation
-
-        DispatchQueue.main.async { [weak self] in
-            guard let self,
-                  self.scheduledActivationRefreshGeneration == generation
-            else {
-                return
-            }
-            self.scheduledActivationRefreshGeneration = nil
-            guard self.wasActive else { return }
-            self.applyPendingStateIfNeeded()
-        }
-    }
-
-    private func cancelScheduledActivationRefresh() {
-        activationRefreshGeneration &+= 1
-        scheduledActivationRefreshGeneration = nil
+        isApplyingState = false
+        markContentLayoutDirty()
     }
 
     override func setFrameSize(_ newSize: NSSize) {
@@ -121,64 +86,71 @@ final class AppKitSettingsPageContainerView: NSView {
     }
 
     override func layout() {
-        super.layout()
-
         let viewportSize = bounds.size
         guard viewportSize.width > 0 else { return }
 
-        let pageWidth = max(
-            viewportSize.width - horizontalContentInset * 2,
-            320
+        let signature = currentLayoutSignature(
+            viewportSize: viewportSize
         )
-        let topInset = verticalContentInset + safeAreaInsets.top
-        pageLeadingConstraint?.constant = horizontalContentInset
-        pageTopConstraint?.constant = topInset
-        pageWidthConstraint?.constant = pageWidth
-        let signature = AppKitSettingsPageLayoutSignature(
-            viewportSize: viewportSize,
-            safeAreaTop: safeAreaInsets.top,
-            contentRevision: contentRefreshGate.contentRevision
-        )
-        if let fittedSize = layoutMeasurementCache.fittedSize(
-            for: signature
-        ) {
-            applyLayoutGeometry(
-                viewportWidth: viewportSize.width,
-                pageWidth: pageWidth,
-                topInset: topInset,
-                fittedSize: fittedSize,
-                settlesDocumentLayout: false
-            )
+        guard appliedLayoutSignature != signature else { return }
+        if layoutMeasurementCache.fittedSize(for: signature) != nil {
+            appliedLayoutSignature = signature
             return
         }
 
-        var previousHeight: CGFloat?
-        var measuredSize = CGSize(width: pageWidth, height: 0)
-        for _ in 0..<maximumLayoutSettlingPasses {
-            pageHeightConstraint?.isActive = false
-            pageView.prepareLayout(forWidth: pageWidth)
-            measuredSize = pageView.preferredFittingSize(
-                forWidth: pageWidth
+        super.layout()
+
+        let safeArea = signature.safeAreaInsets
+        let pageWidth = max(
+            viewportSize.width
+                - safeArea.left
+                - safeArea.right
+                - horizontalContentInset * 2,
+            320
+        )
+        let leadingInset = horizontalContentInset + safeArea.left
+        let topInset = verticalContentInset + safeArea.top
+        if pageHeightConstraint?.isActive != true {
+            let provisionalHeight = max(
+                viewportSize.height
+                    - topInset
+                    - verticalContentInset
+                    - safeArea.bottom,
+                1
             )
             applyLayoutGeometry(
                 viewportWidth: viewportSize.width,
+                leadingInset: leadingInset,
                 pageWidth: pageWidth,
                 topInset: topInset,
-                fittedSize: measuredSize,
-                settlesDocumentLayout: true
+                bottomSafeAreaInset: safeArea.bottom,
+                fittedSize: CGSize(
+                    width: pageWidth,
+                    height: provisionalHeight
+                )
             )
-
-            if let previousHeight,
-               abs(previousHeight - measuredSize.height) <= 0.5
-            {
-                break
-            }
-            previousHeight = measuredSize.height
         }
+        pageView.prepareLayout(forWidth: pageWidth)
+        let measuredSize = pageView.preferredFittingSize(
+            forWidth: pageWidth
+        )
+        applyLayoutGeometry(
+            viewportWidth: viewportSize.width,
+            leadingInset: leadingInset,
+            pageWidth: pageWidth,
+            topInset: topInset,
+            bottomSafeAreaInset: safeArea.bottom,
+            fittedSize: measuredSize
+        )
+        establishInitialScrollPositionIfNeeded()
+        scrollView.needsLayout = true
+        scrollView.layoutSubtreeIfNeeded()
+        documentView.layoutSubtreeIfNeeded()
         layoutMeasurementCache.store(
             fittedSize: measuredSize,
             for: signature
         )
+        appliedLayoutSignature = signature
     }
 
     private func buildViewHierarchy() {
@@ -193,6 +165,10 @@ final class AppKitSettingsPageContainerView: NSView {
 
         documentView.translatesAutoresizingMaskIntoConstraints = true
         pageView.translatesAutoresizingMaskIntoConstraints = false
+        pageView.onContentLayoutInvalidated = { [weak self] in
+            guard let self, !self.isApplyingState else { return }
+            self.invalidateContentLayout()
+        }
         documentView.addSubview(pageView)
         scrollView.documentView = documentView
 
@@ -230,13 +206,17 @@ final class AppKitSettingsPageContainerView: NSView {
 
     private func applyLayoutGeometry(
         viewportWidth: CGFloat,
+        leadingInset: CGFloat,
         pageWidth: CGFloat,
         topInset: CGFloat,
-        fittedSize: CGSize,
-        settlesDocumentLayout: Bool
+        bottomSafeAreaInset: CGFloat,
+        fittedSize: CGSize
     ) {
         let documentHeight =
-            fittedSize.height + topInset + verticalContentInset
+            fittedSize.height
+                + topInset
+                + verticalContentInset
+                + bottomSafeAreaInset
         let targetDocumentFrame = NSRect(
             x: 0,
             y: 0,
@@ -246,14 +226,33 @@ final class AppKitSettingsPageContainerView: NSView {
         if documentView.frame != targetDocumentFrame {
             documentView.frame = targetDocumentFrame
         }
-        pageLeadingConstraint?.constant = horizontalContentInset
-        pageTopConstraint?.constant = topInset
-        pageWidthConstraint?.constant = pageWidth
-        pageHeightConstraint?.constant = fittedSize.height
-        pageHeightConstraint?.isActive = true
-        if settlesDocumentLayout {
-            documentView.layoutSubtreeIfNeeded()
+        update(pageLeadingConstraint, constant: leadingInset)
+        update(pageTopConstraint, constant: topInset)
+        update(pageWidthConstraint, constant: pageWidth)
+        update(pageHeightConstraint, constant: fittedSize.height)
+        if pageHeightConstraint?.isActive == false {
+            pageHeightConstraint?.isActive = true
         }
+        documentView.layoutSubtreeIfNeeded()
+    }
+
+    private func update(
+        _ constraint: NSLayoutConstraint?,
+        constant: CGFloat
+    ) {
+        guard let constraint,
+              abs(constraint.constant - constant) > 0.5
+        else {
+            return
+        }
+        constraint.constant = constant
+    }
+
+    private func establishInitialScrollPositionIfNeeded() {
+        guard !hasEstablishedInitialScrollPosition else { return }
+        hasEstablishedInitialScrollPosition = true
+        scrollView.contentView.setBoundsOrigin(.zero)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
     }
 
     private func applyAppearanceIfNeeded(_ targetAppearance: NSAppearance) {
@@ -300,9 +299,22 @@ final class AppKitSettingsPageContainerView: NSView {
         }
     }
 
-    private func refreshLayoutAfterSettingsUpdate() {
-        layoutMeasurementCache.invalidate()
+    func invalidateContentLayout() {
+        contentRefreshGate.invalidateContent()
         pageView.invalidateMeasuredContentHeight()
+        markContentLayoutDirty()
+        applyPendingContentLayoutIfNeeded()
+    }
+
+    private func markContentLayoutDirty() {
+        layoutMeasurementCache.invalidate()
+        appliedLayoutSignature = nil
+        hasPendingContentLayout = true
+    }
+
+    private func applyPendingContentLayoutIfNeeded() {
+        guard wasActive, hasPendingContentLayout else { return }
+        hasPendingContentLayout = false
         pageView.needsLayout = true
         documentView.needsLayout = true
         needsLayout = true
@@ -325,5 +337,43 @@ final class AppKitSettingsPageContainerView: NSView {
         window?.effectiveAppearance
             ?? superview?.effectiveAppearance
             ?? NSApp.effectiveAppearance
+    }
+
+    private func currentLayoutSignature(
+        viewportSize: CGSize
+    ) -> AppKitSettingsPageLayoutSignature {
+        AppKitSettingsPageLayoutSignature(
+            viewportSize: viewportSize,
+            safeAreaInsets: AppKitSettingsPageSafeAreaInsets(
+                safeAreaInsets
+            ),
+            layoutDirection: userInterfaceLayoutDirection,
+            backingScale: resolvedBackingScale,
+            effectiveAppearanceName: effectiveAppearance.name,
+            contentRevision: contentRefreshGate.contentRevision
+        )
+    }
+
+    private var resolvedBackingScale: CGFloat {
+        let scale = window?.backingScaleFactor
+            ?? window?.screen?.backingScaleFactor
+            ?? NSScreen.main?.backingScaleFactor
+            ?? 1
+        return scale.isFinite && scale > 0 ? scale : 1
+    }
+
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        needsLayout = true
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsLayout = true
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        needsLayout = true
     }
 }

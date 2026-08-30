@@ -1,5 +1,6 @@
 import AppKit
 import FlowTabCore
+import SwiftUI
 import XCTest
 @testable import FlowTab
 
@@ -55,11 +56,7 @@ extension FlowTabTests {
 
     func testSettingsLayoutMeasurementCacheUsesCompleteLayoutSignature() {
         var cache = AppKitSettingsPageLayoutMeasurementCache()
-        let signature = AppKitSettingsPageLayoutSignature(
-            viewportSize: CGSize(width: 1_200, height: 820),
-            safeAreaTop: 0,
-            contentRevision: 4
-        )
+        let signature = makeSettingsLayoutSignature()
         let fittedSize = CGSize(width: 1_152, height: 760)
 
         XCTAssertNil(cache.fittedSize(for: signature))
@@ -67,34 +64,102 @@ extension FlowTabTests {
         XCTAssertEqual(cache.fittedSize(for: signature), fittedSize)
         XCTAssertNil(
             cache.fittedSize(
-                for: AppKitSettingsPageLayoutSignature(
-                    viewportSize: CGSize(width: 1_180, height: 820),
-                    safeAreaTop: 0,
-                    contentRevision: 4
+                for: makeSettingsLayoutSignature(
+                    viewportSize: CGSize(width: 1_180, height: 820)
                 )
             )
         )
         XCTAssertNil(
             cache.fittedSize(
-                for: AppKitSettingsPageLayoutSignature(
-                    viewportSize: CGSize(width: 1_200, height: 820),
-                    safeAreaTop: 24,
-                    contentRevision: 4
+                for: makeSettingsLayoutSignature(
+                    safeAreaInsets: .init(
+                        top: 24,
+                        left: 0,
+                        bottom: 0,
+                        right: 0
+                    )
                 )
             )
         )
         XCTAssertNil(
             cache.fittedSize(
-                for: AppKitSettingsPageLayoutSignature(
-                    viewportSize: CGSize(width: 1_200, height: 820),
-                    safeAreaTop: 0,
-                    contentRevision: 5
+                for: makeSettingsLayoutSignature(
+                    layoutDirection: .rightToLeft
                 )
+            )
+        )
+        XCTAssertNil(
+            cache.fittedSize(
+                for: makeSettingsLayoutSignature(backingScale: 2)
+            )
+        )
+        XCTAssertNil(
+            cache.fittedSize(
+                for: makeSettingsLayoutSignature(
+                    effectiveAppearanceName: .darkAqua
+                )
+            )
+        )
+        XCTAssertNil(
+            cache.fittedSize(
+                for: makeSettingsLayoutSignature(contentRevision: 5)
             )
         )
 
         cache.invalidate()
         XCTAssertNil(cache.fittedSize(for: signature))
+    }
+
+    func testFillViewportSizingUsesProposalAndMountedBounds() {
+        XCTAssertEqual(
+            FlowFillViewportSizing.resolve(
+                proposal: ProposedViewSize(width: 640, height: 480),
+                currentSize: CGSize(width: 900, height: 700)
+            ),
+            CGSize(width: 640, height: 480)
+        )
+        XCTAssertEqual(
+            FlowFillViewportSizing.resolve(
+                proposal: ProposedViewSize(width: 640, height: nil),
+                currentSize: CGSize(width: 900, height: 700)
+            ),
+            CGSize(width: 640, height: 700)
+        )
+        XCTAssertEqual(
+            FlowFillViewportSizing.resolve(
+                proposal: ProposedViewSize(width: nil, height: 480),
+                currentSize: CGSize(width: 900, height: 700)
+            ),
+            CGSize(width: 900, height: 480)
+        )
+    }
+
+    func testFillViewportSizingFallsBackOnlyToValidMountedBounds() {
+        XCTAssertNil(
+            FlowFillViewportSizing.resolve(
+                proposal: ProposedViewSize(width: nil, height: nil),
+                currentSize: .zero
+            )
+        )
+        XCTAssertEqual(
+            FlowFillViewportSizing.resolve(
+                proposal: ProposedViewSize(
+                    width: .nan,
+                    height: -1
+                ),
+                currentSize: CGSize(width: 900, height: 700)
+            ),
+            CGSize(width: 900, height: 700)
+        )
+        XCTAssertNil(
+            FlowFillViewportSizing.resolve(
+                proposal: ProposedViewSize(width: nil, height: 480),
+                currentSize: CGSize(
+                    width: CGFloat.infinity,
+                    height: 700
+                )
+            )
+        )
     }
 
     @MainActor
@@ -134,6 +199,8 @@ extension FlowTabTests {
         container.frame = NSRect(x: 0, y: 0, width: 1_200, height: 820)
         let state = makeSettingsLayoutActivityState()
 
+        container.update(with: state, isActive: true)
+        await awaitSettingsLayoutMainQueueTurn()
         container.update(with: state, isActive: false)
         await awaitSettingsLayoutMainQueueTurn()
 
@@ -161,6 +228,11 @@ extension FlowTabTests {
     func testSettingsStateChangeDefersWhileInactiveAndRefreshesOnActivation() async throws {
         let container = AppKitSettingsPageContainerView()
         container.frame = NSRect(x: 0, y: 0, width: 1_200, height: 820)
+        container.update(
+            with: makeSettingsLayoutActivityState(),
+            isActive: true
+        )
+        await awaitSettingsLayoutMainQueueTurn()
         container.update(
             with: makeSettingsLayoutActivityState(),
             isActive: false
@@ -314,6 +386,29 @@ extension FlowTabTests {
             accessibilityTrusted: false,
             screenCaptureTrusted: false,
             targetNSAppearanceName: targetAppearanceName
+        )
+    }
+
+    private func makeSettingsLayoutSignature(
+        viewportSize: CGSize = CGSize(width: 1_200, height: 820),
+        safeAreaInsets: AppKitSettingsPageSafeAreaInsets = .init(
+            top: 0,
+            left: 0,
+            bottom: 0,
+            right: 0
+        ),
+        layoutDirection: NSUserInterfaceLayoutDirection = .leftToRight,
+        backingScale: CGFloat = 1,
+        effectiveAppearanceName: NSAppearance.Name = .aqua,
+        contentRevision: UInt64 = 4
+    ) -> AppKitSettingsPageLayoutSignature {
+        AppKitSettingsPageLayoutSignature(
+            viewportSize: viewportSize,
+            safeAreaInsets: safeAreaInsets,
+            layoutDirection: layoutDirection,
+            backingScale: backingScale,
+            effectiveAppearanceName: effectiveAppearanceName,
+            contentRevision: contentRevision
         )
     }
 

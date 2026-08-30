@@ -1,4 +1,4 @@
-import CoreGraphics
+import AppKit
 
 struct AppKitSettingsPageIntrinsicHeightCache {
     private struct Entry {
@@ -27,9 +27,38 @@ struct AppKitSettingsPageIntrinsicHeightCache {
     }
 }
 
+struct AppKitSettingsPageSafeAreaInsets: Equatable {
+    let top: CGFloat
+    let left: CGFloat
+    let bottom: CGFloat
+    let right: CGFloat
+
+    init(_ insets: NSEdgeInsets) {
+        top = insets.top
+        left = insets.left
+        bottom = insets.bottom
+        right = insets.right
+    }
+
+    init(
+        top: CGFloat,
+        left: CGFloat,
+        bottom: CGFloat,
+        right: CGFloat
+    ) {
+        self.top = top
+        self.left = left
+        self.bottom = bottom
+        self.right = right
+    }
+}
+
 struct AppKitSettingsPageLayoutSignature: Equatable {
     let viewportSize: CGSize
-    let safeAreaTop: CGFloat
+    let safeAreaInsets: AppKitSettingsPageSafeAreaInsets
+    let layoutDirection: NSUserInterfaceLayoutDirection
+    let backingScale: CGFloat
+    let effectiveAppearanceName: NSAppearance.Name
     let contentRevision: UInt64
 }
 

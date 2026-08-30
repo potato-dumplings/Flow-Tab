@@ -86,6 +86,17 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
             isActive: isActive
         )
     }
+
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        nsView: AppKitSettingsPageContainerView,
+        context: Context
+    ) -> CGSize? {
+        FlowFillViewportSizing.resolve(
+            proposal: proposal,
+            currentSize: nsView.bounds.size
+        )
+    }
 }
 
 extension AppKitSettingsHotkeyRawValues {

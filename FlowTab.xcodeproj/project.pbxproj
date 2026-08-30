@@ -612,6 +612,7 @@
 		A6F200023FD2000100B0D737 /* HomeRetainedTabContentHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F200013FD2000100B0D737 /* HomeRetainedTabContentHost.swift */; };
 		A6F200043FD2000100B0D737 /* FlowTabTests+HomeRetainedTabContentHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F200033FD2000100B0D737 /* FlowTabTests+HomeRetainedTabContentHost.swift */; };
 		A6F200063FD2000100B0D737 /* HomeRetainedTabPagePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F200053FD2000100B0D737 /* HomeRetainedTabPagePresentation.swift */; };
+		A6F400023FD4000100B0D737 /* FlowFillViewportSizing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F400013FD4000100B0D737 /* FlowFillViewportSizing.swift */; };
 		D43000012FFD000100B0D737 /* HomeOverviewComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43000112FFD000100B0D737 /* HomeOverviewComponents.swift */; };
 		D43000022FFD000100B0D737 /* RuntimeAXWindowChangeMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43000122FFD000100B0D737 /* RuntimeAXWindowChangeMonitor.swift */; };
 		D43000032FFD000100B0D737 /* RuntimeAXWindowObservationTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43000132FFD000100B0D737 /* RuntimeAXWindowObservationTransport.swift */; };
@@ -1088,6 +1089,7 @@
 		A6F200013FD2000100B0D737 /* HomeRetainedTabContentHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRetainedTabContentHost.swift; sourceTree = "<group>"; };
 		A6F200033FD2000100B0D737 /* FlowTabTests+HomeRetainedTabContentHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HomeRetainedTabContentHost.swift"; sourceTree = "<group>"; };
 		A6F200053FD2000100B0D737 /* HomeRetainedTabPagePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRetainedTabPagePresentation.swift; sourceTree = "<group>"; };
+		A6F400013FD4000100B0D737 /* FlowFillViewportSizing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowFillViewportSizing.swift; sourceTree = "<group>"; };
 		D43000112FFD000100B0D737 /* HomeOverviewComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeOverviewComponents.swift; sourceTree = "<group>"; };
 		D43000122FFD000100B0D737 /* RuntimeAXWindowChangeMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAXWindowChangeMonitor.swift; sourceTree = "<group>"; };
 		D43000132FFD000100B0D737 /* RuntimeAXWindowObservationTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAXWindowObservationTransport.swift; sourceTree = "<group>"; };
@@ -2345,6 +2347,7 @@
 		F100000B2F74000100B0D737 /* SharedUI */ = {
 			isa = PBXGroup;
 			children = (
+				A6F400013FD4000100B0D737 /* FlowFillViewportSizing.swift */,
 				FCD100013D29000100B0D737 /* HomeControlPressAnimationPolicy.swift */,
 				C10000142F75000100B0D737 /* HomeChrome.swift */,
 				C10000302F75000100B0D737 /* FlowSnappedListScrollView.swift */,
@@ -2632,6 +2635,7 @@
 				FCD100023D29000100B0D737 /* HomeControlPressAnimationPolicy.swift in Sources */,
 				C10000042F75000100B0D737 /* HomeChrome.swift in Sources */,
 				C10000312F75000100B0D737 /* FlowSnappedListScrollView.swift in Sources */,
+				A6F400023FD4000100B0D737 /* FlowFillViewportSizing.swift in Sources */,
 				FD00010136A0000100B0D737 /* FlowDropdownTypes.swift in Sources */,
 				FD00010236A0000100B0D737 /* FlowDropdownControl.swift in Sources */,
 				FD00010336A0000100B0D737 /* FlowDropdownMenuView.swift in Sources */,

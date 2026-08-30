@@ -3,6 +3,7 @@ import AppKit
 import FlowTabCore
 
 final class AppKitSettingsPageView: NSView {
+    var onContentLayoutInvalidated: (() -> Void)?
     var onShowInCommandTabChanged: ((Bool) -> Void)?
     var onThemeModeChanged: ((String) -> Void)?
     var onAppLanguageChanged: ((String) -> Void)?
@@ -260,7 +261,7 @@ final class AppKitSettingsPageView: NSView {
             stackView.invalidateIntrinsicContentSize()
             stackView.needsLayout = true
         }
-        invalidateMeasuredContentHeight()
+        notifyContentLayoutInvalidated()
     }
 
     func updateHotkeyContent(with values: AppKitSettingsHotkeyRawValues) {
@@ -272,7 +273,7 @@ final class AppKitSettingsPageView: NSView {
         appliedHotkeyState = hotkeyState
         hotkeyContent.update(with: hotkeyState)
         hotkeyCard.invalidateIntrinsicContentSize()
-        invalidateMeasuredContentHeight()
+        notifyContentLayoutInvalidated()
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -675,6 +676,11 @@ final class AppKitSettingsPageView: NSView {
 
     private func preferredHeight(for view: NSView) -> CGFloat {
         FlowSettingsLayoutMetrics.preferredHeight(for: view)
+    }
+
+    private func notifyContentLayoutInvalidated() {
+        invalidateMeasuredContentHeight()
+        onContentLayoutInvalidated?()
     }
 
     private func descendantRefreshableViews(in view: NSView) -> [NSView & FlowSettingsAppearanceRefreshable] {
