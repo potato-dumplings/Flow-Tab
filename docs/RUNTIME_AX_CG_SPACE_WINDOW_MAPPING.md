@@ -1337,3 +1337,12 @@ Phase 7 completion-audit ledger: [RUNTIME_PROJECTION_COMPLETION_AUDIT.md](RUNTIM
 - `runtimeAXObserverRebind` 记录 `desired/added/removed/updated/retry`，相同集合不产生日志；`runtimeAXObserverInstall` 记录成功、终止错误与 retry attempt。真实压力 evidence parser 同时识别历史 `homeAXObserverInstall` 和当前事件名，并输出 warm-up 后成功安装、唯一 binding、retry 与 replacement 计数。
 - 永久回归覆盖 binding 归一化、相同集合零安装、目标 PID 差量、PID 复用、权限撤销/恢复、安装失败 retry、迟到完成丢弃、共享 projection 计数反馈、证据路由与 AppDelegate 生命周期顺序。
 - 2026-08-30 的 retained-host 与 stable-root 两阶段继续保持该所有权边界：Home、Logs、Settings 的可见性切换只更新页面 presentation lifecycle，AX binding 仍由 Runtime coordinator 持有。四个真实权限组合各三轮的 warm-up 后成功安装数均为零，普通 Tab 切换未产生 observer replacement；对应证据路径意图为 `.build-local/error-tab-cpu/stage4-pressure/` 与 `.build-local/error-tab-cpu/stage5-pressure/`。
+
+## Retained Tab 统一失效不变量（2026-08-30）
+
+- Stage 6 为 retained page 和 Settings 建立统一 fill-viewport sizing contract。页面外层尺寸只由父内容区决定；Settings 文档高度在内部计算。布局签名由 viewport、全部 safe-area insets、layout direction、backing scale、effective appearance 与 content layout revision 组成，签名命中会在约束、frame、intrinsic invalidation 和 layout settling 之前返回。
+- Stage 7 使用独立 `HomeRetainedTabLifecycle` 传递 active/inactive 迁移。页面内容变化统一由 `identity + contentRevision + layoutEnvironment` 表达；隐藏期间只保留最新变化，激活前合并应用一次。三页 warm-up 后，普通切换的 content publication、provider evaluation、root replacement、host add/remove 与 window change 均为零，每次真实切换只发送一个 outgoing inactive 和一个 incoming active。
+- 两阶段继续保持 Runtime AX 观察所有权。四个真实权限组合各三轮的 Stage 7 warm-up 后成功安装数为零；最终 CPU avg/p95 中位数为 `ERROR 20ms 39.55/41.00%`、`ERROR 50ms 27.11/28.36%`、`DEBUG 20ms 43.94/46.03%`、`DEBUG 50ms 28.15/29.69%`。符号化样本中的 `measureMin`、`systemLayoutSizeFittingSize` 与递归 constraint-engine population 均为零。
+- Search freshness barrier 使用静态 coalescing identity 保留最新请求，将受压主队列上的重复 freshness commit 收敛为一次 authoritative provider read。1000 次 blocked request 的回归验证 pending operation 与 provider read 均为一；Search extreme cooldown p95 从约 `107.84ms` 收敛至 `1.50–1.53ms`。
+- canonical noisy fullscreen/off-Space fixture 在 Home 隐藏状态下通过 `1/1`，40 次 PID/签名身份检查全部匹配，稳定窗口 `5216ms`，cleanup 精确；CPU avg/p95/max 为 `21.21/61.99/67.52%`，RSS avg/p95/max 为 `107.06/175.36/181.92MB`。
+- Stage 6/7 主证据路径意图分别为 `.build-local/error-tab-cpu/stage6-unified-layout/` 与 `.build-local/error-tab-cpu/stage7-lifecycle-separation/`；最终 topology 位于后者的 `runtime-topology/noisy-r7/`。

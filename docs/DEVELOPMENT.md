@@ -319,7 +319,7 @@ swift test
 
 `DEBUG` 使用相同的 `20ms`、`50ms` 组合，可按本轮日志预算增加 `--max-runtime-log-mb-per-minute`。四个组合各运行三次，以同机三轮中位数比较。正式 `status.json` 使用 schema v2：顶层 CPU/RSS、样本数与每次完成切换的 CPU 时间只覆盖唯一 started/completed monotonic 边界内的 active Tab-switch 窗口；preflight、postflight 和 whole-run 资源数据放在诊断字段。每个 CPU 采样保存区间 monotonic 起止时间，只有完整落入 active 窗口的区间参与正式聚合，覆盖率必须达到 `90%`。历史证据缺少 monotonic 边界时标记为 `whole-run-legacy-v1`，只保留 whole-run 诊断值。
 
-正式证据同时保存权限、Home 应用/窗口数、Fixture 命中、三页预热、计划/完成切换数和 Home/Logs/Settings 完成次数；三个 Tab 的计数都必须大于零，且总和等于完成切换数。`DEBUG` 日志量按跨日志文件的唯一 started/completed marker 之间实际字节计算，并输出 category/event 字节排行；完成 marker 在应用退出前同步完成日志队列落盘。当前 CPU 验收状态为 `active-window v2 optimization evidence recorded; release baseline pending`，AX 观察器安装数继续作为独立结构门禁。
+正式证据同时保存权限、Home 应用/窗口数、Fixture 命中、三页预热、计划/完成切换数和 Home/Logs/Settings 完成次数；三个 Tab 的计数都必须大于零，且总和等于完成切换数。`DEBUG` 日志量按跨日志文件的唯一 started/completed marker 之间实际字节计算，并输出 category/event 字节排行；完成 marker 在应用退出前同步完成日志队列落盘。当前 CPU 验收状态为 `active-window v2 Tab gates passed; Search extreme open tail pending`，AX 观察器安装数继续作为独立结构门禁。
 
 2026-08-30 的三阶段优化证据使用最终代码、真实权限和固定 Fixture。四个主组合均取三轮中位数：
 
@@ -345,7 +345,22 @@ Stage 4 的 10 秒 `ERROR / 50ms` 样本相对 Stage 3 将 `_setWindow`、host a
 
 Stage 5 的 `ERROR / 1000ms` 为 `avg 5.61% / p95 11.09%`，通过低频 CPU 门禁；`DEBUG / 60s / 1000ms` active 日志为 `0.0092 MB/min`。隔离矩阵的三轮中位数依次为 `ERROR 20ms 57.23% / 60.90%`、`ERROR 50ms 44.27% / 48.20%`、`DEBUG 20ms 60.97% / 64.20%`、`DEBUG 50ms 47.94% / 52.40%`。其中隔离 `DEBUG / 20ms` 整段运行日志为 `2.207 MB/min`；真实权限 active-window 同组合为 `0.409 MB/min`，满足 active 日志门禁。隔离日志增加来自 Home 激活后恢复 projection owner 并执行缓存读回，普通切换没有发生 hosting root replacement。
 
-Stage 5 相对 Stage 4 的 CPU avg/p95 和 RSS 均未回退超过 `5%`，两阶段实现保留。最终硬门禁中，`ERROR / 50ms` 与 `DEBUG / 50ms` 的 p95 已通过；四个组合的 avg、20ms 两组 p95，以及除 `ERROR / 20ms` 外的每次切换 CPU 时间仍待收敛。`DEBUG / 20ms` 相对同 cadence ERROR 的 avg 增量为 `5.72` 个百分点，仍高于 `5` 个百分点门禁。证据路径意图分别为 `.build-local/error-tab-cpu/stage4-pressure/` 与 `.build-local/error-tab-cpu/stage5-pressure/`。app-panel、search extreme 和 runtime-topology noisy fixture 收尾验证在 Tab CPU 硬门禁通过后执行。
+Stage 5 相对 Stage 4 的 CPU avg/p95 和 RSS 均未回退超过 `5%`，两阶段实现保留。该阶段的最终硬门禁中，`ERROR / 50ms` 与 `DEBUG / 50ms` 的 p95 已通过；四个组合的 avg、20ms 两组 p95，以及除 `ERROR / 20ms` 外的每次切换 CPU 时间仍待收敛。`DEBUG / 20ms` 相对同 cadence ERROR 的 avg 增量为 `5.72` 个百分点。证据路径意图分别为 `.build-local/error-tab-cpu/stage4-pressure/` 与 `.build-local/error-tab-cpu/stage5-pressure/`。
+
+同日完成第六、第七阶段。Stage 6 提交 `c9ac8a6a`，为 retained page 与 Settings 建立 fill-viewport sizing contract，并用完整 layout environment 与 content revision 统一布局签名；Stage 7 提交 `3162e820`，将页面生命周期迁移移出 SwiftUI presentation，使普通 Tab 切换只发送 outgoing inactive 与 incoming active 两个事件。真实权限三轮中位数如下：
+
+| 组合 | Stage 6 CPU avg/p95 | Stage 7 CPU avg/p95 | Stage 7 ms/切换 | Stage 7 DEBUG MB/min |
+| --- | ---: | ---: | ---: | ---: |
+| ERROR，20ms | 54.70% / 55.89% | 39.55% / 41.00% | 8.11ms | — |
+| ERROR，50ms | 29.64% / 31.75% | 27.11% / 28.36% | 13.53ms | — |
+| DEBUG，20ms | 57.33% / 59.11% | 43.94% / 46.03% | 9.01ms | 0.419 |
+| DEBUG，50ms | 33.53% / 35.84% | 28.15% / 29.69% | 14.55ms | 0.168 |
+
+四个 Stage 7 组合均通过 CPU avg/p95、每次切换 CPU 时间、DEBUG 增量、日志、RSS plateau、吞吐和 AX 结构门禁。相对 Stage 6，CPU avg 分别下降 `27.7% / 8.5% / 23.4% / 16.0%`。`ERROR / 1000ms` 为 `avg 3.55% / p95 7.64%`；`DEBUG / 60s / 1000ms` 为 `avg 5.53% / p95 12.08%`，日志速率 `0.0092 MB/min`。符号化样本中的 `measureMin`、`systemLayoutSizeFittingSize` 和递归 constraint-engine population 均为零；三页 warm-up 后，普通切换的 content publication、provider evaluation、root replacement、host add/remove、window change 与 AX install 均为零。
+
+Stage 6 完整 `FlowTabTests` 通过 `1327/1327`，Stage 7 通过 `1329/1329`，固定路径 UI 回归通过 `8/8`。app-panel 收尾发现 Search freshness barrier 会在主队列受压时累积；提交 `34bf10b1` 将该 barrier 按最新请求合并，永久回归以 1000 次请求验证队列只保留一次 provider read，完整 `FlowTabTests` 随后通过 `1330/1330`。Search extreme cooldown p95 从约 `107.84ms` 降至三轮 `1.50–1.53ms`；三轮打开 p95 中位数为 `51.251ms`，当前发布收尾继续受 `50ms` 门禁约束。application realistic/extreme、app-to-window realistic/extreme 与 search realistic 均通过；extreme application warm-open/highlight p95 为 `15.122/15.873ms`，extreme app-to-window open/content p95 为 `33.500/21.298ms`。
+
+最终 runtime-topology noisy fixture 通过 `1/1`，完成 40 次 PID/签名身份检查与 `5216ms` 稳定窗口，CPU avg/p95/max 为 `21.21/61.99/67.52%`，RSS avg/p95/max 为 `107.06/175.36/181.92MB`，cleanup 精确。提交 `637c8828` 让权限 preflight 通过真实状态栏入口临时打开 Home、完成读回后关闭 Home，保持 noisy fixture 的隐藏 Home 运行语义。Stage 6/7 主证据路径意图分别为 `.build-local/error-tab-cpu/stage6-unified-layout/` 与 `.build-local/error-tab-cpu/stage7-lifecycle-separation/`；最终 topology 位于后者的 `runtime-topology/noisy-r7/`。
 
 隔离状态/日志链路提供配对归因数据。参数依次为持续秒数、切换间隔毫秒和采样间隔秒：
 
