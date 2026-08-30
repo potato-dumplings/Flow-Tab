@@ -332,6 +332,21 @@ swift test
 
 所有有效轮次的 active 样本覆盖率均高于 `95%`，计划切换全部完成，DEBUG 相对 ERROR 的 avg/p95 增量满足配对预算，AX warm-up 后成功安装数保持为零。`ERROR / 1000ms` 单轮为 `avg 5.37% / p95 13.57%`；`DEBUG / 60s / 1000ms` 的日志速率为 `0.0093 MB/min`。Settings 稳定布局缓存使 10 秒符号化样本中的 `updateNSView`、页面 intrinsic 测量和 stack height 遍历分别从第二阶段的 `661 / 1004 / 411` 降至约 `7 / 105 / 96`。剩余热点集中在页面重新挂载后的 AppKit display/layout cycle；正式 CPU 和每次切换 CPU 时间门禁仍保持待验收状态。
 
+同日继续完成第四、第五阶段。第四阶段提交 `ba6375d6`，让三个已访问页面的 `NSHostingView` 保持在同一容器和 window 中，只通过可见性与页面生命周期切换；第五阶段提交 `309833a2`，用稳定 page root 和等值保护的 presentation snapshot 保留 SwiftUI root graph。两个阶段分别保留真实权限、隔离归因和符号化采样证据：
+
+| 组合 | Stage 4 CPU avg/p95 | Stage 4 ms/切换 | Stage 5 CPU avg/p95 | Stage 5 ms/切换 | Stage 5 DEBUG MB/min |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| ERROR，20ms | 89.75% / 90.86% | 18.42ms | 86.85% / 88.11% | 17.70ms | — |
+| ERROR，50ms | 47.85% / 49.88% | 24.57ms | 40.45% / 42.13% | 20.73ms | — |
+| DEBUG，20ms | 95.87% / 97.28% | 23.95ms | 92.57% / 94.25% | 19.42ms | 0.409 |
+| DEBUG，50ms | 56.79% / 59.28% | 28.78ms | 44.14% / 46.37% | 22.63ms | 0.168 |
+
+Stage 4 的 10 秒 `ERROR / 50ms` 样本相对 Stage 3 将 `_setWindow`、host add/remove 相关样本分别降低约 `93.5%`、`93%–94%`，超过结构热点 `90%` 降幅门禁。Stage 5 相对 Stage 4 将 `NSDisplayCycleFlush`、`layoutIfNeeded`、`_NSViewLayout`、AttributeGraph weak-value/update 样本分别降低 `54.6%`、`58.3%`、`44.4%`、`52.3% / 51.5%`。完整 `FlowTabTests` 通过 `1325/1325`，固定路径 UI 回归通过 `8/8`；所有真实权限轮次完成计划切换，RSS plateau 通过，AX warm-up 后成功安装数为零。
+
+Stage 5 的 `ERROR / 1000ms` 为 `avg 5.61% / p95 11.09%`，通过低频 CPU 门禁；`DEBUG / 60s / 1000ms` active 日志为 `0.0092 MB/min`。隔离矩阵的三轮中位数依次为 `ERROR 20ms 57.23% / 60.90%`、`ERROR 50ms 44.27% / 48.20%`、`DEBUG 20ms 60.97% / 64.20%`、`DEBUG 50ms 47.94% / 52.40%`。其中隔离 `DEBUG / 20ms` 整段运行日志为 `2.207 MB/min`；真实权限 active-window 同组合为 `0.409 MB/min`，满足 active 日志门禁。隔离日志增加来自 Home 激活后恢复 projection owner 并执行缓存读回，普通切换没有发生 hosting root replacement。
+
+Stage 5 相对 Stage 4 的 CPU avg/p95 和 RSS 均未回退超过 `5%`，两阶段实现保留。最终硬门禁中，`ERROR / 50ms` 与 `DEBUG / 50ms` 的 p95 已通过；四个组合的 avg、20ms 两组 p95，以及除 `ERROR / 20ms` 外的每次切换 CPU 时间仍待收敛。`DEBUG / 20ms` 相对同 cadence ERROR 的 avg 增量为 `5.72` 个百分点，仍高于 `5` 个百分点门禁。证据路径意图分别为 `.build-local/error-tab-cpu/stage4-pressure/` 与 `.build-local/error-tab-cpu/stage5-pressure/`。app-panel、search extreme 和 runtime-topology noisy fixture 收尾验证在 Tab CPU 硬门禁通过后执行。
+
 隔离状态/日志链路提供配对归因数据。参数依次为持续秒数、切换间隔毫秒和采样间隔秒：
 
 ```bash

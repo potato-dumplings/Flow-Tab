@@ -1336,3 +1336,4 @@ Phase 7 completion-audit ledger: [RUNTIME_PROJECTION_COMPLETION_AUDIT.md](RUNTIM
 - 初始启动先刷新 app directory，再用当前 `windowRepairApplications` 与精确 Home summary 计数 seed bindings。Workspace launch 先加入精确身份再提交 projection launch signal；termination 先移除精确身份再提交 termination；权限恢复一次性按当前运行应用重建集合。
 - `runtimeAXObserverRebind` 记录 `desired/added/removed/updated/retry`，相同集合不产生日志；`runtimeAXObserverInstall` 记录成功、终止错误与 retry attempt。真实压力 evidence parser 同时识别历史 `homeAXObserverInstall` 和当前事件名，并输出 warm-up 后成功安装、唯一 binding、retry 与 replacement 计数。
 - 永久回归覆盖 binding 归一化、相同集合零安装、目标 PID 差量、PID 复用、权限撤销/恢复、安装失败 retry、迟到完成丢弃、共享 projection 计数反馈、证据路由与 AppDelegate 生命周期顺序。
+- 2026-08-30 的 retained-host 与 stable-root 两阶段继续保持该所有权边界：Home、Logs、Settings 的可见性切换只更新页面 presentation lifecycle，AX binding 仍由 Runtime coordinator 持有。四个真实权限组合各三轮的 warm-up 后成功安装数均为零，普通 Tab 切换未产生 observer replacement；对应证据路径意图为 `.build-local/error-tab-cpu/stage4-pressure/` 与 `.build-local/error-tab-cpu/stage5-pressure/`。
