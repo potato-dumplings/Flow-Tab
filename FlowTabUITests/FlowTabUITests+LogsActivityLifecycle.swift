@@ -8,6 +8,7 @@ extension FlowTabUITests {
                 "--flowtab-ui-mock-runtime",
                 "--flowtab-ui-seed-logs",
                 "4",
+                "--flowtab-ui-listen-switcher-trigger",
                 "--flowtab-ui-runtime-log-level",
                 "DEBUG",
                 "-showPermissionReminder",
@@ -28,29 +29,28 @@ extension FlowTabUITests {
                 in: app,
                 target: .home
             ) else { return }
-            let didResolveLogs =
-                assertLogsPopulatedProjectionAfterNavigation(
-                    in: app,
-                    targetDescription:
-                        "debug-home-logs-iteration-\(iteration)",
-                    selectedLevel: "DEBUG",
-                    visibleIdentifiers: [
-                        Identifier.logsSeededDebugLine,
-                        Identifier.logsSeededInfoLine,
-                        Identifier.logsSeededWarnLine,
-                        Identifier.logsSeededErrorLine
-                    ]
-                ) {
-                    tapFirstHittable(
-                        in: app.buttons.matching(
-                            identifier: Identifier.logsTabButton
-                        ),
-                        timeout:
-                            FlowTabUITestLogsProjectionPolicy
-                                .tabNavigationWatchdog
-                    )
-                }
-            guard didResolveLogs else { return }
+            guard assertSidebarTabProjectionAfterNavigation(
+                in: app,
+                target: .logs
+            ) else { return }
+            tapElement(
+                app.buttons
+                    .matching(identifier: Identifier.logsClearButton)
+                    .firstMatch
+            )
+            let marker = "runtime log observation probe"
+            assertLogsRuntimeDelivery(
+                in: app,
+                targetDescription:
+                    "debug-home-logs-iteration-\(iteration)",
+                selectedLevel: "DEBUG",
+                marker: marker
+            ) {
+                postFlowTabUITestSwitcherCommand(
+                    .runtimeLogProbe,
+                    traceLabel: "logs.repeated-navigation.\(iteration)"
+                )
+            }
         }
     }
 

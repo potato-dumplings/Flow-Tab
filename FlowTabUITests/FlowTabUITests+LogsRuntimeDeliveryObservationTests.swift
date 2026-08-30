@@ -22,6 +22,10 @@ extension FlowTabUITests {
             logsRuntimeDeliveryTestExpectation(
                 requirement: .delivered
             )
+        let markerAbsentExpectation =
+            logsRuntimeDeliveryTestExpectation(
+                requirement: .markerAbsent
+            )
         let baseline = logsRuntimeDeliveryTestSnapshot()
         let delivered = logsRuntimeDeliveryTestSnapshot(
             linesContainerExists: true,
@@ -35,6 +39,16 @@ extension FlowTabUITests {
         XCTAssertTrue(targetExpectation.isSatisfied(by: delivered))
         XCTAssertFalse(targetExpectation.isSatisfied(by: baseline))
         XCTAssertFalse(baselineExpectation.isSatisfied(by: delivered))
+        XCTAssertTrue(markerAbsentExpectation.isSatisfied(by: baseline))
+        XCTAssertTrue(
+            markerAbsentExpectation.isSatisfied(
+                by: logsRuntimeDeliveryTestSnapshot(
+                    linesContainerExists: true,
+                    emptyHintExists: false
+                )
+            )
+        )
+        XCTAssertFalse(markerAbsentExpectation.isSatisfied(by: delivered))
 
         let sharedInvalidSnapshots = [
             logsRuntimeDeliveryTestSnapshot(
@@ -56,6 +70,9 @@ extension FlowTabUITests {
         for snapshot in sharedInvalidSnapshots {
             XCTAssertFalse(
                 baselineExpectation.isSatisfied(by: snapshot)
+            )
+            XCTAssertFalse(
+                markerAbsentExpectation.isSatisfied(by: snapshot)
             )
         }
 

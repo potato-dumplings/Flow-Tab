@@ -31,19 +31,6 @@ struct HomeRootView: View {
             : Color.black.opacity(0.12)
     }
 
-    @ViewBuilder
-    private func tabContainer<Content: View>(
-        isSelected: Bool,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        content()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .opacity(isSelected ? 1 : 0)
-            .allowsHitTesting(isSelected)
-            .accessibilityHidden(!isSelected)
-            .zIndex(isSelected ? 1 : 0)
-    }
-
     var body: some View {
         HStack(spacing: 0) {
             HomeSidebar(
@@ -56,36 +43,14 @@ struct HomeRootView: View {
             Divider()
                 .overlay(dividerColor)
 
-            ZStack {
-                tabContainer(isSelected: tabState.selectedTab == .home) {
-                    HomeLandingView(
-                        isActive: tabState.selectedTab == .home,
-                        appLanguage: presentation.context.appLanguage,
-                        runtimeProjectionService: runtimeProjectionService,
-                        installedApps: appVisibilityModel.apps,
-                        effectiveHiddenAppIDs:
-                            appVisibilityModel.effectiveHiddenAppIDs
-                    ) {
-                        tabState.selectedTab = .settings
-                    }
-                }
-                tabContainer(isSelected: tabState.selectedTab == .logs) {
-                    AppLogsView(
-                        isActive: tabState.selectedTab == .logs,
-                        appLanguage: presentation.context.appLanguage,
-                        targetAppearance: presentation.context.targetNSAppearance
-                    )
-                }
-                tabContainer(isSelected: tabState.selectedTab == .settings) {
-                    AppSettingsView(
-                        isActive: tabState.selectedTab == .settings,
-                        appVisibilityModel: appVisibilityModel
-                    )
-                        .id(
-                            "settings-\(presentation.context.appearanceRebuildIdentity)"
-                        )
-                }
-            }
+            HomeRetainedTabContentHost(
+                selectedTab: tabState.selectedTab,
+                targetAppearance: presentation.context.targetNSAppearance,
+                contentIdentity: retainedContentIdentity(
+                    for: tabState.selectedTab
+                ),
+                contentForTab: retainedContent(for:isActive:)
+            )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -113,6 +78,56 @@ struct HomeRootView: View {
             for: .flowTabAppVisibilityPreferenceChanged
         )) { _ in
             appVisibilityModel.refreshStoredPreferences()
+        }
+    }
+
+    private func retainedContent(
+        for tab: HomeTab,
+        isActive: Bool
+    ) -> AnyView {
+        switch tab {
+        case .home:
+            return AnyView(
+                HomeLandingView(
+                    isActive: isActive,
+                    appLanguage: presentation.context.appLanguage,
+                    runtimeProjectionService: runtimeProjectionService,
+                    installedApps: appVisibilityModel.apps,
+                    effectiveHiddenAppIDs:
+                        appVisibilityModel.effectiveHiddenAppIDs
+                ) {
+                    tabState.selectedTab = .settings
+                }
+            )
+        case .logs:
+            return AnyView(
+                AppLogsView(
+                    isActive: isActive,
+                    appLanguage: presentation.context.appLanguage,
+                    targetAppearance:
+                        presentation.context.targetNSAppearance
+                )
+            )
+        case .settings:
+            return AnyView(
+                AppSettingsView(
+                    isActive: isActive,
+                    appVisibilityModel: appVisibilityModel
+                )
+            )
+        }
+    }
+
+    private func retainedContentIdentity(for tab: HomeTab) -> AnyHashable {
+        switch tab {
+        case .home:
+            return AnyHashable(HomeTab.home)
+        case .logs:
+            return AnyHashable(HomeTab.logs)
+        case .settings:
+            return AnyHashable(
+                "settings-\(presentation.context.appearanceRebuildIdentity)"
+            )
         }
     }
 }

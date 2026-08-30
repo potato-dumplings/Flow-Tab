@@ -10,6 +10,7 @@ enum FlowTabUITestLogsRuntimeDeliveryRequirement:
     Equatable
 {
     case emptyBaseline
+    case markerAbsent
     case delivered
 }
 
@@ -65,6 +66,17 @@ struct FlowTabUITestLogsRuntimeDeliveryExpectation: Equatable {
         )
     }
 
+    static func markerAbsent(
+        selectedLevel: String,
+        marker: String
+    ) -> Self {
+        Self(
+            requirement: .markerAbsent,
+            selectedLevel: selectedLevel,
+            marker: marker
+        )
+    }
+
     func isSatisfied(
         by snapshot: FlowTabUITestLogsRuntimeDeliverySnapshot
     ) -> Bool {
@@ -83,6 +95,8 @@ struct FlowTabUITestLogsRuntimeDeliveryExpectation: Equatable {
             return !snapshot.linesContainerExists
                 && snapshot.emptyHintExists
                 && snapshot.matchingRowContents.isEmpty
+        case .markerAbsent:
+            return snapshot.matchingRowContents.isEmpty
         case .delivered:
             return snapshot.linesContainerExists
                 && !snapshot.emptyHintExists
@@ -279,7 +293,7 @@ extension FlowTabUITests {
     ) {
         let baselineExpectation =
             FlowTabUITestLogsRuntimeDeliveryExpectation
-                .emptyBaseline(
+                .markerAbsent(
                     selectedLevel: selectedLevel,
                     marker: marker
                 )
