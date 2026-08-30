@@ -22,6 +22,10 @@ enum TabSwitchStressEvidenceTransport {
         static let runtimeLogLevel = "runtimeLogLevel"
         static let requested = "requested"
         static let observed = "observed"
+        static let startedAtUptimeNanoseconds =
+            "startedAtUptimeNanoseconds"
+        static let observedAtUptimeNanoseconds =
+            "observedAtUptimeNanoseconds"
         static let elapsedNanoseconds =
             "elapsedNanoseconds"
         static let durationSatisfied =
@@ -110,6 +114,18 @@ enum TabSwitchStressEvidenceTransport {
                         evidence.observedTarget?
                             .rawValue
                             ?? "none",
+                    UserInfoKey.startedAtUptimeNanoseconds:
+                        NSNumber(
+                            value:
+                                evidence
+                                    .startedAtUptimeNanoseconds
+                        ),
+                    UserInfoKey.observedAtUptimeNanoseconds:
+                        NSNumber(
+                            value:
+                                evidence
+                                    .observedAtUptimeNanoseconds
+                        ),
                     UserInfoKey.elapsedNanoseconds:
                         NSNumber(
                             value:

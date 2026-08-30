@@ -33,6 +33,8 @@ private struct TabSwitchRealPressureStatus: Codable {
     var homeSwitches: UInt64 = 0
     var logsSwitches: UInt64 = 0
     var settingsSwitches: UInt64 = 0
+    var stressStartedUptimeNanoseconds: UInt64 = 0
+    var stressCompletedUptimeNanoseconds: UInt64 = 0
     var elapsedNanoseconds: UInt64 = 0
     var durationSatisfied = false
     var workloadSatisfied = false
@@ -56,6 +58,10 @@ private struct TabSwitchRealPressureStatus: Codable {
         case homeSwitches = "home_switches"
         case logsSwitches = "logs_switches"
         case settingsSwitches = "settings_switches"
+        case stressStartedUptimeNanoseconds =
+            "stress_started_uptime_nanoseconds"
+        case stressCompletedUptimeNanoseconds =
+            "stress_completed_uptime_nanoseconds"
         case elapsedNanoseconds = "elapsed_nanoseconds"
         case durationSatisfied = "duration_satisfied"
         case workloadSatisfied = "workload_satisfied"
@@ -324,6 +330,10 @@ extension FlowTabUITests {
         status.logsSwitches = completed.logsSwitches
         status.settingsSwitches = completed.settingsSwitches
         status.runtimeLogLevel = completed.runtimeLogLevel
+        status.stressStartedUptimeNanoseconds =
+            completed.startedAtUptimeNanoseconds
+        status.stressCompletedUptimeNanoseconds =
+            completed.observedAtUptimeNanoseconds
         status.elapsedNanoseconds = completed.elapsedNanoseconds
         status.durationSatisfied = completed.durationSatisfied
         status.workloadSatisfied = completed.workloadSatisfied

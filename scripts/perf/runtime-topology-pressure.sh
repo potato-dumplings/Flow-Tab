@@ -325,7 +325,7 @@ STATUS_FILE="${OUTPUT_DIR}/status.json"
 UI_ATTEMPT_DIR="${OUTPUT_DIR}/attempts/ui-tests/run"
 
 mkdir -p "$LOG_DIR"
-printf 'sample,timestamp,pid,cpu_percent,rss_kb\n' >"$SAMPLES_FILE"
+printf 'sample,timestamp,pid,interval_started_uptime_nanoseconds,interval_completed_uptime_nanoseconds,cpu_percent,rss_kb\n' >"$SAMPLES_FILE"
 printf 'identity_check,timestamp,pid,process_start_epoch_seconds,process_start_identity,process_path_sha256,executable_sha256,verdict\n' >"$PID_BINDINGS_FILE"
 
 write_status() {

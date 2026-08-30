@@ -1,7 +1,20 @@
+import Darwin
 import XCTest
 @testable import FlowTab
 
 extension FlowTabTests {
+    @MainActor
+    func testTabSwitchStressSystemClockUsesCrossProcessMonotonicDomain() {
+        let before = clock_gettime_nsec_np(CLOCK_MONOTONIC)
+        let observed =
+            TabSwitchStressSystemMonotonicClock()
+                .nowNanoseconds
+        let after = clock_gettime_nsec_np(CLOCK_MONOTONIC)
+
+        XCTAssertGreaterThanOrEqual(observed, before)
+        XCTAssertLessThanOrEqual(observed, after)
+    }
+
     @MainActor
     func testTabSwitchStressPolicyNormalizesLaunchInputsAndWorkload() {
         let previousArguments =
@@ -141,6 +154,14 @@ extension FlowTabTests {
             evidence.last?.elapsedNanoseconds,
             1_000_000_000
         )
+        XCTAssertEqual(
+            evidence.last?.startedAtUptimeNanoseconds,
+            0
+        )
+        XCTAssertEqual(
+            evidence.last?.observedAtUptimeNanoseconds,
+            1_000_000_000
+        )
         XCTAssertTrue(
             evidence.last?.durationSatisfied == true
         )
@@ -208,6 +229,14 @@ extension FlowTabTests {
         )
         XCTAssertEqual(
             terminalEvidence?.elapsedNanoseconds,
+            5_000_000_000
+        )
+        XCTAssertEqual(
+            terminalEvidence?.startedAtUptimeNanoseconds,
+            0
+        )
+        XCTAssertEqual(
+            terminalEvidence?.observedAtUptimeNanoseconds,
             5_000_000_000
         )
     }

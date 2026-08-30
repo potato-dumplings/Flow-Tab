@@ -1,4 +1,5 @@
 #if FLOWTAB_TESTING
+import Darwin
 import Foundation
 
 enum TabSwitchStressTarget:
@@ -136,6 +137,8 @@ struct TabSwitchStressEvidence:
     let settingsSwitchCount: UInt64
     let requestedTarget: TabSwitchStressTarget?
     let observedTarget: TabSwitchStressTarget?
+    let startedAtUptimeNanoseconds: UInt64
+    let observedAtUptimeNanoseconds: UInt64
     let elapsedNanoseconds: UInt64
     let durationSatisfied: Bool
     let workloadSatisfied: Bool
@@ -159,6 +162,10 @@ struct TabSwitchStressEvidence:
             + "\(requestedTarget?.rawValue ?? "none") "
             + "observed="
             + "\(observedTarget?.rawValue ?? "none") "
+            + "startedAtUptimeNanoseconds="
+            + "\(startedAtUptimeNanoseconds) "
+            + "observedAtUptimeNanoseconds="
+            + "\(observedAtUptimeNanoseconds) "
             + "elapsedNanoseconds="
             + "\(elapsedNanoseconds) "
             + "durationSatisfied="
@@ -180,7 +187,7 @@ final class TabSwitchStressSystemMonotonicClock:
     TabSwitchStressMonotonicClock
 {
     var nowNanoseconds: UInt64 {
-        DispatchTime.now().uptimeNanoseconds
+        clock_gettime_nsec_np(CLOCK_MONOTONIC)
     }
 }
 

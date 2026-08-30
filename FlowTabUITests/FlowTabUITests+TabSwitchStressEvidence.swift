@@ -40,6 +40,8 @@ struct TabSwitchStressUITestEvidence:
     let runtimeLogLevel: String
     let requested: String
     let observed: String
+    let startedAtUptimeNanoseconds: UInt64
+    let observedAtUptimeNanoseconds: UInt64
     let elapsedNanoseconds: UInt64
     let durationSatisfied: Bool
     let workloadSatisfied: Bool
@@ -63,6 +65,10 @@ struct TabSwitchStressUITestEvidence:
             + "runtimeLogLevel=\(runtimeLogLevel) "
             + "requested=\(requested) "
             + "observed=\(observed) "
+            + "startedAtUptimeNanoseconds="
+            + "\(startedAtUptimeNanoseconds) "
+            + "observedAtUptimeNanoseconds="
+            + "\(observedAtUptimeNanoseconds) "
             + "elapsedNanoseconds="
             + "\(elapsedNanoseconds) "
             + "durationSatisfied="
@@ -93,6 +99,10 @@ final class TabSwitchStressUITestObservationOwner {
         static let runtimeLogLevel = "runtimeLogLevel"
         static let requested = "requested"
         static let observed = "observed"
+        static let startedAtUptimeNanoseconds =
+            "startedAtUptimeNanoseconds"
+        static let observedAtUptimeNanoseconds =
+            "observedAtUptimeNanoseconds"
         static let elapsedNanoseconds =
             "elapsedNanoseconds"
         static let durationSatisfied =
@@ -260,6 +270,19 @@ final class TabSwitchStressUITestObservationOwner {
               let observed =
                 userInfo[UserInfoKey.observed]
                     as? String,
+              let startedAtUptimeNanoseconds =
+                number(
+                    UserInfoKey.startedAtUptimeNanoseconds,
+                    in: userInfo
+                )?.uint64Value,
+              startedAtUptimeNanoseconds > 0,
+              let observedAtUptimeNanoseconds =
+                number(
+                    UserInfoKey.observedAtUptimeNanoseconds,
+                    in: userInfo
+                )?.uint64Value,
+              observedAtUptimeNanoseconds
+                >= startedAtUptimeNanoseconds,
               let elapsedNanoseconds =
                 number(
                     UserInfoKey.elapsedNanoseconds,
@@ -297,6 +320,10 @@ final class TabSwitchStressUITestObservationOwner {
             runtimeLogLevel: runtimeLogLevel,
             requested: requested,
             observed: observed,
+            startedAtUptimeNanoseconds:
+                startedAtUptimeNanoseconds,
+            observedAtUptimeNanoseconds:
+                observedAtUptimeNanoseconds,
             elapsedNanoseconds:
                 elapsedNanoseconds,
             durationSatisfied:
@@ -424,6 +451,15 @@ extension FlowTabUITests {
             XCTAssertGreaterThanOrEqual(
                 completed?.elapsedNanoseconds ?? 0,
                 TabSwitchStressUITestPolicy.workloadDurationNanoseconds
+            )
+            XCTAssertGreaterThan(
+                completed?.startedAtUptimeNanoseconds ?? 0,
+                0
+            )
+            XCTAssertEqual(
+                (completed?.observedAtUptimeNanoseconds ?? 0)
+                    - (completed?.startedAtUptimeNanoseconds ?? 0),
+                completed?.elapsedNanoseconds
             )
             let terminationWaitCompleted =
                 app.wait(

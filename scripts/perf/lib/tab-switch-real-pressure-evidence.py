@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
 import argparse
-import csv
 import json
-import math
 import os
 import re
 import sys
-import tempfile
+
+from tab_switch_real_pressure_evidence_self_test import run_self_test
+from tab_switch_real_pressure_windows import (
+    ACTIVE_RESOURCE_COVERAGE_MINIMUM,
+    LOG_CAPACITY,
+    TAB_SWITCH_WARMUP_MARKER,
+    active_log_volume,
+    load_samples_or_empty,
+    log_volume,
+    runtime_log_paths,
+    select_resource_windows,
+    summarize_resources,
+)
 
 
-LOG_CAPACITY = 20
-RSS_ABSOLUTE_GROWTH_ALLOWANCE_KB = 32 * 1024
-RSS_RELATIVE_GROWTH_ALLOWANCE = 0.15
 OBSERVER_INSTALL_EVENT_NAMES = (
     "runtimeAXObserverInstall",
     "homeAXObserverInstall",
@@ -20,17 +27,6 @@ OBSERVER_RETRY_EVENT_NAMES = (
     "runtimeAXObserverRetry",
     "homeAXObserverRetry",
 )
-TAB_SWITCH_WARMUP_MARKER = (
-    "FlowTabTabSwitchStressEvidence phase=started"
-)
-
-
-def percentile(values, value):
-    ordered = sorted(values)
-    if not ordered:
-        return None
-    index = math.ceil(len(ordered) * value / 100.0) - 1
-    return ordered[max(0, min(index, len(ordered) - 1))]
 
 
 def load_json(path):
@@ -40,61 +36,6 @@ def load_json(path):
 
 def load_json_or(path, fallback):
     return load_json(path) if os.path.isfile(path) else fallback
-
-
-def load_samples(path):
-    with open(path, newline="", encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle))
-    return [
-        {
-            "cpu": float(row["cpu_percent"]),
-            "rss_kb": float(row["rss_kb"]),
-        }
-        for row in rows
-    ]
-
-
-def load_samples_or_empty(path):
-    return load_samples(path) if os.path.isfile(path) else []
-
-
-def runtime_log_paths(runtime_home):
-    directory = os.path.join(
-        runtime_home,
-        "Library",
-        "Application Support",
-        "FlowTab",
-        "logs",
-    )
-    if not os.path.isdir(directory):
-        return []
-    return [
-        os.path.join(directory, name)
-        for name in sorted(os.listdir(directory))
-        if name.endswith(".log")
-    ]
-
-
-def log_volume(runtime_home, elapsed_seconds, completed_switches):
-    paths = runtime_log_paths(runtime_home)
-    retained_bytes = sum(os.path.getsize(path) for path in paths)
-    line_count = 0
-    for path in paths:
-        with open(path, "rb") as handle:
-            line_count += sum(1 for _ in handle)
-    seconds = max(elapsed_seconds, 0.000001)
-    switches = max(completed_switches, 1)
-    return {
-        "file_count": len(paths),
-        "line_count": line_count,
-        "retained_bytes": retained_bytes,
-        "bytes_per_second": retained_bytes / seconds,
-        "megabytes_per_minute": (
-            retained_bytes * 60 / seconds / 1_000_000
-        ),
-        "bytes_per_completed_switch": retained_bytes / switches,
-        "capacity_saturated": len(paths) >= LOG_CAPACITY,
-    }
 
 
 def observer_install_evidence(runtime_home):
@@ -216,45 +157,60 @@ def evaluate(
     home_switches = int(ui_status.get("home_switches", 0))
     logs_switches = int(ui_status.get("logs_switches", 0))
     settings_switches = int(ui_status.get("settings_switches", 0))
-    volume = log_volume(
+    stress_started = int(
+        ui_status.get("stress_started_uptime_nanoseconds", 0)
+    )
+    stress_completed = int(
+        ui_status.get("stress_completed_uptime_nanoseconds", 0)
+    )
+    active_window_duration = stress_completed - stress_started
+    active_window_timing_satisfied = (
+        stress_started > 0
+        and stress_completed > stress_started
+        and active_window_duration == elapsed_nanoseconds
+    )
+    resource_windows = select_resource_windows(
+        samples,
+        stress_started,
+        stress_completed,
+    )
+    active_resources = summarize_resources(resource_windows["active"])
+    preflight_resources = summarize_resources(
+        resource_windows["preflight"]
+    )
+    postflight_resources = summarize_resources(
+        resource_windows["postflight"]
+    )
+    whole_run_resources = summarize_resources(samples)
+    active_covered_duration = active_resources[
+        "covered_duration_nanoseconds"
+    ]
+    active_resource_coverage = (
+        active_covered_duration / elapsed_nanoseconds
+        if elapsed_nanoseconds > 0
+        else 0
+    )
+    cpu_time_per_completed_switch = (
+        active_resources["processor_time_milliseconds"]
+        / completed_switches
+        if completed_switches > 0
+        else None
+    )
+    active_volume = active_log_volume(
+        runtime_home,
+        elapsed_seconds,
+        completed_switches,
+    )
+    whole_run_volume = log_volume(
         runtime_home,
         elapsed_seconds,
         completed_switches,
     )
     observer_evidence = observer_install_evidence(runtime_home)
-
-    cpu_values = [row["cpu"] for row in samples]
-    rss_values = [row["rss_kb"] for row in samples]
-    warmup_index = min(len(samples), math.ceil(len(samples) * 0.2))
-    plateau = samples[warmup_index:]
-    middle_start = math.floor(len(plateau) * 0.25)
-    middle_end = max(middle_start + 1, math.ceil(len(plateau) * 0.5))
-    late_start = math.floor(len(plateau) * 0.75)
-    middle_rss = [
-        row["rss_kb"] for row in plateau[middle_start:middle_end]
-    ]
-    late_rss = [row["rss_kb"] for row in plateau[late_start:]]
-    middle_rss_p95 = percentile(middle_rss, 95)
-    late_rss_p95 = percentile(late_rss, 95)
-    rss_growth_kb = (
-        late_rss_p95 - middle_rss_p95
-        if middle_rss_p95 is not None and late_rss_p95 is not None
-        else math.inf
-    )
-    rss_growth_limit_kb = (
-        max(
-            RSS_ABSOLUTE_GROWTH_ALLOWANCE_KB,
-            middle_rss_p95 * RSS_RELATIVE_GROWTH_ALLOWANCE,
-        )
-        if middle_rss_p95 is not None
-        else 0
-    )
-    rss_growth_observed = (
-        rss_growth_kb if math.isfinite(rss_growth_kb) else None
-    )
+    active_rss = active_resources["rss_mb"]
     log_budget_satisfied = (
         runtime_log_budget is None
-        or volume["megabytes_per_minute"] <= runtime_log_budget
+        or active_volume["megabytes_per_minute"] <= runtime_log_budget
     )
 
     gates = [
@@ -366,25 +322,68 @@ def evaluate(
             },
             "all passed",
         ),
-        gate("resource_samples", len(samples) >= 3, len(samples), ">=3"),
+        gate(
+            "active_resource_window",
+            active_window_timing_satisfied,
+            {
+                "started_uptime_nanoseconds": stress_started,
+                "completed_uptime_nanoseconds": stress_completed,
+                "elapsed_nanoseconds": elapsed_nanoseconds,
+                "observed_duration_nanoseconds": active_window_duration,
+            },
+            "valid monotonic bounds with duration matching elapsed",
+        ),
+        gate(
+            "resource_samples",
+            active_resources["sample_count"] >= 3,
+            active_resources["sample_count"],
+            ">=3 active samples",
+        ),
+        gate(
+            "active_resource_coverage",
+            active_resource_coverage
+            >= ACTIVE_RESOURCE_COVERAGE_MINIMUM,
+            active_resource_coverage,
+            f">={ACTIVE_RESOURCE_COVERAGE_MINIMUM}",
+        ),
         gate(
             "rss_plateau",
-            len(middle_rss) >= 2
-            and len(late_rss) >= 2
-            and rss_growth_kb <= rss_growth_limit_kb,
-            rss_growth_observed,
-            f"<={rss_growth_limit_kb}",
+            active_rss["middle_sample_count"] >= 2
+            and active_rss["late_sample_count"] >= 2
+            and active_rss["plateau_growth"] is not None
+            and active_rss["plateau_growth"]
+            <= active_rss["plateau_growth_limit"],
+            active_rss["plateau_growth"],
+            f"<={active_rss['plateau_growth_limit']} MB",
+        ),
+        gate(
+            "runtime_log_window",
+            runtime_log_level != "DEBUG"
+            or active_volume["window_satisfied"],
+            {
+                "started_markers": active_volume[
+                    "started_marker_count"
+                ],
+                "completed_markers": active_volume[
+                    "completed_marker_count"
+                ],
+            },
+            (
+                "exactly one started marker and one completed marker"
+                if runtime_log_level == "DEBUG"
+                else "evaluated by paired DEBUG run"
+            ),
         ),
         gate(
             "runtime_log_capacity",
-            not volume["capacity_saturated"],
-            volume["file_count"],
+            not whole_run_volume["capacity_saturated"],
+            whole_run_volume["file_count"],
             f"<{LOG_CAPACITY}",
         ),
         gate(
             "runtime_log_budget",
             log_budget_satisfied,
-            volume["megabytes_per_minute"],
+            active_volume["megabytes_per_minute"],
             (
                 f"<={runtime_log_budget}"
                 if runtime_log_budget is not None
@@ -409,9 +408,15 @@ def evaluate(
         ),
     ]
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "runner_kind": "tab_switch_real_pressure",
         "lane": "real_permissions",
+        "measurement_window": "active_tab_switch",
+        "measurement_source": (
+            "active-window-v2"
+            if active_window_timing_satisfied
+            else "whole-run-legacy-v1"
+        ),
         "verdict": (
             "environment_blocked"
             if environment_blocked
@@ -455,43 +460,35 @@ def evaluate(
         "logs_switches": logs_switches,
         "settings_switches": settings_switches,
         "elapsed_seconds": elapsed_seconds,
-        "sample_count": len(samples),
-        "cpu_percent": {
-            "average": (
-                sum(cpu_values) / len(cpu_values) if cpu_values else None
-            ),
-            "p95": percentile(cpu_values, 95),
-            "max": max(cpu_values) if cpu_values else None,
+        "stress_started_uptime_nanoseconds": stress_started,
+        "stress_completed_uptime_nanoseconds": stress_completed,
+        "active_resource_coverage": {
+            "ratio": active_resource_coverage,
+            "covered_duration_nanoseconds": active_covered_duration,
+            "required_ratio": ACTIVE_RESOURCE_COVERAGE_MINIMUM,
         },
-        "rss_mb": {
-            "average": (
-                sum(rss_values) / len(rss_values) / 1024
-                if rss_values
-                else None
-            ),
-            "p95": (
-                percentile(rss_values, 95) / 1024
-                if rss_values
-                else None
-            ),
-            "max": max(rss_values) / 1024 if rss_values else None,
-            "middle_p95": (
-                middle_rss_p95 / 1024
-                if middle_rss_p95 is not None
-                else None
-            ),
-            "late_p95": (
-                late_rss_p95 / 1024
-                if late_rss_p95 is not None
-                else None
-            ),
-            "plateau_growth": (
-                rss_growth_kb / 1024
-                if math.isfinite(rss_growth_kb)
-                else None
+        "sample_count": active_resources["sample_count"],
+        "whole_run_sample_count": len(samples),
+        "cpu_percent": active_resources["cpu_percent"],
+        "cpu_time_milliseconds_per_completed_switch": (
+            cpu_time_per_completed_switch
+        ),
+        "rss_mb": active_rss,
+        "runtime_logs": active_volume,
+        "diagnostic_runtime_logs": {
+            "whole_run": whole_run_volume,
+        },
+        "diagnostic_resource_windows": {
+            "preflight": preflight_resources,
+            "postflight": postflight_resources,
+            "whole_run": whole_run_resources,
+            "unclassified_sample_count": (
+                len(samples)
+                - preflight_resources["sample_count"]
+                - active_resources["sample_count"]
+                - postflight_resources["sample_count"]
             ),
         },
-        "runtime_logs": volume,
         "runtime_ax_observer": observer_evidence,
         "runtime_pressure": runtime_status,
         "gates": gates,
@@ -510,9 +507,14 @@ def write_atomically(path, content):
 def render_summary(result):
     cpu = result["cpu_percent"]
     rss = result["rss_mb"]
+    coverage = result["active_resource_coverage"]
+    logs = result["runtime_logs"]
     lines = [
         "FlowTab real-permission Tab pressure",
         f"verdict={result['verdict']}",
+        f"schema_version={result['schema_version']}",
+        f"measurement_window={result['measurement_window']}",
+        f"measurement_source={result['measurement_source']}",
         f"duration_seconds={result['duration_seconds']}",
         f"switch_interval_milliseconds={result['switch_interval_milliseconds']}",
         f"completed_switches={result['completed_switches']}",
@@ -522,9 +524,20 @@ def render_summary(result):
         + f"settings:{result['settings_switches']}",
         "cpu_percent="
         + f"avg:{cpu['average']},p95:{cpu['p95']},max:{cpu['max']}",
+        "active_resource_coverage="
+        + f"ratio:{coverage['ratio']},"
+        + f"samples:{result['sample_count']},"
+        + f"whole_run_samples:{result['whole_run_sample_count']}",
+        "cpu_time_milliseconds_per_completed_switch="
+        + str(result["cpu_time_milliseconds_per_completed_switch"]),
         "rss_mb="
         + f"avg:{rss['average']},p95:{rss['p95']},max:{rss['max']},"
         + f"plateau_growth:{rss['plateau_growth']}",
+        "active_runtime_logs="
+        + f"bytes:{logs['retained_bytes']},"
+        + f"megabytes_per_minute:{logs['megabytes_per_minute']},"
+        + f"started_markers:{logs['started_marker_count']},"
+        + f"completed_markers:{logs['completed_marker_count']}",
         "runtime_ax_observer="
         + f"warmup_markers:{result['runtime_ax_observer']['warmup_marker_count']},"
         + "post_warmup_installs:"
@@ -554,111 +567,7 @@ def render_summary(result):
 
 
 def self_test():
-    ui_status = {
-        "state": "completed",
-        "runtime_log_level": "ERROR",
-        "accessibility_authorized": True,
-        "screen_recording_authorized": True,
-        "home_application_count": 3,
-        "home_window_count": 2,
-        "fixture_hit": True,
-        "home_warmed": True,
-        "logs_warmed": True,
-        "settings_warmed": True,
-        "required_switches": 3,
-        "completed_switches": 3,
-        "home_switches": 1,
-        "logs_switches": 1,
-        "settings_switches": 1,
-        "elapsed_nanoseconds": 1_000_000_000,
-        "duration_satisfied": True,
-        "workload_satisfied": True,
-    }
-    runtime_status = {
-        "final_exit_code": 0,
-        "identity_verdict": "matched",
-        "ui_result_bundle_valid": True,
-    }
-    samples = [
-        {"cpu": 10.0, "rss_kb": 100_000 + index * 10}
-        for index in range(20)
-    ]
-    with tempfile.TemporaryDirectory(
-        prefix="flowtab-tab-real-evidence-"
-    ) as runtime_home:
-        result = evaluate(
-            ui_status,
-            runtime_status,
-            samples,
-            runtime_home,
-            "ERROR",
-            1.0,
-            1,
-            333.333,
-            0,
-        )
-        assert result["verdict"] == "passed"
-        denied = dict(ui_status)
-        denied["state"] = "permission_blocked"
-        denied["screen_recording_authorized"] = False
-        assert evaluate(
-            denied,
-            runtime_status,
-            samples,
-            runtime_home,
-            "ERROR",
-            None,
-            1,
-            333.333,
-            0,
-        )["verdict"] == "environment_blocked"
-        log_directory = os.path.join(
-            runtime_home,
-            "Library",
-            "Application Support",
-            "FlowTab",
-            "logs",
-        )
-        os.makedirs(log_directory)
-        with open(
-            os.path.join(log_directory, "Flow_Tab_test.log"),
-            "w",
-            encoding="utf-8",
-        ) as handle:
-            handle.write(
-                "homeAXObserverInstall result=installed "
-                "appID=com.example.prewarm pid=1 retryAttempt=0\n"
-                + TAB_SWITCH_WARMUP_MARKER
-                + "\n"
-                + "runtimeAXObserverInstall result=installed "
-                "appID=com.example.current pid=2 retryAttempt=0\n"
-                + "homeAXObserverInstall result=installed "
-                "appID=com.example.historical pid=3 retryAttempt=0\n"
-                + "runtimeAXObserverInstall result=installed "
-                "appID=com.example.current pid=2 retryAttempt=1\n"
-                + "runtimeAXObserverRetry result=succeeded "
-                "appID=com.example.current pid=2\n"
-            )
-        observer_evidence = observer_install_evidence(runtime_home)
-        assert observer_evidence["warmup_marker_count"] == 1
-        assert observer_evidence["all_successful_install_count"] == 4
-        assert observer_evidence[
-            "post_warmup_successful_install_count"
-        ] == 3
-        assert observer_evidence[
-            "post_warmup_unique_binding_count"
-        ] == 2
-        assert observer_evidence[
-            "post_warmup_retry_install_count"
-        ] == 1
-        assert observer_evidence[
-            "post_warmup_current_install_event_count"
-        ] == 2
-        assert observer_evidence[
-            "post_warmup_historical_install_event_count"
-        ] == 1
-        assert observer_evidence["structure_satisfied"] is True
-    print("Real Tab pressure permission, fixture, tab, RSS, and log gates passed.")
+    run_self_test(evaluate, observer_install_evidence)
 
 
 def main():

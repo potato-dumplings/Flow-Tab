@@ -73,7 +73,11 @@ extension TabSwitchStressRunner {
                 TabSwitchStressTaskScheduler(),
             selectTarget: selectSharedTarget,
             terminate: {
-                NSApp.terminate(nil)
+                Task { @MainActor in
+                    _ = await RuntimeDiagnostics.shared
+                        .makeReadSnapshot()
+                    NSApp.terminate(nil)
+                }
             },
             onEvidence: reportSharedEvidence
         )

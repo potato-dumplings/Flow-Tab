@@ -383,6 +383,10 @@ final class TabSwitchStressRunner:
                 run.requestedTarget,
             observedTarget:
                 run.observedTarget,
+            startedAtUptimeNanoseconds:
+                run.startNanoseconds,
+            observedAtUptimeNanoseconds:
+                observedAtNanoseconds,
             elapsedNanoseconds:
                 elapsedNanoseconds,
             durationSatisfied:

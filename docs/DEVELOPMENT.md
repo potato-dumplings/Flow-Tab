@@ -317,7 +317,9 @@ swift test
   --sample-interval 0.5 --runtime-log-level ERROR
 ```
 
-`DEBUG` 使用相同的 `20ms`、`50ms` 组合，可按本轮日志预算增加 `--max-runtime-log-mb-per-minute`。四个组合各运行三次，以同机三轮中位数比较。正式 `status.json` 保存权限、Home 应用/窗口数、Fixture 命中、三页预热、计划/完成切换数、Home/Logs/Settings 完成次数、CPU/RSS 与日志门禁；三个 Tab 的计数都必须大于零，且总和等于完成切换数。
+`DEBUG` 使用相同的 `20ms`、`50ms` 组合，可按本轮日志预算增加 `--max-runtime-log-mb-per-minute`。四个组合各运行三次，以同机三轮中位数比较。正式 `status.json` 使用 schema v2：顶层 CPU/RSS、样本数与每次完成切换的 CPU 时间只覆盖唯一 started/completed monotonic 边界内的 active Tab-switch 窗口；preflight、postflight 和 whole-run 资源数据放在诊断字段。每个 CPU 采样保存区间 monotonic 起止时间，只有完整落入 active 窗口的区间参与正式聚合，覆盖率必须达到 `90%`。历史证据缺少 monotonic 边界时标记为 `whole-run-legacy-v1`，只保留 whole-run 诊断值。
+
+正式证据同时保存权限、Home 应用/窗口数、Fixture 命中、三页预热、计划/完成切换数和 Home/Logs/Settings 完成次数；三个 Tab 的计数都必须大于零，且总和等于完成切换数。`DEBUG` 日志量按跨日志文件的唯一 started/completed marker 之间实际字节计算，并输出 category/event 字节排行；完成 marker 在应用退出前同步完成日志队列落盘。当前 CPU 验收状态为 `active-window v2 baseline pending`，AX 观察器安装数继续作为独立结构门禁。
 
 隔离状态/日志链路提供配对归因数据。参数依次为持续秒数、切换间隔毫秒和采样间隔秒：
 

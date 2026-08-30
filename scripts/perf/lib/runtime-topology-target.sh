@@ -603,6 +603,7 @@ sample_flowtab() {
   local cpu
   local cpu_time
   local cpu_centiseconds
+  local interval_started_uptime_nanoseconds
   local sample_monotonic_ns
   local rss
 
@@ -641,15 +642,18 @@ sample_flowtab() {
     IDENTITY_VERDICT="cpu_interval_error"
     return 1
   fi
+  interval_started_uptime_nanoseconds="$TARGET_PREVIOUS_CPU_SAMPLE_MONOTONIC_NS"
   TARGET_PREVIOUS_CPU_CENTISECONDS="$cpu_centiseconds"
   TARGET_PREVIOUS_CPU_SAMPLE_MONOTONIC_NS="$sample_monotonic_ns"
 
   SAMPLE_COUNT=$((SAMPLE_COUNT + 1))
   record_identity_binding "$IDENTITY_VERDICT"
-  printf '%s,%s,%s,%s,%s\n' \
+  printf '%s,%s,%s,%s,%s,%s,%s\n' \
     "$SAMPLE_COUNT" \
     "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
     "$TARGET_PID" \
+    "$interval_started_uptime_nanoseconds" \
+    "$sample_monotonic_ns" \
     "$cpu" \
     "$rss" >>"$SAMPLES_FILE"
 }
