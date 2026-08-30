@@ -5,6 +5,59 @@ import XCTest
 
 extension FlowTabTests {
     @MainActor
+    func testCompactActionButtonIntrinsicSizeCacheMeasuresOnlyDistinctSignatures() {
+        let font = FlowTypography.appKit(.controlTextEmphasized)
+        let metrics = FlowCompactActionButtonMetrics(
+            height: 32,
+            minimumWidth: 68,
+            horizontalPadding: 14
+        )
+        let signature = FlowCompactActionButtonIntrinsicSizeSignature(
+            title: "Open Directory",
+            metrics: metrics,
+            font: font
+        )
+        var cache = FlowCompactActionButtonIntrinsicSizeCache()
+        var measurementCount = 0
+        let measure: () -> NSSize = {
+            measurementCount += 1
+            return NSSize(width: 124, height: 32)
+        }
+
+        XCTAssertEqual(cache.size(for: signature, measure: measure).width, 124)
+        XCTAssertEqual(cache.size(for: signature, measure: measure).width, 124)
+        XCTAssertEqual(measurementCount, 1)
+
+        let changedTitle = FlowCompactActionButtonIntrinsicSizeSignature(
+            title: "Clear Logs",
+            metrics: metrics,
+            font: font
+        )
+        _ = cache.size(for: changedTitle, measure: measure)
+        XCTAssertEqual(measurementCount, 2)
+
+        let changedMetrics = FlowCompactActionButtonIntrinsicSizeSignature(
+            title: "Clear Logs",
+            metrics: FlowCompactActionButtonMetrics(
+                height: 34,
+                minimumWidth: 72,
+                horizontalPadding: 16
+            ),
+            font: font
+        )
+        _ = cache.size(for: changedMetrics, measure: measure)
+        XCTAssertEqual(measurementCount, 3)
+
+        let changedFont = FlowCompactActionButtonIntrinsicSizeSignature(
+            title: "Clear Logs",
+            metrics: changedMetrics.metrics,
+            font: NSFont.systemFont(ofSize: font.pointSize + 1)
+        )
+        _ = cache.size(for: changedFont, measure: measure)
+        XCTAssertEqual(measurementCount, 4)
+    }
+
+    @MainActor
     func testCompactActionButtonUpdatesTitleAccessibilityAndWidthForLanguageTitles() throws {
         let appearance = try XCTUnwrap(NSAppearance(named: .aqua))
         let button = FlowCompactActionButtonControl()

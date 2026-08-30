@@ -6,6 +6,34 @@ import XCTest
 
 extension FlowTabTests {
     @MainActor
+    func testSettingsRootRetainsBackingContainerAcrossTabRoundTrip() throws {
+        let previousSelectedTab = HomeTabState.shared.selectedTab
+        HomeTabState.shared.selectedTab = .settings
+        defer { HomeTabState.shared.selectedTab = previousSelectedTab }
+
+        let hostedView = NSHostingView(
+            rootView: HomeRootView()
+                .frame(width: 1_440, height: 900, alignment: .topLeading)
+        )
+        hostedView.frame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
+        hostedView.layoutSubtreeIfNeeded()
+        let initialContainer = try singleSettingsPresentationContainer(
+            in: hostedView
+        )
+
+        HomeTabState.shared.selectedTab = .home
+        RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        HomeTabState.shared.selectedTab = .settings
+        RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        hostedView.layoutSubtreeIfNeeded()
+
+        let restoredContainer = try singleSettingsPresentationContainer(
+            in: hostedView
+        )
+        XCTAssertTrue(restoredContainer === initialContainer)
+    }
+
+    @MainActor
     func testSettingsLanguageChangeRebuildsSettingsBridgeWithLocalizedText() async throws {
         let previousLanguageRaw = UserDefaults.standard.string(
             forKey: AppPreferenceKeys.appLanguage

@@ -21,12 +21,17 @@ extension FlowTabTests {
         var gate = AppKitSettingsPageContentRefreshGate()
         let initialState = makeSettingsLayoutActivityState()
 
+        XCTAssertEqual(gate.contentRevision, 0)
         XCTAssertTrue(gate.consume(initialState))
+        XCTAssertEqual(gate.contentRevision, 1)
         XCTAssertFalse(gate.consume(initialState))
+        XCTAssertEqual(gate.contentRevision, 1)
 
         let changedState = makeSettingsLayoutActivityState(hiddenAppCount: 2)
         XCTAssertTrue(gate.consume(changedState))
+        XCTAssertEqual(gate.contentRevision, 2)
         XCTAssertFalse(gate.consume(changedState))
+        XCTAssertEqual(gate.contentRevision, 2)
     }
 
     func testSettingsContentRefreshGateIncludesLanguageAndAppearance() {
@@ -45,6 +50,51 @@ extension FlowTabTests {
         XCTAssertFalse(gate.consume(languageState))
         XCTAssertTrue(gate.consume(appearanceState))
         XCTAssertFalse(gate.consume(appearanceState))
+        XCTAssertEqual(gate.contentRevision, 3)
+    }
+
+    func testSettingsLayoutMeasurementCacheUsesCompleteLayoutSignature() {
+        var cache = AppKitSettingsPageLayoutMeasurementCache()
+        let signature = AppKitSettingsPageLayoutSignature(
+            viewportSize: CGSize(width: 1_200, height: 820),
+            safeAreaTop: 0,
+            contentRevision: 4
+        )
+        let fittedSize = CGSize(width: 1_152, height: 760)
+
+        XCTAssertNil(cache.fittedSize(for: signature))
+        cache.store(fittedSize: fittedSize, for: signature)
+        XCTAssertEqual(cache.fittedSize(for: signature), fittedSize)
+        XCTAssertNil(
+            cache.fittedSize(
+                for: AppKitSettingsPageLayoutSignature(
+                    viewportSize: CGSize(width: 1_180, height: 820),
+                    safeAreaTop: 0,
+                    contentRevision: 4
+                )
+            )
+        )
+        XCTAssertNil(
+            cache.fittedSize(
+                for: AppKitSettingsPageLayoutSignature(
+                    viewportSize: CGSize(width: 1_200, height: 820),
+                    safeAreaTop: 24,
+                    contentRevision: 4
+                )
+            )
+        )
+        XCTAssertNil(
+            cache.fittedSize(
+                for: AppKitSettingsPageLayoutSignature(
+                    viewportSize: CGSize(width: 1_200, height: 820),
+                    safeAreaTop: 0,
+                    contentRevision: 5
+                )
+            )
+        )
+
+        cache.invalidate()
+        XCTAssertNil(cache.fittedSize(for: signature))
     }
 
     @MainActor
@@ -108,7 +158,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testSettingsStateChangeStillRefreshesContentAndLayout() async throws {
+    func testSettingsStateChangeDefersWhileInactiveAndRefreshesOnActivation() async throws {
         let container = AppKitSettingsPageContainerView()
         container.frame = NSRect(x: 0, y: 0, width: 1_200, height: 820)
         container.update(
@@ -130,6 +180,23 @@ extension FlowTabTests {
             ),
             isActive: false
         )
+
+        XCTAssertEqual(probe.layoutCount, 0)
+        XCTAssertEqual(
+            container.appearance?.bestMatch(from: [.darkAqua, .aqua]),
+            .aqua
+        )
+
+        container.update(
+            with: makeSettingsLayoutActivityState(
+                themeMode: .dark,
+                language: .simplifiedChinese,
+                hiddenAppCount: 2,
+                targetAppearanceName: .darkAqua
+            ),
+            isActive: true
+        )
+        await awaitSettingsLayoutMainQueueTurn()
 
         XCTAssertGreaterThan(probe.layoutCount, 0)
         XCTAssertEqual(

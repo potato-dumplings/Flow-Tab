@@ -197,12 +197,18 @@ final class AppKitSettingsControlRow: NSStackView {
     }
 
     func updateTitle(_ title: String) {
+        guard titleLabel.stringValue != title else { return }
         titleLabel.stringValue = title
         invalidateIntrinsicContentSize()
     }
 
     func updateValidationMessage(_ message: String?) {
         let resolvedMessage = message.flatMap { $0.isEmpty ? nil : $0 }
+        guard validationLabel.stringValue != (resolvedMessage ?? "")
+            || validationLabel.isHidden != (resolvedMessage == nil)
+        else {
+            return
+        }
         validationLabel.stringValue = resolvedMessage ?? ""
         validationLabel.isHidden = resolvedMessage == nil
         validationContainer.isHidden = resolvedMessage == nil

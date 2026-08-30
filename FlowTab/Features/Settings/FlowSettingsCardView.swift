@@ -37,6 +37,17 @@ enum FlowSettingsLayoutMetrics {
 }
 
 final class FlowSettingsCardView: NSView, FlowSettingsAppearanceRefreshable {
+    private struct ChromeState: Equatable {
+        let title: String
+        let subtitle: String?
+    }
+
+    private struct TitleAccessoryState: Equatable {
+        let text: String?
+        let accessibilityIdentifier: String?
+        let accessibilityValue: String?
+    }
+
     private let stackView = NSStackView()
     private let titleRow = NSStackView()
     private let titleLabel: NSTextField
@@ -44,6 +55,8 @@ final class FlowSettingsCardView: NSView, FlowSettingsAppearanceRefreshable {
     private let titleAccessoryLabel = NSTextField(labelWithString: "")
     private let contentPadding = NSEdgeInsets(top: 14, left: 14, bottom: 14, right: 14)
     private var targetAppearance = FlowSettingsStyleResolver.defaultAppearance
+    private var chromeState: ChromeState?
+    private var titleAccessoryState: TitleAccessoryState?
 
     init(title: String, subtitle: String?, contentView: NSView) {
         titleLabel = NSTextField(labelWithString: title)
@@ -51,6 +64,7 @@ final class FlowSettingsCardView: NSView, FlowSettingsAppearanceRefreshable {
         super.init(frame: .zero)
         subtitleLabel.isHidden = subtitle?.isEmpty ?? true
         buildViewHierarchy(contentView: contentView)
+        chromeState = ChromeState(title: title, subtitle: subtitle)
     }
 
     required init?(coder: NSCoder) {
@@ -87,21 +101,42 @@ final class FlowSettingsCardView: NSView, FlowSettingsAppearanceRefreshable {
         accessibilityIdentifier: String? = nil,
         accessibilityValue: String? = nil
     ) {
+        let state = TitleAccessoryState(
+            text: text,
+            accessibilityIdentifier: accessibilityIdentifier,
+            accessibilityValue: accessibilityValue
+        )
+        guard titleAccessoryState != state else { return }
+        titleAccessoryState = state
         titleAccessoryLabel.stringValue = text ?? ""
         titleAccessoryLabel.isHidden = text?.isEmpty ?? true
         if let accessibilityIdentifier {
             titleAccessoryLabel.setFlowTabTestingIdentifier(
                 accessibilityIdentifier
             )
+        } else {
+            titleAccessoryLabel.identifier = nil
+            titleAccessoryLabel.setAccessibilityIdentifier(nil)
         }
         titleAccessoryLabel.setAccessibilityValue(accessibilityValue ?? "")
         invalidateIntrinsicContentSize()
     }
 
     func updateChrome(title: String, subtitle: String?) {
-        titleLabel.stringValue = title
-        subtitleLabel.stringValue = subtitle ?? ""
-        subtitleLabel.isHidden = subtitle?.isEmpty ?? true
+        let state = ChromeState(title: title, subtitle: subtitle)
+        guard chromeState != state else { return }
+        chromeState = state
+        if titleLabel.stringValue != title {
+            titleLabel.stringValue = title
+        }
+        let resolvedSubtitle = subtitle ?? ""
+        if subtitleLabel.stringValue != resolvedSubtitle {
+            subtitleLabel.stringValue = resolvedSubtitle
+        }
+        let hidesSubtitle = subtitle?.isEmpty ?? true
+        if subtitleLabel.isHidden != hidesSubtitle {
+            subtitleLabel.isHidden = hidesSubtitle
+        }
         invalidateIntrinsicContentSize()
     }
 

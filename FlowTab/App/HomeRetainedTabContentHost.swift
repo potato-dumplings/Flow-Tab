@@ -83,8 +83,8 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
 
             if identityChanged,
                let replacedView = hostingViews.removeValue(
-                   forKey: selectedTab
-               )
+                    forKey: selectedTab
+                )
             {
                 replacedView.removeFromSuperview()
             }
@@ -101,7 +101,8 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
                     rootView: contentForTab(selectedTab, true)
                 )
                 incomingView.appearance = targetAppearance
-                incomingView.translatesAutoresizingMaskIntoConstraints = false
+                incomingView.translatesAutoresizingMaskIntoConstraints = true
+                incomingView.autoresizingMask = [.width, .height]
                 incomingView.sizingOptions = []
                 hostingViews[selectedTab] = incomingView
                 requiresInitialLayout = true
@@ -112,20 +113,6 @@ struct HomeRetainedTabContentHost: NSViewRepresentable {
 
             incomingView.frame = container.bounds
             container.addSubview(incomingView)
-            NSLayoutConstraint.activate([
-                incomingView.leadingAnchor.constraint(
-                    equalTo: container.leadingAnchor
-                ),
-                incomingView.trailingAnchor.constraint(
-                    equalTo: container.trailingAnchor
-                ),
-                incomingView.topAnchor.constraint(
-                    equalTo: container.topAnchor
-                ),
-                incomingView.bottomAnchor.constraint(
-                    equalTo: container.bottomAnchor
-                )
-            ])
             if requiresInitialLayout,
                container.bounds.width > 0,
                container.bounds.height > 0

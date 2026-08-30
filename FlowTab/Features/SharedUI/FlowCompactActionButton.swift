@@ -21,13 +21,22 @@ struct FlowCompactActionButtonMetrics: Equatable {
     }
 }
 
-struct FlowCompactActionButtonStyle {
+struct FlowCompactActionButtonStyle: Equatable {
     let textColor: NSColor
     let backgroundColor: NSColor
     let borderColor: NSColor
+
+    static func == (
+        lhs: FlowCompactActionButtonStyle,
+        rhs: FlowCompactActionButtonStyle
+    ) -> Bool {
+        lhs.textColor.isEqual(rhs.textColor)
+            && lhs.backgroundColor.isEqual(rhs.backgroundColor)
+            && lhs.borderColor.isEqual(rhs.borderColor)
+    }
 }
 
-struct FlowCompactActionButtonPresentation {
+struct FlowCompactActionButtonPresentation: Equatable {
     let targetAppearance: NSAppearance
     let metrics: FlowCompactActionButtonMetrics
     let font: NSFont
@@ -38,6 +47,23 @@ struct FlowCompactActionButtonPresentation {
     let shadowRadius: CGFloat
     let shadowOffset: CGSize
     let styles: [FlowCompactActionButtonState: FlowCompactActionButtonStyle]
+
+    static func == (
+        lhs: FlowCompactActionButtonPresentation,
+        rhs: FlowCompactActionButtonPresentation
+    ) -> Bool {
+        lhs.targetAppearance.name == rhs.targetAppearance.name
+            && lhs.metrics == rhs.metrics
+            && lhs.font.pointSize == rhs.font.pointSize
+            && lhs.font.fontDescriptor.isEqual(rhs.font.fontDescriptor)
+            && lhs.cornerRadius == rhs.cornerRadius
+            && lhs.borderWidth == rhs.borderWidth
+            && lhs.shadowColor.isEqual(rhs.shadowColor)
+            && lhs.shadowOpacity == rhs.shadowOpacity
+            && lhs.shadowRadius == rhs.shadowRadius
+            && lhs.shadowOffset == rhs.shadowOffset
+            && lhs.styles == rhs.styles
+    }
 
     func style(for state: FlowCompactActionButtonState) -> FlowCompactActionButtonStyle {
         styles[state] ?? styles[.normal] ?? Self.fallbackStyle
@@ -119,24 +145,85 @@ struct FlowCompactActionButtonPresentation {
     }
 }
 
+struct FlowCompactActionButtonIntrinsicSizeSignature: Equatable {
+    let title: String
+    let metrics: FlowCompactActionButtonMetrics
+    let fontDescriptor: NSFontDescriptor
+    let fontPointSize: CGFloat
+
+    init(
+        title: String,
+        metrics: FlowCompactActionButtonMetrics,
+        font: NSFont
+    ) {
+        self.title = title
+        self.metrics = metrics
+        fontDescriptor = font.fontDescriptor
+        fontPointSize = font.pointSize
+    }
+
+    static func == (
+        lhs: FlowCompactActionButtonIntrinsicSizeSignature,
+        rhs: FlowCompactActionButtonIntrinsicSizeSignature
+    ) -> Bool {
+        lhs.title == rhs.title
+            && lhs.metrics == rhs.metrics
+            && lhs.fontPointSize == rhs.fontPointSize
+            && lhs.fontDescriptor.isEqual(rhs.fontDescriptor)
+    }
+}
+
+struct FlowCompactActionButtonIntrinsicSizeCache {
+    private var entry: (
+        signature: FlowCompactActionButtonIntrinsicSizeSignature,
+        size: NSSize
+    )?
+
+    mutating func size(
+        for signature: FlowCompactActionButtonIntrinsicSizeSignature,
+        measure: () -> NSSize
+    ) -> NSSize {
+        if let entry, entry.signature == signature {
+            return entry.size
+        }
+        let measuredSize = measure()
+        entry = (signature, measuredSize)
+        return measuredSize
+    }
+
+    mutating func invalidate() {
+        entry = nil
+    }
+}
+
 final class FlowCompactActionButtonControl: NSButton {
     private var hoverTrackingArea: NSTrackingArea?
     private var isHovering = false
     private var hasFocus = false
     private var buttonTitle = ""
+    private var configuredAccessibilityLabel: String?
+    private var intrinsicSizeCache =
+        FlowCompactActionButtonIntrinsicSizeCache()
     private var presentation = FlowCompactActionButtonPresentation.compact(
         targetAppearance: NSAppearance(named: .aqua) ?? NSApp.effectiveAppearance
     )
 
     override var intrinsicContentSize: NSSize {
-        NSSize(
-            width: presentation.metrics.preferredWidth(for: buttonTitle, font: presentation.font),
-            height: presentation.metrics.height
-        )
+        let signature = intrinsicSizeSignature
+        return intrinsicSizeCache.size(for: signature) {
+            NSSize(
+                width: presentation.metrics.preferredWidth(
+                    for: buttonTitle,
+                    font: presentation.font
+                ),
+                height: presentation.metrics.height
+            )
+        }
     }
 
     override var isEnabled: Bool {
         didSet {
+            guard oldValue != isEnabled else { return }
             if !isEnabled {
                 isHovering = false
                 hasFocus = false
@@ -146,7 +233,10 @@ final class FlowCompactActionButtonControl: NSButton {
     }
 
     override var isHighlighted: Bool {
-        didSet { refreshStyle() }
+        didSet {
+            guard oldValue != isHighlighted else { return }
+            refreshStyle()
+        }
     }
 
     override init(frame frameRect: NSRect) {
@@ -224,14 +314,35 @@ final class FlowCompactActionButtonControl: NSButton {
         tooltip: String? = nil,
         presentation: FlowCompactActionButtonPresentation
     ) {
-        buttonTitle = title
-        self.title = title
-        self.presentation = presentation
-        appearance = presentation.targetAppearance
-        toolTip = tooltip
-        setAccessibilityLabel(accessibilityLabel)
-        refreshStyle()
-        invalidateIntrinsicContentSize()
+        let previousSizeSignature = intrinsicSizeSignature
+        let titleChanged = buttonTitle != title
+        let presentationChanged = self.presentation != presentation
+
+        if titleChanged {
+            buttonTitle = title
+            self.title = title
+        }
+        if presentationChanged {
+            self.presentation = presentation
+        }
+        if appearance?.name != presentation.targetAppearance.name {
+            appearance = presentation.targetAppearance
+        }
+        if toolTip != tooltip {
+            toolTip = tooltip
+        }
+        if configuredAccessibilityLabel != accessibilityLabel {
+            configuredAccessibilityLabel = accessibilityLabel
+            setAccessibilityLabel(accessibilityLabel)
+        }
+        if titleChanged || presentationChanged {
+            refreshStyle()
+        }
+
+        if previousSizeSignature != intrinsicSizeSignature {
+            intrinsicSizeCache.invalidate()
+            invalidateIntrinsicContentSize()
+        }
     }
 
     var presentationForTesting: FlowCompactActionButtonPresentation { presentation }
@@ -279,6 +390,16 @@ final class FlowCompactActionButtonControl: NSButton {
         if isHovering { return .hovered }
         if hasFocus { return .focused }
         return .normal
+    }
+
+    private var intrinsicSizeSignature:
+        FlowCompactActionButtonIntrinsicSizeSignature
+    {
+        FlowCompactActionButtonIntrinsicSizeSignature(
+            title: buttonTitle,
+            metrics: presentation.metrics,
+            font: presentation.font
+        )
     }
 
     private func attributedString(text: String, color: NSColor) -> NSAttributedString {
@@ -356,11 +477,16 @@ struct FlowCompactActionButton: NSViewRepresentable {
     }
 
     private func configure(_ control: FlowCompactActionButtonControl) {
-        if let accessibilityIdentifier {
-            control.identifier = NSUserInterfaceItemIdentifier(accessibilityIdentifier)
+        let identifier = accessibilityIdentifier.map {
+            NSUserInterfaceItemIdentifier($0)
+        }
+        if control.identifier != identifier {
+            control.identifier = identifier
             control.setAccessibilityIdentifier(accessibilityIdentifier)
         }
-        control.isEnabled = isEnabled
+        if control.isEnabled != isEnabled {
+            control.isEnabled = isEnabled
+        }
         control.configure(
             title: title,
             accessibilityLabel: title,

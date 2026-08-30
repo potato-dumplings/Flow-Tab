@@ -58,6 +58,35 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testHomeRetainedTabHostTracksContainerBoundsWithoutConstraints() {
+        let recorder = HomeRetainedTabProbeRecorder()
+        let coordinator = HomeRetainedTabContentHost.Coordinator()
+        let container = HomeRetainedTabTrackingContainerView(
+            frame: NSRect(x: 0, y: 0, width: 800, height: 600)
+        )
+
+        coordinator.present(
+            selectedTab: .settings,
+            targetAppearance: NSApp.effectiveAppearance,
+            contentForTab: makeHomeRetainedTabProbeContent(
+                recorder: recorder
+            ),
+            in: container
+        )
+        settleHomeRetainedTabHost(container)
+        let settingsHost = container.subviews[0]
+
+        XCTAssertTrue(settingsHost.translatesAutoresizingMaskIntoConstraints)
+        XCTAssertTrue(container.constraints.isEmpty)
+        XCTAssertEqual(settingsHost.frame, container.bounds)
+
+        container.setFrameSize(NSSize(width: 960, height: 720))
+        settleHomeRetainedTabHost(container)
+
+        XCTAssertEqual(settingsHost.frame, container.bounds)
+    }
+
+    @MainActor
     func testHomeRetainedTabHostDeactivatesOutgoingPageBeforeMountingIncoming() {
         let recorder = HomeRetainedTabProbeRecorder()
         let coordinator = HomeRetainedTabContentHost.Coordinator()
@@ -145,6 +174,7 @@ extension FlowTabTests {
         let initialIdentity = try XCTUnwrap(
             recorder.stateIdentities[.home]?.last
         )
+        let initialProbeView = try XCTUnwrap(recorder.probeViews[.home])
 
         coordinator.present(
             selectedTab: .logs,
@@ -165,6 +195,7 @@ extension FlowTabTests {
             recorder.stateIdentities[.home]?.last,
             initialIdentity
         )
+        XCTAssertTrue(recorder.probeViews[.home] === initialProbeView)
     }
 
     @MainActor

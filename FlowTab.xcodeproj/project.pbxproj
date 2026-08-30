@@ -640,6 +640,8 @@
 		C10000092F75000100B0D737 /* AppKitSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000192F75000100B0D737 /* AppKitSettingsPage.swift */; };
 		A1D600023F26000100B0D737 /* AppKitSettingsPageContentRefreshGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D600013F26000100B0D737 /* AppKitSettingsPageContentRefreshGate.swift */; };
 		A1D600043F26000100B0D737 /* AppKitSettingsPageIntrinsicHeightCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D600033F26000100B0D737 /* AppKitSettingsPageIntrinsicHeightCache.swift */; };
+		A6F300023FD3000100B0D737 /* AppKitSettingsPageContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F300013FD3000100B0D737 /* AppKitSettingsPageContainerView.swift */; };
+		A6F300043FD3000100B0D737 /* AppKitSettingsPageBridgeCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6F300033FD3000100B0D737 /* AppKitSettingsPageBridgeCoordinator.swift */; };
 		A1D600063F26000100B0D737 /* AppKitSettingsPageState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D600053F26000100B0D737 /* AppKitSettingsPageState.swift */; };
 		E1F200052B00000100B0D737 /* AppKitSettingsPageBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F200152B00000100B0D737 /* AppKitSettingsPageBridge.swift */; };
 		C100000A2F75000100B0D737 /* AppearanceSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */; };
@@ -1113,6 +1115,8 @@
 		C10000192F75000100B0D737 /* AppKitSettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsPage.swift; sourceTree = "<group>"; };
 		A1D600013F26000100B0D737 /* AppKitSettingsPageContentRefreshGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsPageContentRefreshGate.swift; sourceTree = "<group>"; };
 		A1D600033F26000100B0D737 /* AppKitSettingsPageIntrinsicHeightCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsPageIntrinsicHeightCache.swift; sourceTree = "<group>"; };
+		A6F300013FD3000100B0D737 /* AppKitSettingsPageContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsPageContainerView.swift; sourceTree = "<group>"; };
+		A6F300033FD3000100B0D737 /* AppKitSettingsPageBridgeCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsPageBridgeCoordinator.swift; sourceTree = "<group>"; };
 		A1D600053F26000100B0D737 /* AppKitSettingsPageState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsPageState.swift; sourceTree = "<group>"; };
 		E1F200152B00000100B0D737 /* AppKitSettingsPageBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsPageBridge.swift; sourceTree = "<group>"; };
 		C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsCard.swift; sourceTree = "<group>"; };
@@ -2307,6 +2311,8 @@
 				F0D100033D1E000100B0D737 /* HotkeyRegistrationObservationOwner.swift */,
 				A6F100013E11000100B0D737 /* HotkeySettingsChangeTransaction.swift */,
 				C10000192F75000100B0D737 /* AppKitSettingsPage.swift */,
+				A6F300013FD3000100B0D737 /* AppKitSettingsPageContainerView.swift */,
+				A6F300033FD3000100B0D737 /* AppKitSettingsPageBridgeCoordinator.swift */,
 				A1D600013F26000100B0D737 /* AppKitSettingsPageContentRefreshGate.swift */,
 				A1D600033F26000100B0D737 /* AppKitSettingsPageIntrinsicHeightCache.swift */,
 				A1D600053F26000100B0D737 /* AppKitSettingsPageState.swift */,
@@ -2604,6 +2610,8 @@
 				C100000B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift in Sources */,
 				C100000A2F75000100B0D737 /* AppearanceSettingsCard.swift in Sources */,
 				C10000092F75000100B0D737 /* AppKitSettingsPage.swift in Sources */,
+				A6F300023FD3000100B0D737 /* AppKitSettingsPageContainerView.swift in Sources */,
+				A6F300043FD3000100B0D737 /* AppKitSettingsPageBridgeCoordinator.swift in Sources */,
 				A1D600023F26000100B0D737 /* AppKitSettingsPageContentRefreshGate.swift in Sources */,
 				A1D600043F26000100B0D737 /* AppKitSettingsPageIntrinsicHeightCache.swift in Sources */,
 				A1D600063F26000100B0D737 /* AppKitSettingsPageState.swift in Sources */,

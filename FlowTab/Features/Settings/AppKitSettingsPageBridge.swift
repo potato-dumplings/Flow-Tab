@@ -38,179 +38,43 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
     let onAccessibilityAction: () -> Void
     let onScreenCaptureAction: () -> Void
 
+    func makeCoordinator() -> AppKitSettingsPageBridgeCoordinator {
+        AppKitSettingsPageBridgeCoordinator()
+    }
+
     func makeNSView(context: Context) -> AppKitSettingsPageContainerView {
-        AppKitSettingsPageContainerView()
+        let container = AppKitSettingsPageContainerView()
+        context.coordinator.update(with: self)
+        context.coordinator.connect(to: container.pageView)
+        return container
     }
 
     func updateNSView(_ nsView: AppKitSettingsPageContainerView, context: Context) {
-        let showInCommandTab = $showInCommandTab
-        let themeModeRaw = $themeModeRaw
-        let appLanguageRaw = $appLanguageRaw
-        let autoRestoreMinimizedWindowOnSwitch = $autoRestoreMinimizedWindowOnSwitch
-        let hideMinimizedAppsFromAppLayer = $hideMinimizedAppsFromAppLayer
-        let showPermissionReminder = $showPermissionReminder
-        let allowLaunchAtLogin = $allowLaunchAtLogin
-        let searchEnabled = $searchEnabled
-        let searchDefaultScopeRaw = $searchDefaultScopeRaw
-        let hotkeyPrimaryModifierRaw = $hotkeyPrimaryModifierRaw
-        let hotkeyReverseModifiersRaw = $hotkeyReverseModifiersRaw
-        let hotkeyMainKeyRaw = $hotkeyMainKeyRaw
-        let hotkeyQuitKeyRaw = $hotkeyQuitKeyRaw
-        let inAppWindowHotkeyBaseKeysRaw =
-            $inAppWindowHotkeyBaseKeysRaw
-        let inAppWindowHotkeyReverseKeysRaw =
-            $inAppWindowHotkeyReverseKeysRaw
-        let inAppWindowHotkeyMainKeysRaw =
-            $inAppWindowHotkeyMainKeysRaw
-        let pageView = nsView.pageView
-        let currentHotkeyValues = {
-            AppKitSettingsHotkeyRawValues(
-                hotkeyPrimaryModifierRaw: hotkeyPrimaryModifierRaw.wrappedValue,
-                hotkeyReverseModifiersRaw: hotkeyReverseModifiersRaw.wrappedValue,
-                hotkeyMainKeyRaw: hotkeyMainKeyRaw.wrappedValue,
-                hotkeyQuitKeyRaw: hotkeyQuitKeyRaw.wrappedValue,
-                inAppWindowHotkeyBaseKeysRaw:
-                    inAppWindowHotkeyBaseKeysRaw.wrappedValue,
-                inAppWindowHotkeyReverseKeysRaw:
-                    inAppWindowHotkeyReverseKeysRaw.wrappedValue,
-                inAppWindowHotkeyMainKeysRaw:
-                    inAppWindowHotkeyMainKeysRaw.wrappedValue
-            )
-        }
-        let updateHotkeyContent = { [weak pageView] in
-            pageView?.updateHotkeyContent(with: currentHotkeyValues())
-        }
-
-        pageView.onShowInCommandTabChanged = { showInCommandTab.wrappedValue = $0 }
-        pageView.onThemeModeChanged = { themeModeRaw.wrappedValue = $0 }
-        pageView.onAppLanguageChanged = { appLanguageRaw.wrappedValue = $0 }
-        pageView.onWindowLayerAutoEnterDelayTextChanged = onWindowLayerAutoEnterDelayTextChanged
-        pageView.onWindowLayerAutoEnterDelayTextCommitted = onWindowLayerAutoEnterDelayTextCommitted
-        pageView.onWindowLayerAutoEnterDelayEditingChanged = onWindowLayerAutoEnterDelayEditingChanged
-        pageView.onAutoRestoreMinimizedWindowOnSwitchChanged = {
-            autoRestoreMinimizedWindowOnSwitch.wrappedValue = $0
-        }
-        pageView.onHideMinimizedAppsFromAppLayerChanged = {
-            hideMinimizedAppsFromAppLayer.wrappedValue = $0
-        }
-        pageView.onSearchEnabledChanged = { searchEnabled.wrappedValue = $0 }
-        pageView.onSearchDefaultScopeChanged = { searchDefaultScopeRaw.wrappedValue = $0 }
-        pageView.onManageAppVisibility = onManageAppVisibility
-        pageView.onDismissHotkeyConflict = onDismissHotkeyConflict
-        pageView.onMainModifiersChanged = {
-            onHotkeyChanged(
-                HotkeySettingsChangeCandidate(
-                    field: .mainModifiers,
-                    values: currentHotkeyValues().replacing(
-                        .mainModifiers,
-                        with: $0.rawValue
-                    )
-                )
-            )
-            updateHotkeyContent()
-        }
-        pageView.onMainReverseModifiersChanged = {
-            onHotkeyChanged(
-                HotkeySettingsChangeCandidate(
-                    field: .mainReverseModifiers,
-                    values: currentHotkeyValues().replacing(
-                        .mainReverseModifiers,
-                        with: $0.rawValue
-                    )
-                )
-            )
-            updateHotkeyContent()
-        }
-        pageView.onMainKeyChanged = {
-            onHotkeyChanged(
-                HotkeySettingsChangeCandidate(
-                    field: .mainKey,
-                    values: currentHotkeyValues().replacing(
-                        .mainKey,
-                        with: $0.rawValue
-                    )
-                )
-            )
-            updateHotkeyContent()
-        }
-        pageView.onQuitKeyChanged = {
-            onHotkeyChanged(
-                HotkeySettingsChangeCandidate(
-                    field: .quitKey,
-                    values: currentHotkeyValues().replacing(
-                        .quitKey,
-                        with: $0.rawValue
-                    )
-                )
-            )
-            updateHotkeyContent()
-        }
-        pageView.onInAppBaseKeysChanged = {
-            onHotkeyChanged(
-                HotkeySettingsChangeCandidate(
-                    field: .inAppBaseKeys,
-                    values: currentHotkeyValues().replacing(
-                        .inAppBaseKeys,
-                        with: $0.rawValue
-                    )
-                )
-            )
-            updateHotkeyContent()
-        }
-        pageView.onInAppReverseModifiersChanged = {
-            onHotkeyChanged(
-                HotkeySettingsChangeCandidate(
-                    field: .inAppReverseModifiers,
-                    values: currentHotkeyValues().replacing(
-                        .inAppReverseModifiers,
-                        with: $0.rawValue
-                    )
-                )
-            )
-            updateHotkeyContent()
-        }
-        pageView.onInAppMainKeysChanged = {
-            onHotkeyChanged(
-                HotkeySettingsChangeCandidate(
-                    field: .inAppMainKeys,
-                    values: currentHotkeyValues().replacing(
-                        .inAppMainKeys,
-                        with: $0.rawValue
-                    )
-                )
-            )
-            updateHotkeyContent()
-        }
-        pageView.onShowPermissionReminderChanged = { showPermissionReminder.wrappedValue = $0 }
-        pageView.onAllowLaunchAtLoginChanged = {
-            allowLaunchAtLogin.wrappedValue = $0
-            onLaunchAtLoginChanged($0)
-        }
-        pageView.onAccessibilityAction = onAccessibilityAction
-        pageView.onScreenCaptureAction = onScreenCaptureAction
+        context.coordinator.update(with: self)
+        context.coordinator.connect(to: nsView.pageView)
         nsView.update(
             with: AppKitSettingsPageState(
-                showInCommandTab: showInCommandTab.wrappedValue,
-                themeModeRaw: themeModeRaw.wrappedValue,
-                appLanguageRaw: appLanguageRaw.wrappedValue,
+                showInCommandTab: showInCommandTab,
+                themeModeRaw: themeModeRaw,
+                appLanguageRaw: appLanguageRaw,
                 windowLayerAutoEnterDelayText: windowLayerAutoEnterDelayText,
-                autoRestoreMinimizedWindowOnSwitch: autoRestoreMinimizedWindowOnSwitch.wrappedValue,
-                hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer.wrappedValue,
-                showPermissionReminder: showPermissionReminder.wrappedValue,
-                allowLaunchAtLogin: allowLaunchAtLogin.wrappedValue,
-                searchEnabled: searchEnabled.wrappedValue,
-                searchDefaultScopeRaw: searchDefaultScopeRaw.wrappedValue,
+                autoRestoreMinimizedWindowOnSwitch: autoRestoreMinimizedWindowOnSwitch,
+                hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer,
+                showPermissionReminder: showPermissionReminder,
+                allowLaunchAtLogin: allowLaunchAtLogin,
+                searchEnabled: searchEnabled,
+                searchDefaultScopeRaw: searchDefaultScopeRaw,
                 hiddenAppCount: hiddenAppCount,
-                hotkeyPrimaryModifierRaw: hotkeyPrimaryModifierRaw.wrappedValue,
-                hotkeyReverseModifiersRaw: hotkeyReverseModifiersRaw.wrappedValue,
-                hotkeyMainKeyRaw: hotkeyMainKeyRaw.wrappedValue,
-                hotkeyQuitKeyRaw: hotkeyQuitKeyRaw.wrappedValue,
+                hotkeyPrimaryModifierRaw: hotkeyPrimaryModifierRaw,
+                hotkeyReverseModifiersRaw: hotkeyReverseModifiersRaw,
+                hotkeyMainKeyRaw: hotkeyMainKeyRaw,
+                hotkeyQuitKeyRaw: hotkeyQuitKeyRaw,
                 inAppWindowHotkeyBaseKeysRaw:
-                    inAppWindowHotkeyBaseKeysRaw.wrappedValue,
+                    inAppWindowHotkeyBaseKeysRaw,
                 inAppWindowHotkeyReverseKeysRaw:
-                    inAppWindowHotkeyReverseKeysRaw.wrappedValue,
+                    inAppWindowHotkeyReverseKeysRaw,
                 inAppWindowHotkeyMainKeysRaw:
-                    inAppWindowHotkeyMainKeysRaw.wrappedValue,
+                    inAppWindowHotkeyMainKeysRaw,
                 commandTabTakeoverRegistrationState: commandTabTakeoverRegistrationState,
                 accessibilityTrusted: accessibilityTrusted,
                 screenCaptureTrusted: screenCaptureTrusted,
@@ -224,7 +88,7 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
     }
 }
 
-private extension AppKitSettingsHotkeyRawValues {
+extension AppKitSettingsHotkeyRawValues {
     func replacing(
         _ field: HotkeySettingsField,
         with rawValue: String

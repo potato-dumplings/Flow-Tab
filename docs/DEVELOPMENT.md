@@ -319,7 +319,18 @@ swift test
 
 `DEBUG` 使用相同的 `20ms`、`50ms` 组合，可按本轮日志预算增加 `--max-runtime-log-mb-per-minute`。四个组合各运行三次，以同机三轮中位数比较。正式 `status.json` 使用 schema v2：顶层 CPU/RSS、样本数与每次完成切换的 CPU 时间只覆盖唯一 started/completed monotonic 边界内的 active Tab-switch 窗口；preflight、postflight 和 whole-run 资源数据放在诊断字段。每个 CPU 采样保存区间 monotonic 起止时间，只有完整落入 active 窗口的区间参与正式聚合，覆盖率必须达到 `90%`。历史证据缺少 monotonic 边界时标记为 `whole-run-legacy-v1`，只保留 whole-run 诊断值。
 
-正式证据同时保存权限、Home 应用/窗口数、Fixture 命中、三页预热、计划/完成切换数和 Home/Logs/Settings 完成次数；三个 Tab 的计数都必须大于零，且总和等于完成切换数。`DEBUG` 日志量按跨日志文件的唯一 started/completed marker 之间实际字节计算，并输出 category/event 字节排行；完成 marker 在应用退出前同步完成日志队列落盘。当前 CPU 验收状态为 `active-window v2 baseline pending`，AX 观察器安装数继续作为独立结构门禁。
+正式证据同时保存权限、Home 应用/窗口数、Fixture 命中、三页预热、计划/完成切换数和 Home/Logs/Settings 完成次数；三个 Tab 的计数都必须大于零，且总和等于完成切换数。`DEBUG` 日志量按跨日志文件的唯一 started/completed marker 之间实际字节计算，并输出 category/event 字节排行；完成 marker 在应用退出前同步完成日志队列落盘。当前 CPU 验收状态为 `active-window v2 optimization evidence recorded; release baseline pending`，AX 观察器安装数继续作为独立结构门禁。
+
+2026-08-30 的三阶段优化证据使用最终代码、真实权限和固定 Fixture。四个主组合均取三轮中位数：
+
+| 组合 | CPU avg | CPU p95 | CPU ms/完成切换 | DEBUG 日志 MB/min |
+| --- | ---: | ---: | ---: | ---: |
+| ERROR，20ms | 87.63% | 88.91% | 26.39ms | — |
+| ERROR，50ms | 58.21% | 59.86% | 30.58ms | — |
+| DEBUG，20ms | 92.04% | 93.48% | 28.28ms | 0.278 |
+| DEBUG，50ms | 60.96% | 62.95% | 32.82ms | 0.160 |
+
+所有有效轮次的 active 样本覆盖率均高于 `95%`，计划切换全部完成，DEBUG 相对 ERROR 的 avg/p95 增量满足配对预算，AX warm-up 后成功安装数保持为零。`ERROR / 1000ms` 单轮为 `avg 5.37% / p95 13.57%`；`DEBUG / 60s / 1000ms` 的日志速率为 `0.0093 MB/min`。Settings 稳定布局缓存使 10 秒符号化样本中的 `updateNSView`、页面 intrinsic 测量和 stack height 遍历分别从第二阶段的 `661 / 1004 / 411` 降至约 `7 / 105 / 96`。剩余热点集中在页面重新挂载后的 AppKit display/layout cycle；正式 CPU 和每次切换 CPU 时间门禁仍保持待验收状态。
 
 隔离状态/日志链路提供配对归因数据。参数依次为持续秒数、切换间隔毫秒和采样间隔秒：
 

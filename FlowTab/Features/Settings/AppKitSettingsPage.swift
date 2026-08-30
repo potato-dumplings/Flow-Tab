@@ -2,208 +2,6 @@ import SwiftUI
 import AppKit
 import FlowTabCore
 
-final class AppKitFlippedDocumentView: NSView {
-    override var isFlipped: Bool { true }
-}
-
-final class AppKitSettingsPageContainerView: NSView {
-    let pageView = AppKitSettingsPageView()
-
-    private let scrollView = NSScrollView()
-    private let documentView = AppKitFlippedDocumentView()
-    private let horizontalContentInset = FlowPageLayout.horizontalInset
-    private let verticalContentInset = FlowPageLayout.alignedTopInset
-    private var wasActive = false
-    private var pendingInitialFocusClear = false
-    private var contentRefreshGate = AppKitSettingsPageContentRefreshGate()
-    private var pageLeadingConstraint: NSLayoutConstraint?
-    private var pageTopConstraint: NSLayoutConstraint?
-    private var pageWidthConstraint: NSLayoutConstraint?
-    private var pageHeightConstraint: NSLayoutConstraint?
-    private let maximumLayoutSettlingPasses = 3
-    private var hasDeferredLayoutRefresh = false
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        buildViewHierarchy()
-    }
-
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        buildViewHierarchy()
-    }
-
-    func update(with state: AppKitSettingsPageState, isActive: Bool) {
-        let becameActive = isActive && !wasActive
-        wasActive = isActive
-        if becameActive {
-            clearInitialFirstResponderIfNeeded()
-        }
-
-        guard contentRefreshGate.consume(state) else { return }
-
-        let targetAppearance = FlowSettingsStyleResolver.targetAppearance(
-            named: state.targetNSAppearanceName,
-            fallback: inheritedAppearanceFallback
-        )
-        appearance = targetAppearance
-        scrollView.appearance = targetAppearance
-        documentView.appearance = targetAppearance
-        pageView.appearance = targetAppearance
-        pageView.applySettingsAppearance(targetAppearance)
-        pageView.update(with: state)
-        refreshLayoutAfterSettingsUpdate()
-    }
-
-    override func setFrameSize(_ newSize: NSSize) {
-        let previousSize = frame.size
-        super.setFrameSize(newSize)
-        if previousSize != newSize {
-            needsLayout = true
-        }
-    }
-
-    override func setBoundsSize(_ newSize: NSSize) {
-        let previousSize = bounds.size
-        super.setBoundsSize(newSize)
-        if previousSize != newSize {
-            needsLayout = true
-        }
-    }
-
-    override func layout() {
-        super.layout()
-
-        let containerSize = bounds.size
-        scrollView.frame = NSRect(origin: .zero, size: containerSize)
-
-        let viewportWidth = containerSize.width
-        guard viewportWidth > 0 else { return }
-
-        let pageWidth = max(viewportWidth - horizontalContentInset * 2, 320)
-        pageLeadingConstraint?.constant = horizontalContentInset
-        pageWidthConstraint?.constant = pageWidth
-        let topInset = verticalContentInset + safeAreaInsets.top
-        var previousHeight: CGFloat?
-        for _ in 0..<maximumLayoutSettlingPasses {
-            pageHeightConstraint?.isActive = false
-            pageView.prepareLayout(forWidth: pageWidth)
-            let fittedSize = pageView.preferredFittingSize(forWidth: pageWidth)
-            let documentHeight = fittedSize.height + topInset + verticalContentInset
-
-            documentView.frame = NSRect(
-                x: 0,
-                y: 0,
-                width: viewportWidth,
-                height: documentHeight
-            )
-            pageTopConstraint?.constant = topInset
-            pageHeightConstraint?.constant = fittedSize.height
-            pageHeightConstraint?.isActive = true
-            documentView.layoutSubtreeIfNeeded()
-
-            if let previousHeight, abs(previousHeight - fittedSize.height) <= 0.5 {
-                break
-            }
-            previousHeight = fittedSize.height
-        }
-    }
-
-    private func buildViewHierarchy() {
-        translatesAutoresizingMaskIntoConstraints = false
-
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.drawsBackground = false
-        scrollView.borderType = .noBorder
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
-        scrollView.autohidesScrollers = true
-
-        documentView.translatesAutoresizingMaskIntoConstraints = true
-        documentView.addSubview(pageView)
-        scrollView.documentView = documentView
-
-        addSubview(scrollView)
-        let pageLeadingConstraint = pageView.leadingAnchor.constraint(
-            equalTo: documentView.leadingAnchor
-        )
-        let pageTopConstraint = pageView.topAnchor.constraint(equalTo: documentView.topAnchor)
-        let pageWidthConstraint = pageView.widthAnchor.constraint(equalToConstant: 320)
-        let pageHeightConstraint = pageView.heightAnchor.constraint(equalToConstant: 1)
-        self.pageLeadingConstraint = pageLeadingConstraint
-        self.pageTopConstraint = pageTopConstraint
-        self.pageWidthConstraint = pageWidthConstraint
-        self.pageHeightConstraint = pageHeightConstraint
-        NSLayoutConstraint.activate([
-            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            scrollView.topAnchor.constraint(equalTo: topAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            pageLeadingConstraint,
-            pageTopConstraint,
-            pageWidthConstraint
-        ])
-    }
-
-    private func clearInitialFirstResponderIfNeeded() {
-        guard !pendingInitialFocusClear else { return }
-        pendingInitialFocusClear = true
-
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.pendingInitialFocusClear = false
-            self.resignPageFirstResponderIfNeeded()
-        }
-    }
-
-    private func resignPageFirstResponderIfNeeded() {
-        guard let window else { return }
-
-        if let view = window.firstResponder as? NSView, view.isDescendant(of: pageView) {
-            window.makeFirstResponder(nil)
-            return
-        }
-
-        if let editor = window.firstResponder as? NSTextView,
-            let editedView = editor.delegate as? NSView,
-            editedView.isDescendant(of: pageView)
-        {
-            window.makeFirstResponder(nil)
-        }
-    }
-
-    private func refreshLayoutAfterSettingsUpdate() {
-        pageView.invalidateMeasuredContentHeight()
-        pageView.needsLayout = true
-        documentView.needsLayout = true
-        needsLayout = true
-        layoutSubtreeIfNeeded()
-        scheduleDeferredLayoutRefresh()
-    }
-
-    private func scheduleDeferredLayoutRefresh() {
-        guard !hasDeferredLayoutRefresh else { return }
-        hasDeferredLayoutRefresh = true
-
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.hasDeferredLayoutRefresh = false
-            self.pageView.invalidateMeasuredContentHeight()
-            self.pageView.needsLayout = true
-            self.documentView.needsLayout = true
-            self.needsLayout = true
-            self.layoutSubtreeIfNeeded()
-        }
-    }
-
-    private var inheritedAppearanceFallback: NSAppearance {
-        window?.effectiveAppearance
-            ?? superview?.effectiveAppearance
-            ?? NSApp.effectiveAppearance
-    }
-
-}
-
 final class AppKitSettingsPageView: NSView {
     var onShowInCommandTabChanged: ((Bool) -> Void)?
     var onThemeModeChanged: ((String) -> Void)?
@@ -238,6 +36,10 @@ final class AppKitSettingsPageView: NSView {
     private let rightColumn = NSStackView()
     private let columnFlexibleSpacers = [NSView(), NSView()]
     private let dismissEditingClickRecognizer = NSClickGestureRecognizer()
+    private var cardHeightConstraints: [(
+        card: FlowSettingsCardView,
+        constraint: NSLayoutConstraint
+    )] = []
 
     private let appearanceContent = AppearanceSettingsCardAppKitView()
     private let windowBehaviorContent = WindowBehaviorSettingsCardAppKitView()
@@ -280,6 +82,7 @@ final class AppKitSettingsPageView: NSView {
     )
 
     private var currentState: AppKitSettingsPageState?
+    private var appliedHotkeyState: HotkeySettingsCardState?
     private var intrinsicHeightCache =
         AppKitSettingsPageIntrinsicHeightCache()
     private var targetSettingsAppearance = FlowSettingsStyleResolver.defaultAppearance
@@ -340,6 +143,8 @@ final class AppKitSettingsPageView: NSView {
         prepareLayout(forWidth: width)
         updateHeaderWrappingLabelWidths(forWidth: width)
         layoutSubtreeIfNeeded()
+        updateCardHeightConstraints()
+        layoutSubtreeIfNeeded()
 
         let headerHeight = preferredHeight(for: headerStack)
         let leftColumnHeight = preferredColumnHeight(leftColumn)
@@ -360,77 +165,112 @@ final class AppKitSettingsPageView: NSView {
     }
 
     func update(with state: AppKitSettingsPageState) {
-        guard currentState != state else { return }
+        let previousState = currentState
+        guard previousState != state else { return }
         currentState = state
 
         let language = AppLanguagePreferencesStore.resolve(rawValue: state.appLanguageRaw)
-        titleLabel.stringValue = AppStrings.text(.settingsPageTitle, language: language)
-        subtitleLabel.stringValue = AppStrings.text(.settingsPageSubtitle, language: language)
-        subtitleLabel.isHidden = subtitleLabel.stringValue.isEmpty
-        subtitleLabel.invalidateIntrinsicContentSize()
-        headerStack.invalidateIntrinsicContentSize()
-        updateCardChrome(language: language)
+        if previousState?.appLanguageRaw != state.appLanguageRaw {
+            titleLabel.stringValue = AppStrings.text(
+                .settingsPageTitle,
+                language: language
+            )
+            subtitleLabel.stringValue = AppStrings.text(
+                .settingsPageSubtitle,
+                language: language
+            )
+            subtitleLabel.isHidden = subtitleLabel.stringValue.isEmpty
+            subtitleLabel.invalidateIntrinsicContentSize()
+            headerStack.invalidateIntrinsicContentSize()
+            updateCardChrome(language: language)
+        }
 
-        appearanceContent.update(
-            with: AppearanceSettingsCardState(
-                showInCommandTab: state.showInCommandTab,
-                themeModeRaw: state.themeModeRaw,
-                appLanguageRaw: state.appLanguageRaw
-            )
+        let appearanceState = AppearanceSettingsCardState(
+            showInCommandTab: state.showInCommandTab,
+            themeModeRaw: state.themeModeRaw,
+            appLanguageRaw: state.appLanguageRaw
         )
-        windowBehaviorContent.update(
-            with: WindowBehaviorSettingsCardState(
-                windowLayerAutoEnterDelayText: state.windowLayerAutoEnterDelayText,
-                autoRestoreMinimizedWindowOnSwitch: state.autoRestoreMinimizedWindowOnSwitch,
-                hideMinimizedAppsFromAppLayer: state.hideMinimizedAppsFromAppLayer,
-                appLanguageRaw: state.appLanguageRaw
-            )
+        if previousState.map(appearanceCardState(from:)) != appearanceState {
+            appearanceContent.update(with: appearanceState)
+            appearanceCard.invalidateIntrinsicContentSize()
+        }
+
+        let windowBehaviorState = WindowBehaviorSettingsCardState(
+            windowLayerAutoEnterDelayText: state.windowLayerAutoEnterDelayText,
+            autoRestoreMinimizedWindowOnSwitch:
+                state.autoRestoreMinimizedWindowOnSwitch,
+            hideMinimizedAppsFromAppLayer:
+                state.hideMinimizedAppsFromAppLayer,
+            appLanguageRaw: state.appLanguageRaw
         )
-        searchContent.update(
-            with: SearchSettingsCardState(
-                searchEnabled: state.searchEnabled,
-                searchDefaultScopeRaw: state.searchDefaultScopeRaw,
-                appLanguageRaw: state.appLanguageRaw,
-                accessibilityTrusted: state.accessibilityTrusted
-            )
+        if previousState.map(windowBehaviorCardState(from:))
+            != windowBehaviorState
+        {
+            windowBehaviorContent.update(with: windowBehaviorState)
+            windowBehaviorCard.invalidateIntrinsicContentSize()
+        }
+
+        let searchState = SearchSettingsCardState(
+            searchEnabled: state.searchEnabled,
+            searchDefaultScopeRaw: state.searchDefaultScopeRaw,
+            appLanguageRaw: state.appLanguageRaw,
+            accessibilityTrusted: state.accessibilityTrusted
         )
+        if previousState.map(searchCardState(from:)) != searchState {
+            searchContent.update(with: searchState)
+            searchCard.invalidateIntrinsicContentSize()
+        }
+
         let appVisibilityState = AppVisibilitySettingsCardState(
             hiddenAppCount: state.hiddenAppCount,
             appLanguageRaw: state.appLanguageRaw
         )
-        appVisibilityContent.update(
-            with: appVisibilityState
-        )
-        appVisibilityCard.updateTitleAccessory(
-            appVisibilityState.statusText,
-            accessibilityIdentifier:
-                "flowtab.settings.app-visibility.effective-hidden-count",
-            accessibilityValue: "\(appVisibilityState.hiddenAppCount)"
-        )
-        hotkeyContent.update(with: hotkeyCardState(from: state))
-        permissionContent.update(
-            with: PermissionSettingsCardState(
-                showPermissionReminder: state.showPermissionReminder,
-                allowLaunchAtLogin: state.allowLaunchAtLogin,
-                accessibilityTrusted: state.accessibilityTrusted,
-                screenCaptureTrusted: state.screenCaptureTrusted,
-                appLanguageRaw: state.appLanguageRaw
+        if previousState.map(appVisibilityCardState(from:))
+            != appVisibilityState
+        {
+            appVisibilityContent.update(with: appVisibilityState)
+            appVisibilityCard.updateTitleAccessory(
+                appVisibilityState.statusText,
+                accessibilityIdentifier:
+                    "flowtab.settings.app-visibility.effective-hidden-count",
+                accessibilityValue: "\(appVisibilityState.hiddenAppCount)"
             )
+            appVisibilityCard.invalidateIntrinsicContentSize()
+        }
+
+        let hotkeyState = hotkeyCardState(from: state)
+        if appliedHotkeyState != hotkeyState {
+            appliedHotkeyState = hotkeyState
+            hotkeyContent.update(with: hotkeyState)
+            hotkeyCard.invalidateIntrinsicContentSize()
+        }
+
+        let permissionState = PermissionSettingsCardState(
+            showPermissionReminder: state.showPermissionReminder,
+            allowLaunchAtLogin: state.allowLaunchAtLogin,
+            accessibilityTrusted: state.accessibilityTrusted,
+            screenCaptureTrusted: state.screenCaptureTrusted,
+            appLanguageRaw: state.appLanguageRaw
         )
-        appearanceCard.invalidateIntrinsicContentSize()
-        windowBehaviorCard.invalidateIntrinsicContentSize()
-        permissionCard.invalidateIntrinsicContentSize()
-        searchCard.invalidateIntrinsicContentSize()
-        appVisibilityCard.invalidateIntrinsicContentSize()
-        hotkeyCard.invalidateIntrinsicContentSize()
+        if previousState.map(permissionCardState(from:)) != permissionState {
+            permissionContent.update(with: permissionState)
+            permissionCard.invalidateIntrinsicContentSize()
+        }
+        for stackView in [leftColumn, rightColumn, columnsStack, contentStack] {
+            stackView.invalidateIntrinsicContentSize()
+            stackView.needsLayout = true
+        }
         invalidateMeasuredContentHeight()
     }
 
     func updateHotkeyContent(with values: AppKitSettingsHotkeyRawValues) {
         guard let currentState else { return }
-        hotkeyContent.update(
-            with: hotkeyCardState(from: currentState, overridingRawValuesWith: values)
+        let hotkeyState = hotkeyCardState(
+            from: currentState,
+            overridingRawValuesWith: values
         )
+        appliedHotkeyState = hotkeyState
+        hotkeyContent.update(with: hotkeyState)
         hotkeyCard.invalidateIntrinsicContentSize()
         invalidateMeasuredContentHeight()
     }
@@ -472,14 +312,79 @@ final class AppKitSettingsPageView: NSView {
     }
 
     func applySettingsAppearance(_ appearance: NSAppearance) {
+        guard targetSettingsAppearance.name != appearance.name
+            || self.appearance?.name != appearance.name
+        else {
+            return
+        }
         targetSettingsAppearance = appearance
-        self.appearance = appearance
+        if self.appearance?.name != appearance.name {
+            self.appearance = appearance
+        }
         for subview in descendantViews(in: self) {
-            subview.appearance = appearance
+            if subview.appearance?.name != appearance.name {
+                subview.appearance = appearance
+            }
         }
         for view in descendantRefreshableViews(in: self) where view !== self {
             view.applySettingsAppearance(appearance)
         }
+    }
+
+    private func appearanceCardState(
+        from state: AppKitSettingsPageState
+    ) -> AppearanceSettingsCardState {
+        AppearanceSettingsCardState(
+            showInCommandTab: state.showInCommandTab,
+            themeModeRaw: state.themeModeRaw,
+            appLanguageRaw: state.appLanguageRaw
+        )
+    }
+
+    private func windowBehaviorCardState(
+        from state: AppKitSettingsPageState
+    ) -> WindowBehaviorSettingsCardState {
+        WindowBehaviorSettingsCardState(
+            windowLayerAutoEnterDelayText:
+                state.windowLayerAutoEnterDelayText,
+            autoRestoreMinimizedWindowOnSwitch:
+                state.autoRestoreMinimizedWindowOnSwitch,
+            hideMinimizedAppsFromAppLayer:
+                state.hideMinimizedAppsFromAppLayer,
+            appLanguageRaw: state.appLanguageRaw
+        )
+    }
+
+    private func searchCardState(
+        from state: AppKitSettingsPageState
+    ) -> SearchSettingsCardState {
+        SearchSettingsCardState(
+            searchEnabled: state.searchEnabled,
+            searchDefaultScopeRaw: state.searchDefaultScopeRaw,
+            appLanguageRaw: state.appLanguageRaw,
+            accessibilityTrusted: state.accessibilityTrusted
+        )
+    }
+
+    private func appVisibilityCardState(
+        from state: AppKitSettingsPageState
+    ) -> AppVisibilitySettingsCardState {
+        AppVisibilitySettingsCardState(
+            hiddenAppCount: state.hiddenAppCount,
+            appLanguageRaw: state.appLanguageRaw
+        )
+    }
+
+    private func permissionCardState(
+        from state: AppKitSettingsPageState
+    ) -> PermissionSettingsCardState {
+        PermissionSettingsCardState(
+            showPermissionReminder: state.showPermissionReminder,
+            allowLaunchAtLogin: state.allowLaunchAtLogin,
+            accessibilityTrusted: state.accessibilityTrusted,
+            screenCaptureTrusted: state.screenCaptureTrusted,
+            appLanguageRaw: state.appLanguageRaw
+        )
     }
 
     private func updateCardChrome(language: AppLanguage) {
@@ -720,10 +625,29 @@ final class AppKitSettingsPageView: NSView {
         onDismissHotkeyConflict?()
     }
 
-    private func addCard(_ card: NSView, to column: NSStackView) {
+    private func addCard(
+        _ card: FlowSettingsCardView,
+        to column: NSStackView
+    ) {
         column.addArrangedSubview(card)
         card.translatesAutoresizingMaskIntoConstraints = false
         card.widthAnchor.constraint(equalTo: column.widthAnchor).isActive = true
+        let heightConstraint = card.heightAnchor.constraint(
+            equalToConstant: 0
+        )
+        cardHeightConstraints.append((card, heightConstraint))
+    }
+
+    private func updateCardHeightConstraints() {
+        for binding in cardHeightConstraints {
+            let height = binding.card.preferredLayoutHeight()
+            guard abs(binding.constraint.constant - height) > 0.5 else {
+                binding.constraint.isActive = true
+                continue
+            }
+            binding.constraint.constant = height
+            binding.constraint.isActive = true
+        }
     }
 
     @discardableResult

@@ -232,11 +232,21 @@ final class PermissionStatusControlRowView<Control: NSView>: NSView {
     }
 
     func update(text: String, detail: String, statusColor: NSColor) {
+        let hidesTitle = text.isEmpty
+        let hidesDetail = detail.isEmpty
+        guard titleLabel.stringValue != text
+            || detailLabel.stringValue != detail
+            || titleLabel.isHidden != hidesTitle
+            || detailLabel.isHidden != hidesDetail
+            || titleLabel.textColor?.isEqual(statusColor) != true
+        else {
+            return
+        }
         titleLabel.stringValue = text
         titleLabel.textColor = statusColor
-        titleLabel.isHidden = text.isEmpty
+        titleLabel.isHidden = hidesTitle
         detailLabel.stringValue = detail
-        detailLabel.isHidden = detail.isEmpty
+        detailLabel.isHidden = hidesDetail
         titleLabel.invalidateIntrinsicContentSize()
         detailLabel.invalidateIntrinsicContentSize()
         textStack.invalidateIntrinsicContentSize()
