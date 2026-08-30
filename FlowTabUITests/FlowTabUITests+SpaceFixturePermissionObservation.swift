@@ -242,6 +242,25 @@ extension FlowTabUITests {
         let homeButtons = app.buttons.matching(
             identifier: Identifier.homeTabButton
         )
+        let openedHomeForPermissionPreflight = homeButtons.count == 0
+        if openedHomeForPermissionPreflight {
+            tapElement(flowTabStatusItem(in: app))
+        }
+        defer {
+            if openedHomeForPermissionPreflight,
+               app.state == .runningForeground
+                || app.state == .runningBackground
+            {
+                app.activate()
+                app.typeKey("w", modifierFlags: .command)
+                _ = waitForNonExistence(
+                    homeButtons.firstMatch,
+                    timeout:
+                        FlowTabUITestSupportWatchdogPolicy
+                            .spaceFixtureNavigation
+                )
+            }
+        }
         let navigationSatisfied = tapFirstHittable(
             in: homeButtons,
             timeout:
