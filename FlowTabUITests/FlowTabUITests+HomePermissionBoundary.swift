@@ -175,4 +175,66 @@ extension FlowTabUITests {
                 + projectionObservation.diagnosticSummary
         )
     }
+
+    func testHomePermissionBoundaryRemainsResolvedAcrossRepeatedTabSwitches() {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "-showPermissionReminder",
+                "YES",
+                "--flowtab-ui-ax-trusted",
+                "NO",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        assertHomeAndLogsApplicationIsForegroundReady(app)
+
+        for cycle in 0..<4 {
+            for target in [
+                FlowTabUITestSidebarTabProjectionTarget.logs,
+                .settings,
+                .home
+            ] {
+                guard assertSidebarTabProjectionAfterNavigation(
+                    in: app,
+                    target: target
+                ) else {
+                    XCTFail(
+                        "Permission-boundary navigation failed. "
+                            + "cycle=\(cycle) target=\(target.rawValue)"
+                    )
+                    return
+                }
+            }
+        }
+
+        let flowTabBundleIdentifier =
+            FlowTabUITestAppIdentity.configured().bundleIdentifier
+        let flowTabRow = element(
+            in: app,
+            identifier:
+                "flowtab.home.app."
+                + flowTabBundleIdentifier
+                    .flowTabUITestAccessibilityIdentifierComponent
+        )
+        XCTAssertTrue(flowTabRow.waitForExistence(timeout: 5))
+        XCTAssertEqual(elementStringValue(flowTabRow), "0w hidden")
+        XCTAssertTrue(
+            element(in: app, identifier: Identifier.permissionOpenSettings)
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element(in: app, identifier: Identifier.permissionDismiss)
+                .waitForExistence(timeout: 5)
+        )
+        assertValue(
+            of: element(
+                in: app,
+                identifier: Identifier.homeStatsTotalWindows
+            ),
+            equals: "0"
+        )
+    }
 }

@@ -7,6 +7,7 @@ struct HomeLandingView: View {
     private static var cachedAppSummaries: [RuntimeHomeAppSummary] = []
     private static var cachedWindowsByAppID: [String: [WindowCandidate]] = [:]
     private static var cachedSelectedAppID: String?
+    private static var cachedAccessibilityUnavailableWindowAppIDs: Set<String> = []
     private static var cachedAccessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
     private static var cachedScreenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
 
@@ -86,6 +87,8 @@ struct HomeLandingView: View {
     @State private var loadingWindowCountAppIDs: Set<String> = []
     @State private var selectedDetailRefreshExpectations:
         [String: HomeSelectedAppRefreshExpectation] = [:]
+    @State private var accessibilityUnavailableWindowState =
+        HomeAccessibilityUnavailableWindowState()
     @State private var selectedAppID: String?
 
     private var accessibilityTrusted: Bool {
@@ -440,9 +443,13 @@ struct HomeLandingView: View {
 
         restoreCachedStateIfNeeded()
 
-        if appSummaries.isEmpty || homeSummaryProjectionFreshness?.isCompleteForScope != true {
+        switch HomeApplicationLayerLifecyclePolicy.activationDecision(
+            hasResolvedProjection:
+                appSummaryProjectionObservationOwner.hasResolvedProjection
+        ) {
+        case .coldStart:
             scheduleInitialAppSummariesRefresh(reason: "initial_load")
-        } else {
+        case .resumeObservation:
             startAppSummaryProjectionObservation(reason: "appear")
         }
 
@@ -466,11 +473,23 @@ struct HomeLandingView: View {
         if selectedAppID == nil {
             selectedAppID = Self.cachedSelectedAppID
         }
+        if accessibilityUnavailableWindowState.isEmpty {
+            accessibilityUnavailableWindowState =
+                HomeAccessibilityUnavailableWindowState(
+                    appIDs:
+                        Self.cachedAccessibilityUnavailableWindowAppIDs
+                )
+        }
         syncSelectedApp()
     }
 
     private func startPermissionObservationIfNeeded() {
         permissionObservationOwner.start { evidence in
+            if evidence.target == .accessibility {
+                handleAccessibilityPermissionChanged(
+                    isGranted: evidence.isGranted
+                )
+            }
             requestAppSummaryProjectionMaintenance(
                 reason: "permission_changed_\(evidence.source.rawValue)"
             )
@@ -489,6 +508,8 @@ struct HomeLandingView: View {
             Self.cachedAppSummaries = appSummaries
             Self.cachedWindowsByAppID = windowsByAppID
             Self.cachedSelectedAppID = selectedAppID
+            Self.cachedAccessibilityUnavailableWindowAppIDs =
+                accessibilityUnavailableWindowState.appIDs
         }
     }
 
@@ -536,10 +557,6 @@ struct HomeLandingView: View {
     @discardableResult
     private func startAppSummaryProjectionObservation(reason: String)
         -> HomeAppSummaryProjectionObservationEvidence {
-        RuntimeLog.debug(
-            .projection,
-            "homeAppSummaryProjectionObservation state=starting reason=\(reason)"
-        )
         return appSummaryProjectionObservationOwner.start(reason: reason) { evidence in
             applyAppSummaryProjectionEvidence(evidence, reason: reason)
         }
@@ -583,6 +600,9 @@ struct HomeLandingView: View {
         appDetailProjectionObservationOwner.retainObservations(
             for: validAppIDs
         )
+        if !accessibilityTrusted {
+            resolveWindowsAsAccessibilityUnavailable(for: validAppIDs)
+        }
         syncSelectedApp()
         persistCache()
 
@@ -613,10 +633,14 @@ struct HomeLandingView: View {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         let projectionRead = evidence.projectionRead
         guard evidence.shouldApply else {
-            RuntimeLog.debug(
-                .projection,
-                "homeAppSummaryProjectionRead result=\(evidence.transition.rawValue) source=\(evidence.source.rawValue) reason=\(reason) readbacks=\(evidence.readbackCount)"
-            )
+            if HomeApplicationLayerLifecyclePolicy.shouldLogSummaryRead(
+                transition: evidence.transition
+            ) {
+                RuntimeLog.debug(
+                    .projection,
+                    "homeAppSummaryProjectionRead result=\(evidence.transition.rawValue) source=\(evidence.source.rawValue) reason=\(reason) readbacks=\(evidence.readbackCount)"
+                )
+            }
             return
         }
         guard projectionRead.isProjectionBacked else {
@@ -640,10 +664,14 @@ struct HomeLandingView: View {
         appDetailProjectionObservationOwner.retainObservations(
             for: validAppIDs
         )
+        if !accessibilityTrusted {
+            resolveWindowsAsAccessibilityUnavailable(for: validAppIDs)
+        }
         syncSelectedApp()
         persistCache()
 
-        if let selectedAppID = currentSelectedAppID,
+        if accessibilityTrusted,
+           let selectedAppID = currentSelectedAppID,
            let summary = summaries.first(where: { $0.appID == selectedAppID })
         {
             let cachedCount = windowsByAppID[selectedAppID]?.count
@@ -681,6 +709,11 @@ struct HomeLandingView: View {
         force: Bool,
         reason: String
     ) {
+        guard accessibilityTrusted else {
+            resolveWindowsAsAccessibilityUnavailable(for: [appID])
+            persistCache()
+            return
+        }
         guard force || windowsByAppID[appID] == nil else { return }
         guard let pid = appSummaries.first(where: { $0.appID == appID })?.pid,
               pid > 0
@@ -695,6 +728,48 @@ struct HomeLandingView: View {
             .selected(appID: appID, pid: pid),
             updateWindows: true,
             reason: reason
+        )
+    }
+
+    private func handleAccessibilityPermissionChanged(isGranted: Bool) {
+        if isGranted {
+            let invalidatedAppIDs =
+                accessibilityUnavailableWindowState.invalidateAll()
+            for appID in invalidatedAppIDs {
+                windowsByAppID.removeValue(forKey: appID)
+                homeDetailProjectionsByAppID.removeValue(forKey: appID)
+                selectedDetailRefreshExpectations.removeValue(forKey: appID)
+            }
+            return
+        }
+
+        appDetailProjectionObservationOwner.stopAll(
+            reason: "accessibilityUnavailable"
+        )
+        resolveWindowsAsAccessibilityUnavailable(
+            for: Set(appSummaries.map(\.appID))
+        )
+    }
+
+    private func resolveWindowsAsAccessibilityUnavailable(
+        for appIDs: Set<String>
+    ) {
+        accessibilityUnavailableWindowState.markUnavailable(appIDs: appIDs)
+        accessibilityUnavailableWindowState.retain(
+            appIDs: Set(appSummaries.map(\.appID))
+        )
+        guard !appIDs.isEmpty else { return }
+        appSummaries = accessibilityUnavailableWindowState
+            .resolvingWindowCounts(in: appSummaries)
+        loadingWindowCountAppIDs.subtract(appIDs)
+        for appID in appIDs {
+            windowsByAppID[appID] = []
+            homeDetailProjectionsByAppID.removeValue(forKey: appID)
+            selectedDetailRefreshExpectations.removeValue(forKey: appID)
+        }
+        appDetailProjectionObservationOwner.retainObservations(
+            for: Set(appSummaries.map(\.appID))
+                .subtracting(accessibilityUnavailableWindowState.appIDs)
         )
     }
 

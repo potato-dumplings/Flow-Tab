@@ -23,11 +23,9 @@ struct HomeAppSummaryProjectionObservationEvidence: Equatable {
 final class HomeAppSummaryProjectionObservationOwner: ObservableObject {
     private struct Observation {
         let generation: UInt64
-        let reason: String
         let onEvidence:
             @MainActor (HomeAppSummaryProjectionObservationEvidence) -> Void
         var readbackCount: Int
-        var lastAcceptedState: HomeProjectionEvidenceState?
     }
 
     private let runtimeProjectionService: any RuntimeProjectionServing
@@ -36,6 +34,7 @@ final class HomeAppSummaryProjectionObservationOwner: ObservableObject {
     private var nextGeneration: UInt64 = 1
     private var observation: Observation?
     private var observerToken: NSObjectProtocol?
+    private var lastAcceptedState: HomeProjectionEvidenceState?
 
     init(
         runtimeProjectionService: any RuntimeProjectionServing,
@@ -50,6 +49,10 @@ final class HomeAppSummaryProjectionObservationOwner: ObservableObject {
         observation != nil
     }
 
+    var hasResolvedProjection: Bool {
+        lastAcceptedState?.isProjectionBacked == true
+    }
+
     @discardableResult
     func start(
         reason: String,
@@ -62,10 +65,8 @@ final class HomeAppSummaryProjectionObservationOwner: ObservableObject {
         nextGeneration &+= 1
         observation = Observation(
             generation: generation,
-            reason: reason,
             onEvidence: onEvidence,
-            readbackCount: 0,
-            lastAcceptedState: nil
+            readbackCount: 0
         )
         installObserver(generation: generation)
 
@@ -88,19 +89,8 @@ final class HomeAppSummaryProjectionObservationOwner: ObservableObject {
         requestMaintenance(reason: reason, generation: generation)
     }
 
-    func stop(reason: String) {
-        guard let active = takeObservation() else { return }
-        RuntimeLog.debug(
-            .projection,
-            [
-                "homeAppSummaryProjectionObservation",
-                "state=cancelled",
-                "generation=\(active.generation)",
-                "reason=\(reason)",
-                "requestReason=\(active.reason)",
-                "readbacks=\(active.readbackCount)"
-            ].joined(separator: " ")
-        )
+    func stop(reason _: String) {
+        _ = takeObservation()
     }
 
     deinit {
@@ -164,12 +154,12 @@ final class HomeAppSummaryProjectionObservationOwner: ObservableObject {
             .read(from: runtimeProjectionService)
         let state = HomeProjectionEvidenceState(projectionRead)
         let transition = HomeProjectionEvidenceTransitionResolver.transition(
-            from: active.lastAcceptedState,
+            from: lastAcceptedState,
             to: state
         )
         active.readbackCount += 1
         if transition.shouldApply {
-            active.lastAcceptedState = state
+            lastAcceptedState = state
         }
         observation = active
 

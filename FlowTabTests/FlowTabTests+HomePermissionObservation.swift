@@ -235,6 +235,188 @@ extension FlowTabTests {
         XCTAssertEqual(activationObserver.availableObservationCount, 1)
         owner.stop()
     }
+
+    @MainActor
+    func testHomeAccessibilityTransitionsRefreshOnlyAfterPermissionEvidence() {
+        let notificationCenter = NotificationCenter()
+        let scheduler = HomePermissionManualScheduler()
+        let activationObserver = HomePermissionManualActivationObserver()
+        let coordinator = RuntimePermissionObservationCoordinator(
+            scheduler: scheduler,
+            activationObserver: activationObserver,
+            policy: RuntimePermissionObservationPolicy(
+                fallbackReadbackInterval:
+                    HomePermissionObservationOwner
+                        .fallbackReadbackInterval,
+                permissionRequestWatchdogInterval: 20
+            )
+        )
+        let appID = "com.example.permission-transition"
+        let pid: pid_t = 18_419
+        var accessibilityGranted = false
+
+        func summaryProjection(
+            generation: UInt64,
+            isComplete: Bool
+        ) -> RuntimeHomeSummaryProjection {
+            RuntimeHomeSummaryProjection(
+                summaries: [
+                    RuntimeHomeAppSummary(
+                        appID: appID,
+                        displayName: "Permission Transition",
+                        groupID: "permission-transition",
+                        lastActiveAt: TimeInterval(generation),
+                        windowCount: 1,
+                        pid: pid
+                    )
+                ],
+                freshness: RuntimeProjectionFreshness(
+                    generatedAt: TimeInterval(generation),
+                    sourceGeneration:
+                        RuntimeReadModelGeneration(
+                            projection: generation
+                        ),
+                    dirtyAppIDs: isComplete ? [] : [appID],
+                    dirtyPIDs: isComplete ? [] : [pid],
+                    dirtyCGWindowIDs: [],
+                    pendingRepairScopes:
+                        isComplete ? [] : ["appDirectory"],
+                    isCompleteForScope: isComplete
+                )
+            )
+        }
+
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            homeSummaryProjection: summaryProjection(
+                generation: 1,
+                isComplete: false
+            )
+        )
+        let detailOwner = HomeAppDetailProjectionObservationOwner(
+            runtimeProjectionService: runtimeProjectionService,
+            notificationCenter: notificationCenter
+        )
+        let summaryOwner = HomeAppSummaryProjectionObservationOwner(
+            runtimeProjectionService: runtimeProjectionService,
+            notificationCenter: notificationCenter
+        )
+        let lifecycle = HomeRetainedTabLifecycle(state: .active)
+        let hostedView = NSHostingView(
+            rootView: HomeLandingView(
+                lifecycle: lifecycle,
+                appLanguage: .english,
+                runtimeProjectionService: runtimeProjectionService,
+                permissionObservationOwner:
+                    HomePermissionObservationOwner(
+                        accessibilityTrusted: false,
+                        screenCaptureTrusted: true,
+                        coordinator: coordinator,
+                        readAccessibilityPermission: {
+                            accessibilityGranted
+                        },
+                        readScreenCapturePermission: { true }
+                    ),
+                initialProjectionObservationOwner:
+                    HomeInitialProjectionObservationOwner(
+                        runtimeProjectionService:
+                            runtimeProjectionService,
+                        notificationCenter: notificationCenter
+                    ),
+                appSummaryProjectionObservationOwner: summaryOwner,
+                appDetailProjectionObservationOwner: detailOwner,
+                openSettings: {}
+            )
+        )
+        hostedView.frame = NSRect(
+            x: 0,
+            y: 0,
+            width: 1_040,
+            height: 720
+        )
+        hostedView.layoutSubtreeIfNeeded()
+        notificationCenter.post(
+            name: .runtimeAppSwitcherProjectionMaintenanceDidFinish,
+            object: runtimeProjectionService,
+            userInfo:
+                RuntimeAppSwitcherProjectionMaintenanceCompletion(
+                    reason: .homeProjectionMissing
+                ).notificationUserInfo
+        )
+        hostedView.layoutSubtreeIfNeeded()
+
+        XCTAssertTrue(summaryOwner.hasResolvedProjection)
+        XCTAssertEqual(
+            runtimeProjectionService.homeDetailProjectionReadCount(
+                appID: appID
+            ),
+            0
+        )
+        XCTAssertTrue(
+            runtimeProjectionService
+                .selectedCurrentAppWindowChangeSignalsRecorded()
+                .isEmpty
+        )
+
+        var generation: UInt64 = 1
+        runtimeProjectionService
+            .setAppSwitcherMaintenanceRequestHandler { _ in
+                generation += 1
+                runtimeProjectionService.setHomeSummaryProjection(
+                    summaryProjection(
+                        generation: generation,
+                        isComplete: true
+                    )
+                )
+            }
+
+        accessibilityGranted = true
+        activationObserver.fireAvailable()
+        hostedView.layoutSubtreeIfNeeded()
+
+        XCTAssertEqual(
+            runtimeProjectionService
+                .selectedCurrentAppWindowChangeSignalsRecorded()
+                .map(\.appID),
+            [appID]
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.homeDetailProjectionReadCount(
+                appID: appID
+            ),
+            2
+        )
+        XCTAssertTrue(detailOwner.isObserving(appID: appID))
+
+        accessibilityGranted = false
+        activationObserver.fireAvailable()
+        hostedView.layoutSubtreeIfNeeded()
+
+        XCTAssertFalse(detailOwner.isObserving(appID: appID))
+        XCTAssertEqual(
+            runtimeProjectionService
+                .selectedCurrentAppWindowChangeSignalsRecorded()
+                .map(\.appID),
+            [appID]
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.homeDetailProjectionReadCount(
+                appID: appID
+            ),
+            2
+        )
+        XCTAssertEqual(
+            runtimeProjectionService
+                .appSwitcherMaintenanceRequestsRecorded(),
+            [
+                .homeProjectionMissing,
+                .homeProjectionMissing,
+                .homeProjectionMissing
+            ]
+        )
+
+        XCTAssertTrue(lifecycle.transition(to: .inactive))
+        hostedView.layoutSubtreeIfNeeded()
+    }
 }
 
 @MainActor

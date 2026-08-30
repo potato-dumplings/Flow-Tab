@@ -90,6 +90,71 @@ enum HomeProjectionEvidenceTransitionResolver {
     }
 }
 
+enum HomeApplicationLayerActivationDecision: Equatable {
+    case coldStart
+    case resumeObservation
+}
+
+enum HomeApplicationLayerLifecyclePolicy {
+    static func activationDecision(
+        hasResolvedProjection: Bool
+    ) -> HomeApplicationLayerActivationDecision {
+        hasResolvedProjection ? .resumeObservation : .coldStart
+    }
+
+    static func shouldLogSummaryRead(
+        transition: HomeProjectionEvidenceTransition
+    ) -> Bool {
+        transition != .unchanged
+    }
+}
+
+struct HomeAccessibilityUnavailableWindowState: Equatable {
+    private(set) var appIDs: Set<String>
+
+    init(appIDs: Set<String> = []) {
+        self.appIDs = appIDs
+    }
+
+    var isEmpty: Bool {
+        appIDs.isEmpty
+    }
+
+    mutating func markUnavailable(appIDs: Set<String>) {
+        self.appIDs.formUnion(appIDs)
+    }
+
+    mutating func retain(appIDs: Set<String>) {
+        self.appIDs.formIntersection(appIDs)
+    }
+
+    mutating func invalidateAll() -> Set<String> {
+        let invalidatedAppIDs = appIDs
+        appIDs.removeAll()
+        return invalidatedAppIDs
+    }
+
+    func resolvingWindowCounts(
+        in summaries: [RuntimeHomeAppSummary]
+    ) -> [RuntimeHomeAppSummary] {
+        summaries.map { summary in
+            guard appIDs.contains(summary.appID), summary.windowCount != 0 else {
+                return summary
+            }
+            return RuntimeHomeAppSummary(
+                appID: summary.appID,
+                displayName: summary.displayName,
+                groupID: summary.groupID,
+                lastActiveAt: summary.lastActiveAt,
+                windowCount: 0,
+                pid: summary.pid,
+                bundleIdentifier: summary.bundleIdentifier,
+                bundleURL: summary.bundleURL
+            )
+        }
+    }
+}
+
 struct HomeSelectedAppRefreshExpectation: Equatable {
     let processIdentifier: pid_t
     let windowCount: Int

@@ -222,6 +222,115 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testHomeAppSummaryObservationRetainsAcceptedEvidenceAcrossRestart() {
+        let notificationCenter = NotificationCenter()
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            homeSummaryProjection: makeObservedHomeSummaryProjection(
+                generation: 1,
+                isCompleteForScope: true
+            )
+        )
+        let owner = HomeAppSummaryProjectionObservationOwner(
+            runtimeProjectionService: runtimeProjectionService,
+            notificationCenter: notificationCenter
+        )
+        var resumedEvidence: [HomeAppSummaryProjectionObservationEvidence] = []
+
+        owner.start(reason: "initial") { _ in }
+        owner.stop(reason: "inactive")
+        owner.start(reason: "resume") {
+            resumedEvidence.append($0)
+        }
+
+        XCTAssertEqual(resumedEvidence.map(\.transition), [.unchanged])
+        XCTAssertFalse(resumedEvidence[0].shouldApply)
+
+        runtimeProjectionService.setHomeSummaryProjection(
+            makeObservedHomeSummaryProjection(
+                generation: 2,
+                isCompleteForScope: true
+            )
+        )
+        notificationCenter.post(
+            name: .runtimeAppSwitcherProjectionDidUpdate,
+            object: runtimeProjectionService
+        )
+
+        XCTAssertEqual(
+            resumedEvidence.map(\.transition),
+            [.unchanged, .sourceGenerationAdvanced]
+        )
+        XCTAssertTrue(resumedEvidence[1].shouldApply)
+    }
+
+    @MainActor
+    func testHomeAppSummaryObservationResolvesProjectionBackedEmptyDirectory() {
+        let projection = RuntimeHomeSummaryProjection(
+            summaries: [],
+            freshness: RuntimeProjectionFreshness(
+                generatedAt: 1,
+                sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+                dirtyAppIDs: [],
+                dirtyPIDs: [],
+                dirtyCGWindowIDs: [],
+                pendingRepairScopes: ["appDirectory"],
+                isCompleteForScope: false
+            )
+        )
+        let owner = HomeAppSummaryProjectionObservationOwner(
+            runtimeProjectionService: RecordingRuntimeProjectionService(
+                homeSummaryProjection: projection
+            )
+        )
+
+        let evidence = owner.start(reason: "empty_directory") { _ in }
+
+        XCTAssertTrue(evidence.projectionRead.isProjectionBacked)
+        XCTAssertTrue(owner.hasResolvedProjection)
+        XCTAssertEqual(
+            HomeApplicationLayerLifecyclePolicy.activationDecision(
+                hasResolvedProjection: owner.hasResolvedProjection
+            ),
+            .resumeObservation
+        )
+    }
+
+    func testHomeAccessibilityUnavailableStateOnlyInvalidatesPermissionDerivedEntries() {
+        let permissionDerivedAppID = "com.example.permission-derived"
+        let authorizedEmptyAppID = "com.example.authorized-empty"
+        let summaries = [
+            RuntimeHomeAppSummary(
+                appID: permissionDerivedAppID,
+                displayName: "Permission Derived",
+                groupID: "permission-derived",
+                lastActiveAt: 2,
+                windowCount: 3,
+                pid: 18_415
+            ),
+            RuntimeHomeAppSummary(
+                appID: authorizedEmptyAppID,
+                displayName: "Authorized Empty",
+                groupID: "authorized-empty",
+                lastActiveAt: 1,
+                windowCount: 0,
+                pid: 18_416
+            )
+        ]
+        var state = HomeAccessibilityUnavailableWindowState()
+
+        state.markUnavailable(appIDs: [permissionDerivedAppID])
+        let resolved = state.resolvingWindowCounts(in: summaries)
+
+        XCTAssertEqual(resolved.map(\.windowCount), [0, 0])
+        XCTAssertEqual(state.invalidateAll(), [permissionDerivedAppID])
+        XCTAssertTrue(state.isEmpty)
+        XCTAssertFalse(
+            state.appIDs.contains(authorizedEmptyAppID),
+            "An authorized empty window result has its own runtime evidence."
+        )
+    }
+
+    @MainActor
     func testHomeAppSummaryObservationDeliversBackgroundCommitOnMainActor() async {
         let notificationCenter = NotificationCenter()
         let runtimeProjectionService = RecordingRuntimeProjectionService(
