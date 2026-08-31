@@ -356,7 +356,9 @@ enum AppPanelPressureEvidenceTransport {
             case .appContent:
                 guard model.overlayStyle == .appAndWindow,
                       !model.isPreviewLayerMode,
-                      !model.isSearchActive
+                      !model.isSearchActive,
+                      event.renderGeneration
+                        == model.appLayerRenderSnapshot?.generation
                 else {
                     return
                 }
@@ -527,7 +529,6 @@ enum AppPanelPressureEvidenceTransport {
             )
             if token.phase == .opened {
                 stageMetrics[StageKey.layout] = 0
-                stageMetrics[StageKey.display] = 0
                 stageMetrics[StageKey.visibilityPollWait] = 0
                 stageMetrics[StageKey.visibilityReadback] =
                     AppPanelPressureEvidenceTransport
@@ -646,6 +647,20 @@ enum AppPanelPressureEvidenceTransport {
                 )
 
             let model = panelController.modelForTesting
+            if token.phase == .opened,
+               case .phaseDefault = token.completionRequirement,
+               let evidence = panelController
+                    .initialAppContentRevealObservationOwner
+                    .lastRenderPassEvidence,
+               evidence.target.presentationGeneration
+                    == panelController.presentationSessionGeneration,
+               evidence.target.renderGeneration
+                    == model.appLayerRenderSnapshot?.generation,
+               evidence.completedAtMilliseconds
+                    >= tokenStartedAtMilliseconds {
+                metrics[StageKey.display] =
+                    evidence.durationMilliseconds
+            }
             if let diagnostic = model
                 .lastSelectedAppWindowReadinessReadDiagnostic,
                diagnostic.finishedAtMilliseconds

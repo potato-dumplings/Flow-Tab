@@ -1,6 +1,7 @@
 import AppKit
 import XCTest
 @testable import FlowTab
+import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
     func testSystemAppMRUStateBootstrapUsesFrontmostThenGlobalFallbackAndLaunchOrder() {
@@ -227,6 +228,28 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(nextSession.requiresBootstrapFallback())
     }
 
+    func testFastSwitcherPayloadAppliesCurrentTrackedOrderToCachedProjection() {
+        let payload = AppSwitcherProjectionSessionPayload(
+            apps: [
+                mruCandidate(appID: "app.alpha"),
+                mruCandidate(appID: "app.beta"),
+                mruCandidate(appID: "app.gamma"),
+                mruCandidate(appID: "app.delta")
+            ],
+            contextsByID: [:]
+        )
+
+        let reordered = payload.applyingAppOrder([
+            "app.gamma",
+            "app.alpha"
+        ])
+
+        XCTAssertEqual(
+            reordered.apps.map(\.id),
+            ["app.gamma", "app.alpha", "app.beta", "app.delta"]
+        )
+    }
+
     @MainActor
     func testSystemAppMRUTrackerKeepsKnownOrderWhenFallbackSampleChanges() throws {
         let currentPID = ProcessInfo.processInfo.processIdentifier
@@ -310,6 +333,16 @@ extension FlowTabPriorityCoverageTests {
             pid: pid,
             launchDate: Date(timeIntervalSince1970: launchedAt),
             isCurrentProcess: isCurrentProcess
+        )
+    }
+
+    private func mruCandidate(appID: String) -> AppSwitchCandidate {
+        AppSwitchCandidate(
+            id: appID,
+            displayName: appID,
+            groupID: appID,
+            lastActiveAt: 0,
+            windows: []
         )
     }
 }

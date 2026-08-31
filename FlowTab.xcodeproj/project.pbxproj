@@ -449,6 +449,10 @@
 		FAD100023D27000100B0D737 /* InitialWindowOnlyPreviewRevealObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD100013D27000100B0D737 /* InitialWindowOnlyPreviewRevealObservation.swift */; };
 		FAD100043D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD100033D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealObservation.swift */; };
 		FAD100063D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD100053D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift */; };
+		FBE100023D2C100100B0D737 /* InitialAppContentRevealObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBE100013D2C100100B0D737 /* InitialAppContentRevealObservation.swift */; };
+		FBE100043D2C100100B0D737 /* FlowTabTests+InitialAppContentRevealObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBE100033D2C100100B0D737 /* FlowTabTests+InitialAppContentRevealObservation.swift */; };
+		FBE100063D2C100100B0D737 /* InitialAppContentRevealSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBE100053D2C100100B0D737 /* InitialAppContentRevealSupport.swift */; };
+		FBE100083D2C100100B0D737 /* FlowTabTests+InitialPanelRevealVisibilityCoordination.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBE100073D2C100100B0D737 /* FlowTabTests+InitialPanelRevealVisibilityCoordination.swift */; };
 		FBD100023D28000100B0D737 /* SwitcherAppRemovalAnimationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBD100013D28000100B0D737 /* SwitcherAppRemovalAnimationPolicy.swift */; };
 		FBD100043D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBD100033D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift */; };
 		FCD100023D29000100B0D737 /* HomeControlPressAnimationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCD100013D29000100B0D737 /* HomeControlPressAnimationPolicy.swift */; };
@@ -906,6 +910,10 @@
 		FAD100013D27000100B0D737 /* InitialWindowOnlyPreviewRevealObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitialWindowOnlyPreviewRevealObservation.swift; sourceTree = "<group>"; };
 		FAD100033D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+InitialWindowOnlyPreviewRevealObservation.swift"; sourceTree = "<group>"; };
 		FAD100053D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift"; sourceTree = "<group>"; };
+		FBE100013D2C100100B0D737 /* InitialAppContentRevealObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitialAppContentRevealObservation.swift; sourceTree = "<group>"; };
+		FBE100033D2C100100B0D737 /* FlowTabTests+InitialAppContentRevealObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+InitialAppContentRevealObservation.swift"; sourceTree = "<group>"; };
+		FBE100053D2C100100B0D737 /* InitialAppContentRevealSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitialAppContentRevealSupport.swift; sourceTree = "<group>"; };
+		FBE100073D2C100100B0D737 /* FlowTabTests+InitialPanelRevealVisibilityCoordination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+InitialPanelRevealVisibilityCoordination.swift"; sourceTree = "<group>"; };
 		FBD100013D28000100B0D737 /* SwitcherAppRemovalAnimationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherAppRemovalAnimationPolicy.swift; sourceTree = "<group>"; };
 		FBD100033D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift"; sourceTree = "<group>"; };
 		FCD100013D29000100B0D737 /* HomeControlPressAnimationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeControlPressAnimationPolicy.swift; sourceTree = "<group>"; };
@@ -1609,6 +1617,8 @@
 				F9D100033D26000100B0D737 /* FlowTabTests+TerminatePressFeedbackCompletion.swift */,
 				FAD100033D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealObservation.swift */,
 				FAD100053D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift */,
+				FBE100033D2C100100B0D737 /* FlowTabTests+InitialAppContentRevealObservation.swift */,
+				FBE100073D2C100100B0D737 /* FlowTabTests+InitialPanelRevealVisibilityCoordination.swift */,
 				FBD100033D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift */,
 				FCD100033D29000100B0D737 /* FlowTabTests+HomeControlPressAnimationPolicy.swift */,
 				A8F100043D2A000100B0D737 /* FlowTabTests+HomeAppRowPresentation.swift */,
@@ -2099,6 +2109,8 @@
 				A2E200033D2C000100B0D737 /* SwitcherPanelController+ManualWindowLayerEntry.swift */,
 				F9D100013D26000100B0D737 /* TerminatePressFeedbackCompletion.swift */,
 				FAD100013D27000100B0D737 /* InitialWindowOnlyPreviewRevealObservation.swift */,
+				FBE100053D2C100100B0D737 /* InitialAppContentRevealSupport.swift */,
+				FBE100013D2C100100B0D737 /* InitialAppContentRevealObservation.swift */,
 				FBD100013D28000100B0D737 /* SwitcherAppRemovalAnimationPolicy.swift */,
 				A1B2C4072F73000100B0D737 /* LiveSwitcherModel+Types.swift */,
 				B25000012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift */,
@@ -2808,6 +2820,8 @@
 				A2E200043D2C000100B0D737 /* SwitcherPanelController+ManualWindowLayerEntry.swift in Sources */,
 				F9D100023D26000100B0D737 /* TerminatePressFeedbackCompletion.swift in Sources */,
 				FAD100023D27000100B0D737 /* InitialWindowOnlyPreviewRevealObservation.swift in Sources */,
+				FBE100063D2C100100B0D737 /* InitialAppContentRevealSupport.swift in Sources */,
+				FBE100023D2C100100B0D737 /* InitialAppContentRevealObservation.swift in Sources */,
 				FBD100023D28000100B0D737 /* SwitcherAppRemovalAnimationPolicy.swift in Sources */,
 				A1B2C4172F73000100B0D737 /* LiveSwitcherModel+Types.swift in Sources */,
 				B25010012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift in Sources */,
@@ -2903,6 +2917,8 @@
 				F9D100043D26000100B0D737 /* FlowTabTests+TerminatePressFeedbackCompletion.swift in Sources */,
 				FAD100043D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealObservation.swift in Sources */,
 				FAD100063D27000100B0D737 /* FlowTabTests+InitialWindowOnlyPreviewRevealLifecycle.swift in Sources */,
+				FBE100043D2C100100B0D737 /* FlowTabTests+InitialAppContentRevealObservation.swift in Sources */,
+				FBE100083D2C100100B0D737 /* FlowTabTests+InitialPanelRevealVisibilityCoordination.swift in Sources */,
 				FBD100043D28000100B0D737 /* FlowTabTests+SwitcherAppRemovalAnimationPolicy.swift in Sources */,
 				FCD100043D29000100B0D737 /* FlowTabTests+HomeControlPressAnimationPolicy.swift in Sources */,
 				A8F100033D2A000100B0D737 /* FlowTabTests+HomeAppRowPresentation.swift in Sources */,

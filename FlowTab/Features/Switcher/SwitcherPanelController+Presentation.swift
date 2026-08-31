@@ -254,6 +254,12 @@ extension SwitcherPanelController {
     ) {
         let sessionReadyMs = monotonicMilliseconds()
         beginPresentationSession(kind: kind, trigger: trigger)
+        let preparesStandardAppRevealBeforeLayout =
+            kind == .globalAppSwitcher
+                && !model.isSearchActive
+        if preparesStandardAppRevealBeforeLayout {
+            prepareInitialPanelReveal(kind: kind)
+        }
         RuntimeLog.info(.session, startLogMessage)
 
         let targetScreen = resolveActivePresentationScreen()
@@ -269,7 +275,9 @@ extension SwitcherPanelController {
         syncPanelAccessibilityAnchors()
         let accessibilityReadyMs = monotonicMilliseconds()
         updatePanelPresentationLevel(trigger: trigger)
-        prepareInitialWindowOnlyPanelReveal(kind: kind)
+        if !preparesStandardAppRevealBeforeLayout {
+            prepareInitialPanelReveal(kind: kind)
+        }
         let levelReadyMs = monotonicMilliseconds()
 
         let initialVisibilityTrackingStartMs = monotonicMilliseconds()
@@ -294,6 +302,8 @@ extension SwitcherPanelController {
         panel.orderFrontRegardless()
         let firstOrderRegardlessMs =
             monotonicMilliseconds() - stageStartMs
+
+        requestInitialAppContentRenderPassIfNeeded()
 
         stageStartMs = monotonicMilliseconds()
         hideNonPanelWindowsIfNeeded()
@@ -449,7 +459,7 @@ extension SwitcherPanelController {
         clearInitialPresentationVisibilityTracking(invalidate: true)
         clearInitialVisibleFrameTracking()
         removeEventMonitors()
-        cancelInitialWindowOnlyPanelReveal()
+        cancelInitialPanelReveal()
         panelPresentationActive = false
         panel.orderOut(nil)
         panel.alphaValue = 0

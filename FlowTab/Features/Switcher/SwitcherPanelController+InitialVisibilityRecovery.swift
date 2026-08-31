@@ -1,13 +1,35 @@
 import Foundation
 
 extension SwitcherPanelController {
-    func prepareInitialWindowOnlyPanelReveal(kind: HotkeySessionKind) {
-        initialWindowOnlyPreviewRevealObservationOwner.cancel()
+    func prepareInitialPanelReveal(kind: HotkeySessionKind) {
         guard kind == .inAppWindowSwitcher else {
-            panel.alphaValue = 1
+            initialWindowOnlyPreviewRevealObservationOwner.cancel()
+            guard !model.isSearchActive else {
+                initialAppContentRevealObservationOwner.cancel()
+                panel.alphaValue = 1
+                return
+            }
+
+            panel.alphaValue = 0
+            initialAppContentRevealObservationOwner.start(
+                presentationGeneration: presentationSessionGeneration,
+                renderGeneration:
+                    model.appLayerRenderSnapshot?.generation ?? 0,
+                onDraw: { [weak self] evidence in
+                    self?.revealInitialAppContentPanel(
+                        evidence: evidence
+                    )
+                },
+                onWatchdog: { [weak self] failure in
+                    self?.cancelInitialAppContentRevealAfterWatchdog(
+                        failure
+                    )
+                }
+            )
             return
         }
 
+        initialAppContentRevealObservationOwner.cancel()
         panel.alphaValue = 0
         initialWindowOnlyPreviewRevealObservationOwner.start(
             presentationGeneration: presentationSessionGeneration,
@@ -21,6 +43,100 @@ extension SwitcherPanelController {
                 self?.revealInitialWindowOnlyPanelAfterWatchdog(failure)
             }
         )
+    }
+
+    private func revealInitialAppContentPanel(
+        evidence: InitialAppContentRevealEvidence
+    ) {
+        guard evidence.target.presentationGeneration
+                == presentationSessionGeneration,
+              activeHotkeySessionKind == .globalAppSwitcher,
+              !model.isSearchActive,
+              !model.isWindowOnlyOverlay,
+              model.appLayerRenderSnapshot?.generation
+                == evidence.target.renderGeneration,
+              panel.alphaValue < 1
+        else {
+            return
+        }
+
+        panel.alphaValue = 1
+        _ = observeInitialPresentationVisibility(
+            source: .appContentRenderMilestone
+        )
+        RuntimeLog.debug(
+            .switcherLayout,
+            "initial app panel revealed presentationGeneration=\(evidence.target.presentationGeneration) renderGeneration=\(evidence.target.renderGeneration) \(initialAppContentRenderPassLogFields(for: evidence.target))"
+        )
+    }
+
+    private func cancelInitialAppContentRevealAfterWatchdog(
+        _ failure: InitialAppContentRevealWatchdogFailure
+    ) {
+        guard failure.target.presentationGeneration
+                == presentationSessionGeneration,
+              activeHotkeySessionKind == .globalAppSwitcher,
+              !model.isSearchActive,
+              panel.alphaValue < 1
+        else {
+            return
+        }
+
+        panel.alphaValue = 0
+        RuntimeLog.error(
+            .switcherLayout,
+            "initial app panel presentation cancelled reason=app_content_reveal_watchdog \(failure.logFields)"
+        )
+        cancelSelectionForSystemInterruption(
+            trigger: "app_content_reveal_watchdog"
+        )
+    }
+
+    func cancelInitialPanelReveal() {
+        initialAppContentRevealObservationOwner.cancel()
+        initialWindowOnlyPreviewRevealObservationOwner.cancel()
+    }
+
+    func requestInitialAppContentRenderPassIfNeeded() {
+        guard let target =
+                initialAppContentRevealObservationOwner.target,
+              target.presentationGeneration
+                == presentationSessionGeneration,
+              target.renderGeneration
+                == model.appLayerRenderSnapshot?.generation,
+              panel.alphaValue == 0
+        else {
+            return
+        }
+        _ = initialAppContentRevealObservationOwner.markPanelOrdered(
+            observationGeneration: target.observationGeneration,
+            presentationGeneration: target.presentationGeneration
+        )
+    }
+
+    func handleSwitcherRenderPreparation(
+        _ preparation: SwitcherRenderMilestonePreparation
+    ) {
+        _ = initialAppContentRevealObservationOwner
+            .observePreparation(
+                preparation,
+                presentationGeneration:
+                    presentationSessionGeneration
+            )
+    }
+
+    private func initialAppContentRenderPassLogFields(
+        for target: InitialAppContentRevealTarget
+    ) -> String {
+        guard let evidence =
+                initialAppContentRevealObservationOwner
+                    .lastRenderPassEvidence,
+              evidence.target == target
+        else {
+            return "displayMs=none displayCompletedAtMs=none"
+        }
+        return "displayMs=\(formatMilliseconds(evidence.durationMilliseconds)) "
+            + "displayCompletedAtMs=\(formatMilliseconds(evidence.completedAtMilliseconds))"
     }
 
     func observeInitialWindowOnlyPreviewReadiness(
@@ -48,6 +164,9 @@ extension SwitcherPanelController {
         guard evidence.snapshot.previewsReady else { return }
 
         panel.alphaValue = 1
+        _ = observeInitialPresentationVisibility(
+            source: .windowPreviewReveal
+        )
         RuntimeLog.debug(
             .preview,
             "initial window-only panel revealed reason=\(evidence.source.rawValue) \(evidence.snapshot.logFields)"
@@ -67,15 +186,13 @@ extension SwitcherPanelController {
         guard panel.alphaValue < 1 else { return }
 
         panel.alphaValue = 1
+        _ = observeInitialPresentationVisibility(
+            source: .windowPreviewReveal
+        )
         RuntimeLog.warning(
             .preview,
             "initial window-only panel degraded reveal reason=preview_watchdog \(failure.logFields)"
         )
-    }
-
-    func cancelInitialWindowOnlyPanelReveal() {
-        initialWindowOnlyPreviewRevealObservationOwner.cancel()
-        panel.alphaValue = 1
     }
 
     private func initialWindowOnlyPreviewReadinessSnapshot()
@@ -214,6 +331,12 @@ extension SwitcherPanelController {
     func handleSwitcherRenderMilestone(
         _ event: SwitcherRenderMilestoneEvent
     ) {
+        _ = initialAppContentRevealObservationOwner.observe(
+            event,
+            observationGeneration:
+                initialAppContentRevealObservationOwner.generation,
+            presentationGeneration: presentationSessionGeneration
+        )
         for observer in renderMilestoneObservers.values {
             observer(event)
         }
@@ -324,6 +447,40 @@ extension SwitcherPanelController {
         )
     }
 
+    private var isAwaitingCurrentInitialPanelReveal: Bool {
+        guard hasActivePresentationSession,
+              panel.alphaValue < 1
+        else {
+            return false
+        }
+
+        switch activeHotkeySessionKind {
+        case .globalAppSwitcher:
+            guard !model.isSearchActive,
+                  !model.isWindowOnlyOverlay,
+                  let target =
+                    initialAppContentRevealObservationOwner.target,
+                  target.presentationGeneration
+                    == presentationSessionGeneration,
+                  target.renderGeneration
+                    == model.appLayerRenderSnapshot?.generation
+            else {
+                return false
+            }
+            return true
+        case .inAppWindowSwitcher:
+            let observationGeneration =
+                initialWindowOnlyPreviewRevealObservationOwner.generation
+            return initialWindowOnlyPreviewRevealObservationOwner
+                .isObserving(
+                    observationGeneration: observationGeneration,
+                    presentationGeneration: presentationSessionGeneration
+                )
+        case nil:
+            return false
+        }
+    }
+
     func scheduleInitialPanelVisibilityRecovery(
         trigger: String,
         initialVisibilityGeneration: Int? = nil
@@ -336,6 +493,13 @@ extension SwitcherPanelController {
             observationGeneration: generation,
             presentationGeneration: presentationGeneration
         ) else { return }
+        if isAwaitingCurrentInitialPanelReveal {
+            panelVisibilityRecoveryState = .presenting(
+                trigger: trigger,
+                generation: generation
+            )
+            return
+        }
         if observeInitialPresentationVisibility(
             source: .presentationActionReadback,
             generation: generation,

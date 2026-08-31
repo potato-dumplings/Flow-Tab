@@ -259,6 +259,7 @@ def evaluate(
         if int(row["cycle"]) > 0
         and row["kind"] in {"opened", "highlighted", "closed"}
     ]
+    all_opened = [row for row in metrics if row["kind"] == "opened"]
     opened = [row for row in measured_rows if row["kind"] == "opened"]
     highlighted = [
         row for row in measured_rows if row["kind"] == "highlighted"
@@ -390,6 +391,15 @@ def evaluate(
         ) <= 0.5
         for row in highlighted
     )
+    first_frame_violations = (
+        0
+        if flow_name == "search"
+        else sum(
+            float(row["first_content_draw_ms"])
+            > float(row["occlusion_visible_ms"])
+            for row in all_opened
+        )
+    )
 
     active = timed_samples(samples, measurement_start, cooldown_start)
     cooldown_settle = cooldown_start + measured_cooldown * 0.5
@@ -481,6 +491,12 @@ def evaluate(
             open_p95,
             f"<={OPEN_P95_LIMIT_MS}",
         ),
+        gate(
+            "initial_app_content_draw_before_visibility",
+            first_frame_violations == 0,
+            first_frame_violations,
+            "0",
+        ),
     ] + interaction_gates + [
         gate(
             "active_resource_samples",
@@ -530,7 +546,7 @@ def evaluate(
     )
 
     return {
-        "schema_version": 6,
+        "schema_version": 7,
         "flow": flow_name,
         "scenario": scenario_name,
         "verdict": "passed" if all(item["passed"] for item in gates) else "failed",

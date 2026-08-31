@@ -83,18 +83,77 @@ struct SwitcherRenderMilestoneEvent: Equatable {
     let drawnAtMilliseconds: Double
 }
 
+struct SwitcherRenderMilestoneDisplayEvidence: Equatable {
+    let milestone: SwitcherRenderMilestone
+    let renderGeneration: UInt64
+    let durationMilliseconds: Double
+    let completedAtMilliseconds: Double
+}
+
+struct SwitcherRenderMilestonePreparation {
+    let milestone: SwitcherRenderMilestone
+    let renderGeneration: UInt64
+    private let displayAction:
+        () -> SwitcherRenderMilestoneDisplayEvidence?
+
+    init(
+        milestone: SwitcherRenderMilestone,
+        renderGeneration: UInt64,
+        displayAction:
+            @escaping () -> SwitcherRenderMilestoneDisplayEvidence?
+    ) {
+        self.milestone = milestone
+        self.renderGeneration = renderGeneration
+        self.displayAction = displayAction
+    }
+
+    func displayPreparedRegion()
+        -> SwitcherRenderMilestoneDisplayEvidence?
+    {
+        displayAction()
+    }
+}
+
 private final class SwitcherRenderMilestoneNSView: NSView {
     var milestone: SwitcherRenderMilestone = .appContent
     var renderGeneration: UInt64 = 0
     var onDraw: ((SwitcherRenderMilestoneEvent) -> Void)?
+    var onPreparation:
+        ((SwitcherRenderMilestonePreparation) -> Void)?
     private var deliveredToken: String?
+    private var deliveredPreparationToken: String?
 
     override var isOpaque: Bool { false }
+
+    func publishPreparationIfNeeded() {
+        let token = renderToken
+        guard deliveredPreparationToken != token,
+              let onPreparation
+        else {
+            return
+        }
+        deliveredPreparationToken = token
+        let expectedMilestone = milestone
+        let expectedRenderGeneration = renderGeneration
+        onPreparation(
+            SwitcherRenderMilestonePreparation(
+                milestone: expectedMilestone,
+                renderGeneration: expectedRenderGeneration,
+                displayAction: { [weak self] in
+                    self?.displayPreparedRegion(
+                        expectedMilestone: expectedMilestone,
+                        expectedRenderGeneration:
+                            expectedRenderGeneration
+                    )
+                }
+            )
+        )
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         guard window?.isVisible == true else { return }
-        let token = "\(milestone.rawValue):\(renderGeneration)"
+        let token = renderToken
         guard deliveredToken != token else { return }
         deliveredToken = token
         let event = SwitcherRenderMilestoneEvent(
@@ -107,12 +166,66 @@ private final class SwitcherRenderMilestoneNSView: NSView {
             self?.onDraw?(event)
         }
     }
+
+    private var renderToken: String {
+        "\(milestone.rawValue):\(renderGeneration)"
+    }
+
+    private func displayPreparedRegion(
+        expectedMilestone: SwitcherRenderMilestone,
+        expectedRenderGeneration: UInt64
+    ) -> SwitcherRenderMilestoneDisplayEvidence? {
+        guard milestone == expectedMilestone,
+              renderGeneration == expectedRenderGeneration,
+              let window,
+              window.isVisible,
+              let contentView = window.contentView,
+              isDescendant(of: contentView)
+        else {
+            return nil
+        }
+
+        let startedAtMilliseconds =
+            ProcessInfo.processInfo.systemUptime * 1_000
+        needsDisplay = true
+        contentView.layoutSubtreeIfNeeded()
+        let appStripRect = convert(bounds, to: contentView)
+            .integral
+            .intersection(contentView.bounds)
+        guard !appStripRect.isEmpty else { return nil }
+        deliveredToken = nil
+        contentView.displayIgnoringOpacity(appStripRect)
+        let completedAtMilliseconds =
+            ProcessInfo.processInfo.systemUptime * 1_000
+        return SwitcherRenderMilestoneDisplayEvidence(
+            milestone: expectedMilestone,
+            renderGeneration: expectedRenderGeneration,
+            durationMilliseconds:
+                completedAtMilliseconds - startedAtMilliseconds,
+            completedAtMilliseconds: completedAtMilliseconds
+        )
+    }
 }
 
 struct SwitcherRenderMilestoneProbe: NSViewRepresentable {
     let milestone: SwitcherRenderMilestone
     let renderGeneration: UInt64
+    let onPreparation:
+        ((SwitcherRenderMilestonePreparation) -> Void)?
     let onDraw: (SwitcherRenderMilestoneEvent) -> Void
+
+    init(
+        milestone: SwitcherRenderMilestone,
+        renderGeneration: UInt64,
+        onPreparation:
+            ((SwitcherRenderMilestonePreparation) -> Void)? = nil,
+        onDraw: @escaping (SwitcherRenderMilestoneEvent) -> Void
+    ) {
+        self.milestone = milestone
+        self.renderGeneration = renderGeneration
+        self.onPreparation = onPreparation
+        self.onDraw = onDraw
+    }
 
     func makeNSView(context: Context) -> NSView {
         let view = SwitcherRenderMilestoneNSView()
@@ -131,7 +244,9 @@ struct SwitcherRenderMilestoneProbe: NSViewRepresentable {
     private func configure(_ view: SwitcherRenderMilestoneNSView) {
         view.milestone = milestone
         view.renderGeneration = renderGeneration
+        view.onPreparation = onPreparation
         view.onDraw = onDraw
+        view.publishPreparationIfNeeded()
     }
 }
 
@@ -178,11 +293,13 @@ struct SwitcherAppLayerRenderSnapshot {
     let generation: UInt64
     let items: [SwitcherAppRenderItem]
     let selectedAppID: String
+    let listChange: SwitcherAppListChange
 }
 
 extension LiveSwitcherModel {
     func updateAppLayerRenderSnapshot(
-        from session: SwitcherSession
+        from session: SwitcherSession,
+        previousSession: SwitcherSession?
     ) {
         if overlayStyle == .windowOnly,
            appLayerRenderSnapshot != nil {
@@ -214,7 +331,11 @@ extension LiveSwitcherModel {
             generation:
                 (appLayerRenderSnapshot?.generation ?? 0) &+ 1,
             items: items,
-            selectedAppID: session.selectedApp.id
+            selectedAppID: session.selectedApp.id,
+            listChange: SwitcherAppListChange.classify(
+                previousAppIDs: previousSession?.apps.map(\.id),
+                currentAppIDs: session.apps.map(\.id)
+            )
         )
         appLayerRenderSnapshot = candidate
     }
@@ -237,6 +358,35 @@ struct AppSwitcherProjectionSessionPayload {
         self.init(
             apps: projection.appCycleApps,
             contextsByID: projection.contextsByID
+        )
+    }
+
+    func applyingAppOrder(_ orderedAppIDs: [String]) -> Self {
+        guard apps.count > 1, !orderedAppIDs.isEmpty else { return self }
+
+        var rankByAppID: [String: Int] = [:]
+        for (rank, appID) in orderedAppIDs.enumerated()
+        where rankByAppID[appID] == nil {
+            rankByAppID[appID] = rank
+        }
+        let originalRankByAppID = Dictionary(
+            uniqueKeysWithValues: apps.enumerated().map {
+                ($0.element.id, $0.offset)
+            }
+        )
+        let reorderedApps = apps.sorted { lhs, rhs in
+            let lhsRank = rankByAppID[lhs.id] ?? Int.max
+            let rhsRank = rankByAppID[rhs.id] ?? Int.max
+            if lhsRank != rhsRank {
+                return lhsRank < rhsRank
+            }
+            return (originalRankByAppID[lhs.id] ?? Int.max)
+                < (originalRankByAppID[rhs.id] ?? Int.max)
+        }
+        guard reorderedApps.map(\.id) != apps.map(\.id) else { return self }
+        return Self(
+            apps: reorderedApps,
+            contextsByID: contextsByID
         )
     }
 }

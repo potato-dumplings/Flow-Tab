@@ -5,6 +5,8 @@ import FlowTabCore
 struct SwitcherPanelRootView: View {
     @ObservedObject var model: LiveSwitcherModel
     let pointerSelectionActions: SwitcherPointerSelectionActions
+    let onRenderPreparation:
+        (SwitcherRenderMilestonePreparation) -> Void
     let onRenderMilestone: (SwitcherRenderMilestoneEvent) -> Void
     @ObservedObject private var presentation = FlowPresentationState.shared
     @AppStorage(AppPreferenceKeys.searchEnabled)
@@ -63,6 +65,7 @@ struct SwitcherPanelRootView: View {
                         model.recordSearchResultScrollRequestForTesting(resultID)
                     },
                     pointerSelectionActions: pointerSelectionActions,
+                    onRenderPreparation: onRenderPreparation,
                     onRenderMilestone: onRenderMilestone,
                     iconForApp: { app in
                         model.icon(for: app)
@@ -383,6 +386,8 @@ private struct CommandTabOverlay: View {
     let appTileSpacing: CGFloat
     let onSearchResultScrollRequested: (String) -> Void
     let pointerSelectionActions: SwitcherPointerSelectionActions
+    let onRenderPreparation:
+        (SwitcherRenderMilestonePreparation) -> Void
     let onRenderMilestone: (SwitcherRenderMilestoneEvent) -> Void
     let iconForApp: (AppSwitchCandidate) -> NSImage?
     @Environment(\.colorScheme) private var colorScheme
@@ -537,7 +542,8 @@ private struct CommandTabOverlay: View {
         let removalAnimationDuration =
             SwitcherAppRemovalAnimationPolicy.default
                 .animationDuration(
-                    appCount: appRenderSnapshot.items.count
+                    appCount: appRenderSnapshot.items.count,
+                    listChange: appRenderSnapshot.listChange
                 )
         return HStack(alignment: .center, spacing: appTileSpacing) {
             ForEach(appRenderSnapshot.items) { item in
@@ -605,6 +611,7 @@ private struct CommandTabOverlay: View {
             SwitcherRenderMilestoneProbe(
                 milestone: .appContent,
                 renderGeneration: appRenderSnapshot.generation,
+                onPreparation: onRenderPreparation,
                 onDraw: onRenderMilestone
             )
         )

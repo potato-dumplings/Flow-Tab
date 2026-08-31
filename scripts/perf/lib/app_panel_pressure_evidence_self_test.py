@@ -170,6 +170,7 @@ def run_self_test(evaluate, open_stage_columns, event_stage_columns):
         metrics, samples, "application", "realistic", 120, 15
     )
     assert passing["verdict"] == "passed"
+    assert passing["schema_version"] == 7
     breakdown = passing["open_stage_breakdown"]
     assert breakdown["available"]
     assert breakdown["complete_cycle_count"] == 40
@@ -253,6 +254,32 @@ def run_self_test(evaluate, open_stage_columns, event_stage_columns):
             120,
             15,
         )["verdict"] == "passed"
+    for flow in ("application", "app-to-window"):
+        late_draw_metrics, late_draw_samples = synthetic_inputs(
+            open_stage_columns,
+            event_stage_columns,
+        )
+        first_opened = next(
+            row for row in late_draw_metrics if row["kind"] == "opened"
+        )
+        first_opened["first_content_draw_ms"] = "13"
+        first_opened["occlusion_visible_ms"] = "12"
+        late_draw_result = evaluate(
+            late_draw_metrics,
+            late_draw_samples,
+            flow,
+            "realistic",
+            120,
+            15,
+        )
+        assert late_draw_result["verdict"] == "failed"
+        first_frame_gate = next(
+            item
+            for item in late_draw_result["gates"]
+            if item["name"]
+            == "initial_app_content_draw_before_visibility"
+        )
+        assert first_frame_gate["observed"] == 1
     local_metrics, local_samples = synthetic_inputs(
         open_stage_columns,
         event_stage_columns,

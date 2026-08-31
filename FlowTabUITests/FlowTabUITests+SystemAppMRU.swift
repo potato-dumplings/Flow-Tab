@@ -188,6 +188,58 @@ extension FlowTabUITests {
         }
     }
 
+    func testSystemAppMRUReopenUsesCurrentOrderInSameProcessFirstFrame() throws {
+        let workflow = try configuredSystemAppMRUFixtureWorkflow()
+        let launchArguments = [
+            "--flowtab-ui-listen-switcher-trigger",
+            "-windowLayerAutoEnterDelay", "30.0"
+        ]
+
+        try runRealSpaceFixtureWorkflow(
+            workflow,
+            flowTabAdditionalArguments: launchArguments,
+            beforeFlowTabLaunch: { [self] workflow in
+                establishSystemAppOrder(
+                    workflow.apps.map(\.identity.bundleIdentifier)
+                )
+            }
+        ) { workflow, app in
+            let initialOrder = workflow.apps.map(
+                \.identity.bundleIdentifier
+            )
+            XCTAssertEqual(
+                triggerAndWaitForWorkflowAppOrder(
+                    initialOrder,
+                    in: app,
+                    traceLabel: "system-app-mru.same-process.initial"
+                ),
+                initialOrder
+            )
+            dismissSwitcherAndWait(
+                in: app,
+                timeout:
+                    FlowTabUITestSystemAppMRUPolicy
+                        .switcherDismissalWatchdog
+            )
+
+            let reopenedExpectedOrder = [3, 7, 1, 5, 0, 6, 2, 4]
+                .map { initialOrder[$0] }
+            establishSystemAppOrder(reopenedExpectedOrder)
+
+            let firstCompleteVisibleOrder =
+                triggerAndReadFirstCompleteWorkflowAppOrder(
+                    Set(initialOrder),
+                    in: app,
+                    traceLabel:
+                        "system-app-mru.same-process.reopen-first-frame"
+                )
+            XCTAssertEqual(
+                firstCompleteVisibleOrder,
+                reopenedExpectedOrder
+            )
+        }
+    }
+
     private func configuredSystemAppMRUFixtureWorkflow() throws -> SpaceFixtureResolvedWorkflow {
         let environmentKey = "FLOWTAB_SYSTEM_APP_MRU_FIXTURE_WORKFLOW_PATH"
         let configuredPath = ProcessInfo.processInfo.environment[environmentKey]?
@@ -221,9 +273,24 @@ extension FlowTabUITests {
                         .fixtureActivationWatchdog,
                 message: "Failed to establish the fixture application activation Oracle."
             ) {
-                XCUIApplication(
-                    bundleIdentifier: bundleIdentifier
-                ).activate()
+                let runningApplications =
+                    NSRunningApplication.runningApplications(
+                        withBundleIdentifier: bundleIdentifier
+                    ).filter { !$0.isTerminated }
+                guard runningApplications.count == 1,
+                      let runningApplication = runningApplications.first
+                else {
+                    XCTFail(
+                        "Expected exactly one running MRU fixture process for "
+                            + "\(bundleIdentifier); observedPIDs="
+                            + "\(runningApplications.map(\.processIdentifier))"
+                    )
+                    return
+                }
+                XCTAssertTrue(
+                    runningApplication.activate(options: [.activateAllWindows]),
+                    "Failed to request activation for \(bundleIdentifier)."
+                )
             }
         }
     }
@@ -276,6 +343,68 @@ extension FlowTabUITests {
             "Expected workflow app order \(expectedAppIDs). "
                 + "\(owner.diagnosticSummary). "
                 + switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary)
+        )
+        return owner.latestEvidence?.value.order ?? []
+    }
+
+    private func triggerAndReadFirstCompleteWorkflowAppOrder(
+        _ expectedAppIdentifiers: Set<String>,
+        in app: XCUIApplication,
+        traceLabel: String
+    ) -> [String] {
+        let diagnosticsSummary = element(
+            in: app,
+            identifier: Identifier.switcherSummary
+        )
+        let owner = FlowTabUITestConditionObservationOwner(
+            observationRegistration:
+                FlowTabUITestConditionReadbackScheduler
+                    .mainRunLoopRegistration(
+                        cadence:
+                            FlowTabUITestConditionObservationPolicy
+                                .xcuiReadbackCadence
+                    ),
+            readback: {
+                FlowTabUITestWorkflowAppOrderEvidence(
+                    diagnosticsValue: diagnosticsSummary.exists
+                        ? self.switcherPanelDiagnosticsValue(
+                            diagnosticsSummary,
+                            key: "apps"
+                        )
+                        : nil,
+                    expectedAppIdentifiers:
+                        expectedAppIdentifiers
+                )
+            },
+            isSatisfied: { evidence in
+                evidence.diagnosticsValue != nil
+                    && evidence.order.count
+                        == expectedAppIdentifiers.count
+                    && Set(evidence.order)
+                        == expectedAppIdentifiers
+            },
+            describe: \.diagnosticSummary
+        )
+        owner.start()
+        defer { owner.cancel() }
+
+        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+            .global,
+            traceLabel: traceLabel
+        )
+        if let evidence = owner.waitForResolution(
+            timeout: FlowTabUITestSystemAppMRUPolicy.appOrderWatchdog
+        ) {
+            return evidence.value.order
+        }
+
+        XCTFail(
+            "Expected the first complete visible workflow order. "
+                + "\(owner.diagnosticSummary). "
+                + switcherDebugSummary(
+                    app,
+                    diagnosticsSummary: diagnosticsSummary
+                )
         )
         return owner.latestEvidence?.value.order ?? []
     }

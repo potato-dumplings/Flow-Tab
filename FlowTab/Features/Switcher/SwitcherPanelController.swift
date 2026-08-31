@@ -133,6 +133,8 @@ final class SwitcherPanelController {
     let terminatePressFeedbackPolicy: TerminatePressFeedbackPolicy
     let initialWindowOnlyPreviewRevealObservationOwner:
         InitialWindowOnlyPreviewRevealObservationOwner
+    let initialAppContentRevealObservationOwner:
+        InitialAppContentRevealObservationOwner
     let panelPresentationDiagnosticProbeOwner:
         PanelPresentationDiagnosticProbeOwner
     let terminateTargetProcessStateReader:
@@ -336,6 +338,8 @@ final class SwitcherPanelController {
             (any TerminatePressFeedbackScheduling)? = nil,
         initialWindowOnlyPreviewRevealScheduler:
             (any InitialWindowOnlyPreviewRevealScheduling)? = nil,
+        initialAppContentRevealScheduler:
+            (any InitialAppContentRevealScheduling)? = nil,
         panelPresentationDiagnosticScheduler:
             (any PanelPresentationDiagnosticScheduling)? = nil,
         terminatePressFeedbackPolicy:
@@ -387,6 +391,10 @@ final class SwitcherPanelController {
             InitialWindowOnlyPreviewRevealObservationOwner(
                 scheduler: initialWindowOnlyPreviewRevealScheduler
             )
+        initialAppContentRevealObservationOwner =
+            InitialAppContentRevealObservationOwner(
+                scheduler: initialAppContentRevealScheduler
+            )
         panelPresentationDiagnosticProbeOwner =
             PanelPresentationDiagnosticProbeOwner(
                 scheduler: panelPresentationDiagnosticScheduler
@@ -432,6 +440,11 @@ final class SwitcherPanelController {
                         self?.commitSwitcherSearchResultByPointerClick(resultID: resultID)
                     }
                 ),
+                onRenderPreparation: { [weak self] preparation in
+                    self?.handleSwitcherRenderPreparation(
+                        preparation
+                    )
+                },
                 onRenderMilestone: { [weak self] event in
                     self?.handleSwitcherRenderMilestone(event)
                 }

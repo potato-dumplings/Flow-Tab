@@ -227,6 +227,9 @@ extension LiveSwitcherModel {
         let startMs = Self.monotonicMilliseconds()
         cancelPendingSearchComputation()
         let payload = readFastAppSwitcherProjectionSessionPayload()
+            .applyingAppOrder(
+                SystemAppMRUTracker.shared.trackedAppIDOrder()
+            )
         let projectionReadMs = Self.monotonicMilliseconds()
         return applyAppSwitcherProjectionPayload(
             payload,

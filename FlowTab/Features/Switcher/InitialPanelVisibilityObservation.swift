@@ -6,6 +6,8 @@ enum InitialPanelVisibilityEvidenceSource: String, Equatable {
     case panelOcclusionChanged
     case panelBecameKey
     case panelExposed
+    case appContentRenderMilestone
+    case windowPreviewReveal
     case recoveryReadback
     case recoveryEscalationReadback
 }

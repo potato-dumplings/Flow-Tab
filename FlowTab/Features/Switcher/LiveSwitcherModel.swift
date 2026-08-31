@@ -208,7 +208,10 @@ final class LiveSwitcherModel: ObservableObject {
                 sessionAppsByID = [:]
                 return
             }
-            updateAppLayerRenderSnapshot(from: session)
+            updateAppLayerRenderSnapshot(
+                from: session,
+                previousSession: oldValue
+            )
             handleSessionPreviewSnapshotLifecycle(session)
             guard searchViewState.isActive else {
                 return
