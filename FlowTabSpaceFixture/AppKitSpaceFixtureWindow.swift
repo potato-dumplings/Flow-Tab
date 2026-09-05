@@ -87,6 +87,13 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         window.close()
     }
 
+    func postCreatedAccessibilityNotification() {
+        NSAccessibility.post(
+            element: NSApp,
+            notification: .windowCreated
+        )
+    }
+
     func postDestroyedAccessibilityNotification() {
         NSAccessibility.post(
             element: window,

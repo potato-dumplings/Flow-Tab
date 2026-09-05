@@ -56,6 +56,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         appDirectoryProvider: RuntimeAppDirectoryProviding? = nil,
         readModelStore: RuntimeReadModelStore = RuntimeReadModelStore(),
         axWindowRepairAvailability: (@Sendable () -> Bool)? = nil,
+        dependencies: RuntimeProjectionDependencies? = nil,
         transientRepairObservationScheduler:
             any RuntimeTransientRepairObservationScheduling =
                 RuntimeTransientRepairObservationScheduler(),
@@ -64,34 +65,27 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         reconciliationExecutor: @escaping RuntimeProjectionReconciliationExecutor =
             runtimeProjectionDefaultReconciliationExecutor
     ) {
-        let usesSystemRepairProvider = repairProvider == nil
-        self.axWindowRepairAvailability = axWindowRepairAvailability ?? {
-            if usesSystemRepairProvider {
-                return AccessibilityPermissionChecker.isTrusted()
-            }
-            return true
-        }
+        let systemDependencies = dependencies ?? (repairProvider == nil ? .system() : nil)
+        self.axWindowRepairAvailability = axWindowRepairAvailability
+            ?? systemDependencies?.axWindowRepairAvailability ?? { true }
         self.maintenanceOwner = maintenanceOwner
             ?? RuntimeProjectionMaintenanceOwner(label: label)
         if let repairProvider {
             self.repairProvider = repairProvider
             self.mainTableProjectionBuilder = mainTableProjectionBuilder
                 ?? RuntimeUnavailableMainTableProjectionBuilder()
-        } else {
-            let windowRecordStore = RuntimeWindowRecordStore()
-            let reconciliationCoordinator = RuntimeReconciliationCoordinator()
-            self.repairProvider = RuntimeProjectionRepairProvider(
-                windowRecordStore: windowRecordStore,
-                reconciliationCoordinator: reconciliationCoordinator
-            )
+        } else if let systemDependencies {
+            self.repairProvider = systemDependencies.makeRepairProvider()
             self.mainTableProjectionBuilder = mainTableProjectionBuilder
-                ?? RuntimeMainTableProjectionBuilder(windowRecordStore: windowRecordStore)
+                ?? systemDependencies.mainTableProjectionBuilder
+        } else {
+            preconditionFailure("System projection dependencies are required without a repair provider")
         }
         if let appDirectoryProvider {
             self.appDirectoryProvider = appDirectoryProvider
         } else {
             self.appDirectoryProvider = repairProvider == nil
-                ? RuntimeAppDirectoryProviderFactory.makeDefault()
+                ? systemDependencies?.appDirectoryProvider
                 : nil
         }
         self.readModelStore = readModelStore

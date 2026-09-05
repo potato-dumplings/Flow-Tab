@@ -2,222 +2,34 @@ import AppKit
 import Carbon
 import CoreGraphics
 import SwiftUI
+import Combine
 import FlowTabCore
 
 @MainActor
 final class LiveSwitcherModel: ObservableObject {
-    enum TerminateSelectedAppResult {
-        case notHandled
-        case updatedSession
-        case sessionEnded
+    var sessionState: any SwitcherSessionManaging
+    lazy var sessionResources: any SwitcherSessionResourceManaging = SwitcherSessionResources(model: self)
+    private var sessionStateObservation: AnyCancellable?
+    var sessionPublisher: AnyPublisher<SwitcherSession?, Never> { sessionState.publisher }
+    var session: SwitcherSession? {
+        get { sessionState.session }
+        set { sessionState.publish(newValue) }
     }
 
-    struct PendingTerminateRequest: Equatable {
-        struct AppInstanceIdentity: Equatable {
-            let appID: String
-            let pid: pid_t
-            let generation: UInt64
-
-            func matchesTerminatedInstance(appID: String, pid: pid_t) -> Bool {
-                self.appID == appID && self.pid == pid
-            }
+    private func sessionDidPublish(previous oldValue: SwitcherSession?, current session: SwitcherSession?) {
+        guard let session else {
+            sessionAppsByID = [:]
+            return
         }
-
-        let appInstance: AppInstanceIdentity
-        let preferredSelectedAppID: String?
-
-        var appID: String {
-            appInstance.appID
+        updateAppLayerRenderSnapshot(
+            from: session,
+            previousSession: oldValue
+        )
+        handleSessionPreviewSnapshotLifecycle(session)
+        guard searchViewState.isActive else {
+            return
         }
-
-        var pid: pid_t {
-            appInstance.pid
-        }
-
-        var generation: UInt64 {
-            appInstance.generation
-        }
-
-        init(
-            appID: String,
-            pid: pid_t,
-            generation: UInt64,
-            preferredSelectedAppID: String?
-        ) {
-            appInstance = AppInstanceIdentity(
-                appID: appID,
-                pid: pid,
-                generation: generation
-            )
-            self.preferredSelectedAppID = preferredSelectedAppID
-        }
-
-        func matchesTerminatedInstance(appID: String, pid: pid_t) -> Bool {
-            appInstance.matchesTerminatedInstance(appID: appID, pid: pid)
-        }
-    }
-
-    enum ProjectionInvalidationReason: String, Equatable {
-        case startSession
-        case startFocusedWindowSession
-        case commitSelection
-        case resetSession
-        case resetRuntimeState
-        case explicitRuntimeProjectionMaintenanceInvalidation
-        case explicitSelectedAppWindowProjectionInvalidation
-    }
-
-    enum ProjectionInvalidationScope: String, Equatable {
-        case runtimeProjectionMaintenance
-        case selectedAppWindowProjection
-    }
-
-    struct ProjectionInvalidationRecord: Equatable {
-        let reason: ProjectionInvalidationReason
-        let scope: ProjectionInvalidationScope
-        let maintenanceGeneration: UInt64
-        let selectedAppWindowProjectionGeneration: UInt64
-        let clearedDeferredMaintenanceRequest: Bool
-
-        var logMessage: String {
-            [
-                "projectionInvalidation",
-                "scope=\(scope.rawValue)",
-                "reason=\(reason.rawValue)",
-                "maintenanceGeneration=\(maintenanceGeneration)",
-                "selectedAppWindowProjectionGeneration=\(selectedAppWindowProjectionGeneration)",
-                "clearedDeferredMaintenanceRequest=\(clearedDeferredMaintenanceRequest ? 1 : 0)"
-            ].joined(separator: " ")
-        }
-    }
-
-    struct RuntimeProjectionMaintenanceDiagnostic: Equatable {
-        let result: String
-        let generation: UInt64
-        let currentGeneration: UInt64
-        let reason: ProjectionInvalidationReason
-        let trigger: String
-        let applyGeneration: UInt64?
-        let totalMs: String
-
-        var logMessage: String {
-            [
-                "runtimeProjectionMaintenance",
-                "result=\(result)",
-                "generation=\(generation)",
-                "currentGeneration=\(currentGeneration)",
-                "reason=\(reason.rawValue)",
-                "trigger=\(trigger)",
-                "applyGeneration=\(applyGeneration.map(String.init) ?? "nil")",
-                "totalMs=\(totalMs)"
-            ].joined(separator: " ")
-        }
-    }
-
-    struct AppSwitcherSessionLoadDiagnostic: Equatable {
-        let result: String
-        let event: String
-        let trigger: String
-        let appCount: Int
-        let windowCount: Int
-        let projectionMs: Double
-        let recencyMs: Double
-        let sessionBuildMs: Double
-        let indexMs: Double
-        let publishMs: Double
-
-        var totalMs: Double {
-            projectionMs
-                + recencyMs
-                + sessionBuildMs
-                + indexMs
-                + publishMs
-        }
-    }
-
-    struct AppSwitcherSessionStartDiagnostic: Equatable {
-        let result: String
-        let directoryRefreshMs: Double
-        let invalidationMs: Double
-        let stateResetMs: Double
-        let projectionLoadMs: Double
-        let maintenanceRequestMs: Double
-
-        var totalMs: Double {
-            directoryRefreshMs
-                + invalidationMs
-                + stateResetMs
-                + projectionLoadMs
-                + maintenanceRequestMs
-        }
-    }
-
-    struct SearchIndexReadDiagnostic: Equatable {
-        let reason: String
-        let readiness: RuntimeSearchIndexReadiness
-        let resultState: RuntimeSearchIndexResultState
-        let appCount: Int
-        let windowCount: Int
-        let committedIndexCoversCurrentGeneration: Bool
-        let dirtyAppCount: Int
-        let dirtyPIDCount: Int
-        let dirtyCGWindowIDCount: Int
-        let pendingRepairScopeCount: Int
-        let requestedFreshnessBarrier: Bool
-
-        var searchTraceFields: String {
-            [
-                "searchIndexReadiness=\(readiness.rawValue)",
-                "searchIndexResultState=\(resultState.rawValue)",
-                "searchIndexDegraded=\(resultState == .degradedStaleCommittedResult ? 1 : 0)",
-                "searchIndexCoversCurrentGeneration=\(committedIndexCoversCurrentGeneration ? 1 : 0)",
-                "searchFreshnessBarrierRequested=\(requestedFreshnessBarrier ? 1 : 0)"
-            ].joined(separator: " ")
-        }
-
-        var logMessage: String {
-            [
-                "searchIndexSource",
-                "reason=\(reason)",
-                "source=committedRuntimeIndex",
-                "readiness=\(readiness.rawValue)",
-                "resultState=\(resultState.rawValue)",
-                "apps=\(appCount)",
-                "windows=\(windowCount)",
-                "committedIndexCoversCurrentGeneration=\(committedIndexCoversCurrentGeneration ? 1 : 0)",
-                "degraded=\(resultState == .degradedStaleCommittedResult ? 1 : 0)",
-                "dirtyApps=\(dirtyAppCount)",
-                "dirtyPIDs=\(dirtyPIDCount)",
-                "dirtyCGWindowIDs=\(dirtyCGWindowIDCount)",
-                "pendingScopes=\(pendingRepairScopeCount)",
-                "freshnessBarrierRequested=\(requestedFreshnessBarrier ? 1 : 0)"
-            ].joined(separator: " ")
-        }
-    }
-
-    struct SearchResultPublicationDiagnostic: Equatable {
-        let query: String
-        let debounceMilliseconds: Double
-        let computationMilliseconds: Double
-        let publishedAtMilliseconds: Double
-    }
-
-    @Published var session: SwitcherSession? {
-        didSet {
-            guard let session else {
-                sessionAppsByID = [:]
-                return
-            }
-            updateAppLayerRenderSnapshot(
-                from: session,
-                previousSession: oldValue
-            )
-            handleSessionPreviewSnapshotLifecycle(session)
-            guard searchViewState.isActive else {
-                return
-            }
-            sessionAppsByID = Dictionary(uniqueKeysWithValues: session.apps.map { ($0.id, $0) })
-        }
+        sessionAppsByID = Dictionary(uniqueKeysWithValues: session.apps.map { ($0.id, $0) })
     }
     @Published var appGridTileSize: CGFloat = 68
     @Published var appGridSpacing: CGFloat = 10
@@ -231,15 +43,24 @@ final class LiveSwitcherModel: ObservableObject {
         SwitcherAppLayerRenderSnapshot?
 
     let runtimeProjectionService: any RuntimeProjectionServing
-    let activator = RuntimeActivator()
+    lazy var focusedWindowSession: any SwitcherFocusedWindowSessionStarting = SwitcherFocusedWindowSessionCoordinator(model: self)
+    var activator: any WindowActivating
     let iconProvider = AppIconProvider()
     let searchCoordinator = SwitcherSearchCoordinator()
     let searchSchedulingOwner: SwitcherSearchSchedulingOwner
     let windowRecencyTracker: RuntimeWindowRecencyTracker
     var previewProviderResolver = WindowPreviewProviderResolver.default
-    let previewImageCache = BoundedImageCache(
-        countLimit: 64,
-        totalCostLimit: 160 * 1_024 * 1_024
+    var previewBatchFactory: any SwitcherPreviewBatchCreating = SwitcherPreviewBatchFactory()
+    let previewStorage = SwitcherPreviewStorage()
+    let runtimeContextStore = SwitcherRuntimeContextStore()
+    let previewPublication = SwitcherPreviewPublication()
+    private var previewPublicationObservation: AnyCancellable?
+    lazy var previewSession: any SwitcherPreviewSessionOperating = SwitcherPreviewSession(
+        state: previewStorage, contexts: runtimeContextStore, publication: previewPublication
+    )
+    var previewImageCache: BoundedImageCache { previewStorage.previewImageCache }
+    lazy var previewPlanner: any SwitcherPreviewPlanning = SwitcherPreviewPlanner(
+        state: previewStorage, contexts: runtimeContextStore, previewSession: previewSession
     )
 
     var onSearchStateChanged: (() -> Void)?
@@ -264,22 +85,12 @@ final class LiveSwitcherModel: ObservableObject {
     var sessionAppsByID: [String: AppSwitchCandidate] = [:]
     var committedSearchAppsByID: [String: AppSwitchCandidate] = [:]
     var preparedSearchIndexIdentity: PreparedSearchIndexIdentity?
-    var runtimeContextsByID: [String: RuntimeAppContext] = [:]
+    var runtimeContextsByID: [String: RuntimeAppContext] {
+        get { runtimeContextStore.values }
+        set { runtimeContextStore.values = newValue }
+        _modify { yield &runtimeContextStore.values }
+    }
     var rememberedWindowIDByAppID: [String: String] = [:]
-    var previewCaptureAttemptedKeys: Set<String> = []
-    var previewCaptureFailedKeys: Set<String> = []
-    var previewCaptureInFlightKeys: Set<String> = []
-    var previewCaptureStatesByKey: [String: PreviewCaptureState] = [:]
-    var previewImageReadyLoggedKeys: Set<String> = []
-    var previewSessionPinnedKeys: Set<String> = []
-    var previewSessionPinnedImagesByKey: [String: NSImage] = [:]
-    var previewDeferredCaptureScheduledAppIDs: Set<String> = []
-    var previewCaptureGeneration: UInt64 = 0
-    var previewCaptureCancellationsByID:
-        [UUID: WindowPreviewCaptureCancellation] = [:]
-    let previewCaptureSemaphore = DispatchSemaphore(value: 4)
-    var previewWindowSnapshotsByAppID: [String: [WindowCandidate]] = [:]
-    var lastWindowPreviewExposureLogSummary: String?
     var autoEnterSuppressedAppID: String?
     var titleBarStyleInferenceEnabled = false
     var searchInputHasMarkedText = false
@@ -317,13 +128,17 @@ final class LiveSwitcherModel: ObservableObject {
         windowRecencyTracker: RuntimeWindowRecencyTracker = .shared,
         runtimeProjectionService: any RuntimeProjectionServing =
             sharedRuntimeProjectionService,
-        searchSchedulingOwner: SwitcherSearchSchedulingOwner? = nil
+        searchSchedulingOwner: SwitcherSearchSchedulingOwner? = nil,
+        sessionState: (any SwitcherSessionManaging)? = nil,
+        activator: (any WindowActivating)? = nil
     ) {
+        self.sessionState = sessionState ?? SwitcherSessionState()
+        self.activator = activator ?? RuntimeActivator()
         self.windowRecencyTracker = windowRecencyTracker
         self.runtimeProjectionService = runtimeProjectionService
         self.searchSchedulingOwner =
             searchSchedulingOwner ?? SwitcherSearchSchedulingOwner()
-        activator.windowFocusVerifiedHandler = { [windowRecencyTracker, runtimeProjectionService] verification in
+        self.activator.windowFocusVerifiedHandler = { [windowRecencyTracker, runtimeProjectionService] verification in
             windowRecencyTracker.recordVerifiedFocus(
                 appID: verification.appID,
                 windowID: verification.windowID,
@@ -335,8 +150,20 @@ final class LiveSwitcherModel: ObservableObject {
             )
             runtimeProjectionService.signalWindowFocusVerified(verification)
         }
-        activator.windowFocusReadbackMismatchHandler = { [runtimeProjectionService] diagnostic in
+        self.activator.windowFocusReadbackMismatchHandler = { [runtimeProjectionService] diagnostic in
             runtimeProjectionService.signalWindowFocusReadbackMismatch(diagnostic)
+        }
+        self.sessionState.didPublish = { [weak self] previous, current in
+            self?.sessionDidPublish(previous: previous, current: current)
+        }
+        sessionStateObservation = self.sessionState.willChange.sink { [weak self] in
+            self?.objectWillChange.send()
+        }
+        previewPublicationObservation = previewPublication.changes.sink { [weak self] in
+            self?.objectWillChange.send()
+        }
+        previewPublication.preparationChanged = { [weak self] in
+            self?.onWindowOnlyPreviewPreparationChanged?()
         }
     }
 
@@ -607,7 +434,8 @@ final class LiveSwitcherModel: ObservableObject {
         guard var session else { return }
         let previousMode = session.mode
         let previousAppID = session.selectedApp.id
-        session.handle(keyInput)
+        guard let updatedSession = sessionState.applying(keyInput) else { return }
+        session = updatedSession
 
         let currentAppID = session.selectedApp.id
         if currentAppID != previousAppID {
@@ -705,8 +533,9 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     func commitSelection() {
-        guard var session else { return }
-        let target = session.commitSelection()
+        guard let resolution = sessionState.resolvingSelection() else { return }
+        let session = resolution.session
+        let target = resolution.target
         rememberedWindowIDByAppID = session.rememberedWindowIDByAppID
         recordCommittedSelectionRecencyIfNeeded(target)
         invalidateRuntimeProjectionMaintenanceRequest(reason: .commitSelection)
@@ -751,27 +580,11 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     func resetSessionState() {
-        invalidateRuntimeProjectionMaintenanceRequest(reason: .resetSession)
-        cancelPendingSearchComputation()
-        pendingSearchActivationAfterFreshnessBarrier = false
-        session = nil
-        resetSessionAppWindowReadinessTracking()
-        pendingTerminateRequest = nil
-        terminatingAppID = nil
-        overlayStyle = .appAndWindow
-        _ = searchCoordinator.exit()
-        committedSearchAppsByID = [:]
-        publishSearchStateIfNeeded()
-        resetRuntimeState()
+        sessionResources.resetSession()
     }
 
     func resetRuntimeState() {
-        invalidateSelectedAppWindowProjection(reason: .resetRuntimeState)
-        runtimeContextsByID = [:]
-        clearPreviewSnapshotState()
-        autoEnterSuppressedAppID = nil
-        pendingManualWindowLayerEntryAppID = nil
-        titleBarStyleInferenceEnabled = false
+        sessionResources.resetRuntime()
     }
 
     func appSwitcherPayloadWithWindowRecencyApplied(

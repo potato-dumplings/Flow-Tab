@@ -90,6 +90,20 @@ Minimum validation:
 - Export the attachment from the scenario `.xcresult`; validate its exact name, PNG dimensions, payload size, and SHA-256. Preserve the exported PNG and attachment manifest with the scenario evidence.
 - Record open/interaction/close latency, active CPU `avg/p95/max`, cooldown CPU recovery, RSS `avg/p95/max`, and the warm-state RSS plateau comparison.
 
+### Control+Tab Pressure
+
+Use this for focused projection, in-app window selection, Control+Tab input, window preview/layout, panel visibility, or exact window activation changes.
+
+Minimum validation:
+
+- Run `./scripts/perf/control-tab-pressure.sh` with its default `all` lane: `ready/realistic`, `ready/extreme`, `mutation/closed-panel`, and `topology/noisy`, three `120s + 15s cooldown` attempts each at `0.5s` sampling. Use `--attribution --duration-seconds 30...119` only to locate a defect.
+- Before the matrix, install the stable `~/Applications/Flow Tab UITest.app`, build the signed XCTest runner, and require `testSpaceFixturePermissionPreflightResolvesExactGrantedProjection` to pass. The runner stops at this gate when Accessibility, Screen Recording, fixed-App identity, or XCTest automation authorization is unavailable. Reinstall the same fixed-path App before every Pressure test action so the approved Bundle ID, Team ID, and compatible designated requirement remain stable.
+- Require deterministic TestingSupport sequence acknowledgements plus a physical Control+Tab, Control+Shift+Tab, hold, and release gate. Enter the measurement window only after a monotonic sampler-readiness receipt matches the fixed App PID and identity. Mutation evidence must use strictly increasing generations and fixture readback; topology commits must cover every configured target title with distinct window ID and CGWindowID under one target PID, plus verified-focus readback.
+- Require protocol v6 phase totals, overlapping `component_inclusive` attribution spans, and a contiguous `timeline_exclusive` partition including `unattributed`. Reconcile phase versus timeline wall and process user+system CPU time within `0.5ms`; report component union coverage, overlap, outcome, work units, wall p50/p95/max, CPU-time p50/p95/max, and weighted CPU. Open completes only after visible preview capture/cache application, matching preview-generation content draw, and visibility readback; forward/reverse require matching selection-generation draw plus readback; commit requires verified focus and cleanup; cancel requires reusable-shell completion and closed-state readback.
+- Enforce ready open p95 `<= 50ms`, forward/reverse p95 `<= 33.334ms`, cancel p95 `<= 50ms`, commit activation-request p95 `<= 50ms`, and weighted phase CPU `<= 50%` for open/forward/reverse/commit/cancel. Also enforce cooldown CPU p95 `<= max(5%, active avg * 25%)`, at least `90%` active sampling coverage, and late-versus-mid RSS p95 growth `<= max(16MiB, 10%)`. Keep full commit/readback wall time reported and baseline-compared.
+- Compare only compatible green results with matching protocol, schema digest, required-span set, machine, system, architecture, Release configuration, lane, and scenario. Fail when phase totals or component wall p95, CPU-time p95, weighted CPU, active CPU, RSS p95, or throughput three-attempt medians regress by more than `5%`; retain the current green summary as the new local baseline when none matches. Preserve v4 and v5 results as historical evidence; formal component baselines accept compatible v6 evidence.
+- Preserve every attempt's `phase-metrics.csv`, `process-samples.csv`, fixed-app identity and cleanup evidence, logs, `.xcresult`, first-attempt frame attachment, `summary.txt/json`, and the matrix `status.json` under a fresh project-local leaf. Print scenario/App/window/phase/component metrics, mutation generations, topology target identities, and top-three root-cause rankings by CPU time, CPU percent, and wall p95.
+
 ### Search Pressure
 
 Use this for:

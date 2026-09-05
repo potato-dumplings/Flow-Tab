@@ -486,6 +486,7 @@ Logs 页同等级重新进入时先显示缓存，并在页面连续可见 `100 
 - `scripts/release/publish-sparkle-update.sh`：完成 Community DMG、GitHub Release 与签名 appcast 的单入口发布。
 - `scripts/perf/tab-switch-stress.sh`：tab 高频切换性能压测；采样与切换时长属于显式压力协议，子进程清理由精确 PID/启动身份读回和退出状态驱动。
 - `scripts/perf/app-panel-pressure.sh`：Release 应用面板真实 UI 延迟、CPU 回落与 RSS 平台化门禁。
+- `scripts/perf/control-tab-pressure.sh`：Release Control + Tab 全链路正确性、阶段耗时/CPU、进程 CPU/RSS、吞吐与同机基线门禁。
 
 ## 本地签名配置
 
@@ -788,6 +789,35 @@ gh release create "${TAG}" \
 - active 末段相对中段的 RSS p95 增长小于等于 `max(16MiB, 中段 RSS p95 x 10%)`。
 
 脚本在每次 UI 动作前重新安装测试应用，用不可变 identity manifest 把采样绑定到本次启动的精确 PID，并保留 UI 指标 CSV、CPU/RSS CSV、XCTest 结果、导出的屏幕附件、附件 manifest、文本与 JSON 门禁摘要。摘要输出打开、流程交互和关闭的 p50/p95；打开耗时同时按 session、几何与辅助功能、窗口呈现、观察器调度、呈现后可见性五组拆分，并输出每个子阶段的 p50、p95、平均占比及总耗时对账误差。默认证据根位于 `.build-local/app-panel-pressure/`。
+
+## Control + Tab 全链路压测要求（必须）
+
+修改 Control + Tab 输入、focused projection/freshness、窗口预览或布局、窗口面板生命周期、精确窗口激活路径时，执行：
+
+```bash
+./scripts/perf/control-tab-pressure.sh \
+  --lane all --scenario all --attempts 3 \
+  --duration-seconds 120 --cooldown-seconds 15 \
+  --sample-interval 0.5
+```
+
+压测诊断类型、渲染探针与组件采样器归属 `FlowTab/TestingSupport`，业务入口上的观测钩子统一由 `FLOWTAB_TESTING` 条件编译。压测使用启用 TestingSupport 的 Release 构建，正式应用沿用当前产品的投影、预览、显示和激活策略。
+
+脚本先安装固定路径且稳定签名身份的 `~/Applications/Flow Tab UITest.app`，构建已签名 XCTest runner，并执行 `testSpaceFixturePermissionPreflightResolvesExactGrantedProjection`。只有 Accessibility、Screen Recording、固定 App 身份与 XCTest automation 均完成授权，四场景矩阵才会启动；每次 Pressure test action 前会重新安装同一身份的测试 App。
+
+默认矩阵包含四类正式场景：`ready/realistic` 使用 `24 apps` 且当前 app 为 `5 windows`；`ready/extreme` 使用 `120 apps` 且当前 app 为 `100 windows`，并保留已有 `1000-window` 进程内覆盖；`mutation/closed-panel` 对真实 fixture 重复执行 `2→3→2`，覆盖首次窗口会话、已有 Option + Tab 历史和提前释放 Control；`topology/noisy` 使用四个普通、fullscreen、off-Space 与 noisy-CG 用户窗口，持续正反向选择并提交精确窗口。
+
+每个 attempt 同时使用带序列回执的 TestingSupport 事件和真实 Control + Tab、Control + Shift + Tab、按住/释放门禁。压力协议为 v6，阶段固定为 `open`、`forward`、`reverse`、`commit`、`cancel`、`cooldown`；唯一 phase 总量和互斥 `timeline_exclusive` 在 wall/CPU 两个维度以 `0.5ms` 容差对账，重叠、嵌套的 `component_inclusive` 用于归因并报告 union coverage、overlap、outcome 和 work units。所有口径输出 wall time 与 CPU-time 的 p50/p95/max，CPU 占用率按 `sum(cpu time) / sum(wall time)` 计算，`100%` 表示一个 CPU core。进程采样绑定固定路径 App identity 与精确 PID；UI 负载等待采样器写出同一 PID、同一 identity 的 monotonic readiness 回执后才进入 measurement window，并保留 active/cooldown CPU、RSS、RSS plateau、吞吐与 active coverage。
+
+`open` 依次记录 input routing、projection read、AX/CG/Space reconciliation 及其 on-screen CG/all CG/AX read/mapping-space-filter 子项、session build/publish、preview planning/capture/image-process-cache、AppKit panel presentation、SwiftUI layout/first draw 与 visibility readback；其终点为可见页截图终结并应用缓存、匹配 preview generation 的内容帧完成绘制、面板可见性读回全部完成。`forward/reverse` 记录 selection mutation、publication、geometry、条件性 preview 工作、匹配 selection render generation 的真实 draw 和 selection readback。`commit` 以结构化 PID/window ID/CGWindowID receipt 贯穿 target resolution、activation dispatch、exact activation、focus readback 和完整 cleanup。`cancel` 覆盖 teardown、observer/delayed-task/cache-session 清理、reusable shell 完成和 closed-state readback；未执行分支使用 `not_requested`、`cache_hit` 或 `not_required` outcome 明确留证。
+
+绝对门禁为：ready open p95 `≤ 50ms`，forward/reverse p95 `≤ 33.334ms`，cancel p95 `≤ 50ms`，commit activation request p95 `≤ 50ms`；`open/forward/reverse/commit/cancel` 的 phase 加权 CPU 占用率均 `≤ 50%`。完整 commit/readback wall time继续输出并参与基线比较。cooldown CPU p95 `≤ max(5%, active CPU avg × 25%)`；active 后段相对中段 RSS p95 增长 `≤ max(16MiB, 10%)`；active-window 覆盖率至少 `90%`。Noisy topology 的 commit 必须覆盖全部四个目标标题，并分别给出同一目标 PID 下不同的 window ID、CGWindowID 与 verified-focus readback。同机绿色基线仅在协议、schema digest、必需 span 集合、机器、系统、架构、Release 配置、lane 与 scenario 完全一致时参与比较；phase 总量和 component 的三轮中位数 wall p95、CPU-time p95、加权 CPU、active CPU、RSS p95 或吞吐回退超过 `5%` 即失败。v4、v5 证据作为历史记录保留。正式细阶段基线接受兼容 v6 证据；本轮绿色 `status.json` 可建立新的同机基线。
+
+每个 attempt 使用新的 `.build-local/control-tab-pressure/...` 证据叶目录，保留 `phase-metrics.csv`、`process-samples.csv`、`summary.txt/json`、identity/cleanup 证据、日志、`.xcresult` 和首轮窗口首帧截图。摘要按场景、App 数、窗口数、phase 和 component 打印 wall、CPU-time、CPU%、执行次数与 outcome；mutation 额外按 generation 打印 `2/3` 窗口证据，topology 打印四个精确目标，根因报告分别按 CPU-time、CPU% 与 wall p95 排序并标明 overlap。权限、fixture、generation、activation receipt、draw/readback、timeline 对账、样本、写盘、附件或清理证据缺失时结果保持非绿色。定位问题可使用 `--attribution --duration-seconds <30-119>`；固定路径 App 缺少 Accessibility 或 Screen Recording 权限时会先触发系统权限提示，读回仍未满足则标记为 `blocked`。
+
+组件由业务接口装配，TestingSupport 包装真实操作。全部 50 项指标的所有者、边界、父级、工作量和 outcome 见 [v6 组件迁移表](control-tab-pressure-component-migration-v6.md)。机器契约保存在 `scripts/perf/lib/control_tab_pressure_v6_schema.json`，`test-control-tab-pressure-evidence.sh` 验证 Swift/Python 协议与 digest 一致性；`python3 scripts/perf/check-control-tab-production-boundary.py` 检查生产增量中的压测依赖。每次运行独立持有装饰器、批次上下文、回执与观察器，结束时恢复原有业务依赖。
+
+窗口变更用例先验证 fixture 真实 CG 状态，再接受同 PID、严格更新代次和精确窗口集合的完整投影，随后验证物理快捷键、真实绘制与精确激活。会话预览继续使用原有快照冻结策略。CPU/RSS 外部对照记录相同机器、负载、时长、采样及日志配置；既有性能超标保留 `failed`，新增行为失败、证据缺口或同口径三轮中位数超过 `5%` 的回退阻塞验收。
 
 ## 搜索压测要求（必须）
 

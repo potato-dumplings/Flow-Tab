@@ -18,29 +18,34 @@ private enum FlowTabUITestShortcutEventInjectionTransport {
     }
 }
 
-@MainActor
 private final class FlowTabUITestShortcutEventInjectionObserver {
     private let center: DistributedNotificationCenter
+    private let deliveryQueue: OperationQueue
     private var token: NSObjectProtocol?
     private var runtimePressedKeyCodes: Set<UInt16> = []
     private var runtimeModifierFlags: NSEvent.ModifierFlags = []
 
     init(center: DistributedNotificationCenter = .default()) {
         self.center = center
+        let deliveryQueue = OperationQueue()
+        deliveryQueue.name =
+            "io.github.potato-dumplings.flowtab.ui-test.shortcut-injection"
+        deliveryQueue.maxConcurrentOperationCount = 1
+        deliveryQueue.qualityOfService = .userInteractive
+        self.deliveryQueue = deliveryQueue
         token = center.addObserver(
             forName:
                 FlowTabUITestShortcutEventInjectionTransport
                     .notificationName,
             object: nil,
-            queue: .main
+            queue: deliveryQueue
         ) { [weak self] notification in
-            MainActor.assumeIsolated {
-                self?.injectShortcutEvents(from: notification)
-            }
+            self?.injectShortcutEvents(from: notification)
         }
     }
 
     deinit {
+        deliveryQueue.cancelAllOperations()
         if let token {
             center.removeObserver(token)
         }
@@ -96,11 +101,22 @@ private final class FlowTabUITestShortcutEventInjectionObserver {
             )
             return
         }
+        Task { @MainActor [weak self] in
+            self?.injectRecorderShortcutEvents(
+                keyCodes: keyCodes,
+                modifierFlags: modifierFlags
+            )
+        }
+    }
+
+    @MainActor
+    private func injectRecorderShortcutEvents(
+        keyCodes: [UInt16],
+        modifierFlags: NSEvent.ModifierFlags
+    ) {
         guard let recorder = NSApp.keyWindow?.firstResponder
             as? FlowSettingsShortcutRecorderControl
-        else {
-            return
-        }
+        else { return }
         if keyCodes.isEmpty,
            let modifierPress = event(
                type: .flagsChanged,
@@ -312,6 +328,7 @@ private final class FlowTabUITestShortcutEventInjectionObserver {
         ]
     }
 
+    @MainActor
     private func event(
         type: NSEvent.EventType,
         keyCode: UInt16,

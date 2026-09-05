@@ -253,7 +253,7 @@ enum AppPanelPressureEvidenceTransport {
                 }
 
             let model = panelController.modelForTesting
-            model.$session
+            model.sessionPublisher
                 .dropFirst()
                 .sink { [weak self] _ in
                     Task { @MainActor [weak self] in

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-TARGET_LAUNCH_WATCHDOG_MILLISECONDS=45000
+TARGET_LAUNCH_WATCHDOG_MILLISECONDS="${FLOWTAB_RUNTIME_TARGET_LAUNCH_WATCHDOG_MILLISECONDS:-45000}"
 TARGET_LAUNCH_POLL_INTERVAL_SECONDS=0.1
 TARGET_MATCHING_IDENTITY_ROWS=()
 TARGET_LAUNCH_ROWS=()
@@ -70,6 +70,16 @@ flowtab_perf_interval_cpu_percent() {
         printf "%.3f\n", ((current - previous) * 1000000000) / elapsed
       }
     '
+}
+
+flowtab_perf_cpu_interval_failure_verdict() {
+  local pid="$1"
+
+  if target_process_is_active "$pid"; then
+    printf 'cpu_interval_error\n'
+  else
+    printf 'sample_unavailable\n'
+  fi
 }
 
 target_identity_readback_failed() {
@@ -639,7 +649,9 @@ sample_flowtab() {
       "$TARGET_PREVIOUS_CPU_CENTISECONDS" \
       "$((sample_monotonic_ns - TARGET_PREVIOUS_CPU_SAMPLE_MONOTONIC_NS))"
   )"; then
-    IDENTITY_VERDICT="cpu_interval_error"
+    IDENTITY_VERDICT="$(
+      flowtab_perf_cpu_interval_failure_verdict "$TARGET_PID"
+    )"
     return 1
   fi
   interval_started_uptime_nanoseconds="$TARGET_PREVIOUS_CPU_SAMPLE_MONOTONIC_NS"

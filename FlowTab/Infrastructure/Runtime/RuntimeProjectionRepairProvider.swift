@@ -12,11 +12,14 @@ final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
         cgWindowListProvider: RuntimeCGWindowListProviding = RuntimeSystemCGWindowListProvider(),
         spaceTopologyProvider: RuntimeSpaceTopologyProviding = RuntimeSystemSpaceTopologyProvider(),
         windowRecordStore: RuntimeWindowRecordStore = RuntimeWindowRecordStore(),
-        reconciliationCoordinator: RuntimeReconciliationCoordinator = RuntimeReconciliationCoordinator()
+        reconciliationCoordinator: RuntimeReconciliationCoordinator = RuntimeReconciliationCoordinator(),
+        runtimeFactProvider: (any RuntimeProjectionRepairFactProviding)? = nil,
+        windowEntries: (any RuntimeWindowEntryProjecting)? = nil,
+        focusedWindowFacts: (any RuntimeFocusedWindowFactCollecting)? = nil
     ) {
         self.windowRecordStore = windowRecordStore
         self.reconciliationCoordinator = reconciliationCoordinator
-        let runtimeFactProvider = RuntimeSystemRepairFactProvider(
+        let runtimeFactProvider = runtimeFactProvider ?? RuntimeSystemRepairFactProvider(
             cgWindowListProvider: cgWindowListProvider,
             spaceTopologyProvider: spaceTopologyProvider,
             windowRecordStore: windowRecordStore,
@@ -24,7 +27,9 @@ final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
         )
         self.repairFactSource = RuntimeProjectionRepairFactSource(
             runtimeFactProvider: runtimeFactProvider,
-            windowRecordStore: windowRecordStore
+            windowRecordStore: windowRecordStore,
+            windowEntries: windowEntries,
+            focusedWindowFacts: focusedWindowFacts
         )
     }
 }

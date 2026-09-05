@@ -420,7 +420,7 @@ extension FlowTabUITests {
             diagnosticsSummary,
             timeout: FlowTabUITestSwitcherAndSearchWatchdogPolicy.optionTabAppClickDismissal,
             description: "Option+Tab App-card click presentation dismissal",
-            trigger: { mailTile.tap() }
+            trigger: { self.tapElement(mailTile) }
         )
     }
 

@@ -121,7 +121,8 @@ extension RuntimeProjectionService {
     }
 }
 
-protocol RuntimeProjectionServing: Sendable {
+protocol RuntimeProjectionServing: AnyObject, Sendable {
+    var notificationSource: AnyObject { get }
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection?
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection?
     func readHomeAppDetailProjection(appID: String) -> RuntimeHomeAppDetailProjection?
@@ -158,6 +159,7 @@ protocol RuntimeProjectionServing: Sendable {
 }
 
 extension RuntimeProjectionServing {
+    var notificationSource: AnyObject { self }
     func refreshApplicationDirectoryMembershipForPresentation() {}
 
     func consumeAXWindowChangeEvidence(

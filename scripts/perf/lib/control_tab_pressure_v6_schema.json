@@ -1,0 +1,891 @@
+{
+  "protocol_version": 6,
+  "lifecycle_phases": [
+    "open",
+    "forward",
+    "reverse",
+    "commit",
+    "cancel",
+    "cooldown"
+  ],
+  "component_scope": "component_inclusive",
+  "timeline_scope": "timeline_exclusive",
+  "units": {
+    "wall": "ms",
+    "cpu_time": "ms",
+    "cpu": "percent",
+    "work": "count"
+  },
+  "reconciliation_tolerance_ms": 0.5,
+  "phase_cpu_limit_percent": 50.0,
+  "latency_limits_ms": {
+    "ready_open": 50.0,
+    "forward": 33.334,
+    "reverse": 33.334,
+    "cancel": 50.0,
+    "commit_activation_request": 50.0
+  },
+  "required_components": {
+    "open": [
+      "all_cg_read",
+      "appkit_panel_presentation",
+      "ax_cg_space_reconciliation",
+      "ax_read",
+      "input_routing",
+      "mapping_space_filter",
+      "on_screen_cg_read",
+      "preview_capture",
+      "preview_core_graphics_capture",
+      "preview_image_process_cache",
+      "preview_image_scale",
+      "preview_planning",
+      "preview_screenshot_manager_capture",
+      "preview_shareable_content_lookup",
+      "preview_title_bar_inference",
+      "preview_transparent_trim",
+      "projection_read",
+      "session_build",
+      "session_publish",
+      "swiftui_layout_first_draw",
+      "visibility_readback"
+    ],
+    "forward": [
+      "input_routing",
+      "panel_geometry_update",
+      "preview_capture",
+      "preview_image_process_cache",
+      "selection_mutation",
+      "selection_readback",
+      "session_publish",
+      "swiftui_diff_layout_draw"
+    ],
+    "reverse": [
+      "input_routing",
+      "panel_geometry_update",
+      "preview_capture",
+      "preview_image_process_cache",
+      "selection_mutation",
+      "selection_readback",
+      "session_publish",
+      "swiftui_diff_layout_draw"
+    ],
+    "commit": [
+      "activation_dispatch",
+      "cache_session_cleanup",
+      "delayed_task_cancellation",
+      "exact_window_activation",
+      "focus_readback",
+      "observer_removal",
+      "panel_teardown",
+      "target_resolution"
+    ],
+    "cancel": [
+      "cache_session_cleanup",
+      "closed_state_readback",
+      "delayed_task_cancellation",
+      "observer_removal",
+      "panel_teardown",
+      "reusable_shell_prepare"
+    ],
+    "cooldown": []
+  },
+  "components": [
+    {
+      "name": "input_routing",
+      "swift_case": "inputRouting",
+      "production_owner": "FlowTab/Features/Switcher/OptionTabHotkeyMonitor.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureHotkeyMonitor.swift",
+      "boundary": "真实输入回调进入 → 业务回调返回",
+      "parents": [
+        "none"
+      ],
+      "work_units": "输入事件数",
+      "outcomes": "返回=completed",
+      "required_phases": [
+        "open",
+        "forward",
+        "reverse"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "projection_read",
+      "swift_case": "projectionRead",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherFocusedWindowSessionCoordinator.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureFocusedSession.swift",
+      "boundary": "focused projection read 调用 → 返回",
+      "parents": [
+        "input_routing",
+        "ax_cg_space_reconciliation"
+      ],
+      "work_units": "读取次数",
+      "outcomes": "返回=completed",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "ax_cg_space_reconciliation",
+      "swift_case": "axCGSpaceReconciliation",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherFocusedWindowSessionCoordinator.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureFocusedSession.swift",
+      "boundary": "请求新鲜投影前 → 严格更新的完整投影被接受或取消",
+      "parents": [
+        "projection_read"
+      ],
+      "work_units": "请求数",
+      "outcomes": "已有完整投影=cache_hit;匹配=completed;取消=cancelled",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "on_screen_cg_read",
+      "swift_case": "onScreenCGRead",
+      "production_owner": "FlowTab/Infrastructure/Runtime/RuntimeFocusedWindowFactCollector.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureFactDecorators.swift",
+      "boundary": "on-screen CG 查询调用 → 返回",
+      "parents": [
+        "ax_cg_space_reconciliation"
+      ],
+      "work_units": "目标 PID 查询数",
+      "outcomes": "执行=completed;复用=cache_hit",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "all_cg_read",
+      "swift_case": "allCGRead",
+      "production_owner": "FlowTab/Infrastructure/Runtime/RuntimeFocusedWindowFactCollector.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureFactDecorators.swift",
+      "boundary": "all CG 查询调用 → 返回",
+      "parents": [
+        "ax_cg_space_reconciliation"
+      ],
+      "work_units": "目标 PID 查询数",
+      "outcomes": "执行=completed;复用=cache_hit",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "ax_read",
+      "swift_case": "axRead",
+      "production_owner": "FlowTab/Infrastructure/Runtime/RuntimeFocusedWindowFactCollector.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureFactDecorators.swift",
+      "boundary": "AX facts 查询调用 → 返回",
+      "parents": [
+        "ax_cg_space_reconciliation"
+      ],
+      "work_units": "目标 PID 查询数",
+      "outcomes": "执行=completed;复用=cache_hit",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "mapping_space_filter",
+      "swift_case": "mappingSpaceFilter",
+      "production_owner": "FlowTab/Infrastructure/Runtime/RuntimeWindowEntryProjector.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureFactDecorators.swift",
+      "boundary": "窗口映射与 Space 过滤调用 → 返回",
+      "parents": [
+        "ax_cg_space_reconciliation"
+      ],
+      "work_units": "目标 PID 查询数",
+      "outcomes": "执行=completed;复用=cache_hit",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "session_build",
+      "swift_case": "sessionBuild",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherSessionState.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureSessionState.swift",
+      "boundary": "buildWindowSession 调用 → 返回",
+      "parents": [
+        "input_routing"
+      ],
+      "work_units": "候选窗口数",
+      "outcomes": "session=completed;nil=failed",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "session_publish",
+      "swift_case": "sessionPublish",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherSessionState.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureSessionState.swift",
+      "boundary": "publish 调用 → 同步通知与业务发布回调返回",
+      "parents": [
+        "input_routing",
+        "selection_mutation"
+      ],
+      "work_units": "发布次数",
+      "outcomes": "返回=completed",
+      "required_phases": [
+        "open",
+        "forward",
+        "reverse"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "preview_planning",
+      "swift_case": "previewPlanning",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPreviewPlanner.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePreviewPlanner.swift",
+      "boundary": "plan 调用 → 返回含缓存及待捕获请求的业务计划",
+      "parents": [
+        "input_routing"
+      ],
+      "work_units": "候选窗口数",
+      "outcomes": "返回=completed",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "preview_capture",
+      "swift_case": "previewCapture",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPreviewCaptureBatch.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePreviewBatch.swift",
+      "boundary": "创建业务批次前 → 实际捕获返回;同步 override 调用 → 返回",
+      "parents": [
+        "preview_planning"
+      ],
+      "work_units": "捕获请求数",
+      "outcomes": "捕获返回=completed;已取消=cancelled;全复用=cache_hit",
+      "required_phases": [
+        "open",
+        "forward",
+        "reverse"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "preview_shareable_content_lookup",
+      "swift_case": "previewShareableContentLookup",
+      "production_owner": "FlowTab/Infrastructure/Runtime/RuntimeWindowImageCapturer.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePreviewDecorators.swift",
+      "boundary": "共享窗口查询调用 → 实际返回",
+      "parents": [
+        "preview_capture"
+      ],
+      "work_units": "查询数",
+      "outcomes": "成功=completed;不可用=failed;条件未执行=not_required;复用=cache_hit",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "preview_screenshot_manager_capture",
+      "swift_case": "previewScreenshotManagerCapture",
+      "production_owner": "FlowTab/Infrastructure/Runtime/RuntimeWindowImageCapturer.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePreviewDecorators.swift",
+      "boundary": "ScreenCaptureKit 截图调用 → 成功或失败返回",
+      "parents": [
+        "preview_capture"
+      ],
+      "work_units": "截图请求数",
+      "outcomes": "图像=completed;失败=failed;未选择=not_required;复用=cache_hit",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "preview_core_graphics_capture",
+      "swift_case": "previewCoreGraphicsCapture",
+      "production_owner": "FlowTab/Infrastructure/Runtime/RuntimeWindowImageCapturer.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePreviewDecorators.swift",
+      "boundary": "CG 截图调用 → 返回",
+      "parents": [
+        "preview_capture"
+      ],
+      "work_units": "截图请求数",
+      "outcomes": "图像=completed;失败=failed;未选择=not_required;复用=cache_hit",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "preview_transparent_trim",
+      "swift_case": "previewTransparentTrim",
+      "production_owner": "FlowTab/Infrastructure/Runtime/RuntimePreviewImageProcessor.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePreviewDecorators.swift",
+      "boundary": "透明裁剪调用 → 返回",
+      "parents": [
+        "preview_capture"
+      ],
+      "work_units": "图像数",
+      "outcomes": "返回=completed;流水线未执行=not_required;复用=cache_hit",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "preview_image_scale",
+      "swift_case": "previewImageScale",
+      "production_owner": "FlowTab/Infrastructure/Runtime/RuntimePreviewImageProcessor.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePreviewDecorators.swift",
+      "boundary": "缩放调用 → 返回",
+      "parents": [
+        "preview_capture"
+      ],
+      "work_units": "图像数",
+      "outcomes": "图像=completed;nil=failed;未执行=not_required;复用=cache_hit",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "preview_image_materialization",
+      "swift_case": "previewImageMaterialization",
+      "production_owner": "FlowTab/Infrastructure/Runtime/RuntimePreviewImageProcessor.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePreviewDecorators.swift",
+      "boundary": "NSImage 实例化调用 → 返回",
+      "parents": [
+        "preview_capture"
+      ],
+      "work_units": "图像数",
+      "outcomes": "返回=completed;未执行=not_required;复用=cache_hit",
+      "required_phases": [],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "preview_title_bar_inference",
+      "swift_case": "previewTitleBarInference",
+      "production_owner": "FlowTab/Infrastructure/Runtime/RuntimePreviewImageProcessor+TitleBar.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePreviewDecorators.swift",
+      "boundary": "标题栏推断调用 → 返回",
+      "parents": [
+        "preview_capture"
+      ],
+      "work_units": "图像数",
+      "outcomes": "执行=completed;策略关闭=not_requested;未执行=not_required;复用=cache_hit",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "preview_image_process_cache",
+      "swift_case": "previewImageProcessCache",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPreviewSession.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePreviewSession.swift",
+      "boundary": "单个缓存应用或整批结果应用调用 → 返回",
+      "parents": [
+        "preview_planning"
+      ],
+      "work_units": "图像或请求数",
+      "outcomes": "返回=completed;全复用=cache_hit",
+      "required_phases": [
+        "open",
+        "forward",
+        "reverse"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "preview_batch_publication",
+      "swift_case": "previewBatchPublication",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPreviewPublication.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePreviewSession.swift",
+      "boundary": "批次发布调用 → 业务准备状态回调返回",
+      "parents": [
+        "preview_image_process_cache"
+      ],
+      "work_units": "完成项数",
+      "outcomes": "返回=completed;复用=cache_hit",
+      "required_phases": [],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "preview_result_discard",
+      "swift_case": "previewResultDiscard",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPreviewSession+Batch.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePreviewSession.swift",
+      "boundary": "批次结果判定返回时记录业务结果",
+      "parents": [
+        "preview_planning"
+      ],
+      "work_units": "请求数",
+      "outcomes": "cancelled=cancelled;stale=stale_generation;applied=not_required",
+      "required_phases": [],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "appkit_panel_presentation",
+      "swift_case": "appKitPanelPresentation",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelPresentationCoordinator+Presentation.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelPresentation.swift",
+      "boundary": "presentStartedHotkeySession 调用 → 返回",
+      "parents": [
+        "input_routing"
+      ],
+      "work_units": "预览窗口数",
+      "outcomes": "返回=completed",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "screen_geometry",
+      "swift_case": "screenGeometry",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelGeometry.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelGeometry.swift",
+      "boundary": "resolveActivePresentationScreen 调用 → 返回",
+      "parents": [
+        "appkit_panel_presentation"
+      ],
+      "work_units": "调用数",
+      "outcomes": "返回=completed",
+      "required_phases": [],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "panel_size",
+      "swift_case": "panelSize",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelGeometry.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelGeometry.swift",
+      "boundary": "展示期间 updatePanelSize 调用 → 返回",
+      "parents": [
+        "appkit_panel_presentation"
+      ],
+      "work_units": "调用数",
+      "outcomes": "返回=completed",
+      "required_phases": [],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "panel_center",
+      "swift_case": "panelCenter",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelGeometry.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelGeometry.swift",
+      "boundary": "centerPanelOnActiveScreen 调用 → 返回",
+      "parents": [
+        "appkit_panel_presentation"
+      ],
+      "work_units": "调用数",
+      "outcomes": "返回=completed",
+      "required_phases": [],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "panel_accessibility",
+      "swift_case": "panelAccessibility",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelAccessibility.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelOperations.swift",
+      "boundary": "syncPanelAccessibilityAnchors 调用 → 返回",
+      "parents": [
+        "appkit_panel_presentation"
+      ],
+      "work_units": "调用数",
+      "outcomes": "返回=completed",
+      "required_phases": [],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "panel_level",
+      "swift_case": "panelLevel",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelWindowOperations.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelOperations.swift",
+      "boundary": "updatePanelPresentationLevel 调用 → 返回",
+      "parents": [
+        "appkit_panel_presentation"
+      ],
+      "work_units": "调用数",
+      "outcomes": "返回=completed",
+      "required_phases": [],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "initial_visibility_tracking",
+      "swift_case": "initialVisibilityTracking",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelDelayedOperations.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelDelays.swift",
+      "boundary": "beginInitialVisibilityTracking 调用 → 返回",
+      "parents": [
+        "appkit_panel_presentation"
+      ],
+      "work_units": "调用数",
+      "outcomes": "返回=completed",
+      "required_phases": [],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "make_key",
+      "swift_case": "makeKey",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelWindowOperations.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelOperations.swift",
+      "boundary": "makeKey 或 makeKeyAndOrderFront 调用 → 返回",
+      "parents": [
+        "appkit_panel_presentation"
+      ],
+      "work_units": "调用数",
+      "outcomes": "返回=completed",
+      "required_phases": [],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "order_front",
+      "swift_case": "orderFront",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelWindowOperations.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelOperations.swift",
+      "boundary": "orderFrontRegardless 调用 → 返回",
+      "parents": [
+        "appkit_panel_presentation"
+      ],
+      "work_units": "调用数",
+      "outcomes": "返回=completed",
+      "required_phases": [],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "panel_hide",
+      "swift_case": "panelHide",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelWindowOperations.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelOperations.swift",
+      "boundary": "hideNonPanelWindowsIfNeeded 调用 → 返回",
+      "parents": [
+        "appkit_panel_presentation"
+      ],
+      "work_units": "调用数",
+      "outcomes": "返回=completed",
+      "required_phases": [],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "presentation_readback",
+      "swift_case": "presentationReadback",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelDelayedOperations.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelDelays.swift",
+      "boundary": "scheduleInitialVisibilityRecovery 调用 → 返回",
+      "parents": [
+        "appkit_panel_presentation"
+      ],
+      "work_units": "调用数",
+      "outcomes": "返回=completed",
+      "required_phases": [],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "event_monitor_install",
+      "swift_case": "eventMonitorInstall",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelEventMonitoring.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelOperations.swift",
+      "boundary": "安装本地及全局事件监听调用 → 返回",
+      "parents": [
+        "appkit_panel_presentation"
+      ],
+      "work_units": "调用数",
+      "outcomes": "返回=completed",
+      "required_phases": [],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "delayed_entry_scheduling",
+      "swift_case": "delayedEntryScheduling",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelDelayedOperations.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelDelays.swift",
+      "boundary": "scheduleDelayedWindowLayerEntryIfNeeded 调用 → 返回",
+      "parents": [
+        "appkit_panel_presentation"
+      ],
+      "work_units": "调用数",
+      "outcomes": "返回=completed",
+      "required_phases": [],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "swiftui_layout_first_draw",
+      "swift_case": "swiftUILayoutFirstDraw",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelContentBuilder.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureObservation.swift",
+      "boundary": "open 观察开始 → 当次真实绘制满足会话身份且可见",
+      "parents": [
+        "none"
+      ],
+      "work_units": "预览窗口数",
+      "outcomes": "匹配=completed;观察超时=timed_out",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "visibility_readback",
+      "swift_case": "visibilityReadback",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelController.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureObservation.swift",
+      "boundary": "匹配绘制后开始可见性读回 → 状态条件满足",
+      "parents": [
+        "none"
+      ],
+      "work_units": "读回次数",
+      "outcomes": "满足=completed;超时=timed_out",
+      "required_phases": [
+        "open"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "selection_mutation",
+      "swift_case": "selectionMutation",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherSessionState.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureSessionState.swift",
+      "boundary": "applying 输入归约调用 → 返回",
+      "parents": [
+        "input_routing"
+      ],
+      "work_units": "输入数",
+      "outcomes": "返回=completed",
+      "required_phases": [
+        "forward",
+        "reverse"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "panel_geometry_update",
+      "swift_case": "panelGeometryUpdate",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelGeometry.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelGeometry.swift",
+      "boundary": "非初次展示 updatePanelSize 调用 → 返回",
+      "parents": [
+        "input_routing"
+      ],
+      "work_units": "预览窗口数",
+      "outcomes": "返回=completed",
+      "required_phases": [
+        "forward",
+        "reverse"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "swiftui_diff_layout_draw",
+      "swift_case": "swiftUIDiffLayoutDraw",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelContentBuilder.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureObservation.swift",
+      "boundary": "切换观察开始 → 当次选中窗口与预览版本的真实绘制",
+      "parents": [
+        "none"
+      ],
+      "work_units": "预览窗口数",
+      "outcomes": "匹配=completed;超时=timed_out",
+      "required_phases": [
+        "forward",
+        "reverse"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "selection_readback",
+      "swift_case": "selectionReadback",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelController.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureObservation.swift",
+      "boundary": "匹配选择绘制后开始读回 → 选中窗口与可见性满足",
+      "parents": [
+        "none"
+      ],
+      "work_units": "读回次数",
+      "outcomes": "满足=completed;超时=timed_out",
+      "required_phases": [
+        "forward",
+        "reverse"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "target_resolution",
+      "swift_case": "targetResolution",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherSessionState.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureSessionState.swift",
+      "boundary": "resolvingSelection 调用 → 返回",
+      "parents": [
+        "none"
+      ],
+      "work_units": "解析数",
+      "outcomes": "返回=completed",
+      "required_phases": [
+        "commit"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "activation_dispatch",
+      "swift_case": "activationDispatch",
+      "production_owner": "FlowTab/Infrastructure/Runtime/RuntimeActivator.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureWindowActivator.swift",
+      "boundary": "activate 调用 → 分发返回",
+      "parents": [
+        "target_resolution"
+      ],
+      "work_units": "请求数",
+      "outcomes": "返回=completed",
+      "required_phases": [
+        "commit"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "exact_window_activation",
+      "swift_case": "exactWindowActivation",
+      "production_owner": "FlowTab/Infrastructure/Runtime/RuntimeActivator.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureActivationCoordinator.swift",
+      "boundary": "精确目标激活请求前 → PID/窗口 ID/CGWindowID 匹配的验证回调",
+      "parents": [
+        "activation_dispatch"
+      ],
+      "work_units": "请求数",
+      "outcomes": "验证=completed;无需精确目标=not_required;超时=timed_out",
+      "required_phases": [
+        "commit"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "focus_readback",
+      "swift_case": "focusReadback",
+      "production_owner": "FlowTab/Infrastructure/Runtime/RuntimeWindowFocusRequest.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureObservation.swift",
+      "boundary": "激活状态读回开始 → 精确目标验证及隐藏状态满足",
+      "parents": [
+        "none"
+      ],
+      "work_units": "读回次数",
+      "outcomes": "满足=completed;无需精确目标=not_required;超时=timed_out",
+      "required_phases": [
+        "commit"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "panel_teardown",
+      "swift_case": "panelTeardown",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelPresentationCoordinator+Teardown.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelPresentation.swift",
+      "boundary": "endPresentationSession 调用 → 返回",
+      "parents": [
+        "none"
+      ],
+      "work_units": "调用数",
+      "outcomes": "返回=completed;已关闭=not_required",
+      "required_phases": [
+        "commit",
+        "cancel"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "observer_removal",
+      "swift_case": "observerRemoval",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelEventMonitoring.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelOperations.swift",
+      "boundary": "移除监听及其业务清理调用 → 返回",
+      "parents": [
+        "panel_teardown"
+      ],
+      "work_units": "调用数",
+      "outcomes": "返回=completed;已关闭=not_required",
+      "required_phases": [
+        "commit",
+        "cancel"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "delayed_task_cancellation",
+      "swift_case": "delayedTaskCancellation",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelDelayedOperations.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelDelays.swift",
+      "boundary": "取消展示工作或待新鲜投影展示调用 → 返回",
+      "parents": [
+        "panel_teardown"
+      ],
+      "work_units": "调用数",
+      "outcomes": "返回=completed;已关闭=not_required",
+      "required_phases": [
+        "commit",
+        "cancel"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "cache_session_cleanup",
+      "swift_case": "cacheSessionCleanup",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherSessionResources.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureSessionResources.swift",
+      "boundary": "resetRuntime 调用 → 上下文、缓存、捕获取消与状态清理返回",
+      "parents": [
+        "none"
+      ],
+      "work_units": "清理前应用上下文数",
+      "outcomes": "返回=completed;已关闭=not_required",
+      "required_phases": [
+        "commit",
+        "cancel"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "reusable_shell_prepare",
+      "swift_case": "reusableShellPrepare",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherReusablePanelShell.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressurePanelOperations.swift",
+      "boundary": "prepare 调用前 → 实际完成或取消回调",
+      "parents": [
+        "panel_teardown"
+      ],
+      "work_units": "请求数",
+      "outcomes": "prepared=completed;无尺寸=not_required;superseded=cancelled",
+      "required_phases": [
+        "cancel"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    },
+    {
+      "name": "closed_state_readback",
+      "swift_case": "closedStateReadback",
+      "production_owner": "FlowTab/Features/Switcher/SwitcherPanelController.swift",
+      "test_owner": "FlowTab/TestingSupport/ControlTabPressureObservation.swift",
+      "boundary": "关闭状态读回开始 → 隐藏与清理回执及状态满足",
+      "parents": [
+        "none"
+      ],
+      "work_units": "读回次数",
+      "outcomes": "满足=completed;超时=timed_out",
+      "required_phases": [
+        "cancel"
+      ],
+      "conditional_rule": "业务实际执行时采样；未执行按业务结果输出原有 outcome；旧运行或旧阶段回调不写入当前阶段"
+    }
+  ],
+  "draw_identity": [
+    "presentation_generation",
+    "selected_window_id",
+    "preview_version"
+  ],
+  "async_terminal_boundary": "actual completion, cancellation or failure",
+  "historical_protocol_versions": [
+    5
+  ]
+}

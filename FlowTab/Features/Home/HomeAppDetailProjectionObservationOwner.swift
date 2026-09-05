@@ -84,7 +84,7 @@ final class HomeAppDetailProjectionObservationOwner: ObservableObject {
     ) {
         self.runtimeProjectionService = runtimeProjectionService
         self.notificationCenter = notificationCenter
-        notificationObject = runtimeProjectionService as AnyObject
+        notificationObject = runtimeProjectionService.notificationSource
     }
 
     var observationCount: Int {

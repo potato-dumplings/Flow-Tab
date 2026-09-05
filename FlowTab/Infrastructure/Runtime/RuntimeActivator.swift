@@ -4,7 +4,7 @@ import Foundation
 import FlowTabCore
 
 @MainActor
-final class RuntimeActivator {
+final class RuntimeActivator: WindowActivating {
     var activateCurrentAppIfNeededOverride: ((NSRunningApplication) -> Bool)?
     var requestActivationOverride: ((NSRunningApplication, ((NSRunningApplication) -> Void)?) -> Void)?
     var focusWindowOverride: ((String, String, Bool, NSRunningApplication) -> Void)?

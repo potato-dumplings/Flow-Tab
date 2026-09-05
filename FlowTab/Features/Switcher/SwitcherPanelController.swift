@@ -30,77 +30,19 @@ struct ModifierReleaseConfirmationPolicy: Equatable {
 
 @MainActor
 final class SwitcherPanelController {
-    struct PendingFocusedWindowSessionPresentation {
-        let request: PendingFocusedAppWindowSession
-        let initialKeyInput: KeyInput?
-        let showStartMilliseconds: Double
-        let observationGeneration: Int
-    }
 
-    enum HotkeySessionKind {
-        case globalAppSwitcher
-        case inAppWindowSwitcher
-    }
-
-    enum PanelVisibilityRecoveryMode: Equatable {
-        case softReorder
-        case hardReorder
-
-        var debugName: String {
-            switch self {
-            case .softReorder:
-                "softReorder"
-            case .hardReorder:
-                "hardReorder"
-            }
-        }
-    }
-
-    enum PanelVisibilityRecoveryState: Equatable {
-        case idle
-        case presenting(trigger: String, generation: Int)
-        case visibleConfirmed(trigger: String, generation: Int, reason: String)
-        case suspectedHidden(trigger: String, generation: Int)
-        case recovering(
-            trigger: String,
-            generation: Int,
-            attempt: Int,
-            totalAttempts: Int,
-            mode: PanelVisibilityRecoveryMode
-        )
-        case failed(trigger: String, generation: Int, reason: String)
-    }
-
-    enum ModifierReleaseCancellationReason: String, Equatable {
-        case suppressedForTesting
-        case explicitCancel
-        case panelHidden
-        case searchInteraction
-        case sessionChanged
-    }
-
-    enum ModifierReleaseState: Equatable {
-        case idle
-        case pressed(generation: Int)
-        case releaseObserved(trigger: String, generation: Int)
-        case confirming(trigger: String, generation: Int, releasedSamples: Int)
-        case confirmed(trigger: String, generation: Int)
-        case replaySuppression(trigger: String, generation: Int, releasedSamples: Int)
-        case replaySuppressionEnded(trigger: String, generation: Int)
-        case canceled(reason: ModifierReleaseCancellationReason, generation: Int)
-    }
-
+    let presentationState = SwitcherPanelPresentationState()
+    lazy var presentationCoordinator: any SwitcherPanelPresenting = SwitcherPanelPresentationCoordinator(controller: self)
+    lazy var panelGeometry: any SwitcherPanelGeometryOperating = SwitcherPanelGeometry(controller: self)
+    lazy var panelWindowOperations: any SwitcherPanelWindowOperating = SwitcherPanelWindowOperations(controller: self)
+    lazy var panelAccessibility: any SwitcherPanelAccessibilityOperating = SwitcherPanelAccessibility(controller: self)
+    lazy var panelEventMonitoring: any SwitcherPanelEventMonitoring = SwitcherPanelEventMonitor(controller: self)
+    lazy var panelDelayedOperations: any SwitcherPanelDelayedOperating = SwitcherPanelDelayedOperations(controller: self)
+    lazy var reusablePanelShell: any SwitcherReusablePanelShellPreparing = SwitcherReusablePanelShell(controller: self)
     let model: LiveSwitcherModel
     let panel: SwitcherOverlayPanel
     let runtimeProjectionNotificationObject: AnyObject
 
-    var keyDownMonitor: Any?
-    var localFlagsChangedMonitor: Any?
-    var localMouseMovedMonitor: Any?
-    var globalKeyDownMonitor: Any?
-    var globalFlagsChangedMonitor: Any?
-    var globalMouseDownMonitor: Any?
-    var globalMouseMovedMonitor: Any?
     var appDidResignActiveObserver: NSObjectProtocol?
     var activeSpaceDidChangeObserver: NSObjectProtocol?
     var workspaceDidTerminateApplicationObserver: NSObjectProtocol?
@@ -140,7 +82,10 @@ final class SwitcherPanelController {
     let terminateTargetProcessStateReader:
         any TerminateTargetProcessStateReading
     var modifierReleaseState: ModifierReleaseState = .idle
-    var presentationSessionGeneration = 0
+    var presentationSessionGeneration: Int {
+        get { presentationState.generation }
+        set { presentationState.generation = newValue }
+    }
     var panelPresentationRecoveryGeneration = 0
     var panelVisibilityRecoveryState: PanelVisibilityRecoveryState = .idle
     var lastPanelVisibilityRecoveryDiagnostic: PanelVisibilityRecoveryDiagnostic?
@@ -255,12 +200,26 @@ final class SwitcherPanelController {
     let appLayerMaxAdaptiveTileSize: CGFloat = 90
     let maxAppTileSpacing: CGFloat = 10
     let minAppTileSize: CGFloat = 1
-    var activeHotkeySessionKind: HotkeySessionKind?
-    var panelPresentationActive = false
-    var activePresentationInitialContentSize: NSSize?
-    var pendingFocusedWindowSessionPresentation:
-        PendingFocusedWindowSessionPresentation?
-    var activePresentationScreen: NSScreen?
+    var activeHotkeySessionKind: HotkeySessionKind? {
+        get { presentationState.kind }
+        set { presentationState.kind = newValue }
+    }
+    var panelPresentationActive: Bool {
+        get { presentationState.isActive }
+        set { presentationState.isActive = newValue }
+    }
+    var activePresentationInitialContentSize: NSSize? {
+        get { presentationState.initialContentSize }
+        set { presentationState.initialContentSize = newValue }
+    }
+    var pendingFocusedWindowSessionPresentation: PendingFocusedWindowSessionPresentation? {
+        get { presentationState.pendingFocusedSession }
+        set { presentationState.pendingFocusedSession = newValue }
+    }
+    var activePresentationScreen: NSScreen? {
+        get { presentationState.screen }
+        set { presentationState.screen = newValue }
+    }
     var suppressModifierReleaseConfirmationForTesting = false
 
     var panelVisibilityOverride: Bool?
@@ -345,11 +304,12 @@ final class SwitcherPanelController {
         terminatePressFeedbackPolicy:
             TerminatePressFeedbackPolicy = .default,
         terminateTargetProcessStateReader:
-            (any TerminateTargetProcessStateReading)? = nil
+            (any TerminateTargetProcessStateReading)? = nil,
+        contentBuilder: (any SwitcherPanelContentBuilding)? = nil
     ) {
         self.model = model
         runtimeProjectionNotificationObject =
-            model.runtimeProjectionService as AnyObject
+            model.runtimeProjectionService.notificationSource
         self.terminateTargetProcessStateReader =
             terminateTargetProcessStateReader
             ?? SystemTerminateTargetProcessStateReader()
@@ -417,8 +377,8 @@ final class SwitcherPanelController {
         panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
         panel.hidesOnDeactivate = false
         panel.ignoresMouseEvents = false
-        let hostingView = NSHostingView(
-            rootView: SwitcherPanelRootView(
+        let hostingView = (contentBuilder ?? SwitcherPanelContentBuilder()).makeContent(
+            context: SwitcherPanelContentContext(
                 model: model,
                 pointerSelectionActions: SwitcherPointerSelectionActions(
                     selectApp: { [weak self] appID in
@@ -735,28 +695,7 @@ final class SwitcherPanelController {
     }
 
     func syncPanelAccessibilityAnchors() {
-        if model.isSearchActive {
-            guard !panel.registeredSwitcherAccessibilityAppIDs.isEmpty else {
-                return
-            }
-            panel.updateSwitcherAccessibilityApps(
-                [],
-                tileSize: 1,
-                spacing: 0,
-                appStripHeaderOffset: 0
-            )
-            return
-        }
-        let appStripHeaderOffset =
-            searchFeatureEnabled && !model.isPreviewLayerMode
-            ? appLayerSearchHeaderExtraHeight
-            : 0
-        panel.updateSwitcherAccessibilityApps(
-            model.session?.apps ?? [],
-            tileSize: model.appGridTileSize,
-            spacing: model.appGridSpacing,
-            appStripHeaderOffset: appStripHeaderOffset
-        )
+        panelAccessibility.syncPanelAccessibilityAnchors()
     }
 
     func scheduleDelayedWindowLayerEntryForTesting() {

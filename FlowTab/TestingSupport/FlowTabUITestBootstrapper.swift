@@ -73,6 +73,7 @@ enum FlowTabUITestBootstrapper {
             RuntimeWindowRecencyTracker.shared.removeAll()
         }
 
+        ControlTabPressureBootstrap.prepareIfNeeded()
         installMockRuntimeProjectionServiceIfNeeded()
         installFrontmostRuntimeProjectionOverrideIfNeeded()
         FlowTabUITestCurrentAppProjectionEvidenceBootstrap
@@ -155,7 +156,7 @@ enum FlowTabUITestBootstrapper {
     }
 
     static var resolvedRuntimeProjectionService: any RuntimeProjectionServing {
-        AppDelegate.testHooks.runtimeProjectionService ?? sharedRuntimeProjectionService
+        AppDelegate.testHooks.runtimeProjectionService ?? ControlTabPressureBootstrap.systemProjectionService
     }
 
     static func synchronizeFrontmostAppOverrideIfNeeded() {
@@ -191,7 +192,7 @@ enum FlowTabUITestBootstrapper {
         }
         guard AppDelegate.testHooks.runtimeProjectionService == nil else { return }
         AppDelegate.testHooks.runtimeProjectionService = RuntimeUITestFrontmostProjectionService(
-            baseService: sharedRuntimeProjectionService,
+            baseService: ControlTabPressureBootstrap.systemProjectionService,
             bundleIdentifier: bundleIdentifier
         )
     }
@@ -208,9 +209,13 @@ enum FlowTabUITestBootstrapper {
         let service = RuntimeProjectionService(
             label: "FlowTab.UITest.MockRuntimeProjectionService",
             appDirectoryProvider: RuntimeUITestProjectionAppDirectoryProvider(),
-            axWindowRepairAvailability: axWindowRepairAvailability
+            axWindowRepairAvailability: axWindowRepairAvailability,
+            dependencies: ControlTabPressureBootstrap.run?.makeProjectionDependencies()
         )
-        AppDelegate.testHooks.runtimeProjectionService = service
+        AppDelegate.testHooks.runtimeProjectionService =
+            mockRuntimeProjectionService(
+                wrapping: service
+            )
         service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
         service.waitForMaintenanceQueueForTesting()
 
@@ -224,6 +229,33 @@ enum FlowTabUITestBootstrapper {
 
         service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
         service.waitForMaintenanceQueueForTesting()
+    }
+
+    private static func mockRuntimeProjectionService(
+        wrapping service: RuntimeProjectionService
+    ) -> any RuntimeProjectionServing {
+        guard
+            let bundleIdentifier =
+                FlowTabTestLaunchOptions
+                    .frontmostBundleIdentifierOverride,
+            let entry = FlowTabUITestRuntimeProjectionDataset
+                .current()?
+                .appDirectoryEntries
+                .first(where: {
+                    $0.bundleIdentifier == bundleIdentifier
+                })
+        else {
+            return service
+        }
+        let target = RuntimeUITestFrontmostAppTarget(
+            appID: entry.appID,
+            pid: entry.pid,
+            bundleIdentifier: bundleIdentifier
+        )
+        return RuntimeUITestFrontmostProjectionService(
+            baseService: service,
+            targetProvider: { target }
+        )
     }
 
     private static func seedWindowRecencyIfNeeded() {
@@ -261,6 +293,9 @@ enum FlowTabUITestBootstrapper {
         installSwitcherTriggerNotificationsIfNeeded(panelController: panelController)
         installSwitcherCommandNotificationsIfNeeded(panelController: panelController)
         installAppPanelPressureCommandNotificationIfNeeded()
+        ControlTabPressureBootstrap.configureIfNeeded(
+            panelController: panelController
+        )
 
         guard FlowTabTestLaunchOptions.enablesMockHotkeyEffects else { return }
 

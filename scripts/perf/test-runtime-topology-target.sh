@@ -357,6 +357,17 @@ test_interval_cpu_uses_cumulative_process_time_delta() (
     || fail "interval CPU percent was not derived from elapsed process time: $observed"
 )
 
+test_cpu_interval_failure_distinguishes_live_and_exited_targets() (
+  target_process_is_active() {
+    [[ "$1" == 41 ]]
+  }
+
+  [[ "$(flowtab_perf_cpu_interval_failure_verdict 41)" == cpu_interval_error ]] \
+    || fail "live target CPU interval failure was treated as process exit"
+  [[ "$(flowtab_perf_cpu_interval_failure_verdict 42)" == sample_unavailable ]] \
+    || fail "exited target CPU interval failure was not treated as terminal sampling loss"
+)
+
 test_immediate_readback_precedes_poll_and_qualifies
 test_delayed_candidate_qualifies_from_observation_time
 test_slow_schedule_only_changes_completion_latency
@@ -372,5 +383,6 @@ test_clock_failure_is_unmet_evidence
 test_receipt_failure_is_unmet_evidence
 test_cpu_time_parser_supports_ps_formats
 test_interval_cpu_uses_cumulative_process_time_delta
+test_cpu_interval_failure_distinguishes_live_and_exited_targets
 
 echo "Runtime-topology target checks launch identity and interval CPU evidence."

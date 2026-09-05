@@ -100,7 +100,7 @@ final class HomeInitialProjectionObservationOwner: ObservableObject {
     ) {
         self.runtimeProjectionService = runtimeProjectionService
         self.notificationCenter = notificationCenter
-        notificationObject = runtimeProjectionService as AnyObject
+        notificationObject = runtimeProjectionService.notificationSource
     }
 
     var isObserving: Bool {

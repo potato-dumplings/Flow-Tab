@@ -229,6 +229,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         FlowTabUITestBootstrapper
             .stopInitialUIPresentationObservation()
         FlowTabUITestProjectionAcknowledgementBootstrap.stop()
+        ControlTabPressureBootstrap.stop()
         FlowTabUITestHomeInitialProjectionApplicationBootstrap
             .stop()
         FlowTabUITestAXSuppressionReadbackBootstrap.stop()

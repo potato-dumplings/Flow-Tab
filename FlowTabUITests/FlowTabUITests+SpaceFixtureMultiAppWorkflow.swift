@@ -685,6 +685,7 @@ extension FlowTabUITests {
 
     func runRealSpaceFixtureMultiAppWorkflow(
         flowTabAdditionalArguments: [String] = [],
+        flowTabLaunchEnvironment: [String: String] = [:],
         waitsForFullscreenMarkers: Bool = true,
         suppressesAppAccessibilityChildren: Bool = false,
         validatesPermissionsBeforeFixtureLaunch: Bool = false,
@@ -713,6 +714,7 @@ extension FlowTabUITests {
         try runRealSpaceFixtureWorkflow(
             workflow,
             flowTabAdditionalArguments: flowTabAdditionalArguments,
+            flowTabLaunchEnvironment: flowTabLaunchEnvironment,
             waitsForFullscreenMarkers: waitsForFullscreenMarkers,
             suppressesAppAccessibilityChildren: suppressesAppAccessibilityChildren,
             validatesPermissionsBeforeFixtureLaunch: validatesPermissionsBeforeFixtureLaunch,
@@ -728,6 +730,7 @@ extension FlowTabUITests {
     func runRealSpaceFixtureWorkflow(
         _ workflow: SpaceFixtureResolvedWorkflow,
         flowTabAdditionalArguments: [String] = [],
+        flowTabLaunchEnvironment: [String: String] = [:],
         waitsForFullscreenMarkers: Bool = true,
         suppressesAppAccessibilityChildren: Bool = false,
         validatesPermissionsBeforeFixtureLaunch: Bool = false,
@@ -784,6 +787,9 @@ extension FlowTabUITests {
                 additionalArguments:
                     routedFlowTabAdditionalArguments
             )
+            for item in flowTabLaunchEnvironment {
+                app.launchEnvironment[item.key] = item.value
+            }
             launchFlowTabUITestApplication(app, traceLabel: flowTabLaunchTraceLabel)
             assertRealSpaceFixtureFlowTabIsForegroundReady(
                 app,
@@ -849,6 +855,9 @@ extension FlowTabUITests {
                 additionalArguments:
                     routedFlowTabAdditionalArguments
             )
+            for item in flowTabLaunchEnvironment {
+                app.launchEnvironment[item.key] = item.value
+            }
             launchFlowTabUITestApplication(app, traceLabel: flowTabLaunchTraceLabel)
             flowTabAppForCleanup = app
             try afterFlowTabLaunch?(workflow, app)

@@ -282,12 +282,14 @@ extension FlowTabUITests {
         in app: XCUIApplication,
         keyCodes: [CGKeyCode],
         modifierFlags: XCUIElement.KeyModifierFlags,
+        requiresActiveProcess: Bool = true,
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
         guard let processID = activeFlowTabProcessID(
             in: app,
             description: "runtime pressed-key state",
+            requiresActiveProcess: requiresActiveProcess,
             file: file,
             line: line
         ) else {
@@ -313,16 +315,26 @@ extension FlowTabUITests {
     private func activeFlowTabProcessID(
         in _: XCUIApplication,
         description: String,
+        requiresActiveProcess: Bool = true,
         file: StaticString,
         line: UInt
     ) -> pid_t? {
         let bundleIdentifier =
             FlowTabUITestAppIdentity.configured().bundleIdentifier
-        guard let processID = NSRunningApplication.runningApplications(
+        let candidates = NSRunningApplication.runningApplications(
             withBundleIdentifier: bundleIdentifier
-        ).first(where: \.isActive)?.processIdentifier else {
+        )
+        let matching = requiresActiveProcess
+            ? candidates.filter(\.isActive)
+            : candidates
+        guard matching.count == 1,
+              let processID = matching.first?.processIdentifier
+        else {
             XCTFail(
-                "Missing active app process for \(description)",
+                "Expected one "
+                    + (requiresActiveProcess ? "active" : "running")
+                    + " app process for \(description); "
+                    + "found=\(matching.count)",
                 file: file,
                 line: line
             )

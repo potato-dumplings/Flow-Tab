@@ -107,17 +107,20 @@ protocol GenericWindowPreviewProviding {
 }
 
 struct GenericWindowScreenshotPreviewProvider: GenericWindowPreviewProviding {
+    var batchFactory: any WindowPreviewCaptureBatchCreating = RuntimeWindowPreviewCaptureBatchFactory()
+
     func previews(
         for requests: [WindowPreviewRequest],
         captureSemaphore: DispatchSemaphore?,
         cancellation: WindowPreviewCaptureCancellation
     ) async -> [WindowPreviewResult] {
-        RuntimeWindowPreviewProvider
-            .captureWindowPreviewOutcomes(
-                requests.map(\.genericCaptureRequest),
+        batchFactory
+            .makeBatch(
+                requests: requests.map(\.genericCaptureRequest),
                 captureSemaphore: captureSemaphore,
                 cancellation: cancellation
             )
+            .capture()
             .map(Self.windowPreviewResult)
     }
 

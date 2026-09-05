@@ -281,7 +281,7 @@ enum FlowTabUITestHomeInitialProjectionApplicationBootstrap {
             return
         }
 
-        let notificationObject = service as AnyObject
+        let notificationObject = service.notificationSource
         if owner?.route == route,
            owner?.observes(
             notificationObject: notificationObject

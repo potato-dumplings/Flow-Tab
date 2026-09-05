@@ -7,6 +7,17 @@ struct PendingFocusedAppWindowSession: Equatable {
     let triggerDirection: CycleDirection
     let baselineReadModelGeneration: RuntimeReadModelGeneration
     let baselineProjectionGeneration: RuntimeReadModelGeneration?
+
+    func accepts(_ read: RuntimeFocusedCurrentAppWindowProjectionRead) -> Bool {
+        guard read.appID == appID, read.pid == pid, let projection = read.projection,
+              projection.freshness.isCompleteForScope,
+              projection.freshness.sourceGeneration.isStrictlyLater(than: baselineReadModelGeneration)
+        else { return false }
+        return baselineProjectionGeneration.map {
+            projection.freshness.sourceGeneration.isStrictlyLater(than: $0)
+        } ?? true
+    }
+
 }
 
 enum FocusedAppWindowSessionStartResult: Equatable {
@@ -16,144 +27,12 @@ enum FocusedAppWindowSessionStartResult: Equatable {
 }
 
 extension LiveSwitcherModel {
-    func startFocusedAppWindowSession(
-        triggerDirection: CycleDirection
-    ) -> FocusedAppWindowSessionStartResult {
-        let startMs = Self.monotonicMilliseconds()
-        invalidateSelectedAppWindowProjection(reason: .startFocusedWindowSession)
-        clearTerminateSelectedAppAnimation()
-        guard let focusedRead = runtimeProjectionService.readFocusedCurrentAppWindowProjection() else {
-            runtimeProjectionService.signalFocusedCurrentAppWindowsChanged()
-            logStartFocusedWindowSessionNoFrontmost(startMs: startMs)
-            resetSessionState()
-            return .unavailable
-        }
-        let frontmostReadyMs = Self.monotonicMilliseconds()
-        let projectionReadMs = Self.monotonicMilliseconds()
-        guard let projection = focusedRead.projection,
-              projection.freshness.isCompleteForScope
-        else {
-            let pending = PendingFocusedAppWindowSession(
-                appID: focusedRead.appID,
-                pid: focusedRead.pid,
-                triggerDirection: triggerDirection,
-                baselineReadModelGeneration:
-                    runtimeProjectionService
-                        .runtimeReadModelDiagnostics().generation,
-                baselineProjectionGeneration:
-                    focusedRead.projection?.freshness.sourceGeneration
-            )
-            runtimeProjectionService.signalFocusedCurrentAppWindowsChanged()
-            let awaitingMs = Self.monotonicMilliseconds()
-            logStartFocusedWindowSession(
-                result: "awaitingFreshProjection",
-                frontmostAppID: focusedRead.appID,
-                frontmostReadyMs: frontmostReadyMs,
-                projectionReadMs: projectionReadMs,
-                recencyAppliedMs: awaitingMs,
-                completeMs: awaitingMs,
-                startMs: startMs
-            )
-            resetSessionState()
-            return .awaitingFreshProjection(pending)
-        }
-        let payload = currentAppWindowPayloadWithWindowRecencyApplied(
-            projection.currentAppWindowPayload
-        )
-        let recencyAppliedMs = Self.monotonicMilliseconds()
-        guard installFocusedAppWindowSession(
-            payload: payload,
-            triggerDirection: triggerDirection
-        ) else {
-            let failedMs = Self.monotonicMilliseconds()
-            logStartFocusedWindowSession(
-                result: "noWindows",
-                frontmostAppID: focusedRead.appID,
-                frontmostReadyMs: frontmostReadyMs,
-                projectionReadMs: projectionReadMs,
-                recencyAppliedMs: recencyAppliedMs,
-                completeMs: failedMs,
-                startMs: startMs
-            )
-            resetSessionState()
-            return .unavailable
-        }
-        let completeMs = Self.monotonicMilliseconds()
-        logStartFocusedWindowSession(
-            result: "ready",
-            frontmostAppID: focusedRead.appID,
-            frontmostReadyMs: frontmostReadyMs,
-            projectionReadMs: projectionReadMs,
-            recencyAppliedMs: recencyAppliedMs,
-            completeMs: completeMs,
-            startMs: startMs,
-            windows: payload.candidate.windows.count
-        )
-        return .ready
+    func startFocusedAppWindowSession(triggerDirection: CycleDirection) -> FocusedAppWindowSessionStartResult {
+        focusedWindowSession.startFocusedAppWindowSession(triggerDirection: triggerDirection)
     }
 
-    func completePendingFocusedAppWindowSession(
-        _ pending: PendingFocusedAppWindowSession
-    ) -> Bool {
-        guard session == nil,
-              let focusedRead = runtimeProjectionService
-                .readFocusedCurrentAppWindowProjection(),
-              focusedRead.appID == pending.appID,
-              focusedRead.pid == pending.pid,
-              let projection = focusedRead.projection,
-              projection.freshness.isCompleteForScope,
-              projection.freshness.sourceGeneration.isStrictlyLater(
-                than: pending.baselineReadModelGeneration
-              )
-        else {
-            return false
-        }
-        if let baselineProjectionGeneration =
-            pending.baselineProjectionGeneration
-        {
-            guard projection.freshness.sourceGeneration.isStrictlyLater(
-                than: baselineProjectionGeneration
-            ) else {
-                return false
-            }
-        }
-        let payload = currentAppWindowPayloadWithWindowRecencyApplied(
-            projection.currentAppWindowPayload
-        )
-        return installFocusedAppWindowSession(
-            payload: payload,
-            triggerDirection: pending.triggerDirection
-        )
-    }
-
-    private func installFocusedAppWindowSession(
-        payload: RuntimeCurrentAppWindowPayload,
-        triggerDirection: CycleDirection
-    ) -> Bool {
-        let appCandidate = payload.candidate
-        guard !appCandidate.windows.isEmpty else { return false }
-
-        overlayStyle = .windowOnly
-        titleBarStyleInferenceEnabled = true
-        runtimeContextsByID = [appCandidate.id: payload.context]
-        clearPreviewSnapshotState()
-        autoEnterSuppressedAppID = nil
-        var rebuiltSession = SwitcherSession(
-            apps: [appCandidate],
-            preferences: SwitcherBehaviorPreferencesStore
-                .loadSwitcherPreferences(),
-            triggerDirection: triggerDirection,
-            rememberedWindowIDByAppID: rememberedWindowIDByAppID
-        )
-        guard rebuiltSession.enterWindowCycle(
-            allowSingleWindow: true
-        ) else {
-            return false
-        }
-        session = rebuiltSession
-        _ = searchCoordinator.exit()
-        publishSearchStateIfNeeded()
-        return true
+    func completePendingFocusedAppWindowSession(_ pending: PendingFocusedAppWindowSession) -> Bool {
+        focusedWindowSession.completePendingFocusedAppWindowSession(pending)
     }
 
     func loadAppSwitcherProjectionSession(

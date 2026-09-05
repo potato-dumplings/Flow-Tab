@@ -242,6 +242,40 @@
 		C0D100103E10000100B0D737 /* FlowTabUITests+AppPanelPressureConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D1000F3E10000100B0D737 /* FlowTabUITests+AppPanelPressureConfiguration.swift */; };
 		C0D100083E10000100B0D737 /* FlowTabUITests+AppPanelPressureInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D100073E10000100B0D737 /* FlowTabUITests+AppPanelPressureInteraction.swift */; };
 		C0D100063E10000100B0D737 /* FlowTabTests+AppPanelPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D100053E10000100B0D737 /* FlowTabTests+AppPanelPressure.swift */; };
+		C7F000023F30000100B0D737 /* FocusedWindowSessionDiagnostic.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000013F30000100B0D737 /* FocusedWindowSessionDiagnostic.swift */; };
+		C7F000043F30000100B0D737 /* ControlTabPressureMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000033F30000100B0D737 /* ControlTabPressureMetrics.swift */; };
+		C7F000063F30000100B0D737 /* ControlTabPressureCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000053F30000100B0D737 /* ControlTabPressureCommand.swift */; };
+		C7F000083F30000100B0D737 /* ControlTabPressureEvidenceDelivery.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000073F30000100B0D737 /* ControlTabPressureEvidenceDelivery.swift */; };
+		C7F0000A3F30000100B0D737 /* ControlTabPressureObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000093F30000100B0D737 /* ControlTabPressureObservation.swift */; };
+		C7F0000C3F30000100B0D737 /* ControlTabPressureBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F0000B3F30000100B0D737 /* ControlTabPressureBootstrap.swift */; };
+		C7F0000E3F30000100B0D737 /* FlowTabTests+ControlTabPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F0000D3F30000100B0D737 /* FlowTabTests+ControlTabPressure.swift */; };
+		C7F000103F30000100B0D737 /* FlowTabUITests+ControlTabPressureConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F0000F3F30000100B0D737 /* FlowTabUITests+ControlTabPressureConfiguration.swift */; };
+		C7F000123F30000100B0D737 /* FlowTabUITests+ControlTabPressureTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000113F30000100B0D737 /* FlowTabUITests+ControlTabPressureTransport.swift */; };
+		C7F000143F30000100B0D737 /* FlowTabUITests+ControlTabPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000133F30000100B0D737 /* FlowTabUITests+ControlTabPressure.swift */; };
+		C7F000433F30000100B0D737 /* FlowTabUITests+ControlTabPhysicalPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000423F30000100B0D737 /* FlowTabUITests+ControlTabPhysicalPressure.swift */; };
+		C7F000163F30000100B0D737 /* SpaceFixtureWindowMutationPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000153F30000100B0D737 /* SpaceFixtureWindowMutationPressure.swift */; };
+		C7F000183F30000100B0D737 /* SpaceFixtureWindowMutationPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000153F30000100B0D737 /* SpaceFixtureWindowMutationPressure.swift */; };
+		C7F0001A3F30000100B0D737 /* SpaceFixtureWindowMutationPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000153F30000100B0D737 /* SpaceFixtureWindowMutationPressure.swift */; };
+		C7F0001C3F30000100B0D737 /* SpaceFixtureWindowMutationPressureOwner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000173F30000100B0D737 /* SpaceFixtureWindowMutationPressureOwner.swift */; };
+		C7F0001E3F30000100B0D737 /* SpaceFixtureWindowMutationPressureOwner.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000173F30000100B0D737 /* SpaceFixtureWindowMutationPressureOwner.swift */; };
+		C7F000203F30000100B0D737 /* FlowTabUITests+ControlTabPressureSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F0001F3F30000100B0D737 /* FlowTabUITests+ControlTabPressureSupport.swift */; };
+		C7F000223F30000100B0D737 /* FlowTabUITests+ControlTabMutationTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000213F30000100B0D737 /* FlowTabUITests+ControlTabMutationTransport.swift */; };
+		C7F000243F30000100B0D737 /* FlowTabUITests+ControlTabMutationPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000233F30000100B0D737 /* FlowTabUITests+ControlTabMutationPressure.swift */; };
+		C7F000263F30000100B0D737 /* FlowTabUITests+ControlTabTopologyPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000253F30000100B0D737 /* FlowTabUITests+ControlTabTopologyPressure.swift */; };
+		C7F000283F30000100B0D737 /* SpaceFixtureWindowCoordinator+MutationPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000273F30000100B0D737 /* SpaceFixtureWindowCoordinator+MutationPressure.swift */; };
+		C7F0002A3F30000100B0D737 /* SpaceFixtureWindowCoordinator+MutationPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000273F30000100B0D737 /* SpaceFixtureWindowCoordinator+MutationPressure.swift */; };
+		C7F000303F30000100B0D737 /* SwitcherInteractionDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000313F30000100B0D737 /* SwitcherInteractionDiagnostics.swift */; };
+		C7F000323F30000100B0D737 /* ControlTabPressureSpans.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000333F30000100B0D737 /* ControlTabPressureSpans.swift */; };
+		C7F000343F30000100B0D737 /* FlowTabUITests+ControlTabPressureMetricsRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000353F30000100B0D737 /* FlowTabUITests+ControlTabPressureMetricsRecorder.swift */; };
+		C7F000363F30000100B0D737 /* FlowTabTests+ControlTabPressureSpans.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000373F30000100B0D737 /* FlowTabTests+ControlTabPressureSpans.swift */; };
+		C7F000383F30000100B0D737 /* ControlTabPressureActivationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000393F30000100B0D737 /* ControlTabPressureActivationCoordinator.swift */; };
+		C7F0003C3F30000100B0D737 /* ControlTabPressureSpanContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F0003D3F30000100B0D737 /* ControlTabPressureSpanContract.swift */; };
+		C7F0003E3F30000100B0D737 /* ControlTabPressureEvidenceAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F0003F3F30000100B0D737 /* ControlTabPressureEvidenceAssembler.swift */; };
+		C7F000403F30000100B0D737 /* ControlTabPressureSelectionRenderExpectation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000413F30000100B0D737 /* ControlTabPressureSelectionRenderExpectation.swift */; };
+		C7F000443F30000100B0D737 /* RuntimeProcessDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000453F30000100B0D737 /* RuntimeProcessDiagnostics.swift */; };
+		C7F000463F30000100B0D737 /* RuntimeWindowPreviewCaptureDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F000473F30000100B0D737 /* RuntimeWindowPreviewCaptureDiagnostics.swift */; };
+		C7F0004A3F30000100B0D737 /* ControlTabPressureSpans+FocusedRepair.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F0004B3F30000100B0D737 /* ControlTabPressureSpans+FocusedRepair.swift */; };
+		C7F0004C3F30000100B0D737 /* FlowTabTests+RuntimePreviewCaptureDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F0004D3F30000100B0D737 /* FlowTabTests+RuntimePreviewCaptureDiagnostics.swift */; };
 		A44600023D4E000100B0D737 /* FlowTabUITests+ScrollingSupportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44600013D4E000100B0D737 /* FlowTabUITests+ScrollingSupportTests.swift */; };
 		A44600043D4E000100B0D737 /* FlowTabUITests+ScrollingHittableElementObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44600033D4E000100B0D737 /* FlowTabUITests+ScrollingHittableElementObservation.swift */; };
 		A44700023D4F000100B0D737 /* FlowTabUITests+ScrollingElementVisibilityObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44700013D4F000100B0D737 /* FlowTabUITests+ScrollingElementVisibilityObservation.swift */; };
@@ -361,6 +395,7 @@
 		F6E7E00235C2000100B0D737 /* RuntimeProjectionRepairProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7E00135C2000100B0D737 /* RuntimeProjectionRepairProvider.swift */; };
 		F6E7E50235C5000200B0D737 /* RuntimeProjectionRepairContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7E50135C5000200B0D737 /* RuntimeProjectionRepairContract.swift */; };
 		F6E7E40235C5000100B0D737 /* RuntimeProjectionRepairFactSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7E40135C5000100B0D737 /* RuntimeProjectionRepairFactSource.swift */; };
+		C7F0003A3F30000100B0D737 /* RuntimeFocusedRepairDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F0003B3F30000100B0D737 /* RuntimeFocusedRepairDiagnostics.swift */; };
 		D10000072FF500400B0D737 /* RuntimeProjectionRepairFactProviding.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000082FF500400B0D737 /* RuntimeProjectionRepairFactProviding.swift */; };
 		D10000092FF500500B0D737 /* RuntimeMainTableProjectionBuilding.swift in Sources */ = {isa = PBXBuildFile; fileRef = D100000A2FF500500B0D737 /* RuntimeMainTableProjectionBuilding.swift */; };
 		F6E7E20235C4000100B0D737 /* RuntimeSearchIndexReadModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7E20135C4000100B0D737 /* RuntimeSearchIndexReadModel.swift */; };
@@ -750,6 +785,72 @@
 		A7D4C00436A000100B0D737 /* RuntimeApplicationMembershipProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7D4C00336A000100B0D737 /* RuntimeApplicationMembershipProjection.swift */; };
 		F6E7C01835C000100B0D737 /* RuntimeWindowMappingState+StickyBindings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7C01735C000100B0D737 /* RuntimeWindowMappingState+StickyBindings.swift */; };
 		F6E7B00835AC000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7B00735AC000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift */; };
+		86749C35623114A929EDC62F /* ControlTabPressureModelDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29CA34AAF6F05885987B5D7A /* ControlTabPressureModelDiagnostics.swift */; };
+		CF7D38EBFAA5C6E3805CFBE4 /* ControlTabPressurePanelDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 967E5A815C5A4CF64F83CE1A /* ControlTabPressurePanelDiagnostics.swift */; };
+		6A265F6CE1D7990E6014FD11 /* ControlTabPressureRenderProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62BDEB78317150AB928C7004 /* ControlTabPressureRenderProbe.swift */; };
+		4153F00B3CBF8D052F9E39C2 /* RuntimeFocusedWindowFactCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C2F1CC8D66FA6504E00C950 /* RuntimeFocusedWindowFactCollector.swift */; };
+		2CF02D7934B4C7A43E70C06C /* RuntimePreviewImageProcessor+TitleBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D6213B553273AA81F11286C /* RuntimePreviewImageProcessor+TitleBar.swift */; };
+		9D9EEB9BCA9AE5B1AFAB855E /* RuntimePreviewImageProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9FFDF12D4F925A89EE63BB7 /* RuntimePreviewImageProcessor.swift */; };
+		72F7AF255809BE72CB4113ED /* RuntimeProjectionDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61BCDBEA1957297E5EA06173 /* RuntimeProjectionDependencies.swift */; };
+		C78585381FB692E816E97A1B /* RuntimeWindowEntryProjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 647673D24B6CF93F59717B74 /* RuntimeWindowEntryProjector.swift */; };
+		92797E9DA316C1EE25FD93A0 /* RuntimeWindowImageCapturer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35B4CC0F6B5293F3358F074C /* RuntimeWindowImageCapturer.swift */; };
+		D4C78C17DE981A7511244B0C /* RuntimeWindowPreviewCaptureBatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFFD0EC8E315DA15AF3DD116 /* RuntimeWindowPreviewCaptureBatch.swift */; };
+		723AFFE86B441F790C5000CE /* ScreenCapturePermissionChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89C87EFC9C0144571CDCADD8 /* ScreenCapturePermissionChecker.swift */; };
+		2C1335B39EE76EE90407F53A /* ControlTabPressureFactDecorators.swift in Sources */ = {isa = PBXBuildFile; fileRef = 325845618EAF64021F533286 /* ControlTabPressureFactDecorators.swift */; };
+		259825D72C64D55BF746761B /* ControlTabPressurePreviewDecorators.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B74A24FCC5FACDCBFC9C55D /* ControlTabPressurePreviewDecorators.swift */; };
+		7B23E13C929FA22BC81DDD52 /* RuntimeWindowPreviewProvider+Testing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 226AD720D64ACEA08058B662 /* RuntimeWindowPreviewProvider+Testing.swift */; };
+		0DA9F9B378D32CBF5B15E231 /* SwitcherPanelContentBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF23AB343962D59197855F1C /* SwitcherPanelContentBuilder.swift */; };
+		6789FE958C8929183F4677B8 /* SwitcherSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 374A181FA6DAA13C473EC074 /* SwitcherSessionState.swift */; };
+		8BB3BAE0D1552315B5FBEBD0 /* WindowActivating.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C88E777EE05D6D60EBB2B7 /* WindowActivating.swift */; };
+		2947BAB5BD2F862DF46C356D /* ControlTabPressureAttachments.swift in Sources */ = {isa = PBXBuildFile; fileRef = C35287687A0703F72A58A711 /* ControlTabPressureAttachments.swift */; };
+		FE6C465E5B4B8CC919F8304F /* ControlTabPressureContentBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 826C16656FB98CAF12E0003F /* ControlTabPressureContentBuilder.swift */; };
+		98C1A6853DE58DDEAC611F2B /* ControlTabPressureRun.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C3564760D8ADDD25E239A00 /* ControlTabPressureRun.swift */; };
+		FA186150BA26F115F1F1EAFF /* ControlTabPressureSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E776FE1D72DDE75211EB27CC /* ControlTabPressureSessionState.swift */; };
+		3C1B41CE8F22EBC8EDE567ED /* ControlTabPressureWindowActivator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BE0973EBC7B67CBA612A616 /* ControlTabPressureWindowActivator.swift */; };
+		AC0EA9F2FF322B8E9CB5BF23 /* LiveSwitcherModel+PreviewState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EF0D146C5B85283708558D8 /* LiveSwitcherModel+PreviewState.swift */; };
+		D3C125979F04DCA3821FA1D5 /* LiveSwitcherModel+SessionTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03BD37D4BBA3F8EB157FE2B4 /* LiveSwitcherModel+SessionTypes.swift */; };
+		994B0B4ACF7A51B632FEC9D5 /* PendingPreviewCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBDB069EE0063AC8EE73CF80 /* PendingPreviewCapture.swift */; };
+		54ED81CC9FF002E9D48C4F0C /* SwitcherPreviewPublication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00A2821BF4B3023C2CD49D27 /* SwitcherPreviewPublication.swift */; };
+		C95A80C36CB80BA7B50B2786 /* SwitcherPreviewSession+Batch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D1A5428A62C9C634D073079 /* SwitcherPreviewSession+Batch.swift */; };
+		87F587519E25228AAC71CE55 /* SwitcherPreviewSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51F69438840582FE3447BFC1 /* SwitcherPreviewSession.swift */; };
+		5D61F9D3CA529D7486BD1EC7 /* SwitcherPreviewStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC6F221DFF2685A2BCCFF330 /* SwitcherPreviewStorage.swift */; };
+		B449CFD0AF3D8E85BDB39BD1 /* SwitcherPreviewSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A8842A1BC717AD4A72C35F3 /* SwitcherPreviewSupport.swift */; };
+		9DB99DC955436F810F79EBEF /* ControlTabPressurePreviewSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 179A8479C994B9A00BABB588 /* ControlTabPressurePreviewSession.swift */; };
+		DE3879091838B2C139A3CBD8 /* ControlTabPressureDecoratorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 578D0BFB198EDF2EB2FA2575 /* ControlTabPressureDecoratorTests.swift */; };
+		FADE7EDE966E2E19C3D99210 /* SwitcherPreviewCaptureBatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AAFCC6DB97E2C56FFC13789 /* SwitcherPreviewCaptureBatch.swift */; };
+		280243C782AE504F26A281DE /* ControlTabPressurePreviewBatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 370E6488521C84DE9C43A5AD /* ControlTabPressurePreviewBatch.swift */; };
+		8419CF272B9CA4189BFA0059 /* SwitcherPreviewPlanner+Plan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D6D69BBCFE5C159CEB10E18 /* SwitcherPreviewPlanner+Plan.swift */; };
+		83BB52AC38D279038B5DB895 /* SwitcherPreviewPlanner+Resolution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A9395002628E327548F234 /* SwitcherPreviewPlanner+Resolution.swift */; };
+		515C90D2D59D49A8405876C2 /* SwitcherPreviewPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDF186859DC05D1CAF28A7EC /* SwitcherPreviewPlanner.swift */; };
+		89CAFE9171C60F79594D0183 /* ControlTabPressurePreviewPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82A37253950EB421BA5C5D60 /* ControlTabPressurePreviewPlanner.swift */; };
+		5C09565B177D57B8A70A8E4F /* SwitcherFocusedWindowSessionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B29B3CA94421809EFF36492 /* SwitcherFocusedWindowSessionCoordinator.swift */; };
+		817E218B3A09AA2004772AD7 /* SwitcherFocusedWindowSessionInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90205FC4B6765EF938F081C5 /* SwitcherFocusedWindowSessionInstaller.swift */; };
+		1B9B045586DB75910E4EC703 /* SwitcherPanelAccessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = D15B9E989EF84105C4D873A4 /* SwitcherPanelAccessibility.swift */; };
+		5282202D05D5481208361AD2 /* SwitcherPanelDelayedOperations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7851FB926E9B085282C56080 /* SwitcherPanelDelayedOperations.swift */; };
+		A04971C50125530245070C82 /* SwitcherPanelEventMonitoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1EF0A9086443BBB5B341556 /* SwitcherPanelEventMonitoring.swift */; };
+		89D5D369216AEFBB18191D81 /* SwitcherPanelGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5F836FE540B38918A288CC1 /* SwitcherPanelGeometry.swift */; };
+		29D010F660EAE7F4A5B4CB38 /* SwitcherPanelPresentationCoordinator+FocusedSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B62BDBF6416B24D3C89AD156 /* SwitcherPanelPresentationCoordinator+FocusedSession.swift */; };
+		2BE53E707DE595E08A01415A /* SwitcherPanelPresentationCoordinator+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E890F93F88CD91B61C48A5F /* SwitcherPanelPresentationCoordinator+Presentation.swift */; };
+		30F1217E8C41B0A73719B004 /* SwitcherPanelPresentationCoordinator+Teardown.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2D5648A48FF1C92011C6E6E /* SwitcherPanelPresentationCoordinator+Teardown.swift */; };
+		537982E141F472B73D20B20F /* SwitcherPanelPresentationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 583CED85BEE4F52E65C74EFD /* SwitcherPanelPresentationCoordinator.swift */; };
+		B4B7B24F4114CC6509DC6271 /* SwitcherPanelWindowOperations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C8A3BB762AD6B294ACF4F6D /* SwitcherPanelWindowOperations.swift */; };
+		9ABE0F46AEC60DCB4BEB5519 /* SwitcherReusablePanelShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 941D8641F973FE2188112A00 /* SwitcherReusablePanelShell.swift */; };
+		4920ED2F4A6015A74828DDD0 /* ControlTabPressureFocusedSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9C027B4EC38BB7920F2898 /* ControlTabPressureFocusedSession.swift */; };
+		5F4A2C6DC84AE4A0B946C52B /* ControlTabPressureHotkeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 779D718B42D01859AE1F19DE /* ControlTabPressureHotkeyMonitor.swift */; };
+		FA48F57FC41C2B32753AC0D4 /* ControlTabPressurePanelAssembly.swift in Sources */ = {isa = PBXBuildFile; fileRef = 339E1B9CDB4DCE015D60E62B /* ControlTabPressurePanelAssembly.swift */; };
+		AE5D3A22F189E9A980123C36 /* ControlTabPressurePanelDelays.swift in Sources */ = {isa = PBXBuildFile; fileRef = 506B3B51A1F4912F52089CEA /* ControlTabPressurePanelDelays.swift */; };
+		5DAAA1F89D9FCED160DAB6B0 /* ControlTabPressurePanelGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4198F97C688DA2AEE27DFDC /* ControlTabPressurePanelGeometry.swift */; };
+		1CC0B8495D3698A055C5BBD5 /* ControlTabPressurePanelOperations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C181B73C9E24EC847D8779F /* ControlTabPressurePanelOperations.swift */; };
+		3766D77165A1F7A560231362 /* ControlTabPressurePanelPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40AF2BE10F9B609F096225B5 /* ControlTabPressurePanelPresentation.swift */; };
+		1EE8B77ED3FC5D1875BE941C /* ControlTabPressureRenderEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50E774803ECE33E25F23032A /* ControlTabPressureRenderEvent.swift */; };
+		D567BA87E9CBF401F7079629 /* ControlTabPressurePreviewMeasurements.swift in Sources */ = {isa = PBXBuildFile; fileRef = 578F32CB798C80E7B27603A0 /* ControlTabPressurePreviewMeasurements.swift */; };
+		D7382C16A3C8F844D247916F /* SwitcherPanelController+SessionTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F8DC8B478178E38E64C4076 /* SwitcherPanelController+SessionTypes.swift */; };
+		7BC961171885ECB8FA5AB294 /* SwitcherPanelRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E0EB666E39CCC4DD1C498B /* SwitcherPanelRootView.swift */; };
+		E8414B710CCD2C2DDF931E01 /* SwitcherSessionResources.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2CD511F28838AC66437FCB0 /* SwitcherSessionResources.swift */; };
+		A671695C5C3E4FD2A1D76250 /* ControlTabPressureSessionResources.swift in Sources */ = {isa = PBXBuildFile; fileRef = C06ABB5E63776ADA560DDED6 /* ControlTabPressureSessionResources.swift */; };
+		2B6E9F9DB89A982E27B50DFB /* ControlTabPressureLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35CC6DE7ECB32FE766B22218 /* ControlTabPressureLifecycleTests.swift */; };
+		A8CD91F3D12AE281F973A051 /* ControlTabPressurePreviewCompletionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAF74C9A8BC45A77B82104F2 /* ControlTabPressurePreviewCompletionTests.swift */; };
+		3A4495DB6723E3D878BADD7D /* SwitcherTestingDiagnosticsSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9D5C37497D3DDDA7965B78B /* SwitcherTestingDiagnosticsSummary.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -833,6 +934,7 @@
 		F6E7E00135C2000100B0D737 /* RuntimeProjectionRepairProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionRepairProvider.swift; sourceTree = "<group>"; };
 		F6E7E50135C5000200B0D737 /* RuntimeProjectionRepairContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionRepairContract.swift; sourceTree = "<group>"; };
 		F6E7E40135C5000100B0D737 /* RuntimeProjectionRepairFactSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionRepairFactSource.swift; sourceTree = "<group>"; };
+		C7F0003B3F30000100B0D737 /* RuntimeFocusedRepairDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeFocusedRepairDiagnostics.swift; sourceTree = "<group>"; };
 		D10000082FF500400B0D737 /* RuntimeProjectionRepairFactProviding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionRepairFactProviding.swift; sourceTree = "<group>"; };
 		F6E7D00135C1000100B0D737 /* RuntimeProjectionDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionDiagnostics.swift; sourceTree = "<group>"; };
 		F6E7E10135C3000100B0D737 /* RuntimeProjectionReconciliationDrainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionReconciliationDrainer.swift; sourceTree = "<group>"; };
@@ -1389,6 +1491,36 @@
 		C0D1000F3E10000100B0D737 /* FlowTabUITests+AppPanelPressureConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+AppPanelPressureConfiguration.swift"; sourceTree = "<group>"; };
 		C0D100073E10000100B0D737 /* FlowTabUITests+AppPanelPressureInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+AppPanelPressureInteraction.swift"; sourceTree = "<group>"; };
 		C0D100053E10000100B0D737 /* FlowTabTests+AppPanelPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+AppPanelPressure.swift"; sourceTree = "<group>"; };
+		C7F000013F30000100B0D737 /* FocusedWindowSessionDiagnostic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusedWindowSessionDiagnostic.swift; sourceTree = "<group>"; };
+		C7F000033F30000100B0D737 /* ControlTabPressureMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureMetrics.swift; sourceTree = "<group>"; };
+		C7F000053F30000100B0D737 /* ControlTabPressureCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureCommand.swift; sourceTree = "<group>"; };
+		C7F000073F30000100B0D737 /* ControlTabPressureEvidenceDelivery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureEvidenceDelivery.swift; sourceTree = "<group>"; };
+		C7F000093F30000100B0D737 /* ControlTabPressureObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureObservation.swift; sourceTree = "<group>"; };
+		C7F0000B3F30000100B0D737 /* ControlTabPressureBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureBootstrap.swift; sourceTree = "<group>"; };
+		C7F0000D3F30000100B0D737 /* FlowTabTests+ControlTabPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+ControlTabPressure.swift"; sourceTree = "<group>"; };
+		C7F0000F3F30000100B0D737 /* FlowTabUITests+ControlTabPressureConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ControlTabPressureConfiguration.swift"; sourceTree = "<group>"; };
+		C7F000113F30000100B0D737 /* FlowTabUITests+ControlTabPressureTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ControlTabPressureTransport.swift"; sourceTree = "<group>"; };
+		C7F000133F30000100B0D737 /* FlowTabUITests+ControlTabPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ControlTabPressure.swift"; sourceTree = "<group>"; };
+		C7F000423F30000100B0D737 /* FlowTabUITests+ControlTabPhysicalPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ControlTabPhysicalPressure.swift"; sourceTree = "<group>"; };
+		C7F000153F30000100B0D737 /* SpaceFixtureWindowMutationPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWindowMutationPressure.swift; sourceTree = "<group>"; };
+		C7F000173F30000100B0D737 /* SpaceFixtureWindowMutationPressureOwner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWindowMutationPressureOwner.swift; sourceTree = "<group>"; };
+		C7F0001F3F30000100B0D737 /* FlowTabUITests+ControlTabPressureSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ControlTabPressureSupport.swift"; sourceTree = "<group>"; };
+		C7F000213F30000100B0D737 /* FlowTabUITests+ControlTabMutationTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ControlTabMutationTransport.swift"; sourceTree = "<group>"; };
+		C7F000233F30000100B0D737 /* FlowTabUITests+ControlTabMutationPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ControlTabMutationPressure.swift"; sourceTree = "<group>"; };
+		C7F000253F30000100B0D737 /* FlowTabUITests+ControlTabTopologyPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ControlTabTopologyPressure.swift"; sourceTree = "<group>"; };
+		C7F000273F30000100B0D737 /* SpaceFixtureWindowCoordinator+MutationPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SpaceFixtureWindowCoordinator+MutationPressure.swift"; sourceTree = "<group>"; };
+		C7F000313F30000100B0D737 /* SwitcherInteractionDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherInteractionDiagnostics.swift; sourceTree = "<group>"; };
+		C7F000333F30000100B0D737 /* ControlTabPressureSpans.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureSpans.swift; sourceTree = "<group>"; };
+		C7F000353F30000100B0D737 /* FlowTabUITests+ControlTabPressureMetricsRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ControlTabPressureMetricsRecorder.swift"; sourceTree = "<group>"; };
+		C7F000373F30000100B0D737 /* FlowTabTests+ControlTabPressureSpans.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+ControlTabPressureSpans.swift"; sourceTree = "<group>"; };
+		C7F000393F30000100B0D737 /* ControlTabPressureActivationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureActivationCoordinator.swift; sourceTree = "<group>"; };
+		C7F0003D3F30000100B0D737 /* ControlTabPressureSpanContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureSpanContract.swift; sourceTree = "<group>"; };
+		C7F0003F3F30000100B0D737 /* ControlTabPressureEvidenceAssembler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureEvidenceAssembler.swift; sourceTree = "<group>"; };
+		C7F000413F30000100B0D737 /* ControlTabPressureSelectionRenderExpectation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureSelectionRenderExpectation.swift; sourceTree = "<group>"; };
+		C7F000453F30000100B0D737 /* RuntimeProcessDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProcessDiagnostics.swift; sourceTree = "<group>"; };
+		C7F000473F30000100B0D737 /* RuntimeWindowPreviewCaptureDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowPreviewCaptureDiagnostics.swift; sourceTree = "<group>"; };
+		C7F0004B3F30000100B0D737 /* ControlTabPressureSpans+FocusedRepair.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressureSpans+FocusedRepair.swift"; sourceTree = "<group>"; };
+		C7F0004D3F30000100B0D737 /* FlowTabTests+RuntimePreviewCaptureDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimePreviewCaptureDiagnostics.swift"; sourceTree = "<group>"; };
 		A44600013D4E000100B0D737 /* FlowTabUITests+ScrollingSupportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ScrollingSupportTests.swift"; sourceTree = "<group>"; };
 		A44600033D4E000100B0D737 /* FlowTabUITests+ScrollingHittableElementObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ScrollingHittableElementObservation.swift"; sourceTree = "<group>"; };
 		A44700013D4F000100B0D737 /* FlowTabUITests+ScrollingElementVisibilityObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ScrollingElementVisibilityObservation.swift"; sourceTree = "<group>"; };
@@ -1497,6 +1629,72 @@
 		F6E7B20935AC000100B0D737 /* RuntimeWindowRecordStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowRecordStore.swift; sourceTree = "<group>"; };
 		F7A1000135B7000100B0D737 /* SigningDefaults.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = SigningDefaults.xcconfig; sourceTree = "<group>"; };
 		F7A1000235B7000100B0D737 /* LocalSigning.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "LocalSigning.example.xcconfig"; sourceTree = "<group>"; };
+		29CA34AAF6F05885987B5D7A /* ControlTabPressureModelDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureModelDiagnostics.swift; sourceTree = "<group>"; };
+		967E5A815C5A4CF64F83CE1A /* ControlTabPressurePanelDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressurePanelDiagnostics.swift; sourceTree = "<group>"; };
+		62BDEB78317150AB928C7004 /* ControlTabPressureRenderProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureRenderProbe.swift; sourceTree = "<group>"; };
+		5C2F1CC8D66FA6504E00C950 /* RuntimeFocusedWindowFactCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeFocusedWindowFactCollector.swift; sourceTree = "<group>"; };
+		9D6213B553273AA81F11286C /* RuntimePreviewImageProcessor+TitleBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimePreviewImageProcessor+TitleBar.swift"; sourceTree = "<group>"; };
+		B9FFDF12D4F925A89EE63BB7 /* RuntimePreviewImageProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimePreviewImageProcessor.swift; sourceTree = "<group>"; };
+		61BCDBEA1957297E5EA06173 /* RuntimeProjectionDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionDependencies.swift; sourceTree = "<group>"; };
+		647673D24B6CF93F59717B74 /* RuntimeWindowEntryProjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowEntryProjector.swift; sourceTree = "<group>"; };
+		35B4CC0F6B5293F3358F074C /* RuntimeWindowImageCapturer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowImageCapturer.swift; sourceTree = "<group>"; };
+		AFFD0EC8E315DA15AF3DD116 /* RuntimeWindowPreviewCaptureBatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowPreviewCaptureBatch.swift; sourceTree = "<group>"; };
+		89C87EFC9C0144571CDCADD8 /* ScreenCapturePermissionChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCapturePermissionChecker.swift; sourceTree = "<group>"; };
+		325845618EAF64021F533286 /* ControlTabPressureFactDecorators.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureFactDecorators.swift; sourceTree = "<group>"; };
+		3B74A24FCC5FACDCBFC9C55D /* ControlTabPressurePreviewDecorators.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressurePreviewDecorators.swift; sourceTree = "<group>"; };
+		226AD720D64ACEA08058B662 /* RuntimeWindowPreviewProvider+Testing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeWindowPreviewProvider+Testing.swift"; sourceTree = "<group>"; };
+		CF23AB343962D59197855F1C /* SwitcherPanelContentBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelContentBuilder.swift; sourceTree = "<group>"; };
+		374A181FA6DAA13C473EC074 /* SwitcherSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherSessionState.swift; sourceTree = "<group>"; };
+		F7C88E777EE05D6D60EBB2B7 /* WindowActivating.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowActivating.swift; sourceTree = "<group>"; };
+		C35287687A0703F72A58A711 /* ControlTabPressureAttachments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureAttachments.swift; sourceTree = "<group>"; };
+		826C16656FB98CAF12E0003F /* ControlTabPressureContentBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureContentBuilder.swift; sourceTree = "<group>"; };
+		7C3564760D8ADDD25E239A00 /* ControlTabPressureRun.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureRun.swift; sourceTree = "<group>"; };
+		E776FE1D72DDE75211EB27CC /* ControlTabPressureSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureSessionState.swift; sourceTree = "<group>"; };
+		6BE0973EBC7B67CBA612A616 /* ControlTabPressureWindowActivator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlTabPressureWindowActivator.swift; sourceTree = "<group>"; };
+		4EF0D146C5B85283708558D8 /* LiveSwitcherModel+PreviewState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+PreviewState.swift"; sourceTree = "<group>"; };
+		03BD37D4BBA3F8EB157FE2B4 /* LiveSwitcherModel+SessionTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+SessionTypes.swift"; sourceTree = "<group>"; };
+		BBDB069EE0063AC8EE73CF80 /* PendingPreviewCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PendingPreviewCapture.swift"; sourceTree = "<group>"; };
+		00A2821BF4B3023C2CD49D27 /* SwitcherPreviewPublication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPreviewPublication.swift"; sourceTree = "<group>"; };
+		6D1A5428A62C9C634D073079 /* SwitcherPreviewSession+Batch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPreviewSession+Batch.swift"; sourceTree = "<group>"; };
+		51F69438840582FE3447BFC1 /* SwitcherPreviewSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPreviewSession.swift"; sourceTree = "<group>"; };
+		FC6F221DFF2685A2BCCFF330 /* SwitcherPreviewStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPreviewStorage.swift"; sourceTree = "<group>"; };
+		6A8842A1BC717AD4A72C35F3 /* SwitcherPreviewSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPreviewSupport.swift"; sourceTree = "<group>"; };
+		179A8479C994B9A00BABB588 /* ControlTabPressurePreviewSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressurePreviewSession.swift"; sourceTree = "<group>"; };
+		578D0BFB198EDF2EB2FA2575 /* ControlTabPressureDecoratorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressureDecoratorTests.swift"; sourceTree = "<group>"; };
+		8AAFCC6DB97E2C56FFC13789 /* SwitcherPreviewCaptureBatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPreviewCaptureBatch.swift"; sourceTree = "<group>"; };
+		370E6488521C84DE9C43A5AD /* ControlTabPressurePreviewBatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressurePreviewBatch.swift"; sourceTree = "<group>"; };
+		1D6D69BBCFE5C159CEB10E18 /* SwitcherPreviewPlanner+Plan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPreviewPlanner+Plan.swift"; sourceTree = "<group>"; };
+		47A9395002628E327548F234 /* SwitcherPreviewPlanner+Resolution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPreviewPlanner+Resolution.swift"; sourceTree = "<group>"; };
+		DDF186859DC05D1CAF28A7EC /* SwitcherPreviewPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPreviewPlanner.swift"; sourceTree = "<group>"; };
+		82A37253950EB421BA5C5D60 /* ControlTabPressurePreviewPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressurePreviewPlanner.swift"; sourceTree = "<group>"; };
+		5B29B3CA94421809EFF36492 /* SwitcherFocusedWindowSessionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherFocusedWindowSessionCoordinator.swift"; sourceTree = "<group>"; };
+		90205FC4B6765EF938F081C5 /* SwitcherFocusedWindowSessionInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherFocusedWindowSessionInstaller.swift"; sourceTree = "<group>"; };
+		D15B9E989EF84105C4D873A4 /* SwitcherPanelAccessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelAccessibility.swift"; sourceTree = "<group>"; };
+		7851FB926E9B085282C56080 /* SwitcherPanelDelayedOperations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelDelayedOperations.swift"; sourceTree = "<group>"; };
+		F1EF0A9086443BBB5B341556 /* SwitcherPanelEventMonitoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelEventMonitoring.swift"; sourceTree = "<group>"; };
+		F5F836FE540B38918A288CC1 /* SwitcherPanelGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelGeometry.swift"; sourceTree = "<group>"; };
+		B62BDBF6416B24D3C89AD156 /* SwitcherPanelPresentationCoordinator+FocusedSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelPresentationCoordinator+FocusedSession.swift"; sourceTree = "<group>"; };
+		2E890F93F88CD91B61C48A5F /* SwitcherPanelPresentationCoordinator+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelPresentationCoordinator+Presentation.swift"; sourceTree = "<group>"; };
+		F2D5648A48FF1C92011C6E6E /* SwitcherPanelPresentationCoordinator+Teardown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelPresentationCoordinator+Teardown.swift"; sourceTree = "<group>"; };
+		583CED85BEE4F52E65C74EFD /* SwitcherPanelPresentationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelPresentationCoordinator.swift"; sourceTree = "<group>"; };
+		0C8A3BB762AD6B294ACF4F6D /* SwitcherPanelWindowOperations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelWindowOperations.swift"; sourceTree = "<group>"; };
+		941D8641F973FE2188112A00 /* SwitcherReusablePanelShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherReusablePanelShell.swift"; sourceTree = "<group>"; };
+		CA9C027B4EC38BB7920F2898 /* ControlTabPressureFocusedSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressureFocusedSession.swift"; sourceTree = "<group>"; };
+		779D718B42D01859AE1F19DE /* ControlTabPressureHotkeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressureHotkeyMonitor.swift"; sourceTree = "<group>"; };
+		339E1B9CDB4DCE015D60E62B /* ControlTabPressurePanelAssembly.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressurePanelAssembly.swift"; sourceTree = "<group>"; };
+		506B3B51A1F4912F52089CEA /* ControlTabPressurePanelDelays.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressurePanelDelays.swift"; sourceTree = "<group>"; };
+		C4198F97C688DA2AEE27DFDC /* ControlTabPressurePanelGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressurePanelGeometry.swift"; sourceTree = "<group>"; };
+		5C181B73C9E24EC847D8779F /* ControlTabPressurePanelOperations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressurePanelOperations.swift"; sourceTree = "<group>"; };
+		40AF2BE10F9B609F096225B5 /* ControlTabPressurePanelPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressurePanelPresentation.swift"; sourceTree = "<group>"; };
+		50E774803ECE33E25F23032A /* ControlTabPressureRenderEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressureRenderEvent.swift"; sourceTree = "<group>"; };
+		578F32CB798C80E7B27603A0 /* ControlTabPressurePreviewMeasurements.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressurePreviewMeasurements.swift"; sourceTree = "<group>"; };
+		7F8DC8B478178E38E64C4076 /* SwitcherPanelController+SessionTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+SessionTypes.swift"; sourceTree = "<group>"; };
+		29E0EB666E39CCC4DD1C498B /* SwitcherPanelRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelRootView.swift"; sourceTree = "<group>"; };
+		A2CD511F28838AC66437FCB0 /* SwitcherSessionResources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherSessionResources.swift"; sourceTree = "<group>"; };
+		C06ABB5E63776ADA560DDED6 /* ControlTabPressureSessionResources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressureSessionResources.swift"; sourceTree = "<group>"; };
+		35CC6DE7ECB32FE766B22218 /* ControlTabPressureLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressureLifecycleTests.swift"; sourceTree = "<group>"; };
+		DAF74C9A8BC45A77B82104F2 /* ControlTabPressurePreviewCompletionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ControlTabPressurePreviewCompletionTests.swift"; sourceTree = "<group>"; };
+		D9D5C37497D3DDDA7965B78B /* SwitcherTestingDiagnosticsSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherTestingDiagnosticsSummary.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1580,7 +1778,13 @@
 		4A6DAE7E2F727AF600B0D737 /* FlowTabTests */ = {
 			isa = PBXGroup;
 			children = (
+				35CC6DE7ECB32FE766B22218 /* ControlTabPressureLifecycleTests.swift */,
+				DAF74C9A8BC45A77B82104F2 /* ControlTabPressurePreviewCompletionTests.swift */,
+				578D0BFB198EDF2EB2FA2575 /* ControlTabPressureDecoratorTests.swift */,
 				4A6DAE7F2F727AF600B0D737 /* FlowTabTests.swift */,
+				C7F0000D3F30000100B0D737 /* FlowTabTests+ControlTabPressure.swift */,
+				C7F000373F30000100B0D737 /* FlowTabTests+ControlTabPressureSpans.swift */,
+				C7F0004D3F30000100B0D737 /* FlowTabTests+RuntimePreviewCaptureDiagnostics.swift */,
 				A8A000043F10000100B0D737 /* FlowTabTests+SparkleUpdates.swift */,
 				B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */,
 				B10001022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift */,
@@ -1760,6 +1964,15 @@
 			isa = PBXGroup;
 			children = (
 				4A6DAE892F727AF600B0D737 /* FlowTabUITests.swift */,
+				C7F000133F30000100B0D737 /* FlowTabUITests+ControlTabPressure.swift */,
+				C7F000423F30000100B0D737 /* FlowTabUITests+ControlTabPhysicalPressure.swift */,
+				C7F0000F3F30000100B0D737 /* FlowTabUITests+ControlTabPressureConfiguration.swift */,
+				C7F000353F30000100B0D737 /* FlowTabUITests+ControlTabPressureMetricsRecorder.swift */,
+				C7F000233F30000100B0D737 /* FlowTabUITests+ControlTabMutationPressure.swift */,
+				C7F000213F30000100B0D737 /* FlowTabUITests+ControlTabMutationTransport.swift */,
+				C7F0001F3F30000100B0D737 /* FlowTabUITests+ControlTabPressureSupport.swift */,
+				C7F000113F30000100B0D737 /* FlowTabUITests+ControlTabPressureTransport.swift */,
+				C7F000253F30000100B0D737 /* FlowTabUITests+ControlTabTopologyPressure.swift */,
 				C0D100033E10000100B0D737 /* FlowTabUITests+AppPanelPressure.swift */,
 				C0D1000F3E10000100B0D737 /* FlowTabUITests+AppPanelPressureConfiguration.swift */,
 				C0D100073E10000100B0D737 /* FlowTabUITests+AppPanelPressureInteraction.swift */,
@@ -2069,6 +2282,35 @@
 		F10000032F74000100B0D737 /* Switcher */ = {
 			isa = PBXGroup;
 			children = (
+				A2CD511F28838AC66437FCB0 /* SwitcherSessionResources.swift */,
+				29E0EB666E39CCC4DD1C498B /* SwitcherPanelRootView.swift */,
+				7F8DC8B478178E38E64C4076 /* SwitcherPanelController+SessionTypes.swift */,
+				941D8641F973FE2188112A00 /* SwitcherReusablePanelShell.swift */,
+				0C8A3BB762AD6B294ACF4F6D /* SwitcherPanelWindowOperations.swift */,
+				583CED85BEE4F52E65C74EFD /* SwitcherPanelPresentationCoordinator.swift */,
+				F2D5648A48FF1C92011C6E6E /* SwitcherPanelPresentationCoordinator+Teardown.swift */,
+				2E890F93F88CD91B61C48A5F /* SwitcherPanelPresentationCoordinator+Presentation.swift */,
+				B62BDBF6416B24D3C89AD156 /* SwitcherPanelPresentationCoordinator+FocusedSession.swift */,
+				F5F836FE540B38918A288CC1 /* SwitcherPanelGeometry.swift */,
+				F1EF0A9086443BBB5B341556 /* SwitcherPanelEventMonitoring.swift */,
+				7851FB926E9B085282C56080 /* SwitcherPanelDelayedOperations.swift */,
+				D15B9E989EF84105C4D873A4 /* SwitcherPanelAccessibility.swift */,
+				90205FC4B6765EF938F081C5 /* SwitcherFocusedWindowSessionInstaller.swift */,
+				5B29B3CA94421809EFF36492 /* SwitcherFocusedWindowSessionCoordinator.swift */,
+				DDF186859DC05D1CAF28A7EC /* SwitcherPreviewPlanner.swift */,
+				47A9395002628E327548F234 /* SwitcherPreviewPlanner+Resolution.swift */,
+				1D6D69BBCFE5C159CEB10E18 /* SwitcherPreviewPlanner+Plan.swift */,
+				8AAFCC6DB97E2C56FFC13789 /* SwitcherPreviewCaptureBatch.swift */,
+				6A8842A1BC717AD4A72C35F3 /* SwitcherPreviewSupport.swift */,
+				FC6F221DFF2685A2BCCFF330 /* SwitcherPreviewStorage.swift */,
+				51F69438840582FE3447BFC1 /* SwitcherPreviewSession.swift */,
+				6D1A5428A62C9C634D073079 /* SwitcherPreviewSession+Batch.swift */,
+				00A2821BF4B3023C2CD49D27 /* SwitcherPreviewPublication.swift */,
+				BBDB069EE0063AC8EE73CF80 /* PendingPreviewCapture.swift */,
+				03BD37D4BBA3F8EB157FE2B4 /* LiveSwitcherModel+SessionTypes.swift */,
+				4EF0D146C5B85283708558D8 /* LiveSwitcherModel+PreviewState.swift */,
+				374A181FA6DAA13C473EC074 /* SwitcherSessionState.swift */,
+				CF23AB343962D59197855F1C /* SwitcherPanelContentBuilder.swift */,
 				A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */,
 				BEEF00013F01000100B0D737 /* SwitcherHotkeyModel.swift */,
 				BEEF00073F01000100B0D737 /* HotkeyChordEventMonitor.swift */,
@@ -2145,6 +2387,15 @@
 		F10000052F74000100B0D737 /* Runtime */ = {
 			isa = PBXGroup;
 			children = (
+				F7C88E777EE05D6D60EBB2B7 /* WindowActivating.swift */,
+				89C87EFC9C0144571CDCADD8 /* ScreenCapturePermissionChecker.swift */,
+				AFFD0EC8E315DA15AF3DD116 /* RuntimeWindowPreviewCaptureBatch.swift */,
+				35B4CC0F6B5293F3358F074C /* RuntimeWindowImageCapturer.swift */,
+				647673D24B6CF93F59717B74 /* RuntimeWindowEntryProjector.swift */,
+				61BCDBEA1957297E5EA06173 /* RuntimeProjectionDependencies.swift */,
+				B9FFDF12D4F925A89EE63BB7 /* RuntimePreviewImageProcessor.swift */,
+				9D6213B553273AA81F11286C /* RuntimePreviewImageProcessor+TitleBar.swift */,
+				5C2F1CC8D66FA6504E00C950 /* RuntimeFocusedWindowFactCollector.swift */,
 				A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */,
 				A1B2C4302F73000100B0D737 /* AccessibilityPermissionChecker.swift */,
 				A1B2C4312F73000100B0D737 /* SystemAppMRUTracker.swift */,
@@ -2237,7 +2488,48 @@
 		F10000062F74000100B0D737 /* TestingSupport */ = {
 			isa = PBXGroup;
 			children = (
+				D9D5C37497D3DDDA7965B78B /* SwitcherTestingDiagnosticsSummary.swift */,
+				C06ABB5E63776ADA560DDED6 /* ControlTabPressureSessionResources.swift */,
+				578F32CB798C80E7B27603A0 /* ControlTabPressurePreviewMeasurements.swift */,
+				50E774803ECE33E25F23032A /* ControlTabPressureRenderEvent.swift */,
+				40AF2BE10F9B609F096225B5 /* ControlTabPressurePanelPresentation.swift */,
+				5C181B73C9E24EC847D8779F /* ControlTabPressurePanelOperations.swift */,
+				C4198F97C688DA2AEE27DFDC /* ControlTabPressurePanelGeometry.swift */,
+				506B3B51A1F4912F52089CEA /* ControlTabPressurePanelDelays.swift */,
+				339E1B9CDB4DCE015D60E62B /* ControlTabPressurePanelAssembly.swift */,
+				779D718B42D01859AE1F19DE /* ControlTabPressureHotkeyMonitor.swift */,
+				CA9C027B4EC38BB7920F2898 /* ControlTabPressureFocusedSession.swift */,
+				82A37253950EB421BA5C5D60 /* ControlTabPressurePreviewPlanner.swift */,
+				370E6488521C84DE9C43A5AD /* ControlTabPressurePreviewBatch.swift */,
+				179A8479C994B9A00BABB588 /* ControlTabPressurePreviewSession.swift */,
+				6BE0973EBC7B67CBA612A616 /* ControlTabPressureWindowActivator.swift */,
+				E776FE1D72DDE75211EB27CC /* ControlTabPressureSessionState.swift */,
+				7C3564760D8ADDD25E239A00 /* ControlTabPressureRun.swift */,
+				826C16656FB98CAF12E0003F /* ControlTabPressureContentBuilder.swift */,
+				C35287687A0703F72A58A711 /* ControlTabPressureAttachments.swift */,
+				226AD720D64ACEA08058B662 /* RuntimeWindowPreviewProvider+Testing.swift */,
+				3B74A24FCC5FACDCBFC9C55D /* ControlTabPressurePreviewDecorators.swift */,
+				325845618EAF64021F533286 /* ControlTabPressureFactDecorators.swift */,
+				62BDEB78317150AB928C7004 /* ControlTabPressureRenderProbe.swift */,
+				967E5A815C5A4CF64F83CE1A /* ControlTabPressurePanelDiagnostics.swift */,
+				29CA34AAF6F05885987B5D7A /* ControlTabPressureModelDiagnostics.swift */,
+				C7F000013F30000100B0D737 /* FocusedWindowSessionDiagnostic.swift */,
+				C7F000313F30000100B0D737 /* SwitcherInteractionDiagnostics.swift */,
+				C7F0003B3F30000100B0D737 /* RuntimeFocusedRepairDiagnostics.swift */,
+				C7F000453F30000100B0D737 /* RuntimeProcessDiagnostics.swift */,
+				C7F000473F30000100B0D737 /* RuntimeWindowPreviewCaptureDiagnostics.swift */,
 				E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */,
+				C7F000393F30000100B0D737 /* ControlTabPressureActivationCoordinator.swift */,
+				C7F0000B3F30000100B0D737 /* ControlTabPressureBootstrap.swift */,
+				C7F000053F30000100B0D737 /* ControlTabPressureCommand.swift */,
+				C7F000073F30000100B0D737 /* ControlTabPressureEvidenceDelivery.swift */,
+				C7F0003F3F30000100B0D737 /* ControlTabPressureEvidenceAssembler.swift */,
+				C7F000033F30000100B0D737 /* ControlTabPressureMetrics.swift */,
+				C7F000093F30000100B0D737 /* ControlTabPressureObservation.swift */,
+				C7F000413F30000100B0D737 /* ControlTabPressureSelectionRenderExpectation.swift */,
+				C7F0003D3F30000100B0D737 /* ControlTabPressureSpanContract.swift */,
+				C7F000333F30000100B0D737 /* ControlTabPressureSpans.swift */,
+				C7F0004B3F30000100B0D737 /* ControlTabPressureSpans+FocusedRepair.swift */,
 				C0D100093E10000100B0D737 /* AppPanelPressureCommandTransport.swift */,
 				C0D1000B3E10000100B0D737 /* AppPanelPressureEvidence.swift */,
 				C0D1000D3E10000100B0D737 /* AppPanelPressureEvidenceDelivery.swift */,
@@ -2414,6 +2706,9 @@
 		F50000112F90000100B0D737 /* FlowTabSpaceFixture */ = {
 			isa = PBXGroup;
 			children = (
+				C7F000153F30000100B0D737 /* SpaceFixtureWindowMutationPressure.swift */,
+				C7F000173F30000100B0D737 /* SpaceFixtureWindowMutationPressureOwner.swift */,
+				C7F000273F30000100B0D737 /* SpaceFixtureWindowCoordinator+MutationPressure.swift */,
 				F50000022F90000100B0D737 /* FlowTabSpaceFixtureApp.swift */,
 				F50000032F90000100B0D737 /* SpaceFixtureAppDelegate.swift */,
 				F50000042F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift */,
@@ -2618,6 +2913,82 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3A4495DB6723E3D878BADD7D /* SwitcherTestingDiagnosticsSummary.swift in Sources */,
+				A671695C5C3E4FD2A1D76250 /* ControlTabPressureSessionResources.swift in Sources */,
+				E8414B710CCD2C2DDF931E01 /* SwitcherSessionResources.swift in Sources */,
+				7BC961171885ECB8FA5AB294 /* SwitcherPanelRootView.swift in Sources */,
+				D7382C16A3C8F844D247916F /* SwitcherPanelController+SessionTypes.swift in Sources */,
+				D567BA87E9CBF401F7079629 /* ControlTabPressurePreviewMeasurements.swift in Sources */,
+				1EE8B77ED3FC5D1875BE941C /* ControlTabPressureRenderEvent.swift in Sources */,
+				3766D77165A1F7A560231362 /* ControlTabPressurePanelPresentation.swift in Sources */,
+				1CC0B8495D3698A055C5BBD5 /* ControlTabPressurePanelOperations.swift in Sources */,
+				5DAAA1F89D9FCED160DAB6B0 /* ControlTabPressurePanelGeometry.swift in Sources */,
+				AE5D3A22F189E9A980123C36 /* ControlTabPressurePanelDelays.swift in Sources */,
+				FA48F57FC41C2B32753AC0D4 /* ControlTabPressurePanelAssembly.swift in Sources */,
+				5F4A2C6DC84AE4A0B946C52B /* ControlTabPressureHotkeyMonitor.swift in Sources */,
+				4920ED2F4A6015A74828DDD0 /* ControlTabPressureFocusedSession.swift in Sources */,
+				9ABE0F46AEC60DCB4BEB5519 /* SwitcherReusablePanelShell.swift in Sources */,
+				B4B7B24F4114CC6509DC6271 /* SwitcherPanelWindowOperations.swift in Sources */,
+				537982E141F472B73D20B20F /* SwitcherPanelPresentationCoordinator.swift in Sources */,
+				30F1217E8C41B0A73719B004 /* SwitcherPanelPresentationCoordinator+Teardown.swift in Sources */,
+				2BE53E707DE595E08A01415A /* SwitcherPanelPresentationCoordinator+Presentation.swift in Sources */,
+				29D010F660EAE7F4A5B4CB38 /* SwitcherPanelPresentationCoordinator+FocusedSession.swift in Sources */,
+				89D5D369216AEFBB18191D81 /* SwitcherPanelGeometry.swift in Sources */,
+				A04971C50125530245070C82 /* SwitcherPanelEventMonitoring.swift in Sources */,
+				5282202D05D5481208361AD2 /* SwitcherPanelDelayedOperations.swift in Sources */,
+				1B9B045586DB75910E4EC703 /* SwitcherPanelAccessibility.swift in Sources */,
+				817E218B3A09AA2004772AD7 /* SwitcherFocusedWindowSessionInstaller.swift in Sources */,
+				5C09565B177D57B8A70A8E4F /* SwitcherFocusedWindowSessionCoordinator.swift in Sources */,
+				89CAFE9171C60F79594D0183 /* ControlTabPressurePreviewPlanner.swift in Sources */,
+				515C90D2D59D49A8405876C2 /* SwitcherPreviewPlanner.swift in Sources */,
+				83BB52AC38D279038B5DB895 /* SwitcherPreviewPlanner+Resolution.swift in Sources */,
+				8419CF272B9CA4189BFA0059 /* SwitcherPreviewPlanner+Plan.swift in Sources */,
+				280243C782AE504F26A281DE /* ControlTabPressurePreviewBatch.swift in Sources */,
+				FADE7EDE966E2E19C3D99210 /* SwitcherPreviewCaptureBatch.swift in Sources */,
+				9DB99DC955436F810F79EBEF /* ControlTabPressurePreviewSession.swift in Sources */,
+				B449CFD0AF3D8E85BDB39BD1 /* SwitcherPreviewSupport.swift in Sources */,
+				5D61F9D3CA529D7486BD1EC7 /* SwitcherPreviewStorage.swift in Sources */,
+				87F587519E25228AAC71CE55 /* SwitcherPreviewSession.swift in Sources */,
+				C95A80C36CB80BA7B50B2786 /* SwitcherPreviewSession+Batch.swift in Sources */,
+				54ED81CC9FF002E9D48C4F0C /* SwitcherPreviewPublication.swift in Sources */,
+				994B0B4ACF7A51B632FEC9D5 /* PendingPreviewCapture.swift in Sources */,
+				D3C125979F04DCA3821FA1D5 /* LiveSwitcherModel+SessionTypes.swift in Sources */,
+				AC0EA9F2FF322B8E9CB5BF23 /* LiveSwitcherModel+PreviewState.swift in Sources */,
+				3C1B41CE8F22EBC8EDE567ED /* ControlTabPressureWindowActivator.swift in Sources */,
+				FA186150BA26F115F1F1EAFF /* ControlTabPressureSessionState.swift in Sources */,
+				98C1A6853DE58DDEAC611F2B /* ControlTabPressureRun.swift in Sources */,
+				FE6C465E5B4B8CC919F8304F /* ControlTabPressureContentBuilder.swift in Sources */,
+				2947BAB5BD2F862DF46C356D /* ControlTabPressureAttachments.swift in Sources */,
+				8BB3BAE0D1552315B5FBEBD0 /* WindowActivating.swift in Sources */,
+				6789FE958C8929183F4677B8 /* SwitcherSessionState.swift in Sources */,
+				0DA9F9B378D32CBF5B15E231 /* SwitcherPanelContentBuilder.swift in Sources */,
+				7B23E13C929FA22BC81DDD52 /* RuntimeWindowPreviewProvider+Testing.swift in Sources */,
+				259825D72C64D55BF746761B /* ControlTabPressurePreviewDecorators.swift in Sources */,
+				2C1335B39EE76EE90407F53A /* ControlTabPressureFactDecorators.swift in Sources */,
+				723AFFE86B441F790C5000CE /* ScreenCapturePermissionChecker.swift in Sources */,
+				D4C78C17DE981A7511244B0C /* RuntimeWindowPreviewCaptureBatch.swift in Sources */,
+				92797E9DA316C1EE25FD93A0 /* RuntimeWindowImageCapturer.swift in Sources */,
+				C78585381FB692E816E97A1B /* RuntimeWindowEntryProjector.swift in Sources */,
+				72F7AF255809BE72CB4113ED /* RuntimeProjectionDependencies.swift in Sources */,
+				9D9EEB9BCA9AE5B1AFAB855E /* RuntimePreviewImageProcessor.swift in Sources */,
+				2CF02D7934B4C7A43E70C06C /* RuntimePreviewImageProcessor+TitleBar.swift in Sources */,
+				4153F00B3CBF8D052F9E39C2 /* RuntimeFocusedWindowFactCollector.swift in Sources */,
+				6A265F6CE1D7990E6014FD11 /* ControlTabPressureRenderProbe.swift in Sources */,
+				CF7D38EBFAA5C6E3805CFBE4 /* ControlTabPressurePanelDiagnostics.swift in Sources */,
+				86749C35623114A929EDC62F /* ControlTabPressureModelDiagnostics.swift in Sources */,
+				C7F000023F30000100B0D737 /* FocusedWindowSessionDiagnostic.swift in Sources */,
+				C7F000303F30000100B0D737 /* SwitcherInteractionDiagnostics.swift in Sources */,
+				C7F000383F30000100B0D737 /* ControlTabPressureActivationCoordinator.swift in Sources */,
+				C7F000043F30000100B0D737 /* ControlTabPressureMetrics.swift in Sources */,
+				C7F000063F30000100B0D737 /* ControlTabPressureCommand.swift in Sources */,
+				C7F000083F30000100B0D737 /* ControlTabPressureEvidenceDelivery.swift in Sources */,
+				C7F0003E3F30000100B0D737 /* ControlTabPressureEvidenceAssembler.swift in Sources */,
+				C7F0000A3F30000100B0D737 /* ControlTabPressureObservation.swift in Sources */,
+				C7F000403F30000100B0D737 /* ControlTabPressureSelectionRenderExpectation.swift in Sources */,
+				C7F0003C3F30000100B0D737 /* ControlTabPressureSpanContract.swift in Sources */,
+				C7F000323F30000100B0D737 /* ControlTabPressureSpans.swift in Sources */,
+				C7F0004A3F30000100B0D737 /* ControlTabPressureSpans+FocusedRepair.swift in Sources */,
+				C7F0000C3F30000100B0D737 /* ControlTabPressureBootstrap.swift in Sources */,
 				A8A001013F10000100B0D737 /* FlowTabUpdatePresentation.swift in Sources */,
 				A8A001023F10000100B0D737 /* SparkleUpdateCoordinator.swift in Sources */,
 				A8A001033F10000100B0D737 /* FlowTabUITestUpdateCoordinator.swift in Sources */,
@@ -2715,6 +3086,9 @@
 				F6E7E00235C2000100B0D737 /* RuntimeProjectionRepairProvider.swift in Sources */,
 				F6E7E50235C5000200B0D737 /* RuntimeProjectionRepairContract.swift in Sources */,
 				F6E7E40235C5000100B0D737 /* RuntimeProjectionRepairFactSource.swift in Sources */,
+				C7F0003A3F30000100B0D737 /* RuntimeFocusedRepairDiagnostics.swift in Sources */,
+				C7F000443F30000100B0D737 /* RuntimeProcessDiagnostics.swift in Sources */,
+				C7F000463F30000100B0D737 /* RuntimeWindowPreviewCaptureDiagnostics.swift in Sources */,
 				D10000072FF500400B0D737 /* RuntimeProjectionRepairFactProviding.swift in Sources */,
 				D10000092FF500500B0D737 /* RuntimeMainTableProjectionBuilding.swift in Sources */,
 				F6E7D00435C1000100B0D737 /* RuntimeWindowListFacts.swift in Sources */,
@@ -2880,6 +3254,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2B6E9F9DB89A982E27B50DFB /* ControlTabPressureLifecycleTests.swift in Sources */,
+				A8CD91F3D12AE281F973A051 /* ControlTabPressurePreviewCompletionTests.swift in Sources */,
+				DE3879091838B2C139A3CBD8 /* ControlTabPressureDecoratorTests.swift in Sources */,
+				C7F000183F30000100B0D737 /* SpaceFixtureWindowMutationPressure.swift in Sources */,
+				C7F0001E3F30000100B0D737 /* SpaceFixtureWindowMutationPressureOwner.swift in Sources */,
+				C7F0002A3F30000100B0D737 /* SpaceFixtureWindowCoordinator+MutationPressure.swift in Sources */,
+				C7F0000E3F30000100B0D737 /* FlowTabTests+ControlTabPressure.swift in Sources */,
+				C7F000363F30000100B0D737 /* FlowTabTests+ControlTabPressureSpans.swift in Sources */,
+				C7F0004C3F30000100B0D737 /* FlowTabTests+RuntimePreviewCaptureDiagnostics.swift in Sources */,
 				4A6DAE802F727AF600B0D737 /* FlowTabTests.swift in Sources */,
 				A8A001043F10000100B0D737 /* FlowTabTests+SparkleUpdates.swift in Sources */,
 				B10011012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift in Sources */,
@@ -3082,6 +3465,16 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C7F0001A3F30000100B0D737 /* SpaceFixtureWindowMutationPressure.swift in Sources */,
+				C7F000243F30000100B0D737 /* FlowTabUITests+ControlTabMutationPressure.swift in Sources */,
+				C7F000223F30000100B0D737 /* FlowTabUITests+ControlTabMutationTransport.swift in Sources */,
+				C7F000143F30000100B0D737 /* FlowTabUITests+ControlTabPressure.swift in Sources */,
+				C7F000433F30000100B0D737 /* FlowTabUITests+ControlTabPhysicalPressure.swift in Sources */,
+				C7F000103F30000100B0D737 /* FlowTabUITests+ControlTabPressureConfiguration.swift in Sources */,
+				C7F000343F30000100B0D737 /* FlowTabUITests+ControlTabPressureMetricsRecorder.swift in Sources */,
+				C7F000203F30000100B0D737 /* FlowTabUITests+ControlTabPressureSupport.swift in Sources */,
+				C7F000123F30000100B0D737 /* FlowTabUITests+ControlTabPressureTransport.swift in Sources */,
+				C7F000263F30000100B0D737 /* FlowTabUITests+ControlTabTopologyPressure.swift in Sources */,
 				C0D100043E10000100B0D737 /* FlowTabUITests+AppPanelPressure.swift in Sources */,
 				C0D100103E10000100B0D737 /* FlowTabUITests+AppPanelPressureConfiguration.swift in Sources */,
 				C0D100083E10000100B0D737 /* FlowTabUITests+AppPanelPressureInteraction.swift in Sources */,
@@ -3358,6 +3751,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C7F000163F30000100B0D737 /* SpaceFixtureWindowMutationPressure.swift in Sources */,
+				C7F0001C3F30000100B0D737 /* SpaceFixtureWindowMutationPressureOwner.swift in Sources */,
+				C7F000283F30000100B0D737 /* SpaceFixtureWindowCoordinator+MutationPressure.swift in Sources */,
 				F50001012F90000100B0D737 /* FlowTabSpaceFixtureApp.swift in Sources */,
 				F50001022F90000100B0D737 /* SpaceFixtureAppDelegate.swift in Sources */,
 				F50001032F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift in Sources */,

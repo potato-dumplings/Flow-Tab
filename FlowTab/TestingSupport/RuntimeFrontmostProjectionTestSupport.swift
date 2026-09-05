@@ -32,6 +32,7 @@ struct RuntimeUITestFrontmostAppTarget: Equatable, Sendable {
 }
 
 final class RuntimeUITestFrontmostProjectionService: RuntimeProjectionServing, @unchecked Sendable {
+    var notificationSource: AnyObject { baseService.notificationSource }
     private let baseService: any RuntimeProjectionServing
     private let targetProvider: () -> RuntimeUITestFrontmostAppTarget?
 

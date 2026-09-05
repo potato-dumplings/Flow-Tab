@@ -108,7 +108,7 @@ enum FlowTabUITestCurrentAppProjectionEvidenceBootstrap {
     ) {
         let route = FlowTabTestLaunchOptions
             .currentAppProjectionEvidenceRoute
-        let notificationObject = service as AnyObject
+        let notificationObject = service.notificationSource
         if let route,
            let installedOwner,
            installedOwner.route == route,

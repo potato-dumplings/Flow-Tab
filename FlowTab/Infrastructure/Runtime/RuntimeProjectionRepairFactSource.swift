@@ -139,13 +139,22 @@ extension RuntimeFullRepairAppSelectionFacts {
 struct RuntimeProjectionRepairFactSource {
     private let runtimeFactProvider: any RuntimeProjectionRepairFactProviding
     private let windowRecordStore: RuntimeWindowRecordStore
+    private let windowEntries: any RuntimeWindowEntryProjecting
+    private let focusedWindowFacts: any RuntimeFocusedWindowFactCollecting
 
     init(
         runtimeFactProvider: any RuntimeProjectionRepairFactProviding,
-        windowRecordStore: RuntimeWindowRecordStore
+        windowRecordStore: RuntimeWindowRecordStore,
+        windowEntries: (any RuntimeWindowEntryProjecting)? = nil,
+        focusedWindowFacts: (any RuntimeFocusedWindowFactCollecting)? = nil
     ) {
         self.runtimeFactProvider = runtimeFactProvider
         self.windowRecordStore = windowRecordStore
+        let entries = windowEntries ?? RuntimeWindowEntryProjector(windowRecordStore: windowRecordStore)
+        self.windowEntries = entries
+        self.focusedWindowFacts = focusedWindowFacts ?? RuntimeFocusedWindowFactCollector(
+            runtimeFactProvider: runtimeFactProvider, windowEntries: entries
+        )
     }
 
 #if FLOWTAB_TESTING
@@ -409,59 +418,13 @@ struct RuntimeProjectionRepairFactSource {
         for app: NSRunningApplication,
         in runningApps: [NSRunningApplication]
     ) -> RuntimeFocusedCurrentAppWindowFacts {
-        let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let focusedApps = Self.focusedAppGroup(for: app, in: runningApps)
-        AXLiveWindowRegistry.shared.prune(to: runningApps)
-        let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let cgCollection = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff(
-            options: [.optionOnScreenOnly, .excludeDesktopElements],
-            now: ProcessInfo.processInfo.systemUptime
-        )
-        let cgWindowsByPID = cgCollection.windowsByPID
-        let onScreenCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let allCGCollection = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff(
-            options: [.optionAll, .excludeDesktopElements],
-            now: ProcessInfo.processInfo.systemUptime
-        )
-        let allCGWindowsByPID = allCGCollection.windowsByPID
-        let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        _ = runtimeFactProvider.collectAXWindowData(
-            for: focusedApps,
-            cgWindowsByPID: cgWindowsByPID,
-            allCGWindowsByPID: allCGWindowsByPID,
-            allCGCollectionIsComplete: allCGCollection.isComplete
-        )
-        let axReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let windowsByPID = projectedWindowEntriesByPID(for: focusedApps)
-        return RuntimeFocusedCurrentAppWindowFacts(
-            windowsByPID: windowsByPID,
-            rankByPID: [:],
-            authoritativeCGWindowIDsByPID: allCGCollection.isComplete
-                ? allCGWindowsByPID.mapValues { Set($0.map(\.id)) }
-                : nil,
-            timings: RuntimeFocusedCurrentAppWindowFactTimings(
-                cleanupMs: cleanupReadyMs - startMs,
-                onScreenCGMs: onScreenCGReadyMs - cleanupReadyMs,
-                allCGMs: allCGReadyMs - onScreenCGReadyMs,
-                axMs: axReadyMs - allCGReadyMs
-            )
-        )
+        focusedWindowFacts.collect(for: app, in: runningApps)
     }
 
     private func projectedWindowEntriesByPID(
         for runningApps: [NSRunningApplication]
     ) -> [pid_t: [RuntimeWindowListEntry]] {
-        Dictionary(
-            uniqueKeysWithValues: runningApps.compactMap { app in
-                let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
-                let entries = windowRecordStore.projectedWindowEntries(
-                    processIdentifier: app.processIdentifier,
-                    appName: appName
-                )
-                guard !entries.isEmpty else { return nil }
-                return (app.processIdentifier, entries)
-            }
-        )
+        windowEntries.entries(for: runningApps)
     }
 
     func collectFocusedCurrentAppSelectionFacts(

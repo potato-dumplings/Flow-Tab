@@ -18,20 +18,7 @@ extension LiveSwitcherModel {
     }
 
     func clearPreviewSnapshotState() {
-        previewCaptureCancellationsByID.values.forEach { $0.cancel() }
-        previewCaptureCancellationsByID.removeAll()
-        previewImageCache.removeAll()
-        previewCaptureAttemptedKeys = []
-        previewCaptureFailedKeys = []
-        previewCaptureInFlightKeys = []
-        previewCaptureStatesByKey = [:]
-        previewImageReadyLoggedKeys = []
-        previewSessionPinnedKeys = []
-        previewSessionPinnedImagesByKey = [:]
-        previewDeferredCaptureScheduledAppIDs = []
-        previewCaptureGeneration &+= 1
-        previewWindowSnapshotsByAppID = [:]
-        lastWindowPreviewExposureLogSummary = nil
+        previewSession.clear()
     }
 
     func freezeWindowPreviewOrderIfNeeded(

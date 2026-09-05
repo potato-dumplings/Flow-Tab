@@ -12,6 +12,7 @@ final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
 
     private(set) var showCalls: [Bool] = []
     private(set) var closeCallCount = 0
+    private(set) var createdAccessibilityPostCount = 0
     private(set) var destroyedAccessibilityPostCount = 0
     private(set) var isVisibleForCloseReadback = true
     private(set) var isCGWindowOnScreenForCloseReadback =
@@ -53,6 +54,10 @@ final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
         closeCallCount += 1
         isVisibleForCloseReadback = false
         isCGWindowOnScreenForCloseReadback = false
+    }
+
+    func postCreatedAccessibilityNotification() {
+        createdAccessibilityPostCount += 1
     }
 
     func postDestroyedAccessibilityNotification() {

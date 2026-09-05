@@ -55,7 +55,7 @@ extension AppDelegate {
     }
 
     var resolvedRuntimeProjectionService: any RuntimeProjectionServing {
-        Self.testHooks.runtimeProjectionService ?? sharedRuntimeProjectionService
+        Self.testHooks.runtimeProjectionService ?? ControlTabPressureBootstrap.systemProjectionService
     }
 
     var resolvedUpdateCoordinator: any FlowTabUpdateCoordinating {
@@ -100,7 +100,8 @@ extension AppDelegate {
 
     func makePanelController() -> SwitcherPanelController {
         Self.testHooks.makePanelController?() ?? SwitcherPanelController(
-            model: LiveSwitcherModel(runtimeProjectionService: resolvedRuntimeProjectionService)
+            model: LiveSwitcherModel(runtimeProjectionService: resolvedRuntimeProjectionService),
+            contentBuilder: ControlTabPressureContentBuilder()
         )
     }
 

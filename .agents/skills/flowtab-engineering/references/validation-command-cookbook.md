@@ -268,6 +268,21 @@ App-panel pressure:
 
 The default scenario set covers `realistic` and `extreme`. Every flow/scenario must publish panel width, current visible-frame width, and zero visible Home windows, then retain one first-warm-up XCTest screen attachment at its exact draw milestone. The wrapper exports the `keepAlways` PNG from `.xcresult`, verifies its exact name, dimensions, payload size, and SHA-256, and preserves the PNG plus attachment manifest with the latency and CPU/RSS evidence.
 
+Control+Tab full-chain pressure:
+
+```bash
+./scripts/perf/control-tab-pressure.sh \
+  --lane all \
+  --scenario all \
+  --attempts 3 \
+  --duration-seconds 120 \
+  --cooldown-seconds 15 \
+  --sample-interval 0.5 \
+  --baseline-summary ./.build-local/control-tab-pressure/<baseline>/status.json
+```
+
+Run this gate after changing Control+Tab input, focused projection/freshness, preview/layout, panel lifecycle, or exact activation. It first installs the stable fixed-path App, builds the signed XCTest runner, and requires the existing exact-granted permission-preflight XCTest to pass; the matrix starts only after Accessibility, Screen Recording, App identity, and XCTest automation are ready. Every Pressure action receives a fresh installation of the same App identity. The default matrix covers ready realistic/extreme scale, repeatable closed-panel `2→3→2` mutation, and four-window noisy fullscreen/off-Space activation. Protocol v6 records one phase total, overlapping inclusive component spans, and a contiguous exclusive timeline reconciled within `0.5ms`; open includes preview capture/cache and ends after matching preview-ready draw plus visibility readback. Every attempt receives a fresh evidence leaf and retains phase/component wall/CPU-time/weighted-CPU metrics, process CPU/RSS samples, PID/identity-matched sampler-readiness, identity/cleanup evidence, `.xcresult`, logs, and first-frame evidence. The open/forward/reverse/commit/cancel weighted phase CPU limit is `50%`; compatible baselines must also match schema digest and required-span set, and component p95/CPU regressions over `5%` fail. Permission, fixture, generation, activation receipt, draw/readback, timeline reconciliation, sampling, write, cleanup, or required-branch gaps keep `status.json` non-green. For diagnosis, add `--attribution --duration-seconds <30-119>`.
+
 Full search pressure still requires process-level `%CPU` and `RSS` sampling for at least `30s` per scenario. Use `performance-pressure-workflow.md` for the required dataset, cadence, and reporting fields.
 
 Committed-index process-level search pressure:

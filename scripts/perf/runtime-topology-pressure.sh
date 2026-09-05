@@ -7,6 +7,8 @@ UI_TEST_RUNNER="${ROOT_DIR}/scripts/testing/run-ui-tests-local.sh"
 EVIDENCE_TOOL="${ROOT_DIR}/scripts/perf/lib/runtime-topology-evidence.py"
 MONOTONIC_CLOCK="${ROOT_DIR}/scripts/perf/lib/monotonic-clock.sh"
 TARGET_TOOL="${ROOT_DIR}/scripts/perf/lib/runtime-topology-target.sh"
+FIXTURE_PREPARATION_PATH="${ROOT_DIR}/scripts/perf/lib/runtime-topology-fixture-preparation.sh"
+SPACE_FIXTURE_BUILD_SCRIPT="${ROOT_DIR}/scripts/testing/build-space-fixture-workflow.sh"
 PROCESS_EXIT_OBSERVATION_PATH="${ROOT_DIR}/scripts/perf/lib/process-exit-observation.sh"
 APPLICATION_LIFECYCLE_TOOL="${ROOT_DIR}/scripts/perf/lib/runtime-topology-application-lifecycle.js"
 APPLICATION_PROCESS_CLEANUP_TOOL="${ROOT_DIR}/scripts/perf/lib/runtime-topology-application-process-cleanup.js"
@@ -20,6 +22,8 @@ TARGET_EXIT_COMPLETION_WATCHDOG_MILLISECONDS=30000
 TARGET_EXIT_COMPLETION_POLL_INTERVAL_SECONDS=0.1
 
 source "$TARGET_TOOL"
+# shellcheck source=scripts/perf/lib/runtime-topology-fixture-preparation.sh
+source "$FIXTURE_PREPARATION_PATH"
 # shellcheck source=scripts/perf/lib/process-exit-observation.sh
 source "$PROCESS_EXIT_OBSERVATION_PATH"
 
@@ -67,6 +71,7 @@ HAS_CUSTOM_BUILD_ROOT=false
 HAS_UI_APP_IDENTITY_MANIFEST=false
 REUSE_UI_TEST_BUILD=false
 SKIP_SPACE_FIXTURES=false
+SPACE_FIXTURES_PREPARED=false
 BUILD_ROOT=""
 UI_APP_IDENTITY_MANIFEST=""
 POSITIONAL_ARGS=()
@@ -318,15 +323,34 @@ SUMMARY_FILE="${OUTPUT_DIR}/summary.txt"
 LOG_DIR="${OUTPUT_DIR}/logs"
 UI_LOG_FILE="${LOG_DIR}/ui-test.log"
 SUMMARY_LOG_FILE="${LOG_DIR}/summary.log"
+FIXTURE_PREPARATION_LOG_FILE="${LOG_DIR}/space-fixture-preparation.log"
 UI_RUN_STATUS_FILE="${OUTPUT_DIR}/ui-run-status.txt"
 APPLICATION_BASELINE_FILE="${OUTPUT_DIR}/application-baseline.json"
 APPLICATION_CLEANUP_EVIDENCE_FILE="${OUTPUT_DIR}/application-cleanup.json"
 STATUS_FILE="${OUTPUT_DIR}/status.json"
+SAMPLING_READINESS_FILE="${OUTPUT_DIR}/sampling-ready.json"
 UI_ATTEMPT_DIR="${OUTPUT_DIR}/attempts/ui-tests/run"
 
 mkdir -p "$LOG_DIR"
 printf 'sample,timestamp,pid,interval_started_uptime_nanoseconds,interval_completed_uptime_nanoseconds,cpu_percent,rss_kb\n' >"$SAMPLES_FILE"
 printf 'identity_check,timestamp,pid,process_start_epoch_seconds,process_start_identity,process_path_sha256,executable_sha256,verdict\n' >"$PID_BINDINGS_FILE"
+
+publish_sampling_readiness() {
+  local monotonic_timestamp
+  local readiness_temp="${SAMPLING_READINESS_FILE}.tmp"
+
+  monotonic_timestamp="$(monotonic_ns)" || return 1
+  {
+    printf '{\n'
+    printf '  "schema_version": 1,\n'
+    printf '  "ready": true,\n'
+    printf '  "pid": %s,\n' "$TARGET_PID"
+    printf '  "monotonic_nanoseconds": %s,\n' "$monotonic_timestamp"
+    printf '  "identity_verdict": "matched"\n'
+    printf '}\n'
+  } >"$readiness_temp" || return 1
+  mv "$readiness_temp" "$SAMPLING_READINESS_FILE"
+}
 
 write_status() {
   local final_exit_code="$1"
@@ -371,6 +395,8 @@ write_status() {
     printf '  "ui_wrapper_exit_code": %s,\n' "$UI_WRAPPER_STATUS"
     printf '  "ui_log_exit_code": %s,\n' "$UI_LOG_STATUS"
     printf '  "ui_process_exit_code": %s,\n' "$([[ "$TEST_PROCESS_STATUS" =~ ^[0-9]+$ ]] && printf '%s' "$TEST_PROCESS_STATUS" || printf 'null')"
+    printf '  "fixture_preparation_exit_code": %s,\n' "$FLOWTAB_PERF_FIXTURE_PREPARATION_STATUS"
+    printf '  "fixture_preparation_log_exit_code": %s,\n' "$FLOWTAB_PERF_FIXTURE_PREPARATION_LOG_STATUS"
     printf '  "ui_result_bundle_directory_present": %s,\n' "$result_bundle_directory_present"
     printf '  "ui_result_bundle_present": %s,\n' "$result_bundle_present"
     printf '  "ui_result_bundle_valid": %s,\n' "$result_bundle_present"
@@ -388,6 +414,7 @@ write_status() {
     printf '  "target_terminal_exit_observed": %s,\n' "$target_terminal_exit_observed_json"
     printf '  "target_termination_verdict": "%s",\n' "$TARGET_TERMINATION_VERDICT"
     printf '  "target_launch_receipt_present": %s,\n' "$([[ -f "$LAUNCH_RECEIPT_FILE" ]] && printf true || printf false)"
+    printf '  "sampling_readiness_present": %s,\n' "$([[ -f "$SAMPLING_READINESS_FILE" ]] && printf true || printf false)"
     printf '  "sample_count": %s,\n' "$SAMPLE_COUNT"
     printf '  "summary_exit_code": %s,\n' "$SUMMARY_STATUS"
     printf '  "summary_log_exit_code": %s\n' "$SUMMARY_LOG_STATUS"
@@ -685,7 +712,8 @@ run_ui_test() {
   if [[ "${HAS_CUSTOM_BUILD_ROOT}" == true ]]; then
     runner_arguments+=(--build-root "${CHILD_UI_BUILD_ROOT}")
   fi
-  if [[ "${SKIP_SPACE_FIXTURES}" == true ]]; then
+  if [[ "${SKIP_SPACE_FIXTURES}" == true \
+    || "${SPACE_FIXTURES_PREPARED}" == true ]]; then
     runner_arguments+=(--skip-space-fixtures)
   fi
 
@@ -715,6 +743,20 @@ run_ui_test() {
 
 echo "Evidence directory: $OUTPUT_DIR"
 echo "[1/3] Starting runtime topology UI pressure: $TEST_FILTER"
+if [[ "$SKIP_SPACE_FIXTURES" == false ]]; then
+  CURRENT_STAGE="preparing_space_fixtures"
+  if ! flowtab_perf_prepare_space_fixture_workflows \
+    "$SPACE_FIXTURE_BUILD_SCRIPT" \
+    "$CHILD_UI_BUILD_ROOT" \
+    "$SPACE_FIXTURE_WORKFLOW_CONFIG" \
+    "$SYSTEM_APP_MRU_FIXTURE_WORKFLOW_CONFIG" \
+    "$TEST_FILTER" \
+    "$FIXTURE_PREPARATION_LOG_FILE"; then
+    CURRENT_STAGE="space_fixture_preparation_failed"
+    exit 1
+  fi
+  SPACE_FIXTURES_PREPARED=true
+fi
 CURRENT_STAGE="capturing_application_baseline"
 if ! capture_application_baseline; then
   CURRENT_STAGE="application_baseline_failed"
@@ -736,6 +778,11 @@ if ! await_target_launch; then
   IDENTITY_FAILED=true
   CURRENT_STAGE="target_launch_identity_failed"
   echo "Could not bind the pressure run to one post-request FlowTab process matching the frozen UI App identity." >&2
+  exit 1
+fi
+CURRENT_STAGE="publishing_sampling_readiness"
+if ! publish_sampling_readiness; then
+  echo "Could not publish the stable PID sampling readiness receipt." >&2
   exit 1
 fi
 

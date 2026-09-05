@@ -10,6 +10,7 @@ protocol SpaceFixtureWindowing: AnyObject {
     var currentCGWindowID: CGWindowID { get }
     func show(isKey: Bool)
     func close()
+    func postCreatedAccessibilityNotification()
     func postDestroyedAccessibilityNotification()
     func windowCloseTopologySnapshot(
         remainingWindowPlanIndices: [Int]
@@ -55,7 +56,7 @@ final class SpaceFixtureWindowCoordinator {
 
     private let configuration: SpaceFixtureLaunchConfiguration
     private let visibleFrameProvider: VisibleFrameProvider
-    private let windowFactory: WindowFactory
+    let windowFactory: WindowFactory
     private let scheduler: any SpaceFixtureScheduling
     private let fullscreenTransitionOwner:
         SpaceFixtureFullscreenTransitionOwner
@@ -67,7 +68,7 @@ final class SpaceFixtureWindowCoordinator {
         SpaceFixtureWindowCloseFaultOwner
     private let workflowReadinessOwner:
         SpaceFixtureWorkflowReadinessOwner
-    private let activateApplication: ActivationHandler
+    let activateApplication: ActivationHandler
     private let applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher
     private let applicationIdentityProvider:
         ApplicationIdentityProvider
@@ -76,7 +77,7 @@ final class SpaceFixtureWindowCoordinator {
     private let windowOpenMutationEvidencePublisher:
         WindowOpenMutationEvidencePublisher
 
-    private(set) var windows: [any SpaceFixtureWindowing] = []
+    var windows: [any SpaceFixtureWindowing] = []
     private var suppressesApplicationAccessibilityElements = false
     private var deferredWindowPlan: SpaceFixtureWindowPlan?
     private var windowOpenMutationTriggerObservation:
@@ -86,6 +87,10 @@ final class SpaceFixtureWindowCoordinator {
         [any SpaceFixtureCancellable] = []
     private var windowMutationNoiseWindows:
         [any SpaceFixtureWindowing] = []
+    var windowMutationPressureOwner:
+        SpaceFixtureWindowMutationPressureOwner?
+    var windowMutationPressurePlans:
+        [Int: SpaceFixtureWindowPlan] = [:]
 
     var lastDesktopRefocusWatchdogFailure:
         SpaceFixtureDesktopRefocusWatchdogFailure?
@@ -226,6 +231,11 @@ final class SpaceFixtureWindowCoordinator {
             configuration: configuration,
             visibleFrame: visibleFrameProvider()
         )
+        windowMutationPressurePlans = Dictionary(
+            uniqueKeysWithValues: allWindowPlans.map {
+                ($0.index, $0)
+            }
+        )
         deferredWindowPlan = configuration
             .deferredOpenWindowIndex.flatMap { deferredIndex in
                 allWindowPlans.first {
@@ -277,6 +287,9 @@ final class SpaceFixtureWindowCoordinator {
             applicationIdentity: applicationIdentity
         )
         startWindowCloseFaultIfNeeded(
+            applicationIdentity: applicationIdentity
+        )
+        startWindowMutationPressureIfNeeded(
             applicationIdentity: applicationIdentity
         )
 
@@ -823,7 +836,7 @@ final class SpaceFixtureWindowCoordinator {
         )
     }
 
-    private func publishApplicationAccessibilityElements() {
+    func publishApplicationAccessibilityElements() {
         guard !suppressesApplicationAccessibilityElements else {
             applicationAccessibilityElementsPublisher([])
             return
@@ -847,6 +860,9 @@ final class SpaceFixtureWindowCoordinator {
         windowMutationNoiseTokens.removeAll()
         windowMutationNoiseWindows.forEach { $0.close() }
         windowMutationNoiseWindows.removeAll()
+        windowMutationPressureOwner?.cancel()
+        windowMutationPressureOwner = nil
+        windowMutationPressurePlans.removeAll()
         deferredWindowPlan = nil
         SpaceFixtureWorkflowReadinessTransport
             .removeReadbackEvidence(
